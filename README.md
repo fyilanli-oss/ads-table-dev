@@ -1,21 +1,19 @@
-# AdsTable Google Ready Build
+# AdsTable Dev Build - Pinterest + TikTok Skeleton
 
-Upload these files to GitHub and let Vercel deploy.
+For dev.adstable.app only.
 
-Required Vercel env:
-- SESSION_SECRET
-- META_APP_ID
-- META_APP_SECRET
-- META_REDIRECT_URI
-- GOOGLE_CLIENT_ID
-- GOOGLE_CLIENT_SECRET
-- GOOGLE_REDIRECT_URI
-- GOOGLE_DEVELOPER_TOKEN
-- GOOGLE_LOGIN_CUSTOMER_ID (optional, manager account ID no dashes)
-- GOOGLE_ADS_API_VERSION (default v19)
+Included:
+- Meta OAuth + adaccounts + insights
+- Google OAuth + customers + insights
+- Pinterest OAuth + adaccounts + campaigns + analytics
+- TikTok pending skeleton routes
+- Unified status endpoint
+- Privacy page
 
 Test:
-- /auth/google
-- /api/google/status
-- /api/google/customers
-- /api/google/insights?customerId=YOUR_ID
+- /
+- /privacy.html
+- /api/unified/status
+- /auth/pinterest
+- /api/pinterest/status
+- /api/pinterest/adaccounts

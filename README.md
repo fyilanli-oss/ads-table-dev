@@ -1,3 +1,10 @@
-AdsTable Dev DB Persistence Build
+AdsTable Live Auth Flow Build
 
-Upload to ads-table-dev. Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel env.
+Routes:
+/ landing
+/login sign in
+/signup get started
+/dashboard protected app shell
+/demo public dashboard preview
+
+Add SUPABASE_ANON_KEY to Vercel env before deploy.

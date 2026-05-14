@@ -1,10 +1,23 @@
-AdsTable Live Auth Flow Build
+# AdsTable Stabilization Build v1
 
-Routes:
-/ landing
-/login sign in
-/signup get started
-/dashboard protected app shell
-/demo public dashboard preview
+Upload/replace:
+- server.js
+- package.json
+- vercel.json
+- public/dashboard.html
+- public/dashboard-demo.html
+- sql/stabilization_foundation.sql
 
-Add SUPABASE_ANON_KEY to Vercel env before deploy.
+Optional: keep existing landing/login/signup if already working.
+
+Before testing account discovery, run:
+sql/stabilization_foundation.sql
+
+New endpoints:
+- /api/unified/status
+- /api/debug/connections
+- POST /api/connections/:platform/disconnect
+- /api/meta/adaccounts
+- /api/google/customers
+- /api/pinterest/adaccounts
+- /api/accounts

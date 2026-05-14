@@ -1,18 +1,149 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>AdsTable Dashboard</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style>
-*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f6f6f6;color:#111}.wrap{max-width:1260px;margin:0 auto;padding:10px}.hidden{display:none!important}.stickyShell{position:sticky;top:0;z-index:40;background:rgba(246,246,246,.94);backdrop-filter:blur(12px);padding-top:8px;border-bottom:1px solid rgba(222,222,222,.65)}.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.brand{display:flex;align-items:center;gap:10px}.menuBtn{width:38px;height:38px;border:0;background:transparent;font-size:25px;font-weight:900;cursor:pointer}.brandTitle{font-size:25px;font-weight:950;letter-spacing:-.8px}.aiBtn{position:relative;border:0;background:transparent;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer}.aiIcon{width:25px;height:25px;border:2.2px solid #111;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:950}.badge{position:absolute;top:1px;right:0;background:#d71920;color:#fff;border-radius:999px;font-size:10px;line-height:16px;min-width:16px;height:16px;text-align:center;font-weight:950}.controlbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.graphBtn{border:0;background:transparent;width:42px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer}.graphIcon{width:27px;height:22px}.filters{display:flex;gap:8px;align-items:center}.select,.multiBtn{border:1px solid #dedede;background:#fff;border-radius:15px;padding:10px 12px;font-weight:850;font-size:13px;min-width:116px}.multiWrap{position:relative}.multiBtn{min-width:150px;text-align:left;cursor:pointer}.multiMenu{position:absolute;right:0;top:44px;background:#fff;border:1px solid #dedede;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.13);z-index:55;width:210px;padding:8px}.multiMenu label{display:flex;align-items:center;gap:9px;padding:10px;border-radius:12px;font-weight:850;font-size:13px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:10px 0}.kpi{background:#fff;border:1px solid #dedede;border-radius:18px;padding:10px 12px;min-height:78px}.kpiTitle{font-size:12px;color:#777;font-weight:950;text-transform:uppercase}.kpiFormula{font-size:10px;color:#999;margin-left:5px;white-space:nowrap}.kpiValue{font-size:23px;font-weight:950;margin-top:7px;letter-spacing:-.6px}.card{background:#fff;border:1px solid #dedede;border-radius:22px;padding:13px;margin-bottom:12px}.tableHeader{display:flex;justify-content:space-between;align-items:center}.tableTitle{font-size:18px;font-weight:950}.exportBtn{border:0;background:transparent;width:42px;height:38px;cursor:pointer}.downloadIcon{width:31px;height:31px}.exportWrap{position:relative}.exportMenu{position:absolute;right:0;top:38px;background:#fff;border:1px solid #dedede;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.12);overflow:hidden;z-index:60}.exportMenu button{display:block;width:140px;text-align:left;border:0;background:#fff;padding:12px 14px;font-weight:850}.tableWrap{overflow:auto;max-height:70vh;border-radius:18px}table{width:100%;border-collapse:separate;border-spacing:0 7px;min-width:980px}th{text-align:left;font-size:12px;color:#666;text-transform:uppercase;padding:9px 12px;background:#fff;position:sticky;top:0;z-index:5;border-bottom:1px solid #ddd}td{background:#fff;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:12px;font-size:15px}.emptyState{padding:46px 18px;text-align:center;color:#777;border:1px dashed #ddd;border-radius:20px;background:#fafafa;margin-top:10px}.emptyState h3{margin:0;color:#111;font-size:24px;letter-spacing:-.04em}.emptyState p{margin:12px auto 0;max-width:520px;line-height:1.5}.drawerOverlay{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:80}.drawer{position:fixed;top:0;left:0;width:330px;max-width:88vw;height:100vh;background:#fff;z-index:90;box-shadow:8px 0 28px rgba(0,0,0,.18);padding:20px 24px;overflow:auto}.drawerHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.drawerTitle{font-size:24px;font-weight:950}.closeBtn{border:0;background:transparent;font-size:28px;cursor:pointer}.menuSectionTitle{font-size:12px;text-transform:uppercase;color:#777;font-weight:950;margin:14px 0 8px}.platformLine{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #f0f0f0}.platformLine b{font-size:14px}.platformAction{font-size:12px;border:1px solid #ddd;background:#fff;border-radius:10px;padding:7px 9px;font-weight:850;cursor:pointer}.platformAction.connect{background:#111;color:#fff;border-color:#111}.platformAction.pending{background:#eee;color:#777;border-color:#eee;cursor:not-allowed}.menuItem{border:0;background:transparent;padding:9px 0;font-weight:850;text-align:left;font-size:15px;color:#111;display:block;cursor:pointer}.aiComing{background:#f7f7f7;border:1px solid #e7e7e7;border-radius:16px;padding:12px;margin:10px 0}.aiSub{display:grid;gap:6px;margin-top:9px;color:#666;font-size:13px;font-weight:750}.menuSep{height:1px;background:#e5e5e5;margin:12px 0}.aiPanel{position:fixed;right:12px;top:70px;width:340px;max-width:calc(100vw - 24px);background:#fff;border:1px solid #dedede;border-radius:22px;box-shadow:0 12px 34px rgba(0,0,0,.16);z-index:70;padding:16px}@media(max-width:900px){.kpis{grid-template-columns:1fr 1fr}table{min-width:860px}}@media(max-width:420px){.wrap{padding:9px}.brandTitle{font-size:22px}.select{min-width:104px;padding:9px;font-size:12px}.multiBtn{min-width:135px;padding:9px;font-size:12px}.kpi{min-height:72px;padding:9px}.kpiValue{font-size:21px}table{min-width:790px}.drawer{width:82vw}}
-</style></head><body>
-<div id="drawerOverlay" class="drawerOverlay hidden" onclick="closeMenu()"></div><div id="drawer" class="drawer hidden"><div class="drawerHead"><div class="drawerTitle">AdsTable</div><button class="closeBtn" onclick="closeMenu()">×</button></div><div class="menuSectionTitle">Platforms</div><div id="platformLines"></div><div class="aiComing"><b>+ AI Insights Coming Soon</b><div class="aiSub"><span>Campaign Level</span><span>Product Level</span><span>Keyword Level</span></div></div><button class="menuItem">FAQ</button><button class="menuItem">Help</button><button class="menuItem">Contact Us</button><div class="menuSep"></div><button class="menuItem">My Account</button><button class="menuItem" onclick="logout()">Log Out</button></div>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AdsTable Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f6f6f6;color:#111}
+.wrap{max-width:1260px;margin:0 auto;padding:10px}.hidden{display:none!important}
+.stickyShell{position:sticky;top:0;z-index:40;background:rgba(246,246,246,.94);backdrop-filter:blur(12px);padding-top:8px;border-bottom:1px solid rgba(222,222,222,.65)}
+.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+.brand{display:flex;align-items:center;gap:10px}.menuBtn{width:38px;height:38px;border:0;background:transparent;font-size:25px;font-weight:900;cursor:pointer}.brandTitle{font-size:25px;font-weight:950;letter-spacing:-.8px}
+.aiBtn{position:relative;border:0;background:transparent;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer}.aiIcon{width:25px;height:25px;border:2.2px solid #111;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:950}.badge{position:absolute;top:1px;right:0;background:#d71920;color:#fff;border-radius:999px;font-size:10px;line-height:16px;min-width:16px;height:16px;text-align:center;font-weight:950}
+.controlbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.graphBtn{border:0;background:transparent;width:42px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer}.graphIcon{width:27px;height:22px}.filters{display:flex;gap:8px;align-items:center}.select,.multiBtn{border:1px solid #dedede;background:#fff;border-radius:15px;padding:10px 12px;font-weight:850;font-size:13px;min-width:116px}.multiWrap{position:relative}.multiBtn{min-width:150px;text-align:left;cursor:pointer}.multiMenu{position:absolute;right:0;top:44px;background:#fff;border:1px solid #dedede;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.13);z-index:55;width:210px;padding:8px}.multiMenu label{display:flex;align-items:center;gap:9px;padding:10px;border-radius:12px;font-weight:850;font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:10px 0}.kpi{background:#fff;border:1px solid #dedede;border-radius:18px;padding:10px 12px;min-height:78px}.kpiTitle{font-size:12px;color:#777;font-weight:950;text-transform:uppercase}.kpiFormula{font-size:10px;color:#999;margin-left:5px;white-space:nowrap}.kpiValue{font-size:23px;font-weight:950;margin-top:7px;letter-spacing:-.6px}
+.card{background:#fff;border:1px solid #dedede;border-radius:22px;padding:13px;margin-bottom:12px}.tableHeader{display:flex;justify-content:space-between;align-items:center}.tableTitle{font-size:18px;font-weight:950}.exportBtn{border:0;background:transparent;width:42px;height:38px;cursor:pointer}.downloadIcon{width:31px;height:31px}.exportWrap{position:relative}.exportMenu{position:absolute;right:0;top:38px;background:#fff;border:1px solid #dedede;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.12);overflow:hidden;z-index:60}.exportMenu button{display:block;width:140px;text-align:left;border:0;background:#fff;padding:12px 14px;font-weight:850}
+.tableWrap{overflow:auto;max-height:70vh;border-radius:18px}table{width:100%;border-collapse:separate;border-spacing:0 7px;min-width:980px}th{text-align:left;font-size:12px;color:#666;text-transform:uppercase;padding:9px 12px;background:#fff;position:sticky;top:0;z-index:5;border-bottom:1px solid #ddd}td{background:#fff;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:12px;font-size:15px}
+.emptyState{padding:46px 18px;text-align:center;color:#777;border:1px dashed #ddd;border-radius:20px;background:#fafafa;margin-top:10px}.emptyState h3{margin:0;color:#111;font-size:24px;letter-spacing:-.04em}.emptyState p{margin:12px auto 0;max-width:520px;line-height:1.5}
+.drawerOverlay{position:fixed;inset:0;background:rgba(0,0,0,.25);z-index:80}.drawer{position:fixed;top:0;left:0;width:330px;max-width:88vw;height:100vh;background:#fff;z-index:90;box-shadow:8px 0 28px rgba(0,0,0,.18);padding:20px 24px;overflow:auto}.drawerHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.drawerTitle{font-size:24px;font-weight:950}.closeBtn{border:0;background:transparent;font-size:28px;cursor:pointer}.menuSectionTitle{font-size:12px;text-transform:uppercase;color:#777;font-weight:950;margin:14px 0 8px}.platformLine{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid #f0f0f0}.platformLine b{font-size:14px}.platformAction{font-size:12px;border:1px solid #ddd;background:#fff;border-radius:10px;padding:7px 9px;font-weight:850;cursor:pointer}.platformAction.connect{background:#111;color:#fff;border-color:#111}.platformAction.pending{background:#eee;color:#777;border-color:#eee;cursor:not-allowed}.platformAction:disabled{opacity:.55;cursor:not-allowed}
+.menuItem{border:0;background:transparent;padding:9px 0;font-weight:850;text-align:left;font-size:15px;color:#111;display:block;cursor:pointer}.aiComing{background:#f7f7f7;border:1px solid #e7e7e7;border-radius:16px;padding:12px;margin:10px 0}.aiSub{display:grid;gap:6px;margin-top:9px;color:#666;font-size:13px;font-weight:750}.menuSep{height:1px;background:#e5e5e5;margin:12px 0}.aiPanel{position:fixed;right:12px;top:70px;width:340px;max-width:calc(100vw - 24px);background:#fff;border:1px solid #dedede;border-radius:22px;box-shadow:0 12px 34px rgba(0,0,0,.16);z-index:70;padding:16px}
+@media(max-width:900px){.kpis{grid-template-columns:1fr 1fr}table{min-width:860px}}
+@media(max-width:420px){.wrap{padding:9px}.brandTitle{font-size:22px}.select{min-width:104px;padding:9px;font-size:12px}.multiBtn{min-width:135px;padding:9px;font-size:12px}.kpi{min-height:72px;padding:9px}.kpiValue{font-size:21px}table{min-width:790px}.drawer{width:82vw}}
+</style>
+</head>
+<body>
+<div id="drawerOverlay" class="drawerOverlay hidden" onclick="closeMenu()"></div>
+<div id="drawer" class="drawer hidden">
+  <div class="drawerHead"><div class="drawerTitle">AdsTable</div><button class="closeBtn" onclick="closeMenu()">×</button></div>
+  <div class="menuSectionTitle">Platforms</div>
+  <div id="platformLines"></div>
+  <div class="aiComing"><b>+ AI Insights Coming Soon</b><div class="aiSub"><span>Campaign Level</span><span>Product Level</span><span>Keyword Level</span></div></div>
+  <button class="menuItem">FAQ</button><button class="menuItem">Help</button><button class="menuItem">Contact Us</button>
+  <div class="menuSep"></div><button class="menuItem">My Account</button><button class="menuItem" onclick="logout()">Log Out</button>
+</div>
 <div id="aiPanel" class="aiPanel hidden"><h3>AI Insights</h3><ul><li>AI Insights are coming soon.</li><li>Connect your ad platforms to start building insights.</li></ul></div>
-<div class="wrap"><div class="stickyShell"><div class="topbar"><div class="brand"><button class="menuBtn" onclick="openMenu()">☰</button><div class="brandTitle">AdsTable</div></div><button class="aiBtn" onclick="toggleAiPanel()"><span class="aiIcon">AI</span><span class="badge">3</span></button></div><div class="controlbar"><button class="graphBtn" onclick="toggleView()"><svg class="graphIcon" viewBox="0 0 28 22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h22"/><path d="M6 15l5-6 5 4 6-9"/></svg></button><div class="filters"><select class="select"><option>Today</option><option>Yesterday</option><option>This Week</option><option>This Month</option></select><div class="multiWrap"><button class="multiBtn" onclick="togglePlatformMenu()">Platforms: All</button><div id="platformMenu" class="multiMenu hidden"><label><input type="checkbox" checked> Meta</label><label><input type="checkbox" checked> Google</label><label><input type="checkbox" checked> Pinterest</label><label><input type="checkbox" checked> TikTok</label><label><input type="checkbox" checked> Amazon</label></div></div></div></div></div><div id="kpiGrid" class="kpis"></div><div id="tableView" class="card"><div class="tableHeader"><div class="tableTitle">Performance Table</div><div class="exportWrap"><button class="exportBtn" onclick="toggleExport()"><svg class="downloadIcon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 10v28"/><path d="M20 28l12 12 12-12"/><path d="M14 42v8a6 6 0 0 0 6 6h24a6 6 0 0 0 6-6v-8"/></svg></button><div id="exportMenu" class="exportMenu hidden"><button onclick="alert('Connect platforms before export.')">Download .csv</button><button onclick="alert('Connect platforms before export.')">Download .xls</button></div></div></div><div class="tableWrap"><table><thead><tr><th>Platforms</th><th>Spend</th><th>Sales</th><th>Imp</th><th>Click</th><th>CTR</th><th>CPC</th><th>ROAS</th><th>ACOS</th><th>Status</th></tr></thead><tbody id="tbody"></tbody></table></div><div id="emptyState" class="emptyState"><h3>No advertising data yet</h3><p>Connect Meta, Google or Pinterest from the Platforms menu. Your performance data will appear here after the first connection.</p></div></div><div id="chartView" class="hidden"><div class="card"><div class="emptyState"><h3>No chart data yet</h3><p>Charts will appear after you connect your first advertising platform.</p></div></div></div></div>
+
+<div class="wrap">
+  <div class="stickyShell">
+    <div class="topbar"><div class="brand"><button class="menuBtn" onclick="openMenu()">☰</button><div class="brandTitle">AdsTable</div></div><button class="aiBtn" onclick="toggleAiPanel()"><span class="aiIcon">AI</span><span class="badge">3</span></button></div>
+    <div class="controlbar"><button class="graphBtn" onclick="toggleView()"><svg class="graphIcon" viewBox="0 0 28 22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h22"/><path d="M6 15l5-6 5 4 6-9"/></svg></button><div class="filters"><select class="select"><option>Today</option><option>Yesterday</option><option>This Week</option><option>This Month</option></select><div class="multiWrap"><button class="multiBtn" onclick="togglePlatformMenu()">Platforms: All</button><div id="platformMenu" class="multiMenu hidden"><label><input type="checkbox" checked> Meta</label><label><input type="checkbox" checked> Google</label><label><input type="checkbox" checked> Pinterest</label><label><input type="checkbox" checked> TikTok</label><label><input type="checkbox" checked> Amazon</label></div></div></div></div>
+  </div>
+  <div id="kpiGrid" class="kpis"></div>
+  <div id="tableView" class="card">
+    <div class="tableHeader"><div class="tableTitle">Performance Table</div><div class="exportWrap"><button class="exportBtn" onclick="toggleExport()"><svg class="downloadIcon" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 10v28"/><path d="M20 28l12 12 12-12"/><path d="M14 42v8a6 6 0 0 0 6 6h24a6 6 0 0 0 6-6v-8"/></svg></button><div id="exportMenu" class="exportMenu hidden"><button onclick="alert('Connect platforms before export.')">Download .csv</button><button onclick="alert('Connect platforms before export.')">Download .xls</button></div></div></div>
+    <div class="tableWrap"><table><thead><tr><th>Platforms</th><th>Spend</th><th>Sales</th><th>Imp</th><th>Click</th><th>CTR</th><th>CPC</th><th>ROAS</th><th>ACOS</th><th>Status</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div id="emptyState" class="emptyState"><h3>No advertising data yet</h3><p>Connect Meta, Google or Pinterest from the Platforms menu. Your performance data will appear here after the first connection.</p></div>
+  </div>
+  <div id="chartView" class="hidden"><div class="card"><div class="emptyState"><h3>No chart data yet</h3><p>Charts will appear after you connect your first advertising platform.</p></div></div></div>
+</div>
+
 <script>
-let supabaseClient=null,session=null,currentStatus={meta:false,google:false,pinterest:false,tiktok:false};
-function money(n){return "$"+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}function pct(n){return (Number(n||0)*100).toFixed(2)+"%"}
-async function boot(){const cfg=await fetch('/api/public-config').then(r=>r.json());supabaseClient=supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);const s=await supabaseClient.auth.getSession();session=s.data.session;if(!session){location.href='/login';return}await loadStatus();renderPlatformConnections();renderZeroDashboard()}
-async function authHeader(){return {Authorization:'Bearer '+session.access_token}}async function loadStatus(){try{currentStatus=await fetch('/api/unified/status',{headers:await authHeader()}).then(r=>r.json())}catch(e){}}
-function platformAction(label,key,url){const connected=!!currentStatus[key];if(key==='tiktok')return `<div class="platformLine"><b>${label}</b><button class="platformAction pending">Pending</button></div>`;if(connected)return `<div class="platformLine"><b>${label}</b><button class="platformAction" onclick="disconnectPlatform('${key}')">Disconnect</button></div>`;const href=`${url}?user_id=${encodeURIComponent(session.user.id)}`;return `<div class="platformLine"><b>${label}</b><button class="platformAction connect" onclick="location.href='${href}'">Connect</button></div>`}
-function renderPlatformConnections(){platformLines.innerHTML=[platformAction('Meta Ads','meta','/auth/meta'),platformAction('Google Ads','google','/auth/google'),platformAction('Pinterest Ads','pinterest','/auth/pinterest'),platformAction('TikTok Ads','tiktok','#')].join('')}
-function renderZeroDashboard(){const kpis=[['Spend',money(0),''],['Sales',money(0),''],['Impression','0',''],['Click','0',''],['CTR',pct(0),'Clicks / Imp'],['CPC',money(0),'Spend / Click'],['ROAS','0.00','Sales / Spend'],['ACOS',pct(0),'Spend / Sales']];kpiGrid.innerHTML=kpis.map(([t,v,f])=>`<div class="kpi"><div class="kpiTitle">${t}${f?`<span class="kpiFormula">${f}</span>`:''}</div><div class="kpiValue">${v}</div></div>`).join('');tbody.innerHTML=''}
-async function disconnectPlatform(platform){await fetch('/api/connections/'+platform+'/disconnect',{method:'POST',headers:await authHeader()});await loadStatus();renderPlatformConnections()}
-function toggleView(){tableView.classList.toggle('hidden');chartView.classList.toggle('hidden')}function toggleExport(){exportMenu.classList.toggle('hidden')}function openMenu(){drawerOverlay.classList.remove('hidden');drawer.classList.remove('hidden')}function closeMenu(){drawerOverlay.classList.add('hidden');drawer.classList.add('hidden')}function toggleAiPanel(){aiPanel.classList.toggle('hidden')}function togglePlatformMenu(){platformMenu.classList.toggle('hidden')}async function logout(){await supabaseClient.auth.signOut();location.href='/login'}document.addEventListener('click',e=>{if(!e.target.closest('.multiWrap'))platformMenu.classList.add('hidden')});boot();
-</script></body></html>
+let supabaseClient=null, session=null;
+let currentStatus={meta:false,google:false,pinterest:false,tiktok:false};
+
+function money(n){return "$"+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function pct(n){return (Number(n||0)*100).toFixed(2)+"%"}
+
+async function boot(){
+  const cfg=await fetch('/api/public-config').then(r=>r.json());
+  supabaseClient=supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+  const s=await supabaseClient.auth.getSession();
+  session=s.data.session;
+  if(!session){location.href='/login';return}
+  await loadStatus();
+  renderPlatformConnections();
+  renderZeroDashboard();
+}
+
+async function authHeader(){
+  return {'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'};
+}
+
+async function loadStatus(){
+  try{
+    const res=await fetch('/api/unified/status',{headers:await authHeader()});
+    if(res.ok){ currentStatus=await res.json(); }
+  }catch(e){}
+}
+
+function platformAction(label,key,url){
+  const connected=!!currentStatus[key];
+
+  if(key==='tiktok'){
+    return `<div class="platformLine"><b>${label}</b><button class="platformAction pending" disabled>Pending</button></div>`;
+  }
+
+  if(connected){
+    return `<div class="platformLine"><b>${label}</b><button class="platformAction" onclick="disconnectPlatform('${key}', this)">Disconnect</button></div>`;
+  }
+
+  const href=`${url}?user_id=${encodeURIComponent(session.user.id)}`;
+  return `<div class="platformLine"><b>${label}</b><button class="platformAction connect" onclick="location.href='${href}'">Connect</button></div>`;
+}
+
+function renderPlatformConnections(){
+  platformLines.innerHTML=[
+    platformAction('Meta Ads','meta','/auth/meta'),
+    platformAction('Google Ads','google','/auth/google'),
+    platformAction('Pinterest Ads','pinterest','/auth/pinterest'),
+    platformAction('TikTok Ads','tiktok','#')
+  ].join('');
+}
+
+async function disconnectPlatform(platform, btn){
+  if(!confirm('Disconnect '+platform+'?')) return;
+  btn.disabled=true;
+  btn.textContent='Disconnecting...';
+
+  try{
+    const res=await fetch('/api/connections/'+platform+'/disconnect',{
+      method:'POST',
+      headers:await authHeader()
+    });
+
+    if(!res.ok){
+      const data=await res.json().catch(()=>({}));
+      throw new Error(data.error || 'Disconnect failed');
+    }
+
+    await loadStatus();
+    renderPlatformConnections();
+  }catch(e){
+    alert(e.message);
+    btn.disabled=false;
+    btn.textContent='Disconnect';
+  }
+}
+
+function renderZeroDashboard(){
+  const kpis=[['Spend',money(0),''],['Sales',money(0),''],['Impression','0',''],['Click','0',''],['CTR',pct(0),'Clicks / Imp'],['CPC',money(0),'Spend / Click'],['ROAS','0.00','Sales / Spend'],['ACOS',pct(0),'Spend / Sales']];
+  kpiGrid.innerHTML=kpis.map(([t,v,f])=>`<div class="kpi"><div class="kpiTitle">${t}${f?`<span class="kpiFormula">${f}</span>`:''}</div><div class="kpiValue">${v}</div></div>`).join('');
+  tbody.innerHTML='';
+}
+
+function toggleView(){tableView.classList.toggle('hidden');chartView.classList.toggle('hidden')}
+function toggleExport(){exportMenu.classList.toggle('hidden')}
+function openMenu(){drawerOverlay.classList.remove('hidden');drawer.classList.remove('hidden')}
+function closeMenu(){drawerOverlay.classList.add('hidden');drawer.classList.add('hidden')}
+function toggleAiPanel(){aiPanel.classList.toggle('hidden')}
+function togglePlatformMenu(){platformMenu.classList.toggle('hidden')}
+async function logout(){await supabaseClient.auth.signOut();location.href='/login'}
+
+document.addEventListener('click',e=>{if(!e.target.closest('.multiWrap'))platformMenu.classList.add('hidden')});
+boot();
+</script>
+</body>
+</html>

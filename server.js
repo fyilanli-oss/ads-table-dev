@@ -53,6 +53,58 @@ function normalizeGoogleInsight(row,level){const m=row.metrics||{},c=row.campaig
 app.get("/api/google/customers",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const token=await getFreshGoogleAccessToken(user.id);const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,{method:"GET",headers:googleHeaders(token)});const data=await r.json();if(!r.ok)return res.status(r.status).json({error:JSON.stringify(data),status:r.status});const customers=(data.resourceNames||[]).map(resourceName=>({resourceName,customerId:String(resourceName).replace("customers/","")}));for(const c of customers)await upsertAdAccount(user.id,"google",{id:c.customerId,customerId:c.customerId,name:c.customerId,status:"accessible"});res.json({customers})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/google/insights",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const customerId=req.query.customerId||req.query.customer_id;if(!customerId)return res.status(400).json({error:"Missing customerId"});const level=["campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const loginCustomerId=req.query.loginCustomerId||req.query.login_customer_id||"";const query=googleQuery(level,dateRange);const data=await googleAdsSearch(user.id,customerId,query,loginCustomerId);res.json({platform:"Google",level,customerId:normalizeCustomerId(customerId),loginCustomerId:loginCustomerId?normalizeCustomerId(loginCustomerId):null,date_range:dateRange,rows:(data.results||[]).map(r=>normalizeGoogleInsight(r,level)),rawCount:data.results?data.results.length:0,fieldMask:data.fieldMask||null,requestId:data.requestId||null,nextPageToken:data.nextPageToken||null})}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function pinterestFetch(conn,endpoint,options={}){const r=await fetch(`${PINTEREST_API_BASE}${endpoint}`,{...options,headers:{Authorization:`Bearer ${conn.access_token}`,"Content-Type":"application/json",...(options.headers||{})}});const text=await r.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}if(!r.ok)throw new Error(data.message||text||`Pinterest API error ${r.status}`);return data}
+
+function dateRangeToPinterestDates(range){
+  const end=new Date();
+  const start=new Date(end);
+  if(range==="today"){}
+  else if(range==="yesterday"){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1)}
+  else if(range==="last_30d")start.setDate(start.getDate()-29);
+  else start.setDate(start.getDate()-6);
+  const fmt=d=>d.toISOString().slice(0,10);
+  return{start_date:fmt(start),end_date:fmt(end)};
+}
+function num(v){return v===null||v===undefined||v===""?0:Number(v)||0}
+function maybeNum(v){return v===null||v===undefined||v===""?null:Number(v)}
+function microToMoneyPinterest(v){const n=maybeNum(v);return n===null?null:n/1000000}
+function firstMetric(m,...keys){for(const k of keys){if(m&&m[k]!==undefined&&m[k]!==null)return m[k]}return null}
+function normalizePinterestInsight(row,level){
+  const m=row.metrics||row||{};
+  const campaign=row.campaign||{};
+  const adGroup=row.ad_group||row.adGroup||{};
+  const ad=row.ad||{};
+  const customer=row.customer||{};
+  const seg=row.segments||{};
+  const impressions=num(firstMetric(m,"impressions","IMPRESSION_1","IMPRESSION"));
+  const clicks=num(firstMetric(m,"clicks","CLICKTHROUGH_1","CLICKTHROUGH"));
+  const outboundClicks=maybeNum(firstMetric(m,"OUTBOUND_CLICK","OUTBOUND_CLICK_1","outbound_clicks","outboundClicks"));
+  const lpv=maybeNum(firstMetric(m,"LANDING_PAGE_VIEW","landing_page_views","landingPageViews"));
+  const spend=microToMoneyPinterest(firstMetric(m,"spend_in_micro_dollar","SPEND_IN_MICRO_DOLLAR"));
+  const addToCart=maybeNum(firstMetric(m,"TOTAL_ADD_TO_CART","total_add_to_cart"));
+  const checkout=maybeNum(firstMetric(m,"TOTAL_CHECKOUT","total_checkout"));
+  const purchase=maybeNum(firstMetric(m,"TOTAL_PURCHASE","total_purchase","TOTAL_CONVERSIONS"));
+  const addToCartValue=microToMoneyPinterest(firstMetric(m,"TOTAL_ADD_TO_CART_VALUE_IN_MICRO_DOLLAR"));
+  const checkoutValue=microToMoneyPinterest(firstMetric(m,"TOTAL_CHECKOUT_VALUE_IN_MICRO_DOLLAR"));
+  const purchaseValue=microToMoneyPinterest(firstMetric(m,"TOTAL_WEB_CHECKOUT_VALUE_IN_MICRO_DOLLAR","TOTAL_PURCHASE_VALUE_IN_MICRO_DOLLAR","TOTAL_CONVERSIONS_VALUE_IN_MICRO_DOLLAR"));
+  const abandoned=checkout!==null?Math.max((checkout||0)-(purchase||0),0):null;
+  const cartAbandoned=addToCart!==null&&checkout!==null?Math.max((addToCart||0)-(checkout||0),0):null;
+  const cvr=outboundClicks&&outboundClicks>0&&purchase!==null?(purchase/outboundClicks)*100:null;
+  const roas=spend&&spend>0&&purchaseValue!==null?purchaseValue/spend:null;
+  const acos=purchaseValue&&purchaseValue>0&&spend!==null?spend/purchaseValue:null;
+  return{platform:"Pinterest",level,date:seg.date||row.date||null,report_level:row.report_level||null,campaign_id:campaign.id||row.campaign_id||null,campaign_name:campaign.name||row.campaign_name||null,campaign_status:campaign.status||null,objective_type:campaign.objective_type||campaign.objectiveType||null,adgroup_id:adGroup.id||row.ad_group_id||null,adgroup_name:adGroup.name||row.ad_group_name||null,adgroup_status:adGroup.status||null,ad_id:ad.id||row.ad_id||null,pin_id:ad.pin_id||ad.pinId||null,ad_status:ad.status||null,currency:customer.currency||customer.currency_code||null,impressions,reach:null,clicks,link_clicks:outboundClicks,outbound_clicks:outboundClicks,landing_page_views:lpv,ctr:firstMetric(m,"ctr","CTR")!==null?Number(firstMetric(m,"ctr","CTR"))*100:null,cpc:firstMetric(m,"average_cpc","AVERAGE_CPC")!==null?Number(firstMetric(m,"average_cpc","AVERAGE_CPC")):null,spend,save_rate:maybeNum(firstMetric(m,"save_rate","SAVE_RATE")),add_to_cart:addToCart,checkout,purchase,purchases:purchase,abandoned,cart_abandoned:cartAbandoned,add_to_cart_value:addToCartValue,checkout_value:checkoutValue,purchase_value:purchaseValue,sales:purchaseValue,revenue:purchaseValue,cvr,roas,acos,raw:row};
+}
+function pinterestAnalyticsEndpoint(adAccountId,level){
+  if(level==="adgroup")return `/ad_accounts/${adAccountId}/ad_groups/analytics`;
+  if(level==="ad")return `/ad_accounts/${adAccountId}/ads/analytics`;
+  if(level==="account")return `/ad_accounts/${adAccountId}/analytics`;
+  return `/ad_accounts/${adAccountId}/campaigns/analytics`;
+}
+function normalizePinterestRows(data,level){
+  const rows=Array.isArray(data)?data:Array.isArray(data.items)?data.items:Array.isArray(data.data)?data.data:Array.isArray(data.results)?data.results:[];
+  return rows.map(r=>normalizePinterestInsight(r,level));
+}
+app.get("/api/pinterest/insights",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{conn}=result;const adAccountId=req.query.adAccountId||req.query.ad_account_id;if(!adAccountId)return res.status(400).json({error:"Missing adAccountId"});const level=["account","campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const dates=req.query.start_date&&req.query.end_date?{start_date:String(req.query.start_date),end_date:String(req.query.end_date)}:dateRangeToPinterestDates(dateRange);const defaultColumns="SPEND_IN_MICRO_DOLLAR,IMPRESSION_1,CLICKTHROUGH_1,OUTBOUND_CLICK,LANDING_PAGE_VIEW,TOTAL_ADD_TO_CART,TOTAL_ADD_TO_CART_VALUE_IN_MICRO_DOLLAR,TOTAL_CHECKOUT,TOTAL_CHECKOUT_VALUE_IN_MICRO_DOLLAR,TOTAL_PURCHASE,TOTAL_WEB_CHECKOUT_VALUE_IN_MICRO_DOLLAR";const params=new URLSearchParams({start_date:dates.start_date,end_date:dates.end_date,granularity:String(req.query.granularity||"DAY"),columns:String(req.query.columns||defaultColumns),click_window_days:String(req.query.click_window_days||30),engagement_window_days:String(req.query.engagement_window_days||30),view_window_days:String(req.query.view_window_days||1),conversion_report_time:String(req.query.conversion_report_time||"TIME_OF_AD_ACTION")});const endpoint=`${pinterestAnalyticsEndpoint(adAccountId,level)}?${params.toString()}`;const data=await pinterestFetch(conn,endpoint);res.json({platform:"Pinterest",level,adAccountId,date_range:dateRange,start_date:dates.start_date,end_date:dates.end_date,rows:normalizePinterestRows(data,level),rawCount:normalizePinterestRows(data,level).length,raw:data})}catch(e){res.status(500).json({error:e.message})}});
+
 app.get("/api/pinterest/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{user,conn}=result;const data=await pinterestFetch(conn,"/ad_accounts");const accounts=data.items||[];for(const account of accounts)await upsertAdAccount(user.id,"pinterest",{id:account.id,name:account.name,currency:account.currency,status:"accessible",...account});res.json(data)}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/accounts",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_ad_accounts").select("*").eq("user_id",user.id).order("platform",{ascending:true});if(error)throw error;res.json({accounts:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/tiktok/status",(_,res)=>res.json({connected:false,status:"pending_verification"}));

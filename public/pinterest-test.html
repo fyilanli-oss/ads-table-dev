@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>AdsTable Pinterest Test</title>
+<title>AdsTable Pinterest Insights Test</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}
@@ -18,6 +18,8 @@ p{color:#666;line-height:1.5}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 .secondary{background:#fff;color:#111;border:1px solid #ddd}
 .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+input,select{height:46px;border:1px solid #ddd;border-radius:14px;padding:0 12px;font-size:15px}
+input{min-width:270px}
 pre{white-space:pre-wrap;word-break:break-word;background:#111;color:#fff;border-radius:18px;padding:18px;min-height:260px;overflow:auto;font-size:13px;line-height:1.45}
 .status{font-weight:850;margin-top:10px}
 .ok{color:#0f6b37}
@@ -33,11 +35,27 @@ pre{white-space:pre-wrap;word-break:break-word;background:#111;color:#fff;border
 
   <div class="card">
     <h1>Pinterest Ads API Test</h1>
-    <p>This page calls <b>/api/pinterest/adaccounts</b> with the active Supabase session token and prints the raw JSON response.</p>
+    <p>This page tests <b>/api/pinterest/adaccounts</b> and <b>/api/pinterest/insights</b> with the active Supabase session token.</p>
 
     <div class="row">
-      <button id="testBtn" class="btn" onclick="runPinterestAdAccountsTest()">Run Pinterest Ad Accounts</button>
+      <button id="accountsBtn" class="btn" onclick="runPinterestAdAccountsTest()">Run Ad Accounts</button>
       <button class="btn secondary" onclick="copyJson()">Copy JSON</button>
+    </div>
+
+    <div class="row">
+      <input id="adAccountId" placeholder="adAccountId e.g. 549770357860"/>
+      <select id="level">
+        <option value="campaign">campaign</option>
+        <option value="adgroup">adgroup</option>
+        <option value="ad">ad</option>
+      </select>
+      <select id="dateRange">
+        <option value="last_7d">last_7d</option>
+        <option value="today">today</option>
+        <option value="yesterday">yesterday</option>
+        <option value="last_30d">last_30d</option>
+      </select>
+      <button id="insightsBtn" class="btn" onclick="runPinterestInsightsTest()">Run Insights</button>
     </div>
 
     <div id="status" class="status">Waiting...</div>
@@ -90,37 +108,71 @@ async function init() {
   }
 }
 
+function authHeaders() {
+  return {
+    "Authorization": "Bearer " + session.access_token,
+    "Content-Type": "application/json"
+  };
+}
+
 async function runPinterestAdAccountsTest() {
-  const btn = document.getElementById("testBtn");
+  const btn = document.getElementById("accountsBtn");
   btn.disabled = true;
   btn.textContent = "Running...";
   setStatus("Calling /api/pinterest/adaccounts ...", "");
 
   try {
-    if (!session || !session.access_token) {
-      throw new Error("Missing Supabase session token. Please login again.");
-    }
+    if (!session || !session.access_token) throw new Error("Missing Supabase session token. Please login again.");
 
-    const res = await fetch("/api/pinterest/adaccounts", {
-      headers: {
-        "Authorization": "Bearer " + session.access_token,
-        "Content-Type": "application/json"
-      }
-    });
-
+    const res = await fetch("/api/pinterest/adaccounts", { headers: authHeaders() });
     const data = await res.json().catch(() => ({}));
     printJson(data);
 
-    if (!res.ok) {
-      throw new Error(data.error || "Pinterest ad accounts test failed.");
-    }
+    if (!res.ok) throw new Error(data.error || "Pinterest ad accounts test failed.");
+
+    const first = data.items && data.items[0] && data.items[0].id;
+    if (first) document.getElementById("adAccountId").value = first;
 
     setStatus("Success. Pinterest ad accounts response received.", "ok");
   } catch (e) {
     setStatus(e.message, "err");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Run Pinterest Ad Accounts";
+    btn.textContent = "Run Ad Accounts";
+  }
+}
+
+async function runPinterestInsightsTest() {
+  const btn = document.getElementById("insightsBtn");
+  btn.disabled = true;
+  btn.textContent = "Running...";
+
+  const adAccountId = document.getElementById("adAccountId").value.trim();
+  const level = document.getElementById("level").value;
+  const dateRange = document.getElementById("dateRange").value;
+
+  setStatus("Calling /api/pinterest/insights ...", "");
+
+  try {
+    if (!session || !session.access_token) throw new Error("Missing Supabase session token. Please login again.");
+    if (!adAccountId) throw new Error("adAccountId is required.");
+
+    const url = "/api/pinterest/insights?adAccountId=" + encodeURIComponent(adAccountId)
+      + "&level=" + encodeURIComponent(level)
+      + "&date_range=" + encodeURIComponent(dateRange);
+
+    const res = await fetch(url, { headers: authHeaders() });
+    const data = await res.json().catch(() => ({}));
+    printJson(data);
+
+    if (!res.ok) throw new Error(data.error || "Pinterest insights test failed.");
+
+    setStatus("Success. Pinterest insights response received.", "ok");
+  } catch (e) {
+    setStatus(e.message, "err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Run Insights";
   }
 }
 

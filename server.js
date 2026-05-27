@@ -2,6 +2,7 @@
 const express=require("express");
 const session=require("express-session");
 const path=require("path");
+const crypto=require("crypto");
 const {google}=require("googleapis");
 const {createClient}=require("@supabase/supabase-js");
 const app=express(); const PORT=process.env.PORT||3000;
@@ -10,6 +11,8 @@ app.use(session({secret:process.env.SESSION_SECRET||"dev_secret_change_me",resav
 app.use(express.static(path.join(__dirname,"public")));
 const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
+const KLAVIYO_API_BASE="https://a.klaviyo.com";
+const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
@@ -31,9 +34,124 @@ app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",(req,res)=>{try{const userId=req.query.user_id;if(!userId)return res.redirect("/dashboard?error=missing_user_id");if(!process.env.PINTEREST_CLIENT_ID||!process.env.PINTEREST_REDIRECT_URI)throw new Error("Missing Pinterest env");const state=Math.random().toString(36).slice(2);req.session.pinterestOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.PINTEREST_CLIENT_ID,redirect_uri:process.env.PINTEREST_REDIRECT_URI,scope:"ads:read",state});res.redirect(`https://www.pinterest.com/oauth/?${p}`)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/pinterest/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?pinterest_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?pinterest_error=missing_code");if(!state||state!==req.session.pinterestOAuthState)return res.redirect("/dashboard?pinterest_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?pinterest_error=missing_user_id");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.PINTEREST_REDIRECT_URI});const r=await fetch(`${PINTEREST_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${pinterestBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.message||data.error_description||data.error||"Pinterest token exchange failed");await saveConnection(userId,"pinterest",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||null,expiresIn:data.expires_in||null}});req.session.pinterestOAuthState=null;res.redirect("/dashboard?pinterest_connected=1")}catch(e){res.redirect(`/dashboard?pinterest_error=${encodeURIComponent(e.message)}`)}});
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt}})});
+
+function base64Url(input){return Buffer.from(input).toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
+function klaviyoBasic(){return Buffer.from(`${process.env.KLAVIYO_CLIENT_ID}:${process.env.KLAVIYO_CLIENT_SECRET}`).toString("base64")}
+function klaviyoScopes(){return process.env.KLAVIYO_SCOPES||"accounts:read campaigns:read events:read metrics:read conversations:read"}
+function klaviyoDateWindow(range,startDate,endDate){
+  const end=endDate?new Date(`${endDate}T23:59:59Z`):new Date();
+  const start=startDate?new Date(`${startDate}T00:00:00Z`):new Date(end);
+  if(!startDate){
+    if(range==="today"){}
+    else if(range==="yesterday"){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1)}
+    else if(range==="last_30d")start.setDate(start.getDate()-29);
+    else start.setDate(start.getDate()-6);
+  }
+  const iso=d=>d.toISOString();
+  const dayCount=Math.max(1,Math.ceil((end-start)/(24*60*60*1000))+1);
+  return{start:iso(start),end:iso(end),selected_day_count:dayCount}
+}
+function safeNumber(v){return v===null||v===undefined||v===""?null:Number(v)}
+function deepFindNumber(obj,keys){
+  if(!obj||typeof obj!=="object")return null;
+  for(const k of keys){if(obj[k]!==undefined&&obj[k]!==null&&obj[k]!==""&&!Number.isNaN(Number(obj[k])))return Number(obj[k])}
+  for(const v of Object.values(obj)){if(v&&typeof v==="object"){const found=deepFindNumber(v,keys);if(found!==null)return found}}
+  return null
+}
+async function klaviyoFetch(conn,endpoint,options={}){
+  const r=await fetch(`${KLAVIYO_API_BASE}${endpoint}`,{...options,headers:{Authorization:`Bearer ${conn.access_token}`,Accept:"application/json",Revision:process.env.KLAVIYO_REVISION||"2024-10-15","Content-Type":"application/json",...(options.headers||{})}});
+  const text=await r.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
+  if(!r.ok)throw new Error(data.errors?.[0]?.detail||data.errors?.[0]?.title||data.message||text||`Klaviyo API error ${r.status}`);
+  return data
+}
+async function getKlaviyoMetricId(conn,names){
+  const data=await klaviyoFetch(conn,"/api/metrics/");
+  const list=Array.isArray(data.data)?data.data:[];
+  const wanted=names.map(x=>String(x).toLowerCase());
+  const found=list.find(m=>wanted.includes(String(m.attributes?.name||m.name||"").toLowerCase()));
+  return found?.id||null
+}
+function klaviyoCampaignName(c){return c.attributes?.name||c.name||c.attributes?.campaign_name||null}
+function klaviyoCampaignStatus(c){return c.attributes?.status||c.status||null}
+function klaviyoCampaignSendTime(c){return c.attributes?.send_time||c.attributes?.sendTime||c.send_time||null}
+function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}}){
+  const attr=report?.attributes||report||{};
+  const stats=attr.statistics||attr.stats||attr;
+  const estimatedMonthlySpend=Number(settings.estimatedMonthlySpend||0);
+  const estimatedPeriodSpend=(estimatedMonthlySpend/30)*window.selected_day_count;
+  const spend=estimatedPeriodSpend||0;
+  const delivered=deepFindNumber(stats,["delivered","emails_delivered","DELIVERED"])??0;
+  const opens=deepFindNumber(stats,["opens","open","opened","OPENED_EMAIL"])??null;
+  const clicks=deepFindNumber(stats,["clicks","click","CLICKED_EMAIL"])??0;
+  const clickRate=deepFindNumber(stats,["click_rate","clickRate"])??(delivered?clicks/delivered:null);
+  const sales=deepFindNumber(stats,["conversion_value","conversions_value","revenue","sales"])??0;
+  const purchaseCount=deepFindNumber(stats,["conversions","placed_order","purchase_count"])??0;
+  const addToCart=extraEvents.add_to_cart??null;
+  const checkout=extraEvents.checkout_started??null;
+  const siteVisit=extraEvents.site_visited??null;
+  const abandoned=checkout!==null?Math.max((checkout||0)-(purchaseCount||0),0):null;
+  const trafficScore=siteVisit&&clicks?(siteVisit/clicks)*100:null;
+  return{
+    platform:"Klaviyo",
+    level:"campaign",
+    campaign_id:campaign?.id||attr.campaign_id||null,
+    campaign_name:klaviyoCampaignName(campaign)||attr.campaign_name||null,
+    campaign_status:klaviyoCampaignStatus(campaign)||null,
+    send_time:klaviyoCampaignSendTime(campaign)||null,
+    currency:settings.spendCurrency||null,
+    impressions:delivered,
+    emails_delivered:delivered,
+    clicks,
+    ctr:clickRate!==null?Number(clickRate)*100:null,
+    cpc:clicks?spend/clicks:null,
+    spend,
+    estimated_monthly_spend:estimatedMonthlySpend,
+    estimated_period_spend:spend,
+    selected_day_count:window.selected_day_count,
+    sales,
+    revenue:sales,
+    roas:spend>0?sales/spend:null,
+    acos:sales>0?(spend/sales)*100:null,
+    cvr:clicks?purchaseCount/clicks*100:null,
+    email_open:opens,
+    opened_email:opens,
+    link_clicks:clicks,
+    site_visit:siteVisit,
+    landing_page_views:siteVisit,
+    traffic_score:trafficScore,
+    real_cpc:siteVisit?spend/siteVisit:null,
+    add_to_cart:addToCart,
+    checkout,
+    purchase:purchaseCount,
+    purchases:purchaseCount,
+    purchase_count:purchaseCount,
+    abandoned,
+    raw:{campaign,report,extraEvents}
+  }
+}
+app.get("/auth/klaviyo",async(req,res)=>{try{const userId=req.query.user_id;if(!userId)return res.redirect("/dashboard?error=missing_user_id");if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const state=Math.random().toString(36).slice(2);const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());req.session.klaviyoOAuthState=state;req.session.klaviyoCodeVerifier=codeVerifier;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});res.redirect(`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
+app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,requiresSetup:true}});req.session.klaviyoOAuthState=null;req.session.klaviyoCodeVerifier=null;res.redirect("/dashboard?klaviyo_connected=1&klaviyo_setup=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
+app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");res.json({connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),setupRequired:Boolean(conn?.metadata?.requiresSetup),estimatedMonthlySpend:conn?.metadata?.estimatedMonthlySpend||null,spendCurrency:conn?.metadata?.spendCurrency||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:e.message})}});
+app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false})}catch(e){res.status(500).json({error:e.message})}});
+app.get("/api/klaviyo/campaigns",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const filter=`greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const data=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);res.json(data)}catch(e){res.status(500).json({error:e.message})}});
+app.get("/api/klaviyo/insights",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;if(conn.metadata?.requiresSetup)return res.status(400).json({error:"Klaviyo setup required. Please enter estimated monthly spend and currency."});const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const campaignLimit=Math.min(Number(req.query.limit||25),50);const filter=`greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const campaignsData=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);const campaigns=(campaignsData.data||[]).slice(0,campaignLimit);let placedOrderMetricId=req.query.placedOrderMetricId||process.env.KLAVIYO_PLACED_ORDER_METRIC_ID||null;if(!placedOrderMetricId)placedOrderMetricId=await getKlaviyoMetricId(conn,["Placed Order","Placed order","Order Placed"]);
+const rows=[];const errors=[];
+for(const campaign of campaigns){
+  try{
+    let report=null;
+    if(placedOrderMetricId){
+      const body={data:{type:"campaign-values-report",attributes:{timeframe:{start:w.start,end:w.end},conversion_metric_id:placedOrderMetricId,filter:`equals(campaign_id,"${campaign.id}")`,statistics:["delivered","opens","clicks","click_rate","conversion_value","conversions"]}}};
+      report=await klaviyoFetch(conn,"/api/campaign-values-reports/",{method:"POST",body:JSON.stringify(body)});
+    }
+    rows.push(normalizeKlaviyoInsight({campaign,report,settings:conn.metadata||{},window:w}));
+  }catch(err){errors.push({campaign_id:campaign.id,error:err.message});rows.push(normalizeKlaviyoInsight({campaign,report:null,settings:conn.metadata||{},window:w}))}
+}
+res.json({platform:"Klaviyo",level:"campaign",date_range:range,start:w.start,end:w.end,selected_day_count:w.selected_day_count,rows,rawCount:rows.length,errors,metadata:{campaignCount:campaigns.length,placedOrderMetricId:placedOrderMetricId||null}})
+}catch(e){res.status(500).json({error:e.message})}});
+
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
-app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const{error}=await supabaseAdmin.from("platform_connections").update({connected:false,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform",platform);if(error)throw error;res.json({ok:true,platform,connected:false})}catch(e){res.status(500).json({error:e.message})}});
+app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const{error}=await supabaseAdmin.from("platform_connections").update({connected:false,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform",platform);if(error)throw error;res.json({ok:true,platform,connected:false})}catch(e){res.status(500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){if(!supabaseAdmin||!userId)return;const row={user_id:userId,platform,platform_business_id:account.business_id||null,platform_account_id:account.id||account.customerId||account.account_id,account_name:account.name||account.descriptiveName||account.account_name||null,currency:account.currency||account.currency_code||null,timezone:account.timezone_name||account.timezone||null,status:String(account.account_status||account.status||""),metadata:account,updated_at:new Date().toISOString()};if(!row.platform_account_id)return;await supabaseAdmin.from("platform_ad_accounts").upsert(row,{onConflict:"user_id,platform,platform_account_id"})}
 async function metaGraph(pathname,params,token){const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}${pathname}`);Object.entries(params||{}).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=="")url.searchParams.set(k,v)});url.searchParams.set("access_token",token);const r=await fetch(url);const data=await r.json();if(!r.ok)throw new Error(data.error?.message||JSON.stringify(data));return data}
 app.get("/api/meta/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"meta");if(!result)return;const{user,conn}=result;const data=await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},conn.access_token);const accounts=data.data||[];for(const account of accounts)await upsertAdAccount(user.id,"meta",account);res.json({platform:"meta",accounts})}catch(e){res.status(500).json({error:e.message})}});

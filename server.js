@@ -20,21 +20,6 @@ app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/login",(_,res)=>se
 app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));
 async function getUserFromRequest(req){const a=req.headers.authorization||"";const t=a.startsWith("Bearer ")?a.slice(7):null;if(!t||!supabaseAdmin)return null;const {data,error}=await supabaseAdmin.auth.getUser(t);if(error||!data?.user?.id)return null;return data.user}
 async function requireUser(req,res){const u=await getUserFromRequest(req);if(!u){res.status(401).json({error:"Not authenticated"});return null}return u}
-
-async function updatePublicUserProfile(userId, fields){
-  if(!supabaseAdmin)throw new Error("Supabase not configured");
-  const patch={updated_at:new Date().toISOString()};
-  if(Object.prototype.hasOwnProperty.call(fields,"name"))patch.name=fields.name;
-  if(Object.prototype.hasOwnProperty.call(fields,"email"))patch.email=fields.email;
-  const {data,error}=await supabaseAdmin.from("users").update(patch).eq("id",userId).select("id,name,email,updated_at").maybeSingle();
-  if(error)throw new Error(error.message);
-  return data;
-}
-
-app.get("/api/account/profile",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const {data,error}=await supabaseAdmin.from("users").select("id,name,email,updated_at").eq("id",user.id).maybeSingle();if(error)throw new Error(error.message);res.json({id:user.id,name:data?.name||user.user_metadata?.name||"",email:data?.email||user.email||"",updated_at:data?.updated_at||null})}catch(e){res.status(500).json({error:e.message||"Profile read failed"})}});
-
-app.patch("/api/account/profile",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const name=String(req.body?.name||"").trim();if(!name)return res.status(400).json({error:"Name is required"});const data=await updatePublicUserProfile(user.id,{name});res.json({saved:true,profile:data})}catch(e){res.status(500).json({error:e.message||"Profile update failed"})}});
-
 async function expireTrialsIfNeeded(){if(!supabaseAdmin)return;const{error}=await supabaseAdmin.rpc("expire_trials");if(error)throw error}
 async function getUserSubscription(userId){await expireTrialsIfNeeded();const{data,error}=await supabaseAdmin.from("subscriptions").select("status,trial_end_date").eq("user_id",userId).maybeSingle();if(error)throw error;return data}
 function getAccessByStatus(status){const full=["trial","active"].includes(status);const readonly=["expired","cancelled","deleted_pending"].includes(status);const blocked=["suspended","deleted"].includes(status);return{dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
@@ -251,6 +236,88 @@ app.get("/api/pinterest/insights",async(req,res)=>{try{const result=await requir
 
 app.get("/api/pinterest/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{user,conn}=result;const data=await pinterestFetch(conn,"/ad_accounts");const accounts=data.items||[];for(const account of accounts)await upsertAdAccount(user.id,"pinterest",{id:account.id,name:account.name,currency:account.currency,status:"accessible",...account});res.json(data)}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/accounts",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_ad_accounts").select("*").eq("user_id",user.id).order("platform",{ascending:true});if(error)throw error;res.json({accounts:data||[]})}catch(e){res.status(500).json({error:e.message})}});
+
+// ===== PHASE C ACCOUNT MANAGEMENT API =====
+async function syncPublicUserFromAuth(user){
+  if(!supabaseAdmin||!user?.id)throw new Error("Supabase not configured or user missing");
+  const authEmail=user.email||null;
+  const metaName=user.user_metadata?.name||user.user_metadata?.full_name||null;
+  const now=new Date().toISOString();
+
+  const {data:existing,error:selectError}=await supabaseAdmin
+    .from("users")
+    .select("id,email,name")
+    .eq("id",user.id)
+    .maybeSingle();
+
+  if(selectError)throw selectError;
+
+  if(!existing){
+    const {error:insertError}=await supabaseAdmin
+      .from("users")
+      .insert({id:user.id,email:authEmail,name:metaName,updated_at:now});
+    if(insertError)throw insertError;
+    return {id:user.id,email:authEmail,name:metaName};
+  }
+
+  const patch={updated_at:now};
+  let changed=false;
+
+  if(authEmail&&existing.email!==authEmail){
+    patch.email=authEmail;
+    changed=true;
+  }
+
+  if(changed){
+    const {data,error}=await supabaseAdmin
+      .from("users")
+      .update(patch)
+      .eq("id",user.id)
+      .select("id,email,name")
+      .maybeSingle();
+    if(error)throw error;
+    return data;
+  }
+
+  return existing;
+}
+
+app.get("/api/account/profile",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const profile=await syncPublicUserFromAuth(user);
+    res.json({profile,authEmail:user.email||null});
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+
+app.post("/api/account/profile",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const name=typeof req.body?.name==="string"?req.body.name.trim():null;
+    if(!name)return res.status(400).json({error:"Name is required."});
+
+    await syncPublicUserFromAuth(user);
+
+    const {data,error}=await supabaseAdmin
+      .from("users")
+      .update({name,updated_at:new Date().toISOString()})
+      .eq("id",user.id)
+      .select("id,email,name")
+      .maybeSingle();
+
+    if(error)throw error;
+    res.json({profile:data,message:"Saved"});
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+// ===== END PHASE C ACCOUNT MANAGEMENT API =====
+
 app.get("/api/tiktok/status",(_,res)=>res.json({connected:false,status:"pending_verification"}));
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));
 module.exports=app;

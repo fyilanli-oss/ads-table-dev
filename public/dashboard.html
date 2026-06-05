@@ -9328,6 +9328,12 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       let messages = [];
 
       if(name !== originalName){
+        const metaUpdate = await client.auth.updateUser({ data: { name: name } });
+        if(metaUpdate.error) throw metaUpdate.error;
+
+        const refreshed = await client.auth.getSession();
+        session = refreshed.data.session || session;
+
         const res = await fetch("/api/account/profile",{
           method:"POST",
           headers:{...(await authHeader()),"Content-Type":"application/json"},

@@ -9190,203 +9190,253 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 </style>
 
 
-
-<script id="phase-c-account-management-full-js">
+<!-- PHASE C ACCOUNT MANAGEMENT BEHAVIOR PATCH - no default visual/layout change -->
+<script id="phase-c-account-management-behavior">
 (function(){
   "use strict";
 
-  let accountClient = null;
-  let accountSession = null;
-  let accountReadyPromise = null;
+  let client = null;
+  let session = null;
+  let originalName = "";
+  let originalEmail = "";
 
-  function $(id){ return document.getElementById(id); }
+  function byId(id){ return document.getElementById(id); }
 
-  function getCard(el){ return el && el.closest ? el.closest('.accountCard') : null; }
-
-  function ensureStatus(anchor){
-    const card = getCard(anchor);
-    if(!card) return null;
-    let node = card.querySelector('.accountActionStatus');
-    if(!node){
-      node = document.createElement('div');
-      node.className = 'accountActionStatus';
-      node.style.cssText = 'font-size:13px;font-weight:850;margin-top:10px;line-height:1.35;color:#0f6b37;';
-      card.appendChild(node);
+  function toast(message, isError){
+    let box = byId("accountManagementToast");
+    if(!box){
+      box = document.createElement("div");
+      box.id = "accountManagementToast";
+      box.setAttribute("aria-live","polite");
+      box.style.cssText = "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10000000;max-width:86vw;padding:11px 18px;border-radius:14px;background:#111;color:#fff;font-size:14px;font-weight:950;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none;";
+      document.body.appendChild(box);
     }
-    return node;
+    box.textContent = message || "";
+    box.style.background = isError ? "#9b111e" : "#111";
+    box.style.display = "block";
+    clearTimeout(box._timer);
+    box._timer = setTimeout(function(){ box.style.display = "none"; }, 3200);
   }
 
-  function showStatus(anchor, message, ok){
-    const node = ensureStatus(anchor);
-    if(!node) return;
-    node.textContent = message || '';
-    node.style.color = ok ? '#0f6b37' : '#9b111e';
+  function setBtnBusy(btn, busy, text){
+    if(!btn)return;
+    btn.disabled = !!busy;
+    if(busy){
+      btn.dataset.prevText = btn.textContent || "";
+      btn.textContent = text || "Saving...";
+    }else if(btn.dataset.prevText){
+      btn.textContent = btn.dataset.prevText;
+      delete btn.dataset.prevText;
+    }
   }
 
-  function clearStatus(anchor){ showStatus(anchor, '', true); }
-
-  function setButtonEditing(btn, editing){
-    btn.dataset.editing = editing ? 'true' : 'false';
-    btn.textContent = editing ? 'SAVE' : 'CHANGE';
-    btn.classList.toggle('accountBlackBtn', !editing);
-    btn.classList.toggle('accountWhiteBtn', editing);
-    const card = getCard(btn);
-    if(card) card.classList.toggle('accountEditActive', !!editing);
-  }
-
-  function setFieldsEnabled(fields, enabled){
-    fields.forEach(function(field){ if(field) field.disabled = !enabled; });
-  }
-
-  async function initAccountClient(){
-    if(accountReadyPromise) return accountReadyPromise;
-    accountReadyPromise = (async function(){
-      if(!window.supabase) throw new Error('Supabase client library is not loaded.');
-      const res = await fetch('/api/public-config');
-      const cfg = await res.json();
-      if(!cfg.supabaseUrl || !cfg.supabaseAnonKey) throw new Error('Supabase config is missing.');
-      accountClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-      const sessionResult = await accountClient.auth.getSession();
-      accountSession = sessionResult.data && sessionResult.data.session ? sessionResult.data.session : null;
-      if(!accountSession) throw new Error('Session expired. Please sign in again.');
-      return accountSession;
-    })();
-    return accountReadyPromise;
+  async function initSupabase(){
+    if(client && session) return true;
+    try{
+      const cfg = await fetch("/api/public-config").then(r=>r.json());
+      if(!cfg.supabaseUrl || !cfg.supabaseAnonKey){
+        toast("Supabase config is missing.", true);
+        return false;
+      }
+      client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+      const s = await client.auth.getSession();
+      session = s.data.session;
+      if(!session){
+        toast("Session expired. Please sign in again.", true);
+        setTimeout(function(){ window.location.href="/login"; }, 900);
+        return false;
+      }
+      return true;
+    }catch(err){
+      toast(err.message || "Could not initialize account session.", true);
+      return false;
+    }
   }
 
   async function authHeader(){
-    const session = await initAccountClient();
-    return { Authorization: 'Bearer ' + session.access_token };
+    await initSupabase();
+    return { Authorization: "Bearer " + session.access_token };
+  }
+
+  function setInfoEditing(editing){
+    const btn = byId("profileInfoBtn");
+    const nameInput = byId("profileNameInput");
+    const emailInput = byId("profileEmailInput");
+    [nameInput,emailInput].forEach(function(input){ if(input) input.disabled = !editing; });
+
+    if(btn){
+      btn.dataset.editing = editing ? "true" : "false";
+      btn.textContent = editing ? "SAVE" : "CHANGE";
+      btn.classList.toggle("accountWhiteBtn", editing);
+      btn.classList.toggle("accountBlackBtn", !editing);
+    }
+    const card = btn && btn.closest ? btn.closest(".accountCard") : null;
+    if(card) card.classList.toggle("accountEditActive", !!editing);
+  }
+
+  function setPasswordEditing(editing){
+    const btn = byId("profilePasswordBtn");
+    const fields = byId("passwordFields");
+    const inputs = fields ? Array.from(fields.querySelectorAll("input")) : [];
+    if(fields) fields.classList.toggle("open", !!editing);
+    inputs.forEach(function(input){ input.disabled = !editing; });
+
+    if(btn){
+      btn.dataset.editing = editing ? "true" : "false";
+      btn.textContent = editing ? "SAVE" : "CHANGE";
+      btn.classList.toggle("accountWhiteBtn", editing);
+      btn.classList.toggle("accountBlackBtn", !editing);
+    }
+    const card = btn && btn.closest ? btn.closest(".accountCard") : null;
+    if(card) card.classList.toggle("accountEditActive", !!editing);
   }
 
   async function loadAccountProfile(){
+    if(!await initSupabase()) return;
     try{
-      const nameInput = $('profileNameInput');
-      const emailInput = $('profileEmailInput');
-      if(!nameInput && !emailInput) return;
-      await initAccountClient();
-      const res = await fetch('/api/account/profile', { headers: await authHeader() });
-      const data = await res.json().catch(function(){ return {}; });
-      if(res.ok){
-        if(nameInput && data.name) nameInput.value = data.name;
-        if(emailInput && data.email) emailInput.value = data.email;
-      }else if(accountSession && accountSession.user){
-        if(nameInput && accountSession.user.user_metadata && accountSession.user.user_metadata.name) nameInput.value = accountSession.user.user_metadata.name;
-        if(emailInput && accountSession.user.email) emailInput.value = accountSession.user.email;
-      }
-    }catch(e){}
+      const res = await fetch("/api/account/profile",{headers:await authHeader()});
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(data.error || "Profile could not be loaded.");
+
+      const nameInput = byId("profileNameInput");
+      const emailInput = byId("profileEmailInput");
+      originalName = data.profile?.name || session.user.user_metadata?.name || "";
+      originalEmail = data.profile?.email || data.authEmail || session.user.email || "";
+
+      if(nameInput) nameInput.value = originalName;
+      if(emailInput) emailInput.value = originalEmail;
+      setInfoEditing(false);
+      setPasswordEditing(false);
+    }catch(err){
+      toast(err.message || "Profile sync failed.", true);
+    }
   }
 
-  async function saveProfile(btn){
-    const nameInput = $('profileNameInput');
-    const emailInput = $('profileEmailInput');
-    const name = nameInput ? nameInput.value.trim() : '';
-    const newEmail = emailInput ? emailInput.value.trim() : '';
+  async function saveInformation(){
+    const btn = byId("profileInfoBtn");
+    const nameInput = byId("profileNameInput");
+    const emailInput = byId("profileEmailInput");
+    const name = (nameInput?.value || "").trim();
+    const email = (emailInput?.value || "").trim();
 
-    if(!name){ showStatus(btn, 'Name is required.', false); return; }
-    if(!newEmail){ showStatus(btn, 'Email is required.', false); return; }
+    if(!name) return toast("Name is required.", true);
+    if(!email) return toast("Email is required.", true);
+    if(!await initSupabase()) return;
 
-    btn.disabled = true;
-    showStatus(btn, 'Saving...', true);
+    setBtnBusy(btn, true, "SAVING");
     try{
-      await initAccountClient();
-      const currentEmail = (accountSession && accountSession.user && accountSession.user.email) ? accountSession.user.email : '';
+      let messages = [];
 
-      const profileRes = await fetch('/api/account/profile', {
-        method: 'PATCH',
-        headers: Object.assign({'Content-Type':'application/json'}, await authHeader()),
-        body: JSON.stringify({ name: name })
-      });
-      const profileData = await profileRes.json().catch(function(){ return {}; });
-      if(!profileRes.ok) throw new Error(profileData.error || 'Name update failed.');
+      if(name !== originalName){
+        const res = await fetch("/api/account/profile",{
+          method:"POST",
+          headers:{...(await authHeader()),"Content-Type":"application/json"},
+          body:JSON.stringify({name})
+        });
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok) throw new Error(data.error || "Name could not be saved.");
+        originalName = data.profile?.name || name;
+        if(nameInput) nameInput.value = originalName;
+        messages.push("Saved");
+      }
 
-      if(newEmail && currentEmail && newEmail.toLowerCase() !== currentEmail.toLowerCase()){
-        const redirectTo = window.location.origin + '/login';
-        const { error } = await accountClient.auth.updateUser({ email: newEmail }, { emailRedirectTo: redirectTo });
+      if(email !== originalEmail){
+        const {error} = await client.auth.updateUser(
+          {email: email},
+          {emailRedirectTo: window.location.origin + "/dashboard"}
+        );
         if(error) throw error;
-        showStatus(btn, 'Saved. Check your email to confirm the email change.', true);
-      }else{
-        showStatus(btn, 'Saved.', true);
+        // public.users.email is intentionally NOT changed here.
+        // It will sync from verified auth.users.email on next session/profile load.
+        messages.push("Verification email sent. Please check your inbox.");
       }
 
-      setFieldsEnabled([nameInput,emailInput], false);
-      setButtonEditing(btn, false);
-    }catch(e){
-      showStatus(btn, e.message || 'Error.', false);
+      if(!messages.length) messages.push("Saved");
+      setInfoEditing(false);
+      toast(messages.join(" "), false);
+
+      // Critical DB refresh: after every save, pull auth-verified state back into public.users.
+      setTimeout(loadAccountProfile, 900);
+    }catch(err){
+      toast(err.message || "Save failed.", true);
     }finally{
-      btn.disabled = false;
+      setBtnBusy(btn, false);
+      const editing = btn?.dataset.editing === "true";
+      if(!editing && btn) btn.textContent = "CHANGE";
     }
   }
 
-  async function savePassword(btn){
-    const fields = Array.from(document.querySelectorAll('#passwordFields input'));
-    const currentPassword = fields[0] ? fields[0].value : '';
-    const newPassword = fields[1] ? fields[1].value : '';
-    const confirmPassword = fields[2] ? fields[2].value : '';
+  async function savePassword(){
+    const btn = byId("profilePasswordBtn");
+    const fields = byId("passwordFields");
+    const inputs = fields ? Array.from(fields.querySelectorAll("input")) : [];
+    const currentPassword = inputs[0]?.value || "";
+    const newPassword = inputs[1]?.value || "";
+    const confirmPassword = inputs[2]?.value || "";
 
-    if(!currentPassword){ showStatus(btn, 'Current password is required.', false); return; }
-    if(!newPassword){ showStatus(btn, 'New password is required.', false); return; }
-    if(newPassword.length < 8){ showStatus(btn, 'New password must be at least 8 characters.', false); return; }
-    if(newPassword !== confirmPassword){ showStatus(btn, 'New password and confirmation do not match.', false); return; }
+    if(!currentPassword) return toast("Current password is required.", true);
+    if(!newPassword) return toast("New password is required.", true);
+    if(newPassword.length < 8) return toast("New password must be at least 8 characters.", true);
+    if(newPassword !== confirmPassword) return toast("Passwords do not match.", true);
+    if(!await initSupabase()) return;
 
-    btn.disabled = true;
-    showStatus(btn, 'Saving...', true);
+    setBtnBusy(btn, true, "SAVING");
     try{
-      await initAccountClient();
-      const email = accountSession && accountSession.user ? accountSession.user.email : '';
-      if(!email) throw new Error('User email not found. Please sign in again.');
+      const email = session.user.email || originalEmail;
+      const reauth = await client.auth.signInWithPassword({email, password: currentPassword});
+      if(reauth.error) throw new Error("Current password is incorrect.");
 
-      const signInResult = await accountClient.auth.signInWithPassword({ email: email, password: currentPassword });
-      if(signInResult.error) throw new Error('Current password is incorrect.');
-      if(signInResult.data && signInResult.data.session){ accountSession = signInResult.data.session; }
+      const updatedSession = await client.auth.getSession();
+      session = updatedSession.data.session || session;
 
-      const updateResult = await accountClient.auth.updateUser({ password: newPassword });
-      if(updateResult.error) throw updateResult.error;
+      const update = await client.auth.updateUser({password: newPassword});
+      if(update.error) throw update.error;
 
-      fields.forEach(function(field){ field.value = ''; field.disabled = true; });
-      const box = $('passwordFields');
-      if(box) box.classList.remove('open');
-      setButtonEditing(btn, false);
-      showStatus(btn, 'Saved.', true);
-    }catch(e){
-      showStatus(btn, e.message || 'Error.', false);
+      inputs.forEach(function(input){ input.value = ""; });
+      setPasswordEditing(false);
+      toast("Password updated", false);
+    }catch(err){
+      toast(err.message || "Password update failed.", true);
     }finally{
-      btn.disabled = false;
+      setBtnBusy(btn, false);
+      const editing = btn?.dataset.editing === "true";
+      if(!editing && btn) btn.textContent = "CHANGE";
     }
   }
 
-  document.addEventListener('click', function(e){
-    const infoBtn = e.target.closest && e.target.closest('#profileInfoBtn');
-    const passBtn = e.target.closest && e.target.closest('#profilePasswordBtn');
-    if(!infoBtn && !passBtn) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    if(e.stopImmediatePropagation) e.stopImmediatePropagation();
-
-    if(infoBtn){
-      const fields = [$('profileNameInput'), $('profileEmailInput')];
-      const editing = infoBtn.dataset.editing === 'true';
-      clearStatus(infoBtn);
-      if(!editing){ setFieldsEnabled(fields, true); setButtonEditing(infoBtn, true); }
-      else saveProfile(infoBtn);
-      return;
+  function bindAccountButtons(){
+    const infoBtn = byId("profileInfoBtn");
+    if(infoBtn && !infoBtn.dataset.phaseCBound){
+      infoBtn.dataset.phaseCBound = "true";
+      infoBtn.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if(infoBtn.dataset.editing === "true") saveInformation();
+        else setInfoEditing(true);
+      }, true);
     }
 
-    if(passBtn){
-      const fields = Array.from(document.querySelectorAll('#passwordFields input'));
-      const box = $('passwordFields');
-      const editing = passBtn.dataset.editing === 'true';
-      clearStatus(passBtn);
-      if(!editing){ if(box) box.classList.add('open'); setFieldsEnabled(fields, true); setButtonEditing(passBtn, true); }
-      else savePassword(passBtn);
+    const passBtn = byId("profilePasswordBtn");
+    if(passBtn && !passBtn.dataset.phaseCBound){
+      passBtn.dataset.phaseCBound = "true";
+      passBtn.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if(passBtn.dataset.editing === "true") savePassword();
+        else setPasswordEditing(true);
+      }, true);
     }
-  }, true);
+  }
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadAccountProfile);
-  else loadAccountProfile();
+  document.addEventListener("DOMContentLoaded", function(){
+    bindAccountButtons();
+    loadAccountProfile();
+  });
+
+  window.addEventListener("focus", loadAccountProfile);
 })();
 </script>
+<!-- END PHASE C ACCOUNT MANAGEMENT BEHAVIOR PATCH -->
 
 </body>
 </html>

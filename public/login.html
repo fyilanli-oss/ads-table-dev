@@ -105,4 +105,21 @@ async function saveResetPassword(){
 }
 
 init()
-</script></body></html>
+</script>
+<script id="phase-c-login-lifecycle-message">
+(function(){
+  "use strict";
+  function lifecycleLoginMessage(){
+    const params=new URLSearchParams(window.location.search);
+    const deleted=params.get("account_deleted");
+    const blocked=params.get("account_blocked");
+    const target=document.getElementById("msg")||document.querySelector(".msg");
+    if(!target)return;
+    if(deleted==="1"){target.textContent="Account deleted. You can no longer sign in.";return}
+    if(blocked){target.textContent=blocked==="suspended"?"Account suspended. Contact support.":"Account access blocked."}
+  }
+  document.addEventListener("DOMContentLoaded",lifecycleLoginMessage);
+})();
+</script>
+
+</body></html>

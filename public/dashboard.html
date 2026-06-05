@@ -9444,6 +9444,100 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 </script>
 <!-- END PHASE C ACCOUNT MANAGEMENT BEHAVIOR PATCH -->
 
+
+<!-- PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA BEHAVIOR PATCH - no layout change -->
+<script id="phase-c-account-lifecycle-delete">
+(function(){
+  "use strict";
+  let client=null,session=null,pendingConfirmationUrl=null;
+  function byId(id){return document.getElementById(id)}
+  function toast(message,isError){
+    let box=byId("accountLifecycleToast");
+    if(!box){
+      box=document.createElement("div");
+      box.id="accountLifecycleToast";
+      box.setAttribute("aria-live","polite");
+      box.style.cssText="position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10000001;max-width:86vw;padding:11px 18px;border-radius:14px;background:#111;color:#fff;font-size:14px;font-weight:950;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none;";
+      document.body.appendChild(box);
+    }
+    box.textContent=message||"";
+    box.style.background=isError?"#9b111e":"#111";
+    box.style.display="block";
+    clearTimeout(box._timer);
+    box._timer=setTimeout(function(){box.style.display="none"},3600);
+  }
+  async function initSupabase(){
+    if(client&&session)return true;
+    try{
+      const cfg=await fetch("/api/public-config").then(r=>r.json());
+      client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+      const s=await client.auth.getSession();
+      session=s.data.session;
+      if(!session){window.location.href="/login";return false}
+      return true;
+    }catch(err){toast(err.message||"Session could not be initialized.",true);return false}
+  }
+  async function authHeader(){await initSupabase();return{Authorization:"Bearer "+session.access_token}}
+  async function checkAccountLifecycle(){
+    if(!await initSupabase())return;
+    try{
+      const res=await fetch("/api/account/status",{headers:await authHeader()});
+      const data=await res.json().catch(()=>({}));
+      if(res.status===403||data.status==="suspended"||data.status==="deleted"){
+        await client.auth.signOut();
+        window.location.href="/login?account_blocked="+encodeURIComponent(data.status||"blocked");
+        return;
+      }
+      if(data.access&&!data.access.connect){
+        document.querySelectorAll(".drawerConnectBtn,.platformAction.connect").forEach(function(btn){
+          btn.disabled=true;
+          btn.style.pointerEvents="none";
+          btn.title="Account is read-only";
+        });
+      }
+    }catch(err){}
+  }
+  function ensureDeleteConfirmBox(){
+    let box=byId("deleteConfirmInlineBox");
+    if(box)return box;
+    const deleteBtn=byId("deleteMyDataBtn");
+    const card=deleteBtn&&deleteBtn.closest?deleteBtn.closest(".accountCard"):null;
+    if(!card)return null;
+    box=document.createElement("div");
+    box.id="deleteConfirmInlineBox";
+    box.style.cssText="display:none;margin-top:12px;font-size:14px;font-weight:850;line-height:1.45;color:#333;";
+    box.innerHTML='<div style="margin-bottom:10px;">This will close your account. You will not be able to log in after confirmation. Hard delete is scheduled after 90 days.</div><button id="deleteConfirmContinueBtn" class="accountRedBtn" type="button" style="min-width:120px;">CONFIRM</button><button id="deleteConfirmCancelBtn" class="accountWhiteBtn" type="button" style="min-width:100px;margin-left:8px;">CANCEL</button>';
+    card.appendChild(box);
+    const cancel=byId("deleteConfirmCancelBtn");
+    const confirm=byId("deleteConfirmContinueBtn");
+    if(cancel)cancel.addEventListener("click",function(e){e.preventDefault();box.style.display="none";pendingConfirmationUrl=null});
+    if(confirm)confirm.addEventListener("click",async function(e){e.preventDefault();if(!pendingConfirmationUrl){toast("Delete confirmation is not ready.",true);return}window.location.href=pendingConfirmationUrl});
+    return box;
+  }
+  async function startDeleteFlow(){
+    if(!await initSupabase())return;
+    try{
+      const res=await fetch("/api/account/request-delete",{method:"POST",headers:{...(await authHeader()),"Content-Type":"application/json"},body:JSON.stringify({})});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok)throw new Error(data.error||"Delete request failed.");
+      pendingConfirmationUrl=data.confirmationUrl;
+      const box=ensureDeleteConfirmBox();
+      if(box)box.style.display="block";
+      toast("Delete confirmation ready. Confirm to continue.",false);
+    }catch(err){toast(err.message||"Delete request failed.",true)}
+  }
+  function bindDeleteButton(){
+    const btn=byId("deleteMyDataBtn");
+    if(!btn||btn.dataset.lifecycleDeleteBound)return;
+    btn.dataset.lifecycleDeleteBound="true";
+    btn.addEventListener("click",function(e){e.preventDefault();e.stopImmediatePropagation();startDeleteFlow()},true);
+  }
+  document.addEventListener("DOMContentLoaded",function(){bindDeleteButton();checkAccountLifecycle()});
+  window.addEventListener("focus",checkAccountLifecycle);
+})();
+</script>
+<!-- END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA BEHAVIOR PATCH -->
+
 </body>
 </html>
 <!-- =========================================================

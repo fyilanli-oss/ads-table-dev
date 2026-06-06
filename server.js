@@ -246,7 +246,7 @@ async function syncPublicUserFromAuth(user){
 
   const {data:existing,error:selectError}=await supabaseAdmin
     .from("users")
-    .select("id,email,name")
+    .select("id,email,name,account_currency")
     .eq("id",user.id)
     .maybeSingle();
 
@@ -255,9 +255,9 @@ async function syncPublicUserFromAuth(user){
   if(!existing){
     const {error:insertError}=await supabaseAdmin
       .from("users")
-      .insert({id:user.id,email:authEmail,name:metaName,updated_at:now});
+      .insert({id:user.id,email:authEmail,name:metaName,account_currency:null,updated_at:now});
     if(insertError)throw insertError;
-    return {id:user.id,email:authEmail,name:metaName};
+    return {id:user.id,email:authEmail,name:metaName,account_currency:null};
   }
 
   const patch={updated_at:now};
@@ -273,7 +273,7 @@ async function syncPublicUserFromAuth(user){
       .from("users")
       .update(patch)
       .eq("id",user.id)
-      .select("id,email,name")
+      .select("id,email,name,account_currency")
       .maybeSingle();
     if(error)throw error;
     return data;
@@ -307,7 +307,7 @@ app.post("/api/account/profile",async(req,res)=>{
       .from("users")
       .update({name,updated_at:new Date().toISOString()})
       .eq("id",user.id)
-      .select("id,email,name")
+      .select("id,email,name,account_currency")
       .maybeSingle();
 
     if(error)throw error;
@@ -318,6 +318,68 @@ app.post("/api/account/profile",async(req,res)=>{
 });
 // ===== END PHASE C ACCOUNT MANAGEMENT API =====
 
+
+
+// ===== PHASE D.1 ACCOUNT CURRENCY REQUIRED =====
+const SUPPORTED_ACCOUNT_CURRENCIES=["USD","TRY","EUR","GBP"];
+
+function normalizeAccountCurrency(value){
+  const c=String(value||"").trim().toUpperCase();
+  return SUPPORTED_ACCOUNT_CURRENCIES.includes(c)?c:null;
+}
+
+app.get("/api/account/currency",async(req,res)=>{
+  try{
+    const user=await requireLifecycleAccess(req,res,"dashboard");
+    if(!user)return;
+
+    await syncPublicUserFromAuth(user.user);
+
+    const {data,error}=await supabaseAdmin
+      .from("users")
+      .select("account_currency")
+      .eq("id",user.user.id)
+      .maybeSingle();
+
+    if(error)throw error;
+
+    res.json({
+      account_currency:data?.account_currency||null,
+      required:!data?.account_currency,
+      supported:SUPPORTED_ACCOUNT_CURRENCIES
+    });
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+
+app.post("/api/account/currency",async(req,res)=>{
+  try{
+    const user=await requireLifecycleAccess(req,res,"dashboard");
+    if(!user)return;
+
+    const accountCurrency=normalizeAccountCurrency(req.body?.account_currency);
+    if(!accountCurrency){
+      return res.status(400).json({error:"Account currency is required."});
+    }
+
+    await syncPublicUserFromAuth(user.user);
+
+    const {data,error}=await supabaseAdmin
+      .from("users")
+      .update({account_currency:accountCurrency,updated_at:new Date().toISOString()})
+      .eq("id",user.user.id)
+      .select("id,email,name,account_currency")
+      .maybeSingle();
+
+    if(error)throw error;
+
+    res.json({profile:data,message:"Saved"});
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+// ===== END PHASE D.1 ACCOUNT CURRENCY REQUIRED =====
 
 // ===== PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
 function normalizeAccountStatus(status){return String(status||"").toLowerCase()}

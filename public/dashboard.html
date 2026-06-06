@@ -7796,6 +7796,11 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     msg.style.color=ok?"#0f6b37":"#9b111e";
   }
 
+  function shouldPromptForKlaviyoSpend(){
+    const params=new URLSearchParams(window.location.search);
+    return params.get("klaviyo_connected")==="1";
+  }
+
   async function loadKlaviyoStatus(){
     if(!await initSupabase())return;
     try{
@@ -7804,7 +7809,10 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       setKlaviyoButton(data.state);
       setAccountSpendFields(data.estimated_monthly_spend);
 
-      if(data.state==="CONNECTED"&&!data.estimated_monthly_spend){
+      // D.2B.1 FIX:
+      // Do not open Estimated Monthly Spend modal on generic dashboard load.
+      // The modal is opened only after a Klaviyo connect-success signal or explicit Klaviyo check.
+      if(shouldPromptForKlaviyoSpend() && data.state==="CONNECTED" && !data.estimated_monthly_spend){
         openSpendModal();
       }
     }catch(e){

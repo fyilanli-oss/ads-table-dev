@@ -7326,6 +7326,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     const cancel=byId("connectModalCancel");
 
     if(!modal||!overlay||!action)return;
+    modal.dataset.platform = "meta";
 
     if(mode==="connect"){
       if(title)title.textContent="Meta Not Connected";
@@ -7346,8 +7347,12 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   function closeModal(){
     const modal=byId("connectModal");
     const overlay=byId("connectModalOverlay");
-    if(modal)modal.classList.remove("open");
+    if(modal){
+      modal.classList.remove("open");
+      if(modal.dataset.platform === "meta") delete modal.dataset.platform;
+    }
     if(overlay)overlay.classList.remove("open");
+    modalMode=null;
   }
 
   async function loadMetaStatus(){
@@ -7389,6 +7394,8 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     if(action&&!action.dataset.d2a1MetaBound){
       action.dataset.d2a1MetaBound="true";
       action.addEventListener("click",function(e){
+        const modal=byId("connectModal");
+        if(!modal || modal.dataset.platform !== "meta") return;
         if(modalMode!=="connect"&&modalMode!=="disconnect")return;
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -7407,6 +7414,8 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     if(cancel&&!cancel.dataset.d2a1Bound){
       cancel.dataset.d2a1Bound="true";
       cancel.addEventListener("click",function(e){
+        const modal=byId("connectModal");
+        if(!modal || modal.dataset.platform !== "meta") return;
         e.preventDefault();
         e.stopImmediatePropagation();
         closeModal();

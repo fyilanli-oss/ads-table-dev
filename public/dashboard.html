@@ -3721,7 +3721,7 @@ function togglePJ(groupName){
 
   <div class="drawerRow">
     <span>Google Ads</span>
-    <button class="drawerConnectBtn" data-platform="google" data-state="connect">Connect</button>
+    <button id="googleConnectButton" class="drawerConnectBtn" data-platform="google" data-state="connect">Connect Google</button>
   </div>
 
   <div class="drawerRow">
@@ -7436,6 +7436,176 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 })();
 </script>
 <!-- END D.2A.1 META CONNECT / DISCONNECT -->
+
+
+<!-- D.2A.2 GOOGLE CONNECT / DISCONNECT -->
+<script id="d2a2-google-connect-disconnect">
+(function(){
+  "use strict";
+
+  let client=null;
+  let session=null;
+  let googleState="NOT_CONNECTED";
+  let modalMode=null;
+
+  function byId(id){return document.getElementById(id)}
+
+  async function initSupabase(){
+    if(client&&session)return true;
+    try{
+      const cfg=await fetch("/api/public-config").then(r=>r.json());
+      client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+      const s=await client.auth.getSession();
+      session=s.data.session;
+      if(!session){
+        window.location.href="/login";
+        return false;
+      }
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  async function authHeader(){
+    await initSupabase();
+    return {Authorization:"Bearer "+session.access_token};
+  }
+
+  function setGoogleButton(state){
+    googleState = state === "CONNECTED" ? "CONNECTED" : "NOT_CONNECTED";
+    const btn=byId("googleConnectButton") || document.querySelector('.drawerConnectBtn[data-platform="google"]');
+    if(!btn)return;
+
+    if(googleState==="CONNECTED"){
+      btn.dataset.state="connected";
+      btn.textContent="Disconnect";
+    }else{
+      btn.dataset.state="not_connected";
+      btn.textContent="Connect Google";
+    }
+  }
+
+  function openModal(mode){
+    modalMode=mode;
+    const modal=byId("connectModal");
+    const overlay=byId("connectModalOverlay");
+    const title=byId("connectModalTitle") || (modal&&modal.querySelector(".connectModalTitle"));
+    const desc=byId("connectModalDescription");
+    const action=byId("connectModalAction");
+    const cancel=byId("connectModalCancel");
+
+    if(!modal||!overlay||!action)return;
+    modal.dataset.platform = "google";
+
+    if(mode==="connect"){
+      if(title)title.textContent="Google Not Connected";
+      if(desc)desc.textContent="Connect your Google Ads account to start tracking performance.";
+      action.textContent="Connect Google";
+      if(cancel)cancel.style.display="none";
+    }else{
+      if(title)title.textContent="Disconnect Google?";
+      if(desc)desc.textContent="This will stop future Google syncs. Your historical dashboard data will remain available.";
+      action.textContent="Disconnect";
+      if(cancel)cancel.style.display="";
+    }
+
+    modal.classList.add("open");
+    overlay.classList.add("open");
+  }
+
+  function closeModal(){
+    const modal=byId("connectModal");
+    const overlay=byId("connectModalOverlay");
+    if(modal){
+      modal.classList.remove("open");
+      if(modal.dataset.platform === "google") delete modal.dataset.platform;
+    }
+    if(overlay)overlay.classList.remove("open");
+    modalMode=null;
+  }
+
+  async function loadGoogleStatus(){
+    if(!await initSupabase())return;
+    try{
+      const res=await fetch("/api/platform/google/status",{headers:await authHeader()});
+      const data=await res.json().catch(()=>({}));
+      setGoogleButton(data.state);
+    }catch(e){
+      setGoogleButton("NOT_CONNECTED");
+    }
+  }
+
+  async function disconnectGoogle(){
+    if(!await initSupabase())return;
+    const res=await fetch("/api/platform/google/disconnect",{
+      method:"POST",
+      headers:{...(await authHeader()),"Content-Type":"application/json"},
+      body:JSON.stringify({})
+    });
+    if(res.ok){
+      setGoogleButton("NOT_CONNECTED");
+      closeModal();
+    }
+  }
+
+  function bind(){
+    const btn=byId("googleConnectButton") || document.querySelector('.drawerConnectBtn[data-platform="google"]');
+    if(btn&&!btn.dataset.d2a2Bound){
+      btn.dataset.d2a2Bound="true";
+      btn.addEventListener("click",function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openModal(googleState==="CONNECTED"?"disconnect":"connect");
+      },true);
+    }
+
+    const action=byId("connectModalAction");
+    if(action&&!action.dataset.d2a2GoogleBound){
+      action.dataset.d2a2GoogleBound="true";
+      action.addEventListener("click",function(e){
+        const modal=byId("connectModal");
+        if(!modal || modal.dataset.platform !== "google") return;
+        if(modalMode!=="connect"&&modalMode!=="disconnect")return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        if(modalMode==="connect"){
+          if(session&&session.user&&session.user.id){
+            window.location.href="/auth/google?user_id="+encodeURIComponent(session.user.id);
+          }
+        }else{
+          disconnectGoogle();
+        }
+      },true);
+    }
+
+    const cancel=byId("connectModalCancel");
+    if(cancel&&!cancel.dataset.d2a2Bound){
+      cancel.dataset.d2a2Bound="true";
+      cancel.addEventListener("click",function(e){
+        const modal=byId("connectModal");
+        if(!modal || modal.dataset.platform !== "google") return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeModal();
+      },true);
+    }
+  }
+
+  function boot(){
+    bind();
+    loadGoogleStatus();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",boot);
+  }else{
+    boot();
+  }
+})();
+</script>
+<!-- END D.2A.2 GOOGLE CONNECT / DISCONNECT -->
 
 </body>
 </html>

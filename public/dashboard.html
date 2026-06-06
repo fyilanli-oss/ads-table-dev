@@ -3428,6 +3428,31 @@ body.account-mode .accountSettingsView{
 .currencyRequiredMsg{min-height:18px;text-align:center;color:#9b111e;font-size:13px;font-weight:850;margin-top:12px}
 </style>
 
+
+<style id="d2a1-meta-connect-style">
+.connectModalDescription{
+  margin-top:12px;
+  font-size:14px;
+  line-height:1.45;
+  font-weight:850;
+  color:#555;
+  max-width:320px;
+}
+.connectModalCancel{
+  position:absolute;
+  left:28px;
+  bottom:18px;
+  height:32px;
+  min-width:96px;
+  border:1px solid #ddd;
+  border-radius:6px;
+  background:#fff;
+  color:#111;
+  font-size:13px;
+  font-weight:950;
+}
+</style>
+
 </head>
 <!-- PHASE D.0 PRODUCTION DASHBOARD MARKER: real user dashboard; no mock-only routing. -->
 <body>
@@ -3691,7 +3716,7 @@ function togglePJ(groupName){
 
   <div class="drawerRow">
     <span>Meta Ads</span>
-    <button class="drawerConnectBtn" data-platform="meta" data-state="connect">Connect</button>
+    <button id="metaConnectButton" class="drawerConnectBtn" data-platform="meta" data-state="connect">Connect Meta</button>
   </div>
 
   <div class="drawerRow">
@@ -3753,8 +3778,10 @@ function togglePJ(groupName){
 <div id="connectModalOverlay" class="connectModalOverlay"></div>
 
 <div id="connectModal" class="connectModal">
-  <div class="connectModalTitle">Connect / Disconnect Texts</div>
-  <button id="connectModalAction" class="connectModalAction">Connect</button>
+  <div id="connectModalTitle" class="connectModalTitle">Connect / Disconnect Texts</div>
+  <div id="connectModalDescription" class="connectModalDescription"></div>
+  <button id="connectModalCancel" class="connectModalCancel" type="button">Cancel</button>
+  <button id="connectModalAction" class="connectModalAction" type="button">Connect</button>
 </div>
 
 
@@ -7239,6 +7266,167 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 
 })();
 </script>
+
+
+<!-- D.2A.1 META CONNECT / DISCONNECT -->
+<script id="d2a1-meta-connect-disconnect">
+(function(){
+  "use strict";
+
+  let client=null;
+  let session=null;
+  let metaState="NOT_CONNECTED";
+  let modalMode=null;
+
+  function byId(id){return document.getElementById(id)}
+
+  async function initSupabase(){
+    if(client&&session)return true;
+    try{
+      const cfg=await fetch("/api/public-config").then(r=>r.json());
+      client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+      const s=await client.auth.getSession();
+      session=s.data.session;
+      if(!session){
+        window.location.href="/login";
+        return false;
+      }
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  async function authHeader(){
+    await initSupabase();
+    return {Authorization:"Bearer "+session.access_token};
+  }
+
+  function setMetaButton(state){
+    metaState = state === "CONNECTED" ? "CONNECTED" : "NOT_CONNECTED";
+    const btn=byId("metaConnectButton") || document.querySelector('.drawerConnectBtn[data-platform="meta"]');
+    if(!btn)return;
+
+    if(metaState==="CONNECTED"){
+      btn.dataset.state="connected";
+      btn.textContent="Disconnect";
+    }else{
+      btn.dataset.state="not_connected";
+      btn.textContent="Connect Meta";
+    }
+  }
+
+  function openModal(mode){
+    modalMode=mode;
+    const modal=byId("connectModal");
+    const overlay=byId("connectModalOverlay");
+    const title=byId("connectModalTitle") || (modal&&modal.querySelector(".connectModalTitle"));
+    const desc=byId("connectModalDescription");
+    const action=byId("connectModalAction");
+    const cancel=byId("connectModalCancel");
+
+    if(!modal||!overlay||!action)return;
+
+    if(mode==="connect"){
+      if(title)title.textContent="Meta Not Connected";
+      if(desc)desc.textContent="Connect your Meta ad account to start tracking performance.";
+      action.textContent="Connect Meta";
+      if(cancel)cancel.style.display="none";
+    }else{
+      if(title)title.textContent="Disconnect Meta?";
+      if(desc)desc.textContent="This will stop future Meta syncs. Your historical dashboard data will remain available.";
+      action.textContent="Disconnect";
+      if(cancel)cancel.style.display="";
+    }
+
+    modal.classList.add("open");
+    overlay.classList.add("open");
+  }
+
+  function closeModal(){
+    const modal=byId("connectModal");
+    const overlay=byId("connectModalOverlay");
+    if(modal)modal.classList.remove("open");
+    if(overlay)overlay.classList.remove("open");
+  }
+
+  async function loadMetaStatus(){
+    if(!await initSupabase())return;
+    try{
+      const res=await fetch("/api/platform/meta/status",{headers:await authHeader()});
+      const data=await res.json().catch(()=>({}));
+      setMetaButton(data.state);
+    }catch(e){
+      setMetaButton("NOT_CONNECTED");
+    }
+  }
+
+  async function disconnectMeta(){
+    if(!await initSupabase())return;
+    const res=await fetch("/api/platform/meta/disconnect",{
+      method:"POST",
+      headers:{...(await authHeader()),"Content-Type":"application/json"},
+      body:JSON.stringify({})
+    });
+    if(res.ok){
+      setMetaButton("NOT_CONNECTED");
+      closeModal();
+    }
+  }
+
+  function bind(){
+    const btn=byId("metaConnectButton") || document.querySelector('.drawerConnectBtn[data-platform="meta"]');
+    if(btn&&!btn.dataset.d2a1Bound){
+      btn.dataset.d2a1Bound="true";
+      btn.addEventListener("click",function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        openModal(metaState==="CONNECTED"?"disconnect":"connect");
+      },true);
+    }
+
+    const action=byId("connectModalAction");
+    if(action&&!action.dataset.d2a1MetaBound){
+      action.dataset.d2a1MetaBound="true";
+      action.addEventListener("click",function(e){
+        if(modalMode!=="connect"&&modalMode!=="disconnect")return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        if(modalMode==="connect"){
+          if(session&&session.user&&session.user.id){
+            window.location.href="/auth/meta?user_id="+encodeURIComponent(session.user.id);
+          }
+        }else{
+          disconnectMeta();
+        }
+      },true);
+    }
+
+    const cancel=byId("connectModalCancel");
+    if(cancel&&!cancel.dataset.d2a1Bound){
+      cancel.dataset.d2a1Bound="true";
+      cancel.addEventListener("click",function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeModal();
+      },true);
+    }
+  }
+
+  function boot(){
+    bind();
+    loadMetaStatus();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",boot);
+  }else{
+    boot();
+  }
+})();
+</script>
+<!-- END D.2A.1 META CONNECT / DISCONNECT -->
 
 </body>
 </html>

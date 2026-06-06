@@ -3881,9 +3881,11 @@ function togglePJ(groupName){
       <div class="accountFormRow">
         <div class="accountInputStack">
           <select id="accountCurrencySelect" disabled>
-            <option selected>TRY</option>
-            <option>USD</option>
-            <option>EUR</option>
+            <option value="" selected>Select currency</option>
+            <option value="USD">USD</option>
+            <option value="TRY">TRY</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
           </select>
         </div>
         <button class="accountBlackBtn" id="accountCurrencyBtn">CHANGE</button>
@@ -7171,6 +7173,171 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 })();
 </script>
 <!-- END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA BEHAVIOR PATCH -->
+
+<!-- PHASE D.1 ACCOUNT CURRENCY REQUIRED - no layout change -->
+<script id="phase-d1-account-currency-required">
+(function(){
+  "use strict";
+
+  let client = null;
+  let session = null;
+  let currencyReady = false;
+
+  function byId(id){ return document.getElementById(id); }
+
+  function toast(message, isError){
+    let box = byId("accountCurrencyToast");
+    if(!box){
+      box = document.createElement("div");
+      box.id = "accountCurrencyToast";
+      box.setAttribute("aria-live","polite");
+      box.style.cssText = "position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10000002;max-width:86vw;padding:11px 18px;border-radius:14px;background:#111;color:#fff;font-size:14px;font-weight:950;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none;";
+      document.body.appendChild(box);
+    }
+    box.textContent = message || "";
+    box.style.background = isError ? "#9b111e" : "#111";
+    box.style.display = "block";
+    clearTimeout(box._timer);
+    box._timer = setTimeout(function(){ box.style.display = "none"; }, 3200);
+  }
+
+  async function initSupabase(){
+    if(client && session) return true;
+    try{
+      const cfg = await fetch("/api/public-config").then(r=>r.json());
+      client = window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+      const s = await client.auth.getSession();
+      session = s.data.session;
+      if(!session){
+        window.location.href = "/login";
+        return false;
+      }
+      return true;
+    }catch(err){
+      toast(err.message || "Session could not be initialized.", true);
+      return false;
+    }
+  }
+
+  async function authHeader(){
+    await initSupabase();
+    return {Authorization:"Bearer " + session.access_token};
+  }
+
+  function setCurrencyEditing(editing){
+    const btn = byId("accountCurrencyBtn");
+    const select = byId("accountCurrencySelect");
+    if(select) select.disabled = !editing;
+
+    if(btn){
+      btn.dataset.editing = editing ? "true" : "false";
+      btn.textContent = editing ? "SAVE" : "CHANGE";
+      btn.classList.toggle("accountWhiteBtn", editing);
+      btn.classList.toggle("accountBlackBtn", !editing);
+    }
+
+    const card = btn && btn.closest ? btn.closest(".accountCard") : null;
+    if(card) card.classList.toggle("accountEditActive", !!editing);
+  }
+
+  function lockDashboardUntilCurrency(){
+    document.body.classList.add("account-mode");
+    document.querySelectorAll(".accountTab").forEach(function(tab){
+      tab.classList.remove("active");
+      if(tab.dataset.accountPage === "dashboardPanel") tab.classList.add("active");
+    });
+    document.querySelectorAll(".accountPanel").forEach(function(panel){
+      panel.classList.remove("active");
+    });
+    const panel = byId("dashboardPanel");
+    if(panel) panel.classList.add("active");
+
+    setCurrencyEditing(true);
+    toast("Please select your account currency to continue.", true);
+  }
+
+  async function loadAccountCurrency(){
+    if(!await initSupabase()) return;
+    try{
+      const res = await fetch("/api/account/currency",{headers:await authHeader()});
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(data.error || "Account currency could not be loaded.");
+
+      const select = byId("accountCurrencySelect");
+      if(select) select.value = data.account_currency || "";
+
+      currencyReady = !!data.account_currency;
+
+      if(!currencyReady){
+        lockDashboardUntilCurrency();
+      }else{
+        setCurrencyEditing(false);
+      }
+    }catch(err){
+      toast(err.message || "Account currency check failed.", true);
+    }
+  }
+
+  async function saveAccountCurrency(){
+    const btn = byId("accountCurrencyBtn");
+    const select = byId("accountCurrencySelect");
+    const currency = (select && select.value ? select.value : "").trim().toUpperCase();
+
+    if(!["USD","TRY","EUR","GBP"].includes(currency)){
+      toast("Account currency is required.", true);
+      return;
+    }
+
+    if(!await initSupabase()) return;
+
+    btn.disabled = true;
+    const previousText = btn.textContent;
+    btn.textContent = "SAVING";
+
+    try{
+      const res = await fetch("/api/account/currency",{
+        method:"POST",
+        headers:{...(await authHeader()),"Content-Type":"application/json"},
+        body:JSON.stringify({account_currency:currency})
+      });
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(data.error || "Account currency could not be saved.");
+
+      currencyReady = true;
+      if(select) select.value = data.profile?.account_currency || currency;
+      setCurrencyEditing(false);
+      toast("Saved", false);
+    }catch(err){
+      toast(err.message || "Save failed.", true);
+    }finally{
+      btn.disabled = false;
+      if(btn.dataset.editing === "true") btn.textContent = "SAVE";
+      else btn.textContent = "CHANGE";
+    }
+  }
+
+  function bindCurrencyButton(){
+    const btn = byId("accountCurrencyBtn");
+    if(!btn || btn.dataset.d1CurrencyBound) return;
+    btn.dataset.d1CurrencyBound = "true";
+
+    btn.addEventListener("click", function(e){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      if(btn.dataset.editing === "true") saveAccountCurrency();
+      else setCurrencyEditing(true);
+    }, true);
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    bindCurrencyButton();
+    loadAccountCurrency();
+  });
+})();
+</script>
+<!-- END PHASE D.1 ACCOUNT CURRENCY REQUIRED -->
+
 </body>
 </html>
 <!-- =========================================================

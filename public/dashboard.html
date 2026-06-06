@@ -7186,6 +7186,25 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 </script>
 <!-- END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA BEHAVIOR PATCH -->
 
+
+<!-- D.1 V2 ACCOUNT CURRENCY REQUIRED MODAL -->
+<div id="currencyRequiredOverlay" class="currencyRequiredOverlay" aria-hidden="true">
+  <div class="currencyRequiredModal" role="dialog" aria-modal="true" aria-labelledby="currencyRequiredTitle">
+    <div id="currencyRequiredTitle" class="currencyRequiredTitle">Select Account Currency</div>
+    <div class="currencyRequiredText">Choose the currency your dashboard will use.</div>
+    <select id="currencyRequiredSelect" class="currencyRequiredSelect">
+      <option value="" selected>Select currency</option>
+      <option value="USD">USD</option>
+      <option value="TRY">TRY</option>
+      <option value="EUR">EUR</option>
+      <option value="GBP">GBP</option>
+    </select>
+    <button id="currencyRequiredSaveBtn" class="currencyRequiredSaveBtn" type="button">SAVE</button>
+    <div id="currencyRequiredMsg" class="currencyRequiredMsg"></div>
+  </div>
+</div>
+<!-- END D.1 V2 ACCOUNT CURRENCY REQUIRED MODAL -->
+
 <script id="d1-v2-account-currency-required">
 (function(){
   "use strict";

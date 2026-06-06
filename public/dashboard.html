@@ -3416,6 +3416,18 @@ body.account-mode .accountSettingsView{
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style id="d1-v2-account-currency-style">
+.currencyRequiredOverlay{position:fixed;inset:0;z-index:10000020;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(244,244,244,.76);backdrop-filter:blur(2px)}
+.currencyRequiredOverlay.open{display:flex}
+.currencyRequiredModal{width:100%;max-width:390px;background:#fff;border:1px solid #d9d9d9;border-radius:22px;box-shadow:0 12px 34px rgba(0,0,0,.14);padding:22px}
+.currencyRequiredTitle{font-size:24px;line-height:1;font-weight:950;letter-spacing:-.8px;color:#111;margin-bottom:10px}
+.currencyRequiredText{font-size:14px;line-height:1.4;font-weight:850;color:#555;margin-bottom:16px}
+.currencyRequiredSelect{width:100%;height:54px;border:1px solid #ddd;border-radius:16px;padding:0 14px;font-size:17px;font-weight:900;background:#fff;color:#111;margin-bottom:14px}
+.currencyRequiredSaveBtn{width:100%;height:54px;border:0;border-radius:16px;background:#111;color:#fff;font-size:17px;font-weight:950}
+.currencyRequiredMsg{min-height:18px;text-align:center;color:#9b111e;font-size:13px;font-weight:850;margin-top:12px}
+</style>
+
 </head>
 <!-- PHASE D.0 PRODUCTION DASHBOARD MARKER: real user dashboard; no mock-only routing. -->
 <body>
@@ -3881,9 +3893,11 @@ function togglePJ(groupName){
       <div class="accountFormRow">
         <div class="accountInputStack">
           <select id="accountCurrencySelect" disabled>
-            <option selected>TRY</option>
-            <option>USD</option>
-            <option>EUR</option>
+            <option value="" selected>Select currency</option>
+            <option value="USD">USD</option>
+            <option value="TRY">TRY</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
           </select>
         </div>
         <button class="accountBlackBtn" id="accountCurrencyBtn">CHANGE</button>
@@ -7171,6 +7185,27 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 })();
 </script>
 <!-- END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA BEHAVIOR PATCH -->
+
+<script id="d1-v2-account-currency-required">
+(function(){
+  "use strict";
+  let client=null,session=null;
+  function byId(id){return document.getElementById(id)}
+  function toast(message,isError){let box=byId("accountCurrencyToast");if(!box){box=document.createElement("div");box.id="accountCurrencyToast";box.setAttribute("aria-live","polite");box.style.cssText="position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10000030;max-width:86vw;padding:11px 18px;border-radius:14px;background:#111;color:#fff;font-size:14px;font-weight:950;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none;";document.body.appendChild(box)}box.textContent=message||"";box.style.background=isError?"#9b111e":"#111";box.style.display="block";clearTimeout(box._timer);box._timer=setTimeout(function(){box.style.display="none"},3000)}
+  function modalMsg(message,ok){const msg=byId("currencyRequiredMsg");if(!msg)return;msg.textContent=message||"";msg.style.color=ok?"#0f6b37":"#9b111e"}
+  async function initSupabase(){if(client&&session)return true;try{const cfg=await fetch("/api/public-config").then(r=>r.json());client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);const s=await client.auth.getSession();session=s.data.session;if(!session){window.location.href="/login";return false}return true}catch(err){toast(err.message||"Session could not be initialized.",true);return false}}
+  async function authHeader(){await initSupabase();return{Authorization:"Bearer "+session.access_token}}
+  function openModal(){const o=byId("currencyRequiredOverlay");const s=byId("currencyRequiredSelect");if(s)s.value="";modalMsg("",false);if(o){o.classList.add("open");o.setAttribute("aria-hidden","false")}}
+  function closeModal(){const o=byId("currencyRequiredOverlay");if(o){o.classList.remove("open");o.setAttribute("aria-hidden","true")}}
+  function setAccountSelect(v){const s=byId("accountCurrencySelect");if(s)s.value=v||""}
+  async function loadCurrency(){if(!await initSupabase())return;try{const res=await fetch("/api/account/currency",{headers:await authHeader()});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||"Account currency could not be loaded.");setAccountSelect(data.account_currency||"");if(!data.account_currency)openModal()}catch(err){toast(err.message||"Account currency check failed.",true)}}
+  async function saveCurrency(value,source){const c=String(value||"").trim().toUpperCase();if(!["USD","TRY","EUR","GBP"].includes(c)){source==="modal"?modalMsg("Please select your account currency.",false):toast("Please select your account currency.",true);return false}if(!await initSupabase())return false;try{const res=await fetch("/api/account/currency",{method:"POST",headers:{...(await authHeader()),"Content-Type":"application/json"},body:JSON.stringify({account_currency:c})});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||"Account currency could not be saved.");setAccountSelect(data.profile?.account_currency||c);if(source==="modal"){modalMsg("Saved",true);setTimeout(closeModal,500)}else toast("Saved",false);return true}catch(err){source==="modal"?modalMsg(err.message||"Save failed.",false):toast(err.message||"Save failed.",true);return false}}
+  function setAccountEditing(editing){const btn=byId("accountCurrencyBtn"),sel=byId("accountCurrencySelect");if(sel)sel.disabled=!editing;if(btn){btn.dataset.editing=editing?"true":"false";btn.textContent=editing?"SAVE":"CHANGE";btn.classList.toggle("accountWhiteBtn",editing);btn.classList.toggle("accountBlackBtn",!editing)}const card=btn&&btn.closest?btn.closest(".accountCard"):null;if(card)card.classList.toggle("accountEditActive",!!editing)}
+  function bind(){const mb=byId("currencyRequiredSaveBtn"),ms=byId("currencyRequiredSelect");if(mb&&!mb.dataset.d1v2Bound){mb.dataset.d1v2Bound="true";mb.addEventListener("click",function(e){e.preventDefault();saveCurrency(ms&&ms.value,"modal")})}const btn=byId("accountCurrencyBtn"),sel=byId("accountCurrencySelect");if(btn&&sel&&!btn.dataset.d1v2Bound){btn.dataset.d1v2Bound="true";btn.addEventListener("click",function(e){e.preventDefault();e.stopImmediatePropagation();if(btn.dataset.editing==="true"){saveCurrency(sel.value,"account").then(function(ok){if(ok)setAccountEditing(false)})}else setAccountEditing(true)},true)}}
+  document.addEventListener("DOMContentLoaded",function(){bind();loadCurrency()});
+})();
+</script>
+
 </body>
 </html>
 <!-- =========================================================

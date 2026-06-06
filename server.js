@@ -276,6 +276,45 @@ app.post("/api/platform/meta/disconnect",async(req,res)=>{
 });
 // ===== END D.2A.1 META CONNECT / DISCONNECT =====
 
+
+// ===== D.2A.2 GOOGLE CONNECT / DISCONNECT =====
+app.get("/api/platform/google/status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const conn=await getConnection(user.id,"google");
+    res.json({
+      state: conn ? "CONNECTED" : "NOT_CONNECTED"
+    });
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+
+app.post("/api/platform/google/disconnect",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const {error}=await supabaseAdmin
+      .from("platform_connections")
+      .update({
+        connected:false,
+        updated_at:new Date().toISOString()
+      })
+      .eq("user_id",user.id)
+      .eq("platform","google");
+
+    if(error)throw error;
+
+    res.json({state:"NOT_CONNECTED"});
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+// ===== END D.2A.2 GOOGLE CONNECT / DISCONNECT =====
+
 // ===== PHASE C ACCOUNT MANAGEMENT API =====
 async function syncPublicUserFromAuth(user){
   if(!supabaseAdmin||!user?.id)throw new Error("Supabase not configured or user missing");

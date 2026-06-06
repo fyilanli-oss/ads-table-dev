@@ -237,6 +237,45 @@ app.get("/api/pinterest/insights",async(req,res)=>{try{const result=await requir
 app.get("/api/pinterest/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{user,conn}=result;const data=await pinterestFetch(conn,"/ad_accounts");const accounts=data.items||[];for(const account of accounts)await upsertAdAccount(user.id,"pinterest",{id:account.id,name:account.name,currency:account.currency,status:"accessible",...account});res.json(data)}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/accounts",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_ad_accounts").select("*").eq("user_id",user.id).order("platform",{ascending:true});if(error)throw error;res.json({accounts:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 
+
+// ===== D.2A.1 META CONNECT / DISCONNECT =====
+app.get("/api/platform/meta/status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const conn=await getConnection(user.id,"meta");
+    res.json({
+      state: conn ? "CONNECTED" : "NOT_CONNECTED"
+    });
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+
+app.post("/api/platform/meta/disconnect",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const {error}=await supabaseAdmin
+      .from("platform_connections")
+      .update({
+        connected:false,
+        updated_at:new Date().toISOString()
+      })
+      .eq("user_id",user.id)
+      .eq("platform","meta");
+
+    if(error)throw error;
+
+    res.json({state:"NOT_CONNECTED"});
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+// ===== END D.2A.1 META CONNECT / DISCONNECT =====
+
 // ===== PHASE C ACCOUNT MANAGEMENT API =====
 async function syncPublicUserFromAuth(user){
   if(!supabaseAdmin||!user?.id)throw new Error("Supabase not configured or user missing");

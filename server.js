@@ -154,6 +154,235 @@ for(const campaign of campaigns){
 res.json({platform:"Klaviyo",level:"campaign",date_range:range,start:w.start,end:w.end,selected_day_count:w.selected_day_count,rows,rawCount:rows.length,errors,metadata:{campaignCount:campaigns.length,placedOrderMetricId:placedOrderMetricId||null}})
 }catch(e){res.status(500).json({error:e.message})}});
 
+
+// ===== PHASE E.2A META SNAPSHOT WRITE =====
+function e2aNumber(value){
+  const n=Number(value);
+  return Number.isFinite(n)?n:0;
+}
+
+function e2aNullableNumber(value){
+  if(value===null||value===undefined||value==="")return null;
+  const n=Number(value);
+  return Number.isFinite(n)?n:null;
+}
+
+function e2aSum(rows,field){
+  return (rows||[]).reduce((total,row)=>total+e2aNumber(row?.[field]),0);
+}
+
+function e2aWeightedAverage(rows,valueField,weightField){
+  let weighted=0,weight=0;
+  for(const row of rows||[]){
+    const value=e2aNullableNumber(row?.[valueField]);
+    const w=e2aNumber(row?.[weightField]);
+    if(value!==null&&w>0){
+      weighted+=value*w;
+      weight+=w;
+    }
+  }
+  return weight>0?weighted/weight:null;
+}
+
+function e2aSnapshotDate(value){
+  const d=value?new Date(String(value)):new Date();
+  if(Number.isNaN(d.getTime()))return new Date().toISOString().slice(0,10);
+  return d.toISOString().slice(0,10);
+}
+
+function e2aBuildMetaSnapshot({snapshotDate,accountCurrency,campaignRows,adsetRows,adRows}){
+  const rows=[...(campaignRows||[]),...(adsetRows||[]),...(adRows||[])];
+  const aggregateRows=(campaignRows&&campaignRows.length)?campaignRows:rows;
+
+  const spend=e2aSum(aggregateRows,"spend");
+  const revenue=e2aSum(aggregateRows,"revenue");
+  const sales=revenue;
+  const impressions=e2aSum(aggregateRows,"impressions");
+  const reach=e2aSum(aggregateRows,"reach");
+  const clicks=e2aSum(aggregateRows,"clicks");
+  const linkClicks=e2aSum(aggregateRows,"link_clicks");
+  const landingPageViews=e2aSum(aggregateRows,"landing_page_views");
+  const addToCart=e2aSum(aggregateRows,"add_to_cart");
+  const checkout=e2aSum(aggregateRows,"checkout");
+  const purchase=e2aSum(aggregateRows,"purchase");
+  const abandoned=Math.max(checkout-purchase,0);
+
+  const ctr=clicks>0&&impressions>0?(clicks/impressions)*100:e2aWeightedAverage(aggregateRows,"ctr","impressions");
+  const cpc=clicks>0?spend/clicks:e2aWeightedAverage(aggregateRows,"cpc","clicks");
+  const roas=spend>0?revenue/spend:null;
+  const trafficScore=linkClicks>0?(landingPageViews/linkClicks)*100:null;
+  const realCpc=landingPageViews>0?spend/landingPageViews:null;
+
+  const normalizeRow=row=>({
+    platform:row.platform||"Meta",
+    level:row.level||null,
+    campaign_id:row.campaign_id||null,
+    campaign_name:row.campaign_name||null,
+    adset_id:row.adset_id||null,
+    adset_name:row.adset_name||null,
+    ad_id:row.ad_id||null,
+    ad_name:row.ad_name||null,
+    currency:row.currency||accountCurrency||null,
+    spend:e2aNumber(row.spend),
+    sales:e2aNumber(row.sales??row.revenue),
+    revenue:e2aNumber(row.revenue??row.sales),
+    impressions:e2aNumber(row.impressions),
+    reach:e2aNumber(row.reach),
+    clicks:e2aNumber(row.clicks),
+    ctr:e2aNullableNumber(row.ctr),
+    cpc:e2aNullableNumber(row.cpc),
+    roas:e2aNullableNumber(row.roas),
+    link_clicks:e2aNumber(row.link_clicks),
+    landing_page_views:e2aNumber(row.landing_page_views),
+    add_to_cart:e2aNumber(row.add_to_cart),
+    checkout:e2aNumber(row.checkout),
+    purchase:e2aNumber(row.purchase),
+    abandoned:e2aNumber(row.abandoned),
+    raw:row.raw||{}
+  });
+
+  return {
+    snapshot_date:snapshotDate,
+    account_currency:accountCurrency||null,
+    kpis:{
+      spend,
+      sales,
+      revenue,
+      impressions,
+      reach,
+      clicks,
+      ctr,
+      cpc,
+      roas
+    },
+    purchase_journey:{
+      add_to_cart:addToCart,
+      checkout,
+      purchase,
+      abandoned
+    },
+    click_journey:{
+      ad_clicks:clicks,
+      link_clicks:linkClicks,
+      landing_page_views:landingPageViews,
+      traffic_score:trafficScore,
+      real_cpc:realCpc
+    },
+    performance_summary:{
+      rows:rows.map(normalizeRow),
+      counts:{
+        campaign:(campaignRows||[]).length,
+        adset:(adsetRows||[]).length,
+        ad:(adRows||[]).length,
+        total:rows.length
+      }
+    }
+  };
+}
+
+async function e2aFetchMetaInsightsForLevel(conn,adAccountId,level,datePreset,limit){
+  const fields=["campaign_id","campaign_name","account_currency","impressions","reach","clicks","ctr","cpc","spend","actions","action_values","cost_per_action_type","conversion_rate_ranking"];
+  if(level==="adset")fields.splice(2,0,"adset_id","adset_name");
+  if(level==="ad")fields.splice(2,0,"adset_id","adset_name","ad_id","ad_name");
+
+  const data=await metaGraph(`/${adAccountId}/insights`,{
+    level,
+    date_preset:datePreset,
+    fields:fields.join(","),
+    limit
+  },conn.access_token);
+
+  return (data.data||[]).map(row=>normalizeMetaInsight(row,level));
+}
+
+app.post("/api/snapshots/meta/write",async(req,res)=>{
+  try{
+    const result=await requireConnection(req,res,"meta");
+    if(!result)return;
+
+    const {user,conn}=result;
+    const adAccountId=req.body?.adAccountId||req.body?.ad_account_id||req.query.adAccountId||req.query.ad_account_id;
+    if(!adAccountId)return res.status(400).json({error:"Missing adAccountId"});
+
+    const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"last_7d");
+    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
+    const limit=String(req.body?.limit||req.query.limit||"100");
+
+    const campaignRows=await e2aFetchMetaInsightsForLevel(conn,adAccountId,"campaign",datePreset,limit);
+    const adsetRows=await e2aFetchMetaInsightsForLevel(conn,adAccountId,"adset",datePreset,limit);
+    const adRows=await e2aFetchMetaInsightsForLevel(conn,adAccountId,"ad",datePreset,limit);
+
+    const accountCurrency=
+      campaignRows.find(r=>r.currency)?.currency||
+      adsetRows.find(r=>r.currency)?.currency||
+      adRows.find(r=>r.currency)?.currency||
+      null;
+
+    const snapshot=e2aBuildMetaSnapshot({
+      snapshotDate,
+      accountCurrency,
+      campaignRows,
+      adsetRows,
+      adRows
+    });
+
+    const row={
+      user_id:user.id,
+      snapshot_date:snapshot.snapshot_date,
+      account_currency:snapshot.account_currency,
+      kpis:snapshot.kpis,
+      purchase_journey:snapshot.purchase_journey,
+      click_journey:snapshot.click_journey,
+      performance_summary:snapshot.performance_summary
+    };
+
+    const {data:existing,error:selectError}=await supabaseAdmin
+      .from("dashboard_snapshots")
+      .select("id")
+      .eq("user_id",user.id)
+      .eq("snapshot_date",snapshot.snapshot_date)
+      .maybeSingle();
+
+    if(selectError)throw selectError;
+
+    let writeResult;
+    if(existing?.id){
+      const {data,error}=await supabaseAdmin
+        .from("dashboard_snapshots")
+        .update(row)
+        .eq("id",existing.id)
+        .select("id,snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+        .maybeSingle();
+      if(error)throw error;
+      writeResult={mode:"update",snapshot:data};
+    }else{
+      const {data,error}=await supabaseAdmin
+        .from("dashboard_snapshots")
+        .insert(row)
+        .select("id,snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+        .maybeSingle();
+      if(error)throw error;
+      writeResult={mode:"insert",snapshot:data};
+    }
+
+    res.json({
+      ok:true,
+      platform:"Meta",
+      mode:writeResult.mode,
+      snapshot_id:writeResult.snapshot?.id||null,
+      snapshot_date:snapshot.snapshot_date,
+      account_currency:snapshot.account_currency,
+      row_counts:snapshot.performance_summary.counts,
+      kpis:snapshot.kpis,
+      purchase_journey:snapshot.purchase_journey,
+      click_journey:snapshot.click_journey
+    });
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+// ===== END PHASE E.2A META SNAPSHOT WRITE =====
+
 app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const{error}=await supabaseAdmin.from("platform_connections").update({connected:false,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform",platform);if(error)throw error;res.json({ok:true,platform,connected:false})}catch(e){res.status(500).json({error:e.message})}});

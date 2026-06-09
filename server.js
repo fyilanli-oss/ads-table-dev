@@ -382,6 +382,41 @@ app.post("/api/snapshots/meta/write",async(req,res)=>{
   }
 });
 // ===== END PHASE E.2A META SNAPSHOT WRITE =====
+// ===== PHASE E.2C META SNAPSHOT READ =====
+app.get("/api/snapshots/meta/latest",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const {data,error}=await supabaseAdmin
+      .from("dashboard_snapshots")
+      .select("snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .eq("user_id",user.id)
+      .order("snapshot_date",{ascending:false})
+      .order("created_at",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+
+    if(error)throw error;
+
+    res.json({
+      ok:true,
+      platform:"Meta",
+      snapshot:data?{
+        snapshot_date:data.snapshot_date,
+        account_currency:data.account_currency,
+        kpis:data.kpis||{},
+        purchase_journey:data.purchase_journey||{},
+        click_journey:data.click_journey||{},
+        performance_summary:data.performance_summary||[]
+      }:null
+    });
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+// ===== END PHASE E.2C META SNAPSHOT READ =====
+
 
 app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});

@@ -8363,9 +8363,34 @@ body.account-mode .accountPanel .accountCard:first-child{
     }
   }
 
+  let kpiSupabaseClient = null;
+  let kpiSupabaseSession = null;
+
+  async function getKpiAccessToken(){
+    if(kpiSupabaseSession && kpiSupabaseSession.access_token){
+      return kpiSupabaseSession.access_token;
+    }
+
+    const cfg = await fetch('/api/public-config').then(function(r){ return r.json(); });
+    kpiSupabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+
+    const s = await kpiSupabaseClient.auth.getSession();
+    kpiSupabaseSession = s && s.data ? s.data.session : null;
+
+    return kpiSupabaseSession ? kpiSupabaseSession.access_token : null;
+  }
+
   async function bindLatestMetaKpis(){
     try{
-      const response = await fetch(ENDPOINT, { headers: { 'Accept': 'application/json' } });
+      const accessToken = await getKpiAccessToken();
+      if(!accessToken) return;
+
+      const response = await fetch(ENDPOINT, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ' + accessToken
+        }
+      });
       if(!response.ok) return;
 
       const data = await response.json();

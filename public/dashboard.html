@@ -4997,9 +4997,33 @@ body.help-mode .accountSettingsView{
 <div id="commanderFilterPanel" class="commanderFilterPanel" aria-hidden="true">
   <div class="filterTree" id="commanderFilterTree">
     <label class="filterNode level0"><input type="checkbox" data-node="all"><span>All Platforms</span></label>
+
+    <label class="filterNode level1"><input type="checkbox" data-node="meta"><span>Meta</span></label>
+    <label class="filterNode level2"><input type="checkbox" data-node="meta.earrings"><span>Earrings Campaign</span></label>
+    <label class="filterNode level3"><input type="checkbox" data-node="meta.earrings.stud"><span>Stud Earrings</span></label>
+    <label class="filterNode level4"><input type="checkbox" data-node="meta.earrings.stud.pearl"><span>Pearl Studs</span></label>
+    <label class="filterNode level4"><input type="checkbox" data-node="meta.earrings.stud.zirconia"><span>Zirconia Studs – Test Product</span></label>
+    <label class="filterNode level2"><input type="checkbox" data-node="meta.bracelet"><span>Bracelet Campaign</span></label>
+    <label class="filterNode level3"><input type="checkbox" data-node="meta.bracelet.bracelets"><span>Bracelets</span></label>
+    <label class="filterNode level4"><input type="checkbox" data-node="meta.bracelet.bracelets.silver"><span>Silver Bracelet</span></label>
+    <label class="filterNode level4"><input type="checkbox" data-node="meta.bracelet.bracelets.zirconia"><span>Zirconia Silver Bracelet – Test Product</span></label>
+
+    <label class="filterNode level1"><input type="checkbox" data-node="google"><span>Google</span></label>
+    <label class="filterNode level2"><input type="checkbox" data-node="google.earrings"><span>Earrings Campaign</span></label>
+    <label class="filterNode level3"><input type="checkbox" data-node="google.earrings.stud"><span>Stud Earrings</span></label>
+    <label class="filterNode level4"><input type="checkbox" data-node="google.earrings.stud.pearl"><span>Pearl Studs</span></label>
+    <label class="filterNode level4"><input type="checkbox" data-node="google.earrings.stud.zirconia"><span>Zirconia Studs – Test Product</span></label>
+    <label class="filterNode level2"><input type="checkbox" data-node="google.bracelet"><span>Bracelet Campaign</span></label>
+    <label class="filterNode level3"><input type="checkbox" data-node="google.bracelet.bracelets"><span>Bracelets</span></label>
+    <label class="filterNode level4"><input type="checkbox" data-node="google.bracelet.bracelets.silver"><span>Silver Bracelet</span></label>
+    <label class="filterNode level4"><input type="checkbox" data-node="google.bracelet.bracelets.zirconia"><span>Zirconia Silver Bracelet – Test Product</span></label>
+
+    <label class="filterNode level1"><input type="checkbox" data-node="klaviyo"><span>Klaviyo</span></label>
+    <label class="filterNode level2"><input type="checkbox" data-node="klaviyo.earrings"><span>Earrings Campaign</span></label>
+    <label class="filterNode level2"><input type="checkbox" data-node="klaviyo.bracelet"><span>Bracelet Campaign</span></label>
   </div>
-  <button type="button" class="filterApplyBtn" id="commanderFilterApply">Apply</button>
-  <button type="button" class="filterClearBtn" id="commanderFilterClear">Clear</button>
+  <button type="button" id="commanderApplyFilters" class="filterApplyBtn">APPLY</button>
+  <button type="button" id="commanderClearFilters" class="filterClearBtn">CLEAR</button>
 </div>
 
 <script id="commander-v16-ai-insights-script">
@@ -7255,6 +7279,171 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 })();
 </script>
 <!-- END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA BEHAVIOR PATCH -->
+
+
+
+<!-- PHASE E.3B-FIX FILTERS TREE RESTORE - UI ONLY / NO BINDING -->
+<script id="phase-e3b-filters-tree-restore">
+(function(){
+  "use strict";
+
+  function byId(id){ return document.getElementById(id); }
+
+  function filterButton(){
+    return document.querySelector(".filters .filter:nth-child(2)");
+  }
+
+  function filterText(){
+    const btn = filterButton();
+    return btn ? btn.querySelector(".filterText") : null;
+  }
+
+  function iconMarkup(){
+    return '<span class="commanderFilterIcon" aria-hidden="true"><svg viewBox="0 0 32 22" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 4H29" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M8 11H24" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M13 18H19" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></span><span>Filters</span><span class="filterSummary"></span>';
+  }
+
+  function lockFilterButtonLabel(){
+    const text = filterText();
+    if(!text) return;
+    if(!text.querySelector(".commanderFilterIcon")){
+      text.innerHTML = iconMarkup();
+    }
+  }
+
+  function panel(){ return byId("commanderFilterPanel"); }
+  function tree(){ return byId("commanderFilterTree"); }
+  function allBox(){ return tree() ? tree().querySelector('input[data-node="all"]') : null; }
+  function boxes(){
+    return tree() ? Array.from(tree().querySelectorAll('input[type="checkbox"]')) : [];
+  }
+
+  function closePanel(){
+    const p = panel();
+    if(!p) return;
+    p.classList.remove("open");
+    p.setAttribute("aria-hidden","true");
+  }
+
+  function togglePanel(){
+    const p = panel();
+    if(!p) return;
+    const open = !p.classList.contains("open");
+    p.classList.toggle("open", open);
+    p.setAttribute("aria-hidden", open ? "false" : "true");
+  }
+
+  function selectedNonAll(){
+    return boxes().filter(b => b.checked && b.dataset.node !== "all");
+  }
+
+  function updateSummary(){
+    const text = filterText();
+    if(!text) return;
+    let summary = text.querySelector(".filterSummary");
+    if(!summary){
+      lockFilterButtonLabel();
+      summary = text.querySelector(".filterSummary");
+    }
+    if(!summary) return;
+    const count = selectedNonAll().length;
+    summary.textContent = count ? "(" + count + ")" : "";
+  }
+
+  function bind(){
+    lockFilterButtonLabel();
+
+    const btn = filterButton();
+    const p = panel();
+    const t = tree();
+    const apply = byId("commanderApplyFilters");
+    const clear = byId("commanderClearFilters");
+
+    if(btn && !btn.dataset.e3bFilterTreeBound){
+      btn.dataset.e3bFilterTreeBound = "1";
+      btn.addEventListener("click", function(e){
+        if(document.body.classList.contains("account-mode") || document.body.classList.contains("help-mode") || document.body.classList.contains("ai-mode")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        lockFilterButtonLabel();
+        togglePanel();
+        btn.classList.remove("open");
+        return false;
+      }, true);
+    }
+
+    if(t && !t.dataset.e3bFilterTreeBound){
+      t.dataset.e3bFilterTreeBound = "1";
+      t.addEventListener("change", function(e){
+        const input = e.target && e.target.matches && e.target.matches('input[type="checkbox"]') ? e.target : null;
+        if(!input) return;
+
+        if(input.dataset.node === "all"){
+          boxes().forEach(b => { b.checked = input.checked; });
+        }else{
+          const all = allBox();
+          if(all) all.checked = boxes().filter(b => b.dataset.node !== "all").every(b => b.checked);
+        }
+
+        updateSummary();
+      });
+    }
+
+    if(apply && !apply.dataset.e3bFilterTreeBound){
+      apply.dataset.e3bFilterTreeBound = "1";
+      apply.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        updateSummary();
+        closePanel();
+      });
+    }
+
+    if(clear && !clear.dataset.e3bFilterTreeBound){
+      clear.dataset.e3bFilterTreeBound = "1";
+      clear.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        boxes().forEach(b => { b.checked = false; });
+        updateSummary();
+      });
+    }
+
+    if(p && !p.dataset.e3bPanelBound){
+      p.dataset.e3bPanelBound = "1";
+      p.addEventListener("click", function(e){
+        e.stopPropagation();
+      });
+    }
+
+    if(!document.documentElement.dataset.e3bFilterDocBound){
+      document.documentElement.dataset.e3bFilterDocBound = "1";
+      document.addEventListener("click", function(e){
+        const p = panel();
+        const btn = filterButton();
+        if(p && p.classList.contains("open") && !p.contains(e.target) && btn && !btn.contains(e.target)){
+          closePanel();
+        }
+      }, true);
+    }
+
+    updateSummary();
+  }
+
+  function boot(){
+    bind();
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", boot);
+  }else{
+    boot();
+  }
+  setTimeout(boot, 250);
+  setTimeout(boot, 1000);
+})();
+</script>
+<!-- END PHASE E.3B-FIX FILTERS TREE RESTORE -->
 
 
 <!-- D.1 V2 ACCOUNT CURRENCY REQUIRED MODAL -->

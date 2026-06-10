@@ -8437,31 +8437,158 @@ body.account-mode .accountPanel .accountCard:first-child{
     return [];
   }
 
+  function normalizeLevel(row){
+    return String(row && row.level ? row.level : '').toLowerCase();
+  }
+
   function getRowName(row){
-    const level = String(row && row.level ? row.level : '').toLowerCase();
+    const level = normalizeLevel(row);
+
+    if(level === 'platform'){
+      return row.platform || row.name || row.level || 'Platform';
+    }
 
     if(level === 'campaign'){
-      return row.campaign_name || row.name || row.platform || row.level || 'Meta';
+      return row.campaign_name || row.name || row.platform || row.level || 'Platform';
     }
 
     if(level === 'adset'){
-      return row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Meta';
+      return row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Platform';
     }
 
     if(level === 'ad'){
-      return row.ad_name || row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Meta';
+      return row.ad_name || row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Platform';
     }
 
-    return row.name || row.platform || row.level || 'Meta';
+    return row.name || row.platform || row.level || 'Platform';
   }
 
-  function createNameCell(row){
+  function makeTreeKey(value, fallback){
+    return String(hasValue(value) ? value : fallback);
+  }
+
+  function makeTreeId(parts){
+    return parts.map(function(part){
+      return String(part || 'na').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'na';
+    }).join('__');
+  }
+
+  function cloneRowWithLevel(row, level){
+    const copy = Object.assign({}, row || {});
+    copy.level = level;
+    return copy;
+  }
+
+  function buildPerformanceTreeRows(rows){
+    const input = Array.isArray(rows) ? rows : [];
+    const platforms = new Map();
+
+    input.forEach(function(originalRow, index){
+      const row = originalRow || {};
+      const platformName = makeTreeKey(row.platform, 'Platform');
+      const campaignName = makeTreeKey(row.campaign_name || (normalizeLevel(row) === 'campaign' ? row.name : null), 'Campaign ' + (index + 1));
+      const adsetName = makeTreeKey(row.adset_name || (normalizeLevel(row) === 'adset' ? row.name : null), 'Adset ' + (index + 1));
+      const adName = makeTreeKey(row.ad_name || (normalizeLevel(row) === 'ad' ? row.name : null), 'Ad ' + (index + 1));
+      const level = normalizeLevel(row);
+
+      if(!platforms.has(platformName)){
+        platforms.set(platformName, {
+          row: { level:'platform', platform: platformName },
+          campaigns: new Map()
+        });
+      }
+
+      const platformNode = platforms.get(platformName);
+
+      if(!hasValue(platformNode.row.spend) && level !== 'platform'){
+        platformNode.row = cloneRowWithLevel(row, 'platform');
+        platformNode.row.platform = platformNode.row.platform || platformName;
+      }
+
+      if(level === 'platform'){
+        platformNode.row = cloneRowWithLevel(row, 'platform');
+        platformNode.row.platform = platformNode.row.platform || platformName;
+        return;
+      }
+
+      if(!platformNode.campaigns.has(campaignName)){
+        platformNode.campaigns.set(campaignName, {
+          row: { level:'campaign', platform: platformName, campaign_name: campaignName },
+          adsets: new Map()
+        });
+      }
+
+      const campaignNode = platformNode.campaigns.get(campaignName);
+
+      if(level === 'campaign'){
+        campaignNode.row = cloneRowWithLevel(row, 'campaign');
+        campaignNode.row.platform = campaignNode.row.platform || platformName;
+        campaignNode.row.campaign_name = campaignNode.row.campaign_name || campaignName;
+        return;
+      }
+
+      if(!campaignNode.adsets.has(adsetName)){
+        campaignNode.adsets.set(adsetName, {
+          row: { level:'adset', platform: platformName, campaign_name: campaignName, adset_name: adsetName },
+          ads: []
+        });
+      }
+
+      const adsetNode = campaignNode.adsets.get(adsetName);
+
+      if(level === 'adset'){
+        adsetNode.row = cloneRowWithLevel(row, 'adset');
+        adsetNode.row.platform = adsetNode.row.platform || platformName;
+        adsetNode.row.campaign_name = adsetNode.row.campaign_name || campaignName;
+        adsetNode.row.adset_name = adsetNode.row.adset_name || adsetName;
+        return;
+      }
+
+      if(level === 'ad'){
+        const adRow = cloneRowWithLevel(row, 'ad');
+        adRow.platform = adRow.platform || platformName;
+        adRow.campaign_name = adRow.campaign_name || campaignName;
+        adRow.adset_name = adRow.adset_name || adsetName;
+        adRow.ad_name = adRow.ad_name || adName;
+        adsetNode.ads.push(adRow);
+      }
+    });
+
+    const treeRows = [];
+
+    platforms.forEach(function(platformNode, platformName){
+      const platformId = makeTreeId(['platform', platformName]);
+      const platformRow = cloneRowWithLevel(platformNode.row, 'platform');
+      platformRow.platform = platformRow.platform || platformName;
+      treeRows.push({ row: platformRow, nodeId: platformId, parentId: '', depth:0, hasChildren: platformNode.campaigns.size > 0, visible:true });
+
+      platformNode.campaigns.forEach(function(campaignNode, campaignName){
+        const campaignId = makeTreeId(['platform', platformName, 'campaign', campaignName]);
+        treeRows.push({ row: campaignNode.row, nodeId: campaignId, parentId: platformId, depth:1, hasChildren: campaignNode.adsets.size > 0, visible:false });
+
+        campaignNode.adsets.forEach(function(adsetNode, adsetName){
+          const adsetId = makeTreeId(['platform', platformName, 'campaign', campaignName, 'adset', adsetName]);
+          treeRows.push({ row: adsetNode.row, nodeId: adsetId, parentId: campaignId, depth:2, hasChildren: adsetNode.ads.length > 0, visible:false });
+
+          adsetNode.ads.forEach(function(adRow, adIndex){
+            const adId = makeTreeId(['platform', platformName, 'campaign', campaignName, 'adset', adsetName, 'ad', adRow.ad_name || adRow.name || adIndex]);
+            treeRows.push({ row: adRow, nodeId: adId, parentId: adsetId, depth:3, hasChildren:false, visible:false });
+          });
+        });
+      });
+    });
+
+    return treeRows;
+  }
+
+  function createNameCell(row, treeMeta){
     const wrap = document.createElement('div');
     wrap.className = 'nameCell';
+    wrap.style.paddingLeft = ((treeMeta && treeMeta.depth ? treeMeta.depth : 0) * 24) + 'px';
 
     const arrow = document.createElement('span');
-    arrow.className = 'playArrow neutral';
-    arrow.textContent = '›';
+    arrow.className = 'playArrow' + (treeMeta && treeMeta.hasChildren ? '' : ' neutral');
+    arrow.textContent = treeMeta && treeMeta.hasChildren ? '›' : '•';
 
     const name = document.createElement('b');
     name.textContent = getRowName(row || {});
@@ -8481,18 +8608,57 @@ body.account-mode .accountPanel .accountCard:first-child{
     tr.appendChild(td);
   }
 
-  function formatTableRoas(row){
-    if(row && hasValue(row.roas)) return formatDecimalOrNA(row.roas);
+  function getTableSales(row){
+    if(!row) return null;
+    if(hasValue(row.sales)) return row.sales;
+    if(hasValue(row.revenue)) return row.revenue;
+    return null;
+  }
 
-    const spend = row && hasValue(row.spend) ? Number(row.spend) : null;
-    const salesValue = row && hasValue(row.sales) ? row.sales : (row && hasValue(row.revenue) ? row.revenue : null);
-    const sales = hasValue(salesValue) ? Number(salesValue) : null;
+  function getTableRoas(row){
+    if(!row) return null;
+    if(hasValue(row.roas)) return row.roas;
+    const spend = Number(row.spend || 0);
+    const sales = Number(getTableSales(row) || 0);
+    if(spend > 0 && sales === 0) return 0;
+    return null;
+  }
 
-    if(Number.isFinite(spend) && spend > 0 && Number.isFinite(sales) && sales === 0){
-      return '0.00';
+  function setRowVisibility(tr, visible){
+    tr.style.display = visible ? '' : 'none';
+  }
+
+  function collapseDescendants(tableBody, nodeId){
+    const descendants = tableBody.querySelectorAll('tr[data-parent-chain~="' + nodeId + '"]');
+    descendants.forEach(function(row){
+      row.dataset.expanded = 'false';
+      setRowVisibility(row, false);
+      const arrow = row.querySelector('.playArrow');
+      if(arrow && !arrow.classList.contains('neutral')) arrow.textContent = '›';
+    });
+  }
+
+  function toggleTreeRow(tableBody, tr){
+    const nodeId = tr.dataset.nodeId;
+    if(!nodeId) return;
+
+    const isExpanded = tr.dataset.expanded === 'true';
+    const arrow = tr.querySelector('.playArrow');
+
+    if(isExpanded){
+      tr.dataset.expanded = 'false';
+      if(arrow && !arrow.classList.contains('neutral')) arrow.textContent = '›';
+      collapseDescendants(tableBody, nodeId);
+      return;
     }
 
-    return 'N/A';
+    tr.dataset.expanded = 'true';
+    if(arrow && !arrow.classList.contains('neutral')) arrow.textContent = '⌄';
+
+    const children = tableBody.querySelectorAll('tr[data-parent-id="' + nodeId + '"]');
+    children.forEach(function(child){
+      setRowVisibility(child, true);
+    });
   }
 
   function bindPerformanceTable(performanceSummary, currency){
@@ -8500,9 +8666,10 @@ body.account-mode .accountPanel .accountCard:first-child{
     if(!tableBody) return;
 
     const rows = resolvePerformanceRows(performanceSummary);
+    const treeRows = buildPerformanceTreeRows(rows);
     tableBody.innerHTML = '';
 
-    if(!rows.length){
+    if(!treeRows.length){
       const emptyRow = document.createElement('tr');
       const emptyCell = document.createElement('td');
       emptyCell.colSpan = 16;
@@ -8512,30 +8679,56 @@ body.account-mode .accountPanel .accountCard:first-child{
       return;
     }
 
-    rows.forEach(function(row){
+    treeRows.forEach(function(treeMeta){
+      const row = treeMeta.row || {};
       const tr = document.createElement('tr');
-      const level = String(row && row.level ? row.level : '').toLowerCase();
-      if(level === 'adset') tr.className = 'level2';
-      if(level === 'ad') tr.className = 'level3';
+      tr.dataset.nodeId = treeMeta.nodeId;
+      tr.dataset.parentId = treeMeta.parentId || '';
+      tr.dataset.parentChain = treeMeta.parentId || '';
+      tr.dataset.expanded = 'false';
+      tr.dataset.hasChildren = treeMeta.hasChildren ? 'true' : 'false';
+      if(treeMeta.depth === 1) tr.className = 'level1';
+      if(treeMeta.depth === 2) tr.className = 'level2';
+      if(treeMeta.depth === 3) tr.className = 'level3';
+      setRowVisibility(tr, treeMeta.visible);
 
-      appendCell(tr, createNameCell(row || {}));
-      appendCell(tr, formatCurrency(row && row.spend, currency));
-      appendCell(tr, formatCurrency(row && row.sales, currency));
-      appendCell(tr, formatNumber(row && row.impressions));
-      appendCell(tr, formatNumber(row && row.clicks));
-      appendCell(tr, formatPercent(row && row.ctr));
-      appendCell(tr, formatCurrency(row && row.cpc, currency));
-      appendCell(tr, formatTableRoas(row || {}));
-      appendCell(tr, formatPercent(row && row.acos));
-      appendCell(tr, formatPercent(row && row.cvr));
-      appendCell(tr, formatNumber(row && row.add_to_cart));
-      appendCell(tr, formatNumber(row && row.checkout));
-      appendCell(tr, formatNumber(row && row.abandoned));
-      appendCell(tr, formatNumber(row && (hasValue(row.ad_clicks) ? row.ad_clicks : row.clicks)));
-      appendCell(tr, formatNumber(row && row.link_clicks));
-      appendCell(tr, formatNumber(row && row.landing_page_views));
+      appendCell(tr, createNameCell(row, treeMeta));
+      appendCell(tr, formatCurrency(row.spend, currency));
+      appendCell(tr, formatCurrency(getTableSales(row), currency));
+      appendCell(tr, formatNumber(row.impressions));
+      appendCell(tr, formatNumber(row.clicks));
+      appendCell(tr, formatPercent(row.ctr));
+      appendCell(tr, formatCurrency(row.cpc, currency));
+      appendCell(tr, formatDecimalOrNA(getTableRoas(row)));
+      appendCell(tr, formatPercent(row.acos));
+      appendCell(tr, formatPercent(row.cvr));
+      appendCell(tr, formatNumber(row.add_to_cart));
+      appendCell(tr, formatNumber(row.checkout));
+      appendCell(tr, formatNumber(row.abandoned));
+      appendCell(tr, formatNumber(hasValue(row.ad_clicks) ? row.ad_clicks : row.clicks));
+      appendCell(tr, formatNumber(row.link_clicks));
+      appendCell(tr, formatNumber(row.landing_page_views));
+
+      if(treeMeta.hasChildren){
+        tr.addEventListener('click', function(event){
+          event.preventDefault();
+          toggleTreeRow(tableBody, tr);
+        });
+      }
 
       tableBody.appendChild(tr);
+    });
+
+    const allRows = Array.from(tableBody.querySelectorAll('tr[data-node-id]'));
+    allRows.forEach(function(row){
+      const chain = [];
+      let parentId = row.dataset.parentId;
+      while(parentId){
+        chain.push(parentId);
+        const parent = tableBody.querySelector('tr[data-node-id="' + parentId + '"]');
+        parentId = parent ? parent.dataset.parentId : '';
+      }
+      row.dataset.parentChain = chain.join(' ');
     });
   }
 

@@ -3415,6 +3415,7 @@ body.account-mode .accountSettingsView{
 }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="app">
@@ -6220,6 +6221,33 @@ body.help-mode .accountSettingsView{
     tree.innerHTML = html;
   }
 
+  let commanderSupabaseClient = null;
+  let commanderSupabaseSession = null;
+
+  async function commanderGetSnapshotAuthHeader(){
+    if(!window.supabase){
+      throw new Error("Supabase client library is not loaded");
+    }
+
+    if(!commanderSupabaseClient){
+      const cfgRes = await fetch("/api/public-config", { credentials:"include", headers:{ "Accept":"application/json" } });
+      const cfg = await cfgRes.json();
+      if(!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey){
+        throw new Error("Supabase public config is missing");
+      }
+      commanderSupabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    }
+
+    const sessionResult = await commanderSupabaseClient.auth.getSession();
+    commanderSupabaseSession = sessionResult?.data?.session || null;
+
+    if(!commanderSupabaseSession || !commanderSupabaseSession.access_token){
+      throw new Error("Supabase session access_token is missing");
+    }
+
+    return { Authorization: "Bearer " + commanderSupabaseSession.access_token };
+  }
+
   function commanderDebug(message, payload){
     try{
       console.log("[F-TEST.3]", message, payload || "");
@@ -6234,7 +6262,11 @@ body.help-mode .accountSettingsView{
 
   async function commanderLoadSnapshotIntoDemoEngine(){
     commanderDebug("load start");
-    const res = await fetch("/api/snapshots/meta/latest", { credentials:"include" });
+    const authHeaders = await commanderGetSnapshotAuthHeader();
+    const res = await fetch("/api/snapshots/meta/latest", {
+      credentials:"include",
+      headers: Object.assign({ "Accept":"application/json" }, authHeaders)
+    });
     commanderDebug("endpoint status", { status: res.status, ok: res.ok });
 
     let payload = null;
@@ -6278,7 +6310,6 @@ body.help-mode .accountSettingsView{
     }
 
     commanderV13Apply();
-    commanderLoadSnapshotIntoDemoEngine().catch(err => commanderDebug('load failed', {error:err.message}));
     commanderDebug("apply complete", { keys: LEAF_KEYS.length });
     return true;
   }
@@ -6358,6 +6389,14 @@ body.help-mode .accountSettingsView{
   window.commanderV13Apply = commanderV13Apply;
   window.commanderLoadSnapshotIntoDemoEngine = commanderLoadSnapshotIntoDemoEngine;
   window.commanderAdaptSnapshotRows = commanderAdaptSnapshotRows;
+
+  if(document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){
+      commanderLoadSnapshotIntoDemoEngine().catch(err => commanderDebug('load failed', {error:err.message}));
+    });
+  } else {
+    commanderLoadSnapshotIntoDemoEngine().catch(err => commanderDebug('load failed', {error:err.message}));
+  }
 })();
 </script>
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AdsTable Demo Dashboard</title>
+<title>AdsTable Snapshot Lab</title>
 <style>
 *{box-sizing:border-box}
 html,body{
@@ -6087,7 +6087,23 @@ body.help-mode .accountSettingsView{
   }
 
 
-  // ===== F-TEST.3 SNAPSHOT ADAPTER - TEST ONLY =====
+  
+  function commanderCurrencySymbol(){
+    const c = String(commanderSnapshotCurrency || "").toUpperCase();
+    if(c === "USD") return "$";
+    if(c === "TRY") return "₺";
+    if(c === "EUR") return "€";
+    if(c === "GBP") return "£";
+    return "$";
+  }
+
+  function commanderFormatMoney(value){
+    const symbol = commanderCurrencySymbol();
+    const n = Number(value) || 0;
+    return symbol + Math.round(n).toLocaleString("en-US");
+  }
+
+// ===== F-TEST.3 SNAPSHOT ADAPTER - TEST ONLY =====
   function commanderCleanSlug(value, fallback){
     const raw = String(value || fallback || "unknown").trim().toLowerCase();
     return raw
@@ -6286,6 +6302,7 @@ body.help-mode .accountSettingsView{
       return false;
     }
 
+    commanderSnapshotCurrency = payload.snapshot.account_currency || payload.snapshot.accountCurrency || null;
     const rows = payload.snapshot?.performance_summary?.rows || payload.snapshot?.performance_summary || [];
     commanderDebug("snapshot rows", { count: Array.isArray(rows) ? rows.length : 0 });
 
@@ -6301,12 +6318,13 @@ body.help-mode .accountSettingsView{
     LEAF_KEYS = Object.keys(DATA_BASE);
     labels = adapted.labels;
     commanderSnapshotMode = true;
+    commanderRealSnapshotLoaded = true;
 
     commanderReplaceFilterTreeForData(DATA_BASE);
 
     const status = document.getElementById("ftest3Status");
     if(status){
-      status.textContent = "REAL SNAPSHOT MODE · " + LEAF_KEYS.length + " rows · " + (payload.snapshot.snapshot_date || "");
+      status.textContent = "REAL SNAPSHOT MODE · " + LEAF_KEYS.length + " rows · " + (payload.snapshot.snapshot_date || "") + (commanderSnapshotCurrency ? " · " + commanderSnapshotCurrency : "");
     }
 
     commanderV13Apply();
@@ -6316,7 +6334,25 @@ body.help-mode .accountSettingsView{
   // ===== END F-TEST.3 SNAPSHOT ADAPTER - TEST ONLY =====
 
 
-  function commanderV13Apply(){
+  
+  function commanderApplySnapshotCurrencyLabels(){
+    if(!commanderSnapshotCurrency) return;
+    const currency = String(commanderSnapshotCurrency).toUpperCase();
+    const status = document.getElementById("ftest3Status");
+    if(status && status.textContent.includes("REAL SNAPSHOT MODE") && !status.textContent.includes(currency)){
+      status.textContent = status.textContent + " · " + currency;
+    }
+  }
+
+  function commanderLockRealSnapshotMode(reason){
+    if(!commanderRealSnapshotLoaded) return;
+    commanderSnapshotMode = true;
+    if(typeof commanderDebug === "function"){
+      commanderDebug("snapshot mode locked", { reason, currency: commanderSnapshotCurrency, leafKeys: LEAF_KEYS.length });
+    }
+  }
+
+function commanderV13Apply(){
     const DATA = scaledData();
     const keys = activeKeys(DATA);
     const total = sumRows(DATA, keys);
@@ -6389,6 +6425,14 @@ body.help-mode .accountSettingsView{
   window.commanderV13Apply = commanderV13Apply;
   window.commanderLoadSnapshotIntoDemoEngine = commanderLoadSnapshotIntoDemoEngine;
   window.commanderAdaptSnapshotRows = commanderAdaptSnapshotRows;
+
+  window.commanderSnapshotState = {
+    get realLoaded(){ return commanderRealSnapshotLoaded; },
+    get snapshotMode(){ return commanderSnapshotMode; },
+    get currency(){ return commanderSnapshotCurrency; },
+    get leafKeys(){ return LEAF_KEYS ? LEAF_KEYS.length : 0; }
+  };
+
 
   if(document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function(){
@@ -9471,6 +9515,67 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   <div id="ftest3Status" style="font-weight:900;color:#555;margin-bottom:4px">BOOTING · demo fallback active</div>
   <div id="ftest3DebugBox"></div>
 </div>
+
+
+<script id="snapshot-clean-guard">
+(function(){
+  function logClean(message, payload){
+    try{
+      console.log("[SNAPSHOT-CLEAN]", message, payload || "");
+      var box = document.getElementById("ftest3DebugBox");
+      if(box){
+        var line = document.createElement("div");
+        line.textContent = "[SNAPSHOT-CLEAN] " + message + (payload !== undefined ? " " + JSON.stringify(payload).slice(0,300) : "");
+        box.appendChild(line);
+      }
+    }catch(e){}
+  }
+
+  window.addEventListener("click", function(ev){
+    var target = ev.target;
+    if(!target) return;
+    var dateInput = target.closest && target.closest('#dateFilter input, [data-date], [data-date-mode]');
+    if(!dateInput) return;
+    if(window.commanderSnapshotState && window.commanderSnapshotState.realLoaded){
+      logClean("date filter locked in real snapshot mode");
+      setTimeout(function(){
+        if(typeof window.commanderV13Apply === "function") window.commanderV13Apply();
+      },0);
+    }
+  }, true);
+
+  window.snapshotCleanLog = logClean;
+})();
+</script>
+
+
+<script id="snapshot-clean-apply-wrapper">
+(function(){
+  var tries = 0;
+  function install(){
+    tries++;
+    if(typeof window.commanderV13Apply !== "function"){
+      if(tries < 20) setTimeout(install, 100);
+      return;
+    }
+    var originalApply = window.commanderV13Apply;
+    window.commanderV13Apply = function(){
+      var result = originalApply.apply(this, arguments);
+      try{
+        if(window.commanderSnapshotState && window.commanderSnapshotState.realLoaded){
+          var status = document.getElementById("ftest3Status");
+          if(status && status.textContent.indexOf("REAL SNAPSHOT MODE") === -1){
+            status.textContent = "REAL SNAPSHOT MODE · " + window.commanderSnapshotState.leafKeys + " rows" + (window.commanderSnapshotState.currency ? " · " + window.commanderSnapshotState.currency : "");
+          }
+        }
+      }catch(e){}
+      return result;
+    };
+    if(window.snapshotCleanLog) window.snapshotCleanLog("apply wrapper installed");
+  }
+  install();
+})();
+</script>
 
 </body>
 </html>

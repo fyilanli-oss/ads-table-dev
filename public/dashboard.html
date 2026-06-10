@@ -8298,12 +8298,13 @@ body.account-mode .accountPanel .accountCard:first-child{
 </style>
 
 <!-- =========================================================
-     PHASE E.3C.1 - KPI CARDS BINDING ONLY
+     PHASE E.3C.1/E.3C.2 - KPI + PURCHASE JOURNEY BINDING ONLY
      Source: GET /api/snapshots/meta/latest
      Scope: snapshot.kpis -> existing KPI Cards
-     No filters, journeys, performance table, layout, demo, or server changes.
+            snapshot.purchase_journey -> existing Purchase Journey numbers
+     No filters, click journey, performance table, layout, demo, or server changes.
      ========================================================= -->
-<script id="phase-e3c1-kpi-cards-binding">
+<script id="phase-e3c1-e3c2-kpi-purchase-binding">
 (function(){
   const ENDPOINT = '/api/snapshots/meta/latest';
 
@@ -8363,6 +8364,27 @@ body.account-mode .accountPanel .accountCard:first-child{
     }
   }
 
+  function formatJourneyNumber(value){
+    if(value === null || value === undefined || value === ''){
+      return 'N/A';
+    }
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.round(n).toLocaleString('en-US') : 'N/A';
+  }
+
+  function setPurchaseJourneyValue(title, value){
+    const rows = document.querySelectorAll('.purchase .pjMainRow');
+    for(const row of rows){
+      const labelEl = row.querySelector('.pjFixedLabel');
+      const valueEl = row.querySelector('.pjFixedNumber');
+      if(!labelEl || !valueEl) continue;
+      if(labelEl.textContent.trim().toLowerCase() === title.toLowerCase()){
+        valueEl.textContent = formatJourneyNumber(value);
+        return;
+      }
+    }
+  }
+
   let kpiSupabaseClient = null;
   let kpiSupabaseSession = null;
 
@@ -8407,6 +8429,14 @@ body.account-mode .accountPanel .accountCard:first-child{
       setKpiValue('CTR', formatPercent(kpis.ctr));
       setKpiValue('CPC', formatCurrency(kpis.cpc, currency));
       setKpiValue('ROAS', formatDecimalOrNA(kpis.roas));
+
+      if(snapshot.purchase_journey){
+        const purchaseJourney = snapshot.purchase_journey;
+        setPurchaseJourneyValue('ADD TO CART', purchaseJourney.add_to_cart);
+        setPurchaseJourneyValue('CHECKOUT', purchaseJourney.checkout);
+        setPurchaseJourneyValue('ABANDONED', purchaseJourney.abandoned);
+        setPurchaseJourneyValue('PURCHASE', purchaseJourney.purchase);
+      }
     }catch(e){
       /* Keep existing hardcoded KPI values if latest snapshot is unavailable. */
     }

@@ -8157,183 +8157,6 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 </script>
 <!-- END D.2B.1 KLAVIYO CONNECT / DISCONNECT + ESTIMATED MONTHLY SPEND -->
 
-
-
-<!-- E.3C.4 PERFORMANCE TABLE BINDING FLOW FIX -->
-<script>
-(function(){
-  const ENDPOINT = '/api/snapshots/meta/latest';
-  let performanceTableBindingStarted = false;
-
-  function isPresent(value){
-    return value !== undefined && value !== null && value !== '';
-  }
-
-  function currencySymbol(currency){
-    const code = String(currency || 'USD').toUpperCase();
-    if(code === 'TRY') return '₺';
-    if(code === 'EUR') return '€';
-    if(code === 'GBP') return '£';
-    return '$';
-  }
-
-  function formatCurrency(value, currency){
-    if(!isPresent(value)) return 'N/A';
-    const number = Number(value);
-    if(!Number.isFinite(number)) return 'N/A';
-    return currencySymbol(currency) + number.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  }
-
-  function formatNumber(value){
-    if(!isPresent(value)) return 'N/A';
-    const number = Number(value);
-    if(!Number.isFinite(number)) return 'N/A';
-    return number.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  }
-
-  function formatPercent(value){
-    if(!isPresent(value)) return 'N/A';
-    const number = Number(value);
-    if(!Number.isFinite(number)) return 'N/A';
-    return number.toFixed(2) + '%';
-  }
-
-  function formatDecimal(value){
-    if(!isPresent(value)) return 'N/A';
-    const number = Number(value);
-    if(!Number.isFinite(number)) return 'N/A';
-    return number.toFixed(2);
-  }
-
-  function resolveRows(performanceSummary){
-    if(Array.isArray(performanceSummary)) return performanceSummary;
-    if(performanceSummary && Array.isArray(performanceSummary.rows)) return performanceSummary.rows;
-    return [];
-  }
-
-  function getRowName(row){
-    const level = String(row && row.level ? row.level : '').toLowerCase();
-
-    if(level === 'campaign') return row.campaign_name || row.name || row.platform || row.level || 'Meta';
-    if(level === 'adset') return row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Meta';
-    if(level === 'ad') return row.ad_name || row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Meta';
-
-    return row.name || row.platform || row.level || 'Meta';
-  }
-
-  function createNameCell(row){
-    const wrap = document.createElement('div');
-    wrap.className = 'nameCell';
-
-    const arrow = document.createElement('span');
-    arrow.className = 'playArrow neutral';
-    arrow.textContent = '›';
-
-    const name = document.createElement('b');
-    name.textContent = getRowName(row);
-
-    wrap.appendChild(arrow);
-    wrap.appendChild(name);
-    return wrap;
-  }
-
-  function appendCell(tr, content){
-    const td = document.createElement('td');
-    if(content && content.nodeType === 1){
-      td.appendChild(content);
-    }else{
-      td.textContent = String(content);
-    }
-    tr.appendChild(td);
-  }
-
-  function bindPerformanceTable(performanceSummary, currency){
-    const tbody = document.querySelector('.tableCard .perf tbody');
-    if(!tbody) return;
-
-    const rows = resolveRows(performanceSummary);
-    tbody.innerHTML = '';
-
-    if(!rows.length){
-      const tr = document.createElement('tr');
-      const td = document.createElement('td');
-      td.colSpan = 16;
-      td.textContent = 'No advertising data yet';
-      tr.appendChild(td);
-      tbody.appendChild(tr);
-      return;
-    }
-
-    rows.forEach(function(row){
-      const tr = document.createElement('tr');
-      appendCell(tr, createNameCell(row));
-      appendCell(tr, formatCurrency(row.spend, currency));
-      appendCell(tr, formatCurrency(row.sales, currency));
-      appendCell(tr, formatNumber(row.impressions));
-      appendCell(tr, formatNumber(row.clicks));
-      appendCell(tr, formatPercent(row.ctr));
-      appendCell(tr, formatCurrency(row.cpc, currency));
-      appendCell(tr, formatDecimal(row.roas));
-      appendCell(tr, formatPercent(row.acos));
-      appendCell(tr, formatPercent(row.cvr));
-      appendCell(tr, formatNumber(row.add_to_cart));
-      appendCell(tr, formatNumber(row.checkout));
-      appendCell(tr, formatNumber(row.abandoned));
-      appendCell(tr, formatNumber(row.ad_clicks));
-      appendCell(tr, formatNumber(row.link_clicks));
-      appendCell(tr, formatNumber(row.landing_page_views));
-      tbody.appendChild(tr);
-    });
-  }
-
-  async function getSupabaseAccessToken(){
-    if(!window.supabase) return null;
-    const cfgRes = await fetch('/api/public-config', { headers: { 'Accept': 'application/json' } });
-    const cfg = await cfgRes.json();
-    const client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-    const sessionResult = await client.auth.getSession();
-    return sessionResult && sessionResult.data && sessionResult.data.session
-      ? sessionResult.data.session.access_token
-      : null;
-  }
-
-  async function loadAndBindPerformanceTable(){
-    if(performanceTableBindingStarted) return;
-    performanceTableBindingStarted = true;
-
-    try{
-      const accessToken = await getSupabaseAccessToken();
-      if(!accessToken) return;
-
-      const response = await fetch(ENDPOINT, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer ' + accessToken
-        }
-      });
-      const data = await response.json().catch(function(){ return {}; });
-      if(!response.ok || !data || !data.snapshot) return;
-
-      const snapshot = data.snapshot;
-      if(snapshot.performance_summary){
-        bindPerformanceTable(snapshot.performance_summary, snapshot.account_currency);
-      }
-    }catch(err){
-      console.error('E3C4 performance table binding failed:', err);
-    }
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', loadAndBindPerformanceTable);
-  }else{
-    loadAndBindPerformanceTable();
-  }
-})();
-</script>
-<!-- END E.3C.4 PERFORMANCE TABLE BINDING FLOW FIX -->
 </body>
 </html>
 <!-- =========================================================
@@ -8473,3 +8296,284 @@ body.account-mode .accountPanel .accountCard:first-child{
   margin-top:0 !important;
 }
 </style>
+
+<!-- =========================================================
+     PHASE E.3C REGRESSION FIX - SINGLE SNAPSHOT LOAD BINDING
+     Source: GET /api/snapshots/meta/latest
+     Scope: Preserve table hierarchy fix and restore single-load binding order:
+            bindKpis -> bindPurchaseJourney -> bindClickJourney -> bindPerformanceTable
+     No filters, CSS/layout, demo, or server changes.
+     ========================================================= -->
+<script id="phase-e3c-regression-single-snapshot-binding">
+(function(){
+  const ENDPOINT = '/api/snapshots/meta/latest';
+
+  function hasValue(value){
+    return value !== null && value !== undefined && value !== '';
+  }
+
+  function toNumber(value){
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function formatCurrency(value, currency){
+    if(!hasValue(value)) return 'N/A';
+    const code = currency || 'USD';
+    try{
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(toNumber(value));
+    }catch(e){
+      const symbol = code === 'TRY' ? '₺' : code === 'USD' ? '$' : code + ' ';
+      return symbol + toNumber(value).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+  }
+
+  function formatNumber(value){
+    if(!hasValue(value)) return 'N/A';
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.round(n).toLocaleString('en-US') : 'N/A';
+  }
+
+  function formatPercent(value){
+    if(!hasValue(value)) return 'N/A';
+    let n = Number(value);
+    if(!Number.isFinite(n)) return 'N/A';
+    if(Math.abs(n) > 0 && Math.abs(n) <= 1){
+      n = n * 100;
+    }
+    return n.toFixed(2) + '%';
+  }
+
+  function formatDecimalOrNA(value){
+    if(!hasValue(value)) return 'N/A';
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(2) : 'N/A';
+  }
+
+  function setKpiValue(title, value){
+    const cards = document.querySelectorAll('.kpis .kpi');
+    for(const card of cards){
+      const titleEl = card.querySelector('.kTitle');
+      const valueEl = card.querySelector('.kValue');
+      if(!titleEl || !valueEl) continue;
+      if(titleEl.textContent.trim().toLowerCase() === title.toLowerCase()){
+        valueEl.textContent = value;
+        return;
+      }
+    }
+  }
+
+  function bindKpis(kpis, currency){
+    if(!kpis) return;
+    setKpiValue('Spend', formatCurrency(kpis.spend, currency));
+    setKpiValue('Sales', formatCurrency(kpis.sales, currency));
+    setKpiValue('Impression', formatNumber(kpis.impressions));
+    setKpiValue('Click', formatNumber(kpis.clicks));
+    setKpiValue('CTR', formatPercent(kpis.ctr));
+    setKpiValue('CPC', formatCurrency(kpis.cpc, currency));
+    setKpiValue('ROAS', formatDecimalOrNA(kpis.roas));
+  }
+
+  function setPurchaseJourneyValue(title, value){
+    const rows = document.querySelectorAll('.purchase .pjMainRow');
+    for(const row of rows){
+      const labelEl = row.querySelector('.pjFixedLabel');
+      const valueEl = row.querySelector('.pjFixedNumber');
+      if(!labelEl || !valueEl) continue;
+      if(labelEl.textContent.trim().toLowerCase() === title.toLowerCase()){
+        valueEl.textContent = formatNumber(value);
+        return;
+      }
+    }
+  }
+
+  function bindPurchaseJourney(purchaseJourney){
+    if(!purchaseJourney) return;
+    setPurchaseJourneyValue('ADD TO CART', purchaseJourney.add_to_cart);
+    setPurchaseJourneyValue('CHECKOUT', purchaseJourney.checkout);
+    setPurchaseJourneyValue('ABANDONED', purchaseJourney.abandoned);
+    setPurchaseJourneyValue('PURCHASE', purchaseJourney.purchase);
+  }
+
+  function setClickJourneyValue(title, value){
+    const cells = document.querySelectorAll('.click .cj-cell');
+    for(const cell of cells){
+      const labelEl = cell.querySelector('.clickLabel');
+      const valueEl = cell.querySelector('.clickValue');
+      if(!labelEl || !valueEl) continue;
+      if(labelEl.textContent.trim().toLowerCase() === title.toLowerCase()){
+        valueEl.textContent = formatNumber(value);
+        return;
+      }
+    }
+  }
+
+  function bindClickJourney(clickJourney, currency){
+    if(!clickJourney) return;
+    setClickJourneyValue('Ad Click', clickJourney.ad_clicks);
+    setClickJourneyValue('Link Click', clickJourney.link_clicks);
+    setClickJourneyValue('Landing Page View', clickJourney.landing_page_views);
+
+    const detail = document.querySelector('.click .clickDetail');
+    if(detail && (hasValue(clickJourney.traffic_score) || hasValue(clickJourney.real_cpc))){
+      const trafficScore = hasValue(clickJourney.traffic_score) ? formatPercent(clickJourney.traffic_score) : 'N/A';
+      const realCpc = hasValue(clickJourney.real_cpc) ? formatCurrency(clickJourney.real_cpc, currency) : 'N/A';
+      detail.innerHTML = '<div class="split"><span>Traffic Score</span><b>' + trafficScore + '</b></div>' +
+                         '<div class="split"><span>Real CPC</span><b>' + realCpc + '</b></div>';
+    }
+  }
+
+  function resolvePerformanceRows(performanceSummary){
+    if(Array.isArray(performanceSummary)) return performanceSummary;
+    if(performanceSummary && Array.isArray(performanceSummary.rows)) return performanceSummary.rows;
+    return [];
+  }
+
+  function getRowName(row){
+    const level = String(row && row.level ? row.level : '').toLowerCase();
+
+    if(level === 'campaign'){
+      return row.campaign_name || row.name || row.platform || row.level || 'Meta';
+    }
+
+    if(level === 'adset'){
+      return row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Meta';
+    }
+
+    if(level === 'ad'){
+      return row.ad_name || row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Meta';
+    }
+
+    return row.name || row.platform || row.level || 'Meta';
+  }
+
+  function createNameCell(row){
+    const wrap = document.createElement('div');
+    wrap.className = 'nameCell';
+
+    const arrow = document.createElement('span');
+    arrow.className = 'playArrow neutral';
+    arrow.textContent = '›';
+
+    const name = document.createElement('b');
+    name.textContent = getRowName(row || {});
+
+    wrap.appendChild(arrow);
+    wrap.appendChild(name);
+    return wrap;
+  }
+
+  function appendCell(tr, content){
+    const td = document.createElement('td');
+    if(content && content.nodeType === 1){
+      td.appendChild(content);
+    }else{
+      td.textContent = hasValue(content) ? content : 'N/A';
+    }
+    tr.appendChild(td);
+  }
+
+  function bindPerformanceTable(performanceSummary, currency){
+    const tableBody = document.querySelector('.tableCard .perf tbody');
+    if(!tableBody) return;
+
+    const rows = resolvePerformanceRows(performanceSummary);
+    tableBody.innerHTML = '';
+
+    if(!rows.length){
+      const emptyRow = document.createElement('tr');
+      const emptyCell = document.createElement('td');
+      emptyCell.colSpan = 16;
+      emptyCell.textContent = 'No advertising data yet';
+      emptyRow.appendChild(emptyCell);
+      tableBody.appendChild(emptyRow);
+      return;
+    }
+
+    rows.forEach(function(row){
+      const tr = document.createElement('tr');
+      const level = String(row && row.level ? row.level : '').toLowerCase();
+      if(level === 'adset') tr.className = 'level2';
+      if(level === 'ad') tr.className = 'level3';
+
+      appendCell(tr, createNameCell(row || {}));
+      appendCell(tr, formatCurrency(row && row.spend, currency));
+      appendCell(tr, formatCurrency(row && row.sales, currency));
+      appendCell(tr, formatNumber(row && row.impressions));
+      appendCell(tr, formatNumber(row && row.clicks));
+      appendCell(tr, formatPercent(row && row.ctr));
+      appendCell(tr, formatCurrency(row && row.cpc, currency));
+      appendCell(tr, formatDecimalOrNA(row && row.roas));
+      appendCell(tr, formatPercent(row && row.acos));
+      appendCell(tr, formatPercent(row && row.cvr));
+      appendCell(tr, formatNumber(row && row.add_to_cart));
+      appendCell(tr, formatNumber(row && row.checkout));
+      appendCell(tr, formatNumber(row && row.abandoned));
+      appendCell(tr, formatNumber(row && row.ad_clicks));
+      appendCell(tr, formatNumber(row && row.link_clicks));
+      appendCell(tr, formatNumber(row && row.landing_page_views));
+
+      tableBody.appendChild(tr);
+    });
+  }
+
+  let snapshotSupabaseClient = null;
+  let snapshotSupabaseSession = null;
+
+  async function getSnapshotAccessToken(){
+    if(snapshotSupabaseSession && snapshotSupabaseSession.access_token){
+      return snapshotSupabaseSession.access_token;
+    }
+
+    const cfg = await fetch('/api/public-config').then(function(r){ return r.json(); });
+    snapshotSupabaseClient = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+
+    const s = await snapshotSupabaseClient.auth.getSession();
+    snapshotSupabaseSession = s && s.data ? s.data.session : null;
+
+    return snapshotSupabaseSession ? snapshotSupabaseSession.access_token : null;
+  }
+
+  async function loadLatestMetaSnapshot(){
+    try{
+      const accessToken = await getSnapshotAccessToken();
+      if(!accessToken) return;
+
+      const response = await fetch(ENDPOINT, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer ' + accessToken
+        }
+      });
+      if(!response.ok) return;
+
+      const data = await response.json();
+      if(!data || data.ok !== true || !data.snapshot) return;
+
+      const snapshot = data.snapshot;
+      const currency = snapshot.account_currency || 'USD';
+
+      bindKpis(snapshot.kpis, currency);
+      bindPurchaseJourney(snapshot.purchase_journey);
+      bindClickJourney(snapshot.click_journey, currency);
+      bindPerformanceTable(snapshot.performance_summary, currency);
+    }catch(e){
+      /* Keep existing dashboard values if latest snapshot is unavailable. */
+    }
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', loadLatestMetaSnapshot);
+  }else{
+    loadLatestMetaSnapshot();
+  }
+})();
+</script>

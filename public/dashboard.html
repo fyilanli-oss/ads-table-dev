@@ -8308,6 +8308,15 @@ body.account-mode .accountPanel .accountCard:first-child{
 (function(){
   const ENDPOINT = '/api/snapshots/meta/latest';
 
+  const f2State = {
+    datePreset: 'Today',
+    customStart: '',
+    customEnd: '',
+    selectedFilters: []
+  };
+  let latestSnapshotForF2 = null;
+
+
   function hasValue(value){
     return value !== null && value !== undefined && value !== '';
   }
@@ -8661,11 +8670,144 @@ body.account-mode .accountPanel .accountCard:first-child{
     });
   }
 
+
+  function getRowPlatform(row){
+    return (row && (row.platform || row.platform_name)) || 'Meta';
+  }
+
+  function getCampaignName(row){
+    return row && (row.campaign_name || row.campaign || row.name) || '';
+  }
+
+  function getAdsetName(row){
+    return row && (row.adset_name || row.ad_set_name || row.adgroup_name || row.ad_group_name) || '';
+  }
+
+  function getAdName(row){
+    return row && (row.ad_name || row.ad || row.name) || '';
+  }
+
+  function getRowTreeIdentity(row){
+    const level = normalizeLevel(row);
+    const platform = getRowPlatform(row);
+    const campaign = getCampaignName(row);
+    const adset = getAdsetName(row);
+    const ad = getAdName(row);
+    let nodeId = makeTreeId(['platform', platform]);
+
+    if(level === 'campaign') nodeId = makeTreeId(['platform', platform, 'campaign', campaign]);
+    if(level === 'adset') nodeId = makeTreeId(['platform', platform, 'campaign', campaign, 'adset', adset]);
+    if(level === 'ad') nodeId = makeTreeId(['platform', platform, 'campaign', campaign, 'adset', adset, 'ad', ad]);
+
+    return { level, platform, campaign, adset, ad, nodeId };
+  }
+
+  function selectedTreeFilters(){
+    const tree = document.getElementById('commanderFilterTree');
+    if(!tree) return f2State.selectedFilters || [];
+    return Array.from(tree.querySelectorAll('input[type="checkbox"]:checked'))
+      .filter(function(input){ return input.dataset.node !== 'all'; })
+      .map(function(input){
+        return {
+          node: input.dataset.node || '',
+          level: input.dataset.level || '',
+          platform: input.dataset.platform || '',
+          campaign: input.dataset.campaign || '',
+          adset: input.dataset.adset || '',
+          ad: input.dataset.ad || ''
+        };
+      });
+  }
+
+  function filterMatchesRow(filter, row){
+    const id = getRowTreeIdentity(row);
+    if(!filter || !filter.level) return true;
+
+    if(filter.platform && id.platform !== filter.platform) return false;
+
+    if(filter.level === 'platform') return id.platform === filter.platform;
+    if(filter.level === 'campaign') return id.campaign === filter.campaign;
+    if(filter.level === 'adset') return id.campaign === filter.campaign && id.adset === filter.adset;
+    if(filter.level === 'ad') return id.campaign === filter.campaign && id.adset === filter.adset && id.ad === filter.ad;
+
+    return true;
+  }
+
+  function applyPerformanceFilters(rows){
+    const input = Array.isArray(rows) ? rows : [];
+    const filters = f2State.selectedFilters || [];
+    if(!filters.length) return input;
+
+    return input.filter(function(row){
+      return filters.some(function(filter){ return filterMatchesRow(filter, row); });
+    });
+  }
+
+  function renderCommanderFilterTree(rows){
+    const tree = document.getElementById('commanderFilterTree');
+    if(!tree) return;
+
+    const input = Array.isArray(rows) ? rows : [];
+    const selectedNodes = new Set((f2State.selectedFilters || []).map(function(f){ return f.node; }));
+    const platforms = new Map();
+
+    input.forEach(function(row){
+      const id = getRowTreeIdentity(row || {});
+      if(!platforms.has(id.platform)) platforms.set(id.platform, new Map());
+      const campaigns = platforms.get(id.platform);
+      if(id.campaign && !campaigns.has(id.campaign)) campaigns.set(id.campaign, new Map());
+      const adsets = id.campaign ? campaigns.get(id.campaign) : null;
+      if(adsets && id.adset && !adsets.has(id.adset)) adsets.set(id.adset, new Set());
+      const ads = adsets && id.adset ? adsets.get(id.adset) : null;
+      if(ads && id.ad) ads.add(id.ad);
+    });
+
+    const parts = [];
+    parts.push('<label class="filterNode level0"><input type="checkbox" data-node="all"><span>All Platforms</span></label>');
+
+    platforms.forEach(function(campaigns, platform){
+      const platformNode = makeTreeId(['platform', platform]);
+      parts.push('<label class="filterNode level1"><input type="checkbox" data-node="' + platformNode + '" data-level="platform" data-platform="' + escapeAttr(platform) + '"><span>' + escapeHtml(platform) + '</span></label>');
+
+      campaigns.forEach(function(adsets, campaign){
+        const campaignNode = makeTreeId(['platform', platform, 'campaign', campaign]);
+        parts.push('<label class="filterNode level2"><input type="checkbox" data-node="' + campaignNode + '" data-level="campaign" data-platform="' + escapeAttr(platform) + '" data-campaign="' + escapeAttr(campaign) + '"><span>' + escapeHtml(campaign) + '</span></label>');
+
+        adsets.forEach(function(ads, adset){
+          const adsetNode = makeTreeId(['platform', platform, 'campaign', campaign, 'adset', adset]);
+          parts.push('<label class="filterNode level3"><input type="checkbox" data-node="' + adsetNode + '" data-level="adset" data-platform="' + escapeAttr(platform) + '" data-campaign="' + escapeAttr(campaign) + '" data-adset="' + escapeAttr(adset) + '"><span>' + escapeHtml(adset) + '</span></label>');
+
+          ads.forEach(function(ad){
+            const adNode = makeTreeId(['platform', platform, 'campaign', campaign, 'adset', adset, 'ad', ad]);
+            parts.push('<label class="filterNode level4"><input type="checkbox" data-node="' + adNode + '" data-level="ad" data-platform="' + escapeAttr(platform) + '" data-campaign="' + escapeAttr(campaign) + '" data-adset="' + escapeAttr(adset) + '" data-ad="' + escapeAttr(ad) + '"><span>' + escapeHtml(ad) + '</span></label>');
+          });
+        });
+      });
+    });
+
+    tree.innerHTML = parts.join('');
+    Array.from(tree.querySelectorAll('input[type="checkbox"]')).forEach(function(input){
+      if(selectedNodes.has(input.dataset.node)) input.checked = true;
+    });
+  }
+
+  function escapeHtml(value){
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch];
+    });
+  }
+
+  function escapeAttr(value){
+    return escapeHtml(value);
+  }
+
   function bindPerformanceTable(performanceSummary, currency){
     const tableBody = document.querySelector('.tableCard .perf tbody');
     if(!tableBody) return;
 
-    const rows = resolvePerformanceRows(performanceSummary);
+    const sourceRows = resolvePerformanceRows(performanceSummary);
+    renderCommanderFilterTree(sourceRows);
+    const rows = applyPerformanceFilters(sourceRows);
     const treeRows = buildPerformanceTreeRows(rows);
     tableBody.innerHTML = '';
 
@@ -8749,12 +8891,134 @@ body.account-mode .accountPanel .accountCard:first-child{
     return snapshotSupabaseSession ? snapshotSupabaseSession.access_token : null;
   }
 
+
+  function renderLatestSnapshot(){
+    if(!latestSnapshotForF2) return;
+    const snapshot = latestSnapshotForF2;
+    const currency = snapshot.account_currency || 'USD';
+    bindKpis(snapshot.kpis, currency);
+    bindPurchaseJourney(snapshot.purchase_journey);
+    bindClickJourney(snapshot.click_journey, currency);
+    bindPerformanceTable(snapshot.performance_summary, currency);
+  }
+
+  function buildSnapshotUrl(){
+    const params = new URLSearchParams();
+    if(f2State.datePreset) params.set('date_filter', f2State.datePreset);
+    if(f2State.datePreset === 'Custom Date'){
+      if(f2State.customStart) params.set('start_date', f2State.customStart);
+      if(f2State.customEnd) params.set('end_date', f2State.customEnd);
+    }
+    const query = params.toString();
+    return query ? ENDPOINT + '?' + query : ENDPOINT;
+  }
+
+  function ensureCustomDateControls(){
+    const dateFilter = document.querySelector('.filters .filter:nth-child(1)');
+    const drop = dateFilter ? dateFilter.querySelector('.drop') : null;
+    if(!drop || drop.dataset.f2CustomReady) return;
+    drop.dataset.f2CustomReady = '1';
+
+    if(!Array.from(drop.querySelectorAll('.option')).some(function(opt){ return (opt.textContent || '').trim() === 'Custom Date'; })){
+      const custom = document.createElement('div');
+      custom.className = 'option';
+      custom.textContent = 'Custom Date';
+      drop.appendChild(custom);
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'option f2CustomDateControls';
+    wrap.innerHTML = '<input type="date" id="f2StartDate" aria-label="Start Date" style="width:100%;height:28px;margin:2px 0;">' +
+                     '<input type="date" id="f2EndDate" aria-label="End Date" style="width:100%;height:28px;margin:2px 0;">';
+    drop.appendChild(wrap);
+  }
+
+  function bindF2DateFilters(){
+    ensureCustomDateControls();
+    const dateFilter = document.querySelector('.filters .filter:nth-child(1)');
+    if(!dateFilter || dateFilter.dataset.f2DateWired) return;
+    dateFilter.dataset.f2DateWired = '1';
+
+    dateFilter.addEventListener('click', function(event){
+      const option = event.target && event.target.closest ? event.target.closest('.option') : null;
+      if(!option || option.classList.contains('f2CustomDateControls')) return;
+      const text = (option.textContent || '').trim();
+      if(!text) return;
+      if(['Today','Yesterday','Last 7 Days','This Month','Custom Date'].indexOf(text) === -1) return;
+      f2State.datePreset = text;
+      const label = dateFilter.querySelector('.filterText');
+      if(label) label.textContent = text;
+      setTimeout(loadLatestMetaSnapshot, 0);
+    }, true);
+
+    dateFilter.addEventListener('change', function(event){
+      if(event.target && event.target.id === 'f2StartDate') f2State.customStart = event.target.value || '';
+      if(event.target && event.target.id === 'f2EndDate') f2State.customEnd = event.target.value || '';
+      if(f2State.datePreset === 'Custom Date') loadLatestMetaSnapshot();
+    }, true);
+  }
+
+  function updateF2FilterSummary(){
+    const text = document.querySelector('.filters .filter:nth-child(2) .filterText');
+    if(!text) return;
+    let summary = text.querySelector('.filterSummary');
+    if(!summary){
+      summary = document.createElement('span');
+      summary.className = 'filterSummary';
+      text.appendChild(summary);
+    }
+    const count = (f2State.selectedFilters || []).length;
+    summary.textContent = count ? '(' + count + ')' : '';
+  }
+
+  function bindF2TreeFilters(){
+    const apply = document.getElementById('commanderApplyFilters');
+    const clear = document.getElementById('commanderClearFilters');
+    const tree = document.getElementById('commanderFilterTree');
+
+    if(tree && !tree.dataset.f2TreeWired){
+      tree.dataset.f2TreeWired = '1';
+      tree.addEventListener('change', function(event){
+        const input = event.target && event.target.matches && event.target.matches('input[type="checkbox"]') ? event.target : null;
+        if(!input) return;
+        if(input.dataset.node === 'all'){
+          Array.from(tree.querySelectorAll('input[type="checkbox"]')).forEach(function(box){ box.checked = input.checked; });
+        }
+      }, true);
+    }
+
+    if(apply && !apply.dataset.f2ApplyWired){
+      apply.dataset.f2ApplyWired = '1';
+      apply.addEventListener('click', function(){
+        f2State.selectedFilters = selectedTreeFilters();
+        updateF2FilterSummary();
+        renderLatestSnapshot();
+      }, true);
+    }
+
+    if(clear && !clear.dataset.f2ClearWired){
+      clear.dataset.f2ClearWired = '1';
+      clear.addEventListener('click', function(){
+        f2State.selectedFilters = [];
+        const t = document.getElementById('commanderFilterTree');
+        if(t) Array.from(t.querySelectorAll('input[type="checkbox"]')).forEach(function(box){ box.checked = false; });
+        updateF2FilterSummary();
+        renderLatestSnapshot();
+      }, true);
+    }
+  }
+
+  function bootF2Filters(){
+    bindF2DateFilters();
+    bindF2TreeFilters();
+  }
+
   async function loadLatestMetaSnapshot(){
     try{
       const accessToken = await getSnapshotAccessToken();
       if(!accessToken) return;
 
-      const response = await fetch(ENDPOINT, {
+      const response = await fetch(buildSnapshotUrl(), {
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer ' + accessToken
@@ -8765,21 +9029,20 @@ body.account-mode .accountPanel .accountCard:first-child{
       const data = await response.json();
       if(!data || data.ok !== true || !data.snapshot) return;
 
-      const snapshot = data.snapshot;
-      const currency = snapshot.account_currency || 'USD';
-
-      bindKpis(snapshot.kpis, currency);
-      bindPurchaseJourney(snapshot.purchase_journey);
-      bindClickJourney(snapshot.click_journey, currency);
-      bindPerformanceTable(snapshot.performance_summary, currency);
+      latestSnapshotForF2 = data.snapshot;
+      renderLatestSnapshot();
     }catch(e){
       /* Keep existing dashboard values if latest snapshot is unavailable. */
     }
   }
 
   if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', loadLatestMetaSnapshot);
+    document.addEventListener('DOMContentLoaded', function(){
+      bootF2Filters();
+      loadLatestMetaSnapshot();
+    });
   }else{
+    bootF2Filters();
     loadLatestMetaSnapshot();
   }
 })();

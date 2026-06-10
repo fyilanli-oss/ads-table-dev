@@ -8215,7 +8215,13 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   }
 
   function getRowName(row){
-    return row.name || row.campaign_name || row.adset_name || row.ad_name || row.platform || row.level || 'Meta';
+    const level = String(row && row.level ? row.level : '').toLowerCase();
+
+    if(level === 'campaign') return row.campaign_name || row.name || row.platform || row.level || 'Meta';
+    if(level === 'adset') return row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Meta';
+    if(level === 'ad') return row.ad_name || row.adset_name || row.campaign_name || row.name || row.platform || row.level || 'Meta';
+
+    return row.name || row.platform || row.level || 'Meta';
   }
 
   function createNameCell(row){

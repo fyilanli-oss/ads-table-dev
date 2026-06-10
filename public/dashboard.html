@@ -8481,6 +8481,20 @@ body.account-mode .accountPanel .accountCard:first-child{
     tr.appendChild(td);
   }
 
+  function formatTableRoas(row){
+    if(row && hasValue(row.roas)) return formatDecimalOrNA(row.roas);
+
+    const spend = row && hasValue(row.spend) ? Number(row.spend) : null;
+    const salesValue = row && hasValue(row.sales) ? row.sales : (row && hasValue(row.revenue) ? row.revenue : null);
+    const sales = hasValue(salesValue) ? Number(salesValue) : null;
+
+    if(Number.isFinite(spend) && spend > 0 && Number.isFinite(sales) && sales === 0){
+      return '0.00';
+    }
+
+    return 'N/A';
+  }
+
   function bindPerformanceTable(performanceSummary, currency){
     const tableBody = document.querySelector('.tableCard .perf tbody');
     if(!tableBody) return;
@@ -8511,13 +8525,13 @@ body.account-mode .accountPanel .accountCard:first-child{
       appendCell(tr, formatNumber(row && row.clicks));
       appendCell(tr, formatPercent(row && row.ctr));
       appendCell(tr, formatCurrency(row && row.cpc, currency));
-      appendCell(tr, formatDecimalOrNA(row && row.roas));
+      appendCell(tr, formatTableRoas(row || {}));
       appendCell(tr, formatPercent(row && row.acos));
       appendCell(tr, formatPercent(row && row.cvr));
       appendCell(tr, formatNumber(row && row.add_to_cart));
       appendCell(tr, formatNumber(row && row.checkout));
       appendCell(tr, formatNumber(row && row.abandoned));
-      appendCell(tr, formatNumber(row && row.ad_clicks));
+      appendCell(tr, formatNumber(row && (hasValue(row.ad_clicks) ? row.ad_clicks : row.clicks)));
       appendCell(tr, formatNumber(row && row.link_clicks));
       appendCell(tr, formatNumber(row && row.landing_page_views));
 

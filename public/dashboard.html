@@ -8298,13 +8298,14 @@ body.account-mode .accountPanel .accountCard:first-child{
 </style>
 
 <!-- =========================================================
-     PHASE E.3C.1/E.3C.2 - KPI + PURCHASE JOURNEY BINDING ONLY
+     PHASE E.3C.1/E.3C.2/E.3C.3 - KPI + PURCHASE + CLICK JOURNEY BINDING ONLY
      Source: GET /api/snapshots/meta/latest
      Scope: snapshot.kpis -> existing KPI Cards
             snapshot.purchase_journey -> existing Purchase Journey numbers
-     No filters, click journey, performance table, layout, demo, or server changes.
+            snapshot.click_journey -> existing Click Journey numbers
+     No filters, performance table, layout, demo, or server changes.
      ========================================================= -->
-<script id="phase-e3c1-e3c2-kpi-purchase-binding">
+<script id="phase-e3c1-e3c2-e3c3-kpi-purchase-click-binding">
 (function(){
   const ENDPOINT = '/api/snapshots/meta/latest';
 
@@ -8385,6 +8386,37 @@ body.account-mode .accountPanel .accountCard:first-child{
     }
   }
 
+  function setClickJourneyValue(title, value){
+    const cells = document.querySelectorAll('.click .cj-cell');
+    for(const cell of cells){
+      const labelEl = cell.querySelector('.clickLabel');
+      const valueEl = cell.querySelector('.clickValue');
+      if(!labelEl || !valueEl) continue;
+      if(labelEl.textContent.trim().toLowerCase() === title.toLowerCase()){
+        valueEl.textContent = formatJourneyNumber(value);
+        return;
+      }
+    }
+  }
+
+  let latestClickJourney = null;
+
+  function bindClickJourneyValues(clickJourney){
+    if(!clickJourney) return;
+    latestClickJourney = clickJourney;
+    setClickJourneyValue('Ad Click', clickJourney.ad_clicks);
+    setClickJourneyValue('Link Click', clickJourney.link_clicks);
+    setClickJourneyValue('Landing Page View', clickJourney.landing_page_views);
+  }
+
+  function scheduleClickJourneyBinding(clickJourney){
+    bindClickJourneyValues(clickJourney);
+    requestAnimationFrame(function(){ bindClickJourneyValues(latestClickJourney); });
+    setTimeout(function(){ bindClickJourneyValues(latestClickJourney); }, 0);
+    setTimeout(function(){ bindClickJourneyValues(latestClickJourney); }, 250);
+    window.addEventListener('load', function(){ bindClickJourneyValues(latestClickJourney); }, { once:true });
+  }
+
   let kpiSupabaseClient = null;
   let kpiSupabaseSession = null;
 
@@ -8437,8 +8469,12 @@ body.account-mode .accountPanel .accountCard:first-child{
         setPurchaseJourneyValue('ABANDONED', purchaseJourney.abandoned);
         setPurchaseJourneyValue('PURCHASE', purchaseJourney.purchase);
       }
+
+      if(snapshot.click_journey){
+        scheduleClickJourneyBinding(snapshot.click_journey);
+      }
     }catch(e){
-      /* Keep existing hardcoded KPI values if latest snapshot is unavailable. */
+      /* Keep existing hardcoded values if latest snapshot is unavailable. */
     }
   }
 

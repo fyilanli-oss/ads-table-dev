@@ -8908,12 +8908,116 @@ body.account-mode .accountPanel .accountCard:first-child{
 
 
   
+
+// ===== PHASE D-1 DATE SCOPE TABLE READ =====
+// Purpose: Performance Table must respect Date Scope.
+// This is a table-scope guard only. KPI / Purchase / Click remain unchanged in this phase.
+function normalizeDatePresetForApi(preset){
+  const value = String(preset || '').trim().toLowerCase();
+  if(value === 'today') return 'today';
+  if(value === 'yesterday') return 'yesterday';
+  if(value === 'last 7 days') return 'last_7_days';
+  if(value === 'this month') return 'this_month';
+  if(value === 'custom date') return 'custom';
+  return value || 'today';
+}
+
+function getLocalIsoDate(date){
+  const d = date instanceof Date ? date : new Date(date);
+  if(Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function addDaysIso(iso, days){
+  const parts = String(iso || '').split('-').map(Number);
+  if(parts.length !== 3 || parts.some(function(n){ return !Number.isFinite(n); })) return '';
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+  d.setDate(d.getDate() + days);
+  return getLocalIsoDate(d);
+}
+
+function getSnapshotIsoDate(snapshot){
+  if(!snapshot) return '';
+  const raw = snapshot.snapshot_date || snapshot.date || snapshot.created_at || '';
+  if(!raw) return '';
+  const text = String(raw);
+  const match = text.match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : getLocalIsoDate(text);
+}
+
+function isIsoDateInF2DateScope(isoDate){
+  if(!isoDate) return false;
+
+  const preset = normalizeDatePresetForApi(f2State && f2State.datePreset);
+  const todayIso = getLocalIsoDate(new Date());
+
+  if(preset === 'today') return isoDate === todayIso;
+  if(preset === 'yesterday') return isoDate === addDaysIso(todayIso, -1);
+
+  if(preset === 'last_7_days'){
+    const start = addDaysIso(todayIso, -6);
+    return isoDate >= start && isoDate <= todayIso;
+  }
+
+  if(preset === 'this_month'){
+    return isoDate.slice(0, 7) === todayIso.slice(0, 7);
+  }
+
+  if(preset === 'custom'){
+    const start = f2State && f2State.customStart ? f2State.customStart : '';
+    const end = f2State && f2State.customEnd ? f2State.customEnd : '';
+    if(start && isoDate < start) return false;
+    if(end && isoDate > end) return false;
+    return true;
+  }
+
+  return true;
+}
+
+function applyD1DateScopeToTableRows(rows, snapshot){
+  const input = Array.isArray(rows) ? rows : [];
+  const snapshotDate = getSnapshotIsoDate(snapshot);
+  const inScope = isIsoDateInF2DateScope(snapshotDate);
+  const scopedRows = inScope ? input : [];
+
+  try{
+    console.log('[D-1 Date Scope Table Read]', {
+      datePreset: f2State ? f2State.datePreset : null,
+      snapshotDate,
+      inScope,
+      inputRows: input.length,
+      outputRows: scopedRows.length
+    });
+  }catch(e){}
+
+  return scopedRows;
+}
+
+function buildEmptySnapshotForCurrentDateScope(previousSnapshot){
+  return {
+    snapshot_date: null,
+    account_currency: previousSnapshot && previousSnapshot.account_currency ? previousSnapshot.account_currency : 'USD',
+    kpis: previousSnapshot ? previousSnapshot.kpis : null,
+    purchase_journey: previousSnapshot ? previousSnapshot.purchase_journey : null,
+    click_journey: previousSnapshot ? previousSnapshot.click_journey : null,
+    performance_summary: { rows: [] },
+    __emptyForDateScope: true
+  };
+}
+// ===== END PHASE D-1 DATE SCOPE TABLE READ =====
+
+
 // ===== PHASE F-3 VIEWMODEL SKELETON =====
 // Purpose: Build a non-invasive dashboardViewModel skeleton before existing bindings.
 // This phase MUST NOT change UI, numbers, existing bindings, or activate Filter Engine.
 function buildF3DashboardViewModelSkeleton(snapshot, currency){
   const performanceSummary = snapshot ? snapshot.performance_summary : null;
-  const sourceRows = resolvePerformanceRows(performanceSummary);
+  const rawSourceRows = resolvePerformanceRows(performanceSummary);
+  const sourceRows = applyD1DateScopeToTableRows(rawSourceRows, snapshot);
+  const filteredRows = applyPerformanceFilters(sourceRows);
 
   return {
     phase: 'F-3',
@@ -8922,13 +9026,16 @@ function buildF3DashboardViewModelSkeleton(snapshot, currency){
       date: {
         preset: f2State ? f2State.datePreset : null,
         customStart: f2State ? f2State.customStart : null,
-        customEnd: f2State ? f2State.customEnd : null
+        customEnd: f2State ? f2State.customEnd : null,
+        snapshotDate: getSnapshotIsoDate(snapshot),
+        inScope: isIsoDateInF2DateScope(getSnapshotIsoDate(snapshot))
       },
       filters: f2State ? f2State.selectedFilters : [],
       currency
     },
     snapshot,
     currency,
+    rawSourceRows,
     sourceRows,
     filterState: f2State,
     kpis: snapshot ? snapshot.kpis : null,
@@ -8936,17 +9043,19 @@ function buildF3DashboardViewModelSkeleton(snapshot, currency){
     clickJourney: snapshot ? snapshot.click_journey : null,
     table: {
       sourceRows,
-      filteredRows: applyPerformanceFilters(sourceRows),
-      rows: applyPerformanceFilters(sourceRows),
+      filteredRows,
+      rows: filteredRows,
       performanceSummary
     },
     meta: {
+      rawSourceRowCount: Array.isArray(rawSourceRows) ? rawSourceRows.length : 0,
       sourceRowCount: Array.isArray(sourceRows) ? sourceRows.length : 0,
-      filteredRowCount: Array.isArray(applyPerformanceFilters(sourceRows)) ? applyPerformanceFilters(sourceRows).length : 0,
+      filteredRowCount: Array.isArray(filteredRows) ? filteredRows.length : 0,
       createdAt: new Date().toISOString(),
       existingBindingsPreserved: true,
       filterEngineActive: false,
-      tableOnlyFilterSmokeTest: true
+      tableOnlyFilterSmokeTest: true,
+      dateScopeTableRead: true
     }
   };
 }
@@ -8957,13 +9066,15 @@ function logF3DashboardViewModelSkeleton(viewModel){
     console.log('[F-3 ViewModel Skeleton]', {
       mode: viewModel.mode,
       currency: viewModel.currency,
+      rawSourceRowCount: viewModel.meta.rawSourceRowCount,
       sourceRowCount: viewModel.meta.sourceRowCount,
       filteredRowCount: viewModel.meta.filteredRowCount,
       date: viewModel.scope.date,
       filterCount: Array.isArray(viewModel.scope.filters) ? viewModel.scope.filters.length : 0,
       existingBindingsPreserved: viewModel.meta.existingBindingsPreserved,
       filterEngineActive: viewModel.meta.filterEngineActive,
-      tableOnlyFilterSmokeTest: viewModel.meta.tableOnlyFilterSmokeTest
+      tableOnlyFilterSmokeTest: viewModel.meta.tableOnlyFilterSmokeTest,
+      dateScopeTableRead: viewModel.meta.dateScopeTableRead
     });
   }catch(e){
     console.warn('[F-3 ViewModel Skeleton] log failed', e);
@@ -8986,13 +9097,22 @@ bindKpis(snapshot.kpis, currency);
 
   function buildSnapshotUrl(){
     const params = new URLSearchParams();
-    if(f2State.datePreset) params.set('date_filter', f2State.datePreset);
-    if(f2State.datePreset === 'Custom Date'){
+    const normalizedDateFilter = normalizeDatePresetForApi(f2State.datePreset);
+    if(normalizedDateFilter) params.set('date_filter', normalizedDateFilter);
+    if(normalizedDateFilter === 'custom'){
       if(f2State.customStart) params.set('start_date', f2State.customStart);
       if(f2State.customEnd) params.set('end_date', f2State.customEnd);
     }
     const query = params.toString();
-    return query ? ENDPOINT + '?' + query : ENDPOINT;
+    const url = query ? ENDPOINT + '?' + query : ENDPOINT;
+    try{
+      console.log('[D-1 Date Scope Request]', {
+        preset: f2State.datePreset,
+        normalizedDateFilter,
+        url
+      });
+    }catch(e){}
+    return url;
   }
 
   function ensureCustomDateControls(){
@@ -9109,9 +9229,9 @@ bindKpis(snapshot.kpis, currency);
       if(!response.ok) return;
 
       const data = await response.json();
-      if(!data || data.ok !== true || !data.snapshot) return;
+      if(!data || data.ok !== true) return;
 
-      latestSnapshotForF2 = data.snapshot;
+      latestSnapshotForF2 = data.snapshot || buildEmptySnapshotForCurrentDateScope(latestSnapshotForF2);
       renderLatestSnapshot();
     }catch(e){
       /* Keep existing dashboard values if latest snapshot is unavailable. */

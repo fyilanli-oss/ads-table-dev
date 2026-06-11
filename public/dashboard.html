@@ -8807,7 +8807,22 @@ body.account-mode .accountPanel .accountCard:first-child{
 
     const sourceRows = resolvePerformanceRows(performanceSummary);
     renderCommanderFilterTree(sourceRows);
-    const rows = applyPerformanceFilters(sourceRows);
+
+    // ===== PHASE F-4 TABLE-ONLY FILTER SMOKE TEST =====
+    // If a ViewModel wrapper supplies filteredRows, use it only for Performance Table rows.
+    // KPI / Purchase / Click bindings remain unchanged and snapshot-based in this phase.
+    const hasViewModelFilteredRows = performanceSummary && Array.isArray(performanceSummary.filteredRows);
+    const rows = hasViewModelFilteredRows ? performanceSummary.filteredRows : applyPerformanceFilters(sourceRows);
+    try{
+      console.log('[F-4 Table-only Filter Smoke Test]', {
+        sourceRowCount: Array.isArray(sourceRows) ? sourceRows.length : 0,
+        tableRowCount: Array.isArray(rows) ? rows.length : 0,
+        filterCount: f2State && Array.isArray(f2State.selectedFilters) ? f2State.selectedFilters.length : 0,
+        usingViewModelFilteredRows: hasViewModelFilteredRows
+      });
+    }catch(e){}
+    // ===== END PHASE F-4 TABLE-ONLY FILTER SMOKE TEST =====
+
     const treeRows = buildPerformanceTreeRows(rows);
     tableBody.innerHTML = '';
 
@@ -8920,14 +8935,18 @@ function buildF3DashboardViewModelSkeleton(snapshot, currency){
     purchaseJourney: snapshot ? snapshot.purchase_journey : null,
     clickJourney: snapshot ? snapshot.click_journey : null,
     table: {
-      rows: sourceRows,
+      sourceRows,
+      filteredRows: applyPerformanceFilters(sourceRows),
+      rows: applyPerformanceFilters(sourceRows),
       performanceSummary
     },
     meta: {
       sourceRowCount: Array.isArray(sourceRows) ? sourceRows.length : 0,
+      filteredRowCount: Array.isArray(applyPerformanceFilters(sourceRows)) ? applyPerformanceFilters(sourceRows).length : 0,
       createdAt: new Date().toISOString(),
       existingBindingsPreserved: true,
-      filterEngineActive: false
+      filterEngineActive: false,
+      tableOnlyFilterSmokeTest: true
     }
   };
 }
@@ -8939,10 +8958,12 @@ function logF3DashboardViewModelSkeleton(viewModel){
       mode: viewModel.mode,
       currency: viewModel.currency,
       sourceRowCount: viewModel.meta.sourceRowCount,
+      filteredRowCount: viewModel.meta.filteredRowCount,
       date: viewModel.scope.date,
       filterCount: Array.isArray(viewModel.scope.filters) ? viewModel.scope.filters.length : 0,
       existingBindingsPreserved: viewModel.meta.existingBindingsPreserved,
-      filterEngineActive: viewModel.meta.filterEngineActive
+      filterEngineActive: viewModel.meta.filterEngineActive,
+      tableOnlyFilterSmokeTest: viewModel.meta.tableOnlyFilterSmokeTest
     });
   }catch(e){
     console.warn('[F-3 ViewModel Skeleton] log failed', e);
@@ -8960,7 +8981,7 @@ function renderLatestSnapshot(){
 bindKpis(snapshot.kpis, currency);
     bindPurchaseJourney(snapshot.purchase_journey);
     bindClickJourney(snapshot.click_journey, currency);
-    bindPerformanceTable(snapshot.performance_summary, currency);
+    bindPerformanceTable({ rows: dashboardViewModel.table.sourceRows, filteredRows: dashboardViewModel.table.filteredRows }, currency);
   }
 
   function buildSnapshotUrl(){

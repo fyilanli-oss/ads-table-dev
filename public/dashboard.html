@@ -8892,11 +8892,72 @@ body.account-mode .accountPanel .accountCard:first-child{
   }
 
 
-  function renderLatestSnapshot(){
+  
+// ===== PHASE F-3 VIEWMODEL SKELETON =====
+// Purpose: Build a non-invasive dashboardViewModel skeleton before existing bindings.
+// This phase MUST NOT change UI, numbers, existing bindings, or activate Filter Engine.
+function buildF3DashboardViewModelSkeleton(snapshot, currency){
+  const performanceSummary = snapshot ? snapshot.performance_summary : null;
+  const sourceRows = resolvePerformanceRows(performanceSummary);
+
+  return {
+    phase: 'F-3',
+    mode: 'skeleton-only',
+    scope: {
+      date: {
+        preset: f2State ? f2State.datePreset : null,
+        customStart: f2State ? f2State.customStart : null,
+        customEnd: f2State ? f2State.customEnd : null
+      },
+      filters: f2State ? f2State.selectedFilters : [],
+      currency
+    },
+    snapshot,
+    currency,
+    sourceRows,
+    filterState: f2State,
+    kpis: snapshot ? snapshot.kpis : null,
+    purchaseJourney: snapshot ? snapshot.purchase_journey : null,
+    clickJourney: snapshot ? snapshot.click_journey : null,
+    table: {
+      rows: sourceRows,
+      performanceSummary
+    },
+    meta: {
+      sourceRowCount: Array.isArray(sourceRows) ? sourceRows.length : 0,
+      createdAt: new Date().toISOString(),
+      existingBindingsPreserved: true,
+      filterEngineActive: false
+    }
+  };
+}
+
+function logF3DashboardViewModelSkeleton(viewModel){
+  try{
+    window.dashboardViewModelF3 = viewModel;
+    console.log('[F-3 ViewModel Skeleton]', {
+      mode: viewModel.mode,
+      currency: viewModel.currency,
+      sourceRowCount: viewModel.meta.sourceRowCount,
+      date: viewModel.scope.date,
+      filterCount: Array.isArray(viewModel.scope.filters) ? viewModel.scope.filters.length : 0,
+      existingBindingsPreserved: viewModel.meta.existingBindingsPreserved,
+      filterEngineActive: viewModel.meta.filterEngineActive
+    });
+  }catch(e){
+    console.warn('[F-3 ViewModel Skeleton] log failed', e);
+  }
+}
+// ===== END PHASE F-3 VIEWMODEL SKELETON =====
+
+function renderLatestSnapshot(){
     if(!latestSnapshotForF2) return;
     const snapshot = latestSnapshotForF2;
     const currency = snapshot.account_currency || 'USD';
-    bindKpis(snapshot.kpis, currency);
+    
+  const dashboardViewModel = buildF3DashboardViewModelSkeleton(snapshot, currency);
+  logF3DashboardViewModelSkeleton(dashboardViewModel);
+bindKpis(snapshot.kpis, currency);
     bindPurchaseJourney(snapshot.purchase_journey);
     bindClickJourney(snapshot.click_journey, currency);
     bindPerformanceTable(snapshot.performance_summary, currency);

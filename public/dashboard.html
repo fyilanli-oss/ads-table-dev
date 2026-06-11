@@ -9061,15 +9061,42 @@ function applyD1DateScopeToTableRows(rows, snapshot){
 }
 
 function buildEmptySnapshotForCurrentDateScope(previousSnapshot){
+  // ===== PHASE B2 EMPTY SNAPSHOT CLEAR FIX =====
+  // When backend returns snapshot:null for a date scope, do NOT carry old KPI/Journey values.
+  // Performance Table was already empty; KPI/Purchase/Click must also clear to zero.
+  const currency = previousSnapshot && previousSnapshot.account_currency ? previousSnapshot.account_currency : 'USD';
+
   return {
     snapshot_date: null,
-    account_currency: previousSnapshot && previousSnapshot.account_currency ? previousSnapshot.account_currency : 'USD',
-    kpis: previousSnapshot ? previousSnapshot.kpis : null,
-    purchase_journey: previousSnapshot ? previousSnapshot.purchase_journey : null,
-    click_journey: previousSnapshot ? previousSnapshot.click_journey : null,
+    account_currency: currency,
+    kpis: {
+      spend: 0,
+      sales: 0,
+      impressions: 0,
+      clicks: 0,
+      ctr: 0,
+      cpc: 0,
+      roas: 0,
+      acos: 0,
+      cvr: 0
+    },
+    purchase_journey: {
+      add_to_cart: 0,
+      checkout: 0,
+      abandoned: 0,
+      purchase: 0
+    },
+    click_journey: {
+      ad_clicks: 0,
+      link_clicks: 0,
+      landing_page_views: 0,
+      traffic_score: 0,
+      real_cpc: 0
+    },
     performance_summary: { rows: [] },
     __emptyForDateScope: true
   };
+  // ===== END PHASE B2 EMPTY SNAPSHOT CLEAR FIX =====
 }
 // ===== END PHASE D-1 DATE SCOPE TABLE READ =====
 

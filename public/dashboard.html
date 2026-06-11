@@ -4989,6 +4989,7 @@ body.help-mode .accountSettingsView{
 }
 .filterClearBtn{border:0;background:transparent;color:#777;font-size:11px;font-weight:900;display:block;margin:8px auto 0;padding:0}
 .filterSummary{font-size:11px;font-weight:950;color:#777;margin-left:2px}
+.filterTreePending{color:#777;font-weight:900;padding:4px 0}
 @media(max-width:560px){
   .commanderFilterPanel{top:348px;right:20px;width:45%;min-width:318px;max-width:318px}
 }
@@ -4996,31 +4997,7 @@ body.help-mode .accountSettingsView{
 
 <div id="commanderFilterPanel" class="commanderFilterPanel" aria-hidden="true">
   <div class="filterTree" id="commanderFilterTree">
-    <label class="filterNode level0"><input type="checkbox" data-node="all"><span>All Platforms</span></label>
-
-    <label class="filterNode level1"><input type="checkbox" data-node="meta"><span>Meta</span></label>
-    <label class="filterNode level2"><input type="checkbox" data-node="meta.earrings"><span>Earrings Campaign</span></label>
-    <label class="filterNode level3"><input type="checkbox" data-node="meta.earrings.stud"><span>Stud Earrings</span></label>
-    <label class="filterNode level4"><input type="checkbox" data-node="meta.earrings.stud.pearl"><span>Pearl Studs</span></label>
-    <label class="filterNode level4"><input type="checkbox" data-node="meta.earrings.stud.zirconia"><span>Zirconia Studs – Test Product</span></label>
-    <label class="filterNode level2"><input type="checkbox" data-node="meta.bracelet"><span>Bracelet Campaign</span></label>
-    <label class="filterNode level3"><input type="checkbox" data-node="meta.bracelet.bracelets"><span>Bracelets</span></label>
-    <label class="filterNode level4"><input type="checkbox" data-node="meta.bracelet.bracelets.silver"><span>Silver Bracelet</span></label>
-    <label class="filterNode level4"><input type="checkbox" data-node="meta.bracelet.bracelets.zirconia"><span>Zirconia Silver Bracelet – Test Product</span></label>
-
-    <label class="filterNode level1"><input type="checkbox" data-node="google"><span>Google</span></label>
-    <label class="filterNode level2"><input type="checkbox" data-node="google.earrings"><span>Earrings Campaign</span></label>
-    <label class="filterNode level3"><input type="checkbox" data-node="google.earrings.stud"><span>Stud Earrings</span></label>
-    <label class="filterNode level4"><input type="checkbox" data-node="google.earrings.stud.pearl"><span>Pearl Studs</span></label>
-    <label class="filterNode level4"><input type="checkbox" data-node="google.earrings.stud.zirconia"><span>Zirconia Studs – Test Product</span></label>
-    <label class="filterNode level2"><input type="checkbox" data-node="google.bracelet"><span>Bracelet Campaign</span></label>
-    <label class="filterNode level3"><input type="checkbox" data-node="google.bracelet.bracelets"><span>Bracelets</span></label>
-    <label class="filterNode level4"><input type="checkbox" data-node="google.bracelet.bracelets.silver"><span>Silver Bracelet</span></label>
-    <label class="filterNode level4"><input type="checkbox" data-node="google.bracelet.bracelets.zirconia"><span>Zirconia Silver Bracelet – Test Product</span></label>
-
-    <label class="filterNode level1"><input type="checkbox" data-node="klaviyo"><span>Klaviyo</span></label>
-    <label class="filterNode level2"><input type="checkbox" data-node="klaviyo.earrings"><span>Earrings Campaign</span></label>
-    <label class="filterNode level2"><input type="checkbox" data-node="klaviyo.bracelet"><span>Bracelet Campaign</span></label>
+    <div class="filterNode level0" data-source="production-pending"><span>Loading filters...</span></div>
   </div>
   <button type="button" id="commanderApplyFilters" class="filterApplyBtn">APPLY</button>
   <button type="button" id="commanderClearFilters" class="filterClearBtn">CLEAR</button>
@@ -8777,6 +8754,18 @@ body.account-mode .accountPanel .accountCard:first-child{
     if(!tree) return;
 
     const input = Array.isArray(rows) ? rows : [];
+
+    // ===== PHASE T-2 TREE SOURCE CLEANUP =====
+    // Production Filters tree must be rendered only from snapshot rows.
+    // Static/demo tree must never flash in production.
+    if(!input.length){
+      tree.innerHTML = '<div class="filterNode level0 filterTreePending" data-source="production-empty"><span>No filter data for this date scope</span></div>';
+      try{ console.log('[T-2 Tree Source Cleanup]', { source: 'production-empty', inputRows: 0 }); }catch(e){}
+      return;
+    }
+    try{ console.log('[T-2 Tree Source Cleanup]', { source: 'production-snapshot-rows', inputRows: input.length }); }catch(e){}
+    // ===== END PHASE T-2 TREE SOURCE CLEANUP =====
+
     const selectedNodes = new Set((f2State.selectedFilters || []).map(function(f){ return f.node; }));
     const platforms = new Map();
 

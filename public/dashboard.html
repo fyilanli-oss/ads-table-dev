@@ -8704,8 +8704,13 @@ body.account-mode .accountPanel .accountCard:first-child{
 
   function selectedTreeFilters(){
     const tree = document.getElementById('commanderFilterTree');
-    if(!tree) return f2State.selectedFilters || [];
-    return Array.from(tree.querySelectorAll('input[type="checkbox"]:checked'))
+    if(!tree){
+      const fallback = f2State.selectedFilters || [];
+      try{ console.log('[T-1 selectedTreeFilters output]', { source: 'fallback-no-tree', count: fallback.length, selected: fallback }); }catch(e){}
+      return fallback;
+    }
+
+    const selected = Array.from(tree.querySelectorAll('input[type="checkbox"]:checked'))
       .filter(function(input){ return input.dataset.node !== 'all'; })
       .map(function(input){
         return {
@@ -8717,6 +8722,9 @@ body.account-mode .accountPanel .accountCard:first-child{
           ad: input.dataset.ad || ''
         };
       });
+
+    try{ console.log('[T-1 selectedTreeFilters output]', { source: 'dom-checked', count: selected.length, selected }); }catch(e){}
+    return selected;
   }
 
   function filterMatchesRow(filter, row){
@@ -8734,13 +8742,34 @@ body.account-mode .accountPanel .accountCard:first-child{
   }
 
   function applyPerformanceFilters(rows){
-    const input = Array.isArray(rows) ? rows : [];
+    const inputRows = Array.isArray(rows) ? rows : [];
     const filters = f2State.selectedFilters || [];
-    if(!filters.length) return input;
 
-    return input.filter(function(row){
-      return filters.some(function(filter){ return filterMatchesRow(filter, row); });
+    if(!filters.length){
+      try{ console.log('[T-1 applyPerformanceFilters]', { filterCount: 0, inputRows: inputRows.length, outputRows: inputRows.length }); }catch(e){}
+      return inputRows;
+    }
+
+    const outputRows = inputRows.filter(function(row){
+      return filters.some(function(filter){
+        if(filter.platform && String(row.platform || '').toLowerCase() !== String(filter.platform || '').toLowerCase()) return false;
+        if(filter.campaign && String(row.campaign_name || row.campaign || '').toLowerCase() !== String(filter.campaign || '').toLowerCase()) return false;
+        if(filter.adset && String(row.adset_name || row.adset || row.adgroup || '').toLowerCase() !== String(filter.adset || '').toLowerCase()) return false;
+        if(filter.ad && String(row.ad_name || row.ad || '').toLowerCase() !== String(filter.ad || '').toLowerCase()) return false;
+        return true;
+      });
     });
+
+    try{
+      console.log('[T-1 applyPerformanceFilters]', {
+        filterCount: filters.length,
+        inputRows: inputRows.length,
+        outputRows: outputRows.length,
+        filters
+      });
+    }catch(e){}
+
+    return outputRows;
   }
 
   function renderCommanderFilterTree(rows){
@@ -8807,6 +8836,7 @@ body.account-mode .accountPanel .accountCard:first-child{
 
     const sourceRows = resolvePerformanceRows(performanceSummary);
     renderCommanderFilterTree(sourceRows);
+    debugT1TreeState('after-renderCommanderFilterTree');
 
     // ===== PHASE F-4 TABLE-ONLY FILTER SMOKE TEST =====
     // If a ViewModel wrapper supplies filteredRows, use it only for Performance Table rows.
@@ -8908,6 +8938,51 @@ body.account-mode .accountPanel .accountCard:first-child{
 
 
   
+
+
+// ===== PHASE T-1 TREE STATE DIAGNOSTIC =====
+// Purpose: diagnose tree scope state only.
+// This phase MUST NOT change UI, KPI, Purchase, Click, Currency, or aggregation behavior.
+function debugT1TreeState(source){
+  try{
+    const checkedInputs = Array.from(document.querySelectorAll('#commanderFilterTree input[type="checkbox"]:checked'));
+    const allInputs = Array.from(document.querySelectorAll('#commanderFilterTree input[type="checkbox"]'));
+
+    const checkedNodes = checkedInputs.map(function(input){
+      return {
+        node: input.dataset.node || '',
+        level: input.dataset.level || '',
+        platform: input.dataset.platform || '',
+        campaign: input.dataset.campaign || '',
+        adset: input.dataset.adset || '',
+        ad: input.dataset.ad || '',
+        checked: input.checked === true
+      };
+    });
+
+    const allNodeStates = allInputs.map(function(input){
+      return {
+        node: input.dataset.node || '',
+        level: input.dataset.level || '',
+        checked: input.checked === true,
+        indeterminate: input.indeterminate === true
+      };
+    });
+
+    console.log('[T-1 Tree State Diagnostic]', {
+      source: source || 'unknown',
+      checkedCount: checkedNodes.length,
+      checkedNodes,
+      selectedFilters: f2State && Array.isArray(f2State.selectedFilters) ? f2State.selectedFilters : [],
+      selectedFilterCount: f2State && Array.isArray(f2State.selectedFilters) ? f2State.selectedFilters.length : 0,
+      allNodeStates
+    });
+  }catch(e){
+    console.warn('[T-1 Tree State Diagnostic] failed', e);
+  }
+}
+// ===== END PHASE T-1 TREE STATE DIAGNOSTIC =====
+
 
 // ===== PHASE D-1 DATE SCOPE TABLE READ =====
 // Purpose: Performance Table must respect Date Scope.
@@ -9193,6 +9268,7 @@ bindKpis(snapshot.kpis, currency);
       apply.dataset.f2ApplyWired = '1';
       apply.addEventListener('click', function(){
         f2State.selectedFilters = selectedTreeFilters();
+      debugT1TreeState('after-apply-selectedFilters');
         updateF2FilterSummary();
         renderLatestSnapshot();
       }, true);

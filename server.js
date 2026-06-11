@@ -383,15 +383,70 @@ app.post("/api/snapshots/meta/write",async(req,res)=>{
 });
 // ===== END PHASE E.2A META SNAPSHOT WRITE =====
 // ===== PHASE E.2C META SNAPSHOT READ =====
+function toIsoDateOnly(value){
+  const d=value instanceof Date?value:new Date(value);
+  if(Number.isNaN(d.getTime()))return "";
+  const y=d.getUTCFullYear();
+  const m=String(d.getUTCMonth()+1).padStart(2,"0");
+  const day=String(d.getUTCDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+
+function addUtcDays(isoDate,days){
+  const parts=String(isoDate||"").split("-").map(Number);
+  if(parts.length!==3||parts.some(n=>!Number.isFinite(n)))return "";
+  const d=new Date(Date.UTC(parts[0],parts[1]-1,parts[2]));
+  d.setUTCDate(d.getUTCDate()+days);
+  return toIsoDateOnly(d);
+}
+
+function resolveSnapshotDateScope(query){
+  const raw=String(query.date_filter||"latest").trim().toLowerCase();
+  const dateFilter=raw.replace(/\s+/g,"_");
+  const today=toIsoDateOnly(new Date());
+
+  if(dateFilter==="today"){
+    return {dateFilter,start:today,end:today};
+  }
+
+  if(dateFilter==="yesterday"){
+    const yesterday=addUtcDays(today,-1);
+    return {dateFilter,start:yesterday,end:yesterday};
+  }
+
+  if(dateFilter==="last_7_days"){
+    return {dateFilter,start:addUtcDays(today,-6),end:today};
+  }
+
+  if(dateFilter==="this_month"){
+    return {dateFilter,start:today.slice(0,7)+"-01",end:today};
+  }
+
+  if(dateFilter==="custom"){
+    const start=String(query.start_date||"").slice(0,10);
+    const end=String(query.end_date||"").slice(0,10);
+    return {dateFilter,start:start||null,end:end||null};
+  }
+
+  return {dateFilter:"latest",start:null,end:null};
+}
+
 app.get("/api/snapshots/meta/latest",async(req,res)=>{
   try{
     const user=await requireUser(req,res);
     if(!user)return;
 
-    const {data,error}=await supabaseAdmin
+    const scope=resolveSnapshotDateScope(req.query||{});
+
+    let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
       .select("snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
-      .eq("user_id",user.id)
+      .eq("user_id",user.id);
+
+    if(scope.start)snapshotQuery=snapshotQuery.gte("snapshot_date",scope.start);
+    if(scope.end)snapshotQuery=snapshotQuery.lte("snapshot_date",scope.end);
+
+    const {data,error}=await snapshotQuery
       .order("snapshot_date",{ascending:false})
       .order("created_at",{ascending:false})
       .limit(1)
@@ -402,6 +457,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
     res.json({
       ok:true,
       platform:"Meta",
+      date_scope:scope,
       snapshot:data?{
         snapshot_date:data.snapshot_date,
         account_currency:data.account_currency,

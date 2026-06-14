@@ -26,10 +26,206 @@ function getAccessByStatus(status){const full=["trial","active"].includes(status
 async function requireAccess(req,res,userId,capability){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);if(access.blocked||!access[capability]){res.status(403).json({error:"Subscription inactive",status:sub?.status||null});return null}return{sub,access}}
 async function requireConnectAccessForOAuth(req,res){const userId=req.query.user_id;if(!userId){res.redirect("/dashboard?error=missing_user_id");return null}const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);if(access.blocked||!access.connect){res.redirect(`/dashboard?subscription_inactive=1&status=${encodeURIComponent(sub?.status||"")}`);return null}return{userId,sub,access}}
 function parseExpiry(s){return s?new Date(Date.now()+Number(s)*1000).toISOString():null}
-async function saveConnection(userId,platform,payload){if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");const row={user_id:userId,platform,access_token:payload.accessToken||null,refresh_token:payload.refreshToken||null,token_expires_at:payload.tokenExpiresAt||null,account_id:payload.accountId||null,account_name:payload.accountName||null,metadata:payload.metadata||{},connected:true,updated_at:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").upsert(row,{onConflict:"user_id,platform"});if(error)throw new Error(error.message)}
+async function saveConnection(userId,platform,payload){
+  if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
+  const {data:existing,error:existingError}=await supabaseAdmin
+    .from("platform_connections")
+    .select("account_id,account_name,metadata,refresh_token,token_expires_at")
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .maybeSingle();
+  if(existingError)throw new Error(existingError.message);
+  const row={
+    user_id:userId,
+    platform,
+    access_token:payload.accessToken||null,
+    refresh_token:payload.refreshToken!==undefined?payload.refreshToken:(existing?.refresh_token||null),
+    token_expires_at:payload.tokenExpiresAt!==undefined?payload.tokenExpiresAt:(existing?.token_expires_at||null),
+    account_id:payload.accountId!==undefined?payload.accountId:(existing?.account_id||null),
+    account_name:payload.accountName!==undefined?payload.accountName:(existing?.account_name||null),
+    metadata:{...(existing?.metadata||{}),...(payload.metadata||{})},
+    connected:true,
+    updated_at:new Date().toISOString()
+  };
+  const {error}=await supabaseAdmin.from("platform_connections").upsert(row,{onConflict:"user_id,platform"});
+  if(error)throw new Error(error.message)
+}
 async function getConnection(userId,platform){if(!supabaseAdmin||!userId)return null;const {data,error}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",platform).eq("connected",true).maybeSingle();if(error)throw new Error(error.message);return data}
 async function connectionStatus(userId,platform){const r=await getConnection(userId,platform).catch(()=>null);return{connected:Boolean(r&&(r.access_token||r.refresh_token)),source:r?"database":"none",updatedAt:r?.updated_at||null}}
 async function requireConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked){res.status(403).json({error:"Account access blocked",status:access.status});return null}const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn}}
+
+// ===== PHASE 1 CONSTITUTION PACK HELPERS =====
+const PHASE1_PLATFORM_LIMITS={meta:3,google:3,klaviyo:3,tiktok:3};
+const PHASE1_REPORTABLE_ACCOUNT_TYPES={
+  meta:"meta_ads_account",
+  google:"google_ads_customer_account",
+  tiktok:"tiktok_advertiser_account",
+  klaviyo:"klaviyo_account"
+};
+function phase1ReportableAccountType(platform){return PHASE1_REPORTABLE_ACCOUNT_TYPES[platform]||`${platform}_platform_account`}
+function normalizePlatformAccountId(value){return String(value||"").trim()}
+function activeOwnershipStatuses(){return ["connected","active"]}
+async function getUserAccountCurrency(userId){
+  const {data,error}=await supabaseAdmin.from("users").select("account_currency").eq("id",userId).maybeSingle();
+  if(error)throw error;
+  return data?.account_currency||null;
+}
+async function getOwnership(platform,platformAccountId){
+  const id=normalizePlatformAccountId(platformAccountId);
+  if(!id)return null;
+  const {data,error}=await supabaseAdmin
+    .from("platform_account_ownerships")
+    .select("*")
+    .eq("platform",platform)
+    .eq("platform_account_id",id)
+    .maybeSingle();
+  if(error)throw error;
+  return data;
+}
+async function countActiveOwnerships(userId,platform){
+  const {count,error}=await supabaseAdmin
+    .from("platform_account_ownerships")
+    .select("id",{count:"exact",head:true})
+    .eq("owner_user_id",userId)
+    .eq("platform",platform)
+    .eq("account_type",phase1ReportableAccountType(platform))
+    .in("status",activeOwnershipStatuses());
+  if(error)throw error;
+  return count||0;
+}
+async function ensurePlatformOwnership(userId,platform,account){
+  if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
+  const platformAccountId=normalizePlatformAccountId(account.platform_account_id||account.id||account.customerId||account.account_id);
+  if(!platformAccountId)throw new Error("Platform account id is required for ownership");
+  const existing=await getOwnership(platform,platformAccountId);
+  const now=new Date().toISOString();
+  if(existing&&existing.owner_user_id!==userId&&activeOwnershipStatuses().includes(existing.status)){
+    const err=new Error("Platform account already owned by another user");
+    err.status=409;
+    throw err;
+  }
+  if(!existing){
+    const limit=PHASE1_PLATFORM_LIMITS[platform]||3;
+    const activeCount=await countActiveOwnerships(userId,platform);
+    if(activeCount>=limit){
+      const err=new Error(`Connected reportable platform account limit reached for ${platform}`);
+      err.status=403;
+      throw err;
+    }
+    const {data,error}=await supabaseAdmin
+      .from("platform_account_ownerships")
+      .insert({
+        owner_user_id:userId,
+        platform,
+        platform_account_id:platformAccountId,
+        platform_account_name:account.account_name||account.name||account.descriptiveName||null,
+        account_type:phase1ReportableAccountType(platform),
+        base_currency:account.currency||account.currency_code||null,
+        status:"connected",
+        connected_at:now,
+        updated_at:now,
+        metadata:account
+      })
+      .select("*")
+      .maybeSingle();
+    if(error)throw error;
+    return data;
+  }
+  const {data,error}=await supabaseAdmin
+    .from("platform_account_ownerships")
+    .update({
+      owner_user_id:userId,
+      platform_account_name:account.account_name||account.name||account.descriptiveName||existing.platform_account_name||null,
+      account_type:phase1ReportableAccountType(platform),
+      base_currency:account.currency||account.currency_code||existing.base_currency||null,
+      status:"connected",
+      connected_at:existing.connected_at||now,
+      disconnected_at:null,
+      updated_at:now,
+      metadata:{...(existing.metadata||{}),...account}
+    })
+    .eq("id",existing.id)
+    .select("*")
+    .maybeSingle();
+  if(error)throw error;
+  return data;
+}
+async function requireActiveOwnership(userId,platform,platformAccountId){
+  const ownership=await getOwnership(platform,platformAccountId);
+  if(!ownership||ownership.owner_user_id!==userId||!activeOwnershipStatuses().includes(ownership.status)){
+    const err=new Error("Platform account ownership is not active");
+    err.status=403;
+    throw err;
+  }
+  return ownership;
+}
+async function disconnectPlatformLifecycle(userId,platform){
+  const now=new Date().toISOString();
+  const {error:connError}=await supabaseAdmin
+    .from("platform_connections")
+    .update({connected:false,updated_at:now})
+    .eq("user_id",userId)
+    .eq("platform",platform);
+  if(connError)throw connError;
+
+  const {error:ownershipError}=await supabaseAdmin
+    .from("platform_account_ownerships")
+    .update({status:"disconnected",disconnected_at:now,updated_at:now})
+    .eq("owner_user_id",userId)
+    .eq("platform",platform)
+    .in("status",activeOwnershipStatuses());
+  if(ownershipError)throw ownershipError;
+
+  await supabaseAdmin
+    .from("snapshot_schedules")
+    .update({active:false,updated_at:now})
+    .eq("user_id",userId)
+    .eq("platform",platform);
+
+  await supabaseAdmin
+    .from("snapshot_jobs")
+    .update({status:"failed",error_message:"Stopped by disconnect",finished_at:now,updated_at:now})
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .in("status",["queued","running"]);
+
+  return {ok:true,platform,connected:false,ownership:"disconnected",snapshot_generation:"stopped"};
+}
+async function createRefreshJob(userId,platform,platformAccountId,metadata={}){
+  const existing=await supabaseAdmin
+    .from("snapshot_jobs")
+    .select("id,status")
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .eq("platform_account_id",platformAccountId)
+    .in("status",["queued","running"])
+    .limit(1)
+    .maybeSingle();
+  if(existing.error)throw existing.error;
+  if(existing.data){
+    const err=new Error("Refresh job already queued or running for this platform account");
+    err.status=409;
+    err.job=existing.data;
+    throw err;
+  }
+  const {data,error}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .insert({user_id:userId,platform,platform_account_id:platformAccountId,status:"queued",metadata,created_at:new Date().toISOString(),updated_at:new Date().toISOString()})
+    .select("*")
+    .maybeSingle();
+  if(error)throw error;
+  return data;
+}
+async function setRefreshJobStatus(jobId,status,extra={}){
+  const now=new Date().toISOString();
+  const patch={status,updated_at:now,...extra};
+  if(status==="running")patch.started_at=now;
+  if(["completed","failed"].includes(status))patch.finished_at=now;
+  const {data,error}=await supabaseAdmin.from("snapshot_jobs").update(patch).eq("id",jobId).select("*").maybeSingle();
+  if(error)throw error;
+  return data;
+}
+// ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
 app.get("/auth/meta",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.META_APP_ID||!process.env.META_REDIRECT_URI)throw new Error("Missing Meta env");const state=Math.random().toString(36).slice(2);req.session.metaOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({client_id:process.env.META_APP_ID,redirect_uri:process.env.META_REDIRECT_URI,state,response_type:"code",scope:"ads_read"});res.redirect(`https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${p}`)}catch(e){res.status(500).send(e.message)}});
@@ -295,7 +491,73 @@ async function e2aFetchMetaInsightsForLevel(conn,adAccountId,level,datePreset,li
   return (data.data||[]).map(row=>normalizeMetaInsight(row,level));
 }
 
-app.post("/api/snapshots/meta/write",async(req,res)=>{
+async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="last_7d",snapshotDate,limit="100",sourceJobId=null}){
+  const platformAccountId=normalizePlatformAccountId(adAccountId);
+  const ownership=await requireActiveOwnership(user.id,"meta",platformAccountId);
+  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate);
+
+  const campaignRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"campaign",datePreset,limit);
+  const adsetRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"adset",datePreset,limit);
+  const adRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"ad",datePreset,limit);
+
+  const platformBaseCurrency=
+    ownership.base_currency||
+    campaignRows.find(r=>r.currency)?.currency||
+    adsetRows.find(r=>r.currency)?.currency||
+    adRows.find(r=>r.currency)?.currency||
+    null;
+  const accountCurrency=await getUserAccountCurrency(user.id)||platformBaseCurrency;
+
+  const snapshot=e2aBuildMetaSnapshot({
+    snapshotDate:effectiveSnapshotDate,
+    accountCurrency,
+    campaignRows,
+    adsetRows,
+    adRows
+  });
+
+  const existingVersionResult=await supabaseAdmin
+    .from("dashboard_snapshots")
+    .select("snapshot_version")
+    .eq("user_id",user.id)
+    .eq("platform","meta")
+    .eq("platform_account_id",platformAccountId)
+    .eq("snapshot_date",snapshot.snapshot_date)
+    .order("snapshot_version",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(existingVersionResult.error)throw existingVersionResult.error;
+  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
+  const now=new Date().toISOString();
+
+  const row={
+    user_id:user.id,
+    platform:"meta",
+    platform_account_id:platformAccountId,
+    platform_base_currency:platformBaseCurrency,
+    snapshot_version:snapshotVersion,
+    source_job_id:sourceJobId,
+    snapshot_date:snapshot.snapshot_date,
+    snapshot_created_at:now,
+    account_currency:snapshot.account_currency,
+    kpis:snapshot.kpis,
+    purchase_journey:snapshot.purchase_journey,
+    click_journey:snapshot.click_journey,
+    performance_summary:snapshot.performance_summary
+  };
+
+  const {data,error}=await supabaseAdmin
+    .from("dashboard_snapshots")
+    .insert(row)
+    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .maybeSingle();
+  if(error)throw error;
+
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts};
+}
+
+async function handleMetaSnapshotWrite(req,res){
+  let job=null;
   try{
     const result=await requireConnection(req,res,"meta");
     if(!result)return;
@@ -304,79 +566,54 @@ app.post("/api/snapshots/meta/write",async(req,res)=>{
     const adAccountId=req.body?.adAccountId||req.body?.ad_account_id||req.query.adAccountId||req.query.ad_account_id;
     if(!adAccountId)return res.status(400).json({error:"Missing adAccountId"});
 
+    const platformAccountId=normalizePlatformAccountId(adAccountId);
+    await requireActiveOwnership(user.id,"meta",platformAccountId);
+
     const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"last_7d");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
     const limit=String(req.body?.limit||req.query.limit||"100");
 
-    const campaignRows=await e2aFetchMetaInsightsForLevel(conn,adAccountId,"campaign",datePreset,limit);
-    const adsetRows=await e2aFetchMetaInsightsForLevel(conn,adAccountId,"adset",datePreset,limit);
-    const adRows=await e2aFetchMetaInsightsForLevel(conn,adAccountId,"ad",datePreset,limit);
+    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit});
+    await setRefreshJobStatus(job.id,"running");
 
-    const accountCurrency=
-      campaignRows.find(r=>r.currency)?.currency||
-      adsetRows.find(r=>r.currency)?.currency||
-      adRows.find(r=>r.currency)?.currency||
-      null;
-
-    const snapshot=e2aBuildMetaSnapshot({
-      snapshotDate,
-      accountCurrency,
-      campaignRows,
-      adsetRows,
-      adRows
-    });
-
-    const row={
-      user_id:user.id,
-      snapshot_date:snapshot.snapshot_date,
-      account_currency:snapshot.account_currency,
-      kpis:snapshot.kpis,
-      purchase_journey:snapshot.purchase_journey,
-      click_journey:snapshot.click_journey,
-      performance_summary:snapshot.performance_summary
-    };
-
-    const {data:existing,error:selectError}=await supabaseAdmin
-      .from("dashboard_snapshots")
-      .select("id")
-      .eq("user_id",user.id)
-      .eq("snapshot_date",snapshot.snapshot_date)
-      .maybeSingle();
-
-    if(selectError)throw selectError;
-
-    let writeResult;
-    if(existing?.id){
-      const {data,error}=await supabaseAdmin
-        .from("dashboard_snapshots")
-        .update(row)
-        .eq("id",existing.id)
-        .select("id,snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
-        .maybeSingle();
-      if(error)throw error;
-      writeResult={mode:"update",snapshot:data};
-    }else{
-      const {data,error}=await supabaseAdmin
-        .from("dashboard_snapshots")
-        .insert(row)
-        .select("id,snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
-        .maybeSingle();
-      if(error)throw error;
-      writeResult={mode:"insert",snapshot:data};
-    }
+    const writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,sourceJobId:job.id});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
 
     res.json({
       ok:true,
       platform:"Meta",
+      refresh_job:{id:job.id,status:"completed"},
       mode:writeResult.mode,
       snapshot_id:writeResult.snapshot?.id||null,
-      snapshot_date:snapshot.snapshot_date,
-      account_currency:snapshot.account_currency,
-      row_counts:snapshot.performance_summary.counts,
-      kpis:snapshot.kpis,
-      purchase_journey:snapshot.purchase_journey,
-      click_journey:snapshot.click_journey
+      snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,
+      snapshot_version:writeResult.snapshot?.snapshot_version||null,
+      platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
+      platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
+      account_currency:writeResult.snapshot?.account_currency||null,
+      row_counts:writeResult.row_counts,
+      kpis:writeResult.snapshot?.kpis||{},
+      purchase_journey:writeResult.snapshot?.purchase_journey||{},
+      click_journey:writeResult.snapshot?.click_journey||{}
     });
+  }catch(e){
+    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    res.status(e.status||500).json({error:e.message,job_id:job?.id||null});
+  }
+}
+
+app.post("/api/snapshots/meta/write",handleMetaSnapshotWrite);
+app.post("/api/refresh/meta",handleMetaSnapshotWrite);
+
+app.get("/api/refresh/status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    let q=supabaseAdmin.from("snapshot_jobs").select("*").eq("user_id",user.id).order("created_at",{ascending:false}).limit(Number(req.query.limit||10));
+    if(req.query.platform)q=q.eq("platform",String(req.query.platform));
+    if(req.query.platform_account_id)q=q.eq("platform_account_id",String(req.query.platform_account_id));
+    const {data,error}=await q;
+    if(error)throw error;
+    res.json({jobs:data||[]});
   }catch(e){
     res.status(500).json({error:e.message});
   }
@@ -440,7 +677,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .select("platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
       .eq("user_id",user.id);
 
     if(scope.start)snapshotQuery=snapshotQuery.gte("snapshot_date",scope.start);
@@ -459,7 +696,13 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
       platform:"Meta",
       date_scope:scope,
       snapshot:data?{
+        platform:data.platform||"meta",
+        platform_account_id:data.platform_account_id||null,
+        platform_base_currency:data.platform_base_currency||null,
+        snapshot_version:data.snapshot_version||null,
+        source_job_id:data.source_job_id||null,
         snapshot_date:data.snapshot_date,
+        snapshot_created_at:data.snapshot_created_at||null,
         account_currency:data.account_currency,
         kpis:data.kpis||{},
         purchase_journey:data.purchase_journey||{},
@@ -476,8 +719,27 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
 app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
-app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const{error}=await supabaseAdmin.from("platform_connections").update({connected:false,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform",platform);if(error)throw error;res.json({ok:true,platform,connected:false})}catch(e){res.status(500).json({error:e.message})}});
-async function upsertAdAccount(userId,platform,account){if(!supabaseAdmin||!userId)return;const row={user_id:userId,platform,platform_business_id:account.business_id||null,platform_account_id:account.id||account.customerId||account.account_id,account_name:account.name||account.descriptiveName||account.account_name||null,currency:account.currency||account.currency_code||null,timezone:account.timezone_name||account.timezone||null,status:String(account.account_status||account.status||""),metadata:account,updated_at:new Date().toISOString()};if(!row.platform_account_id)return;await supabaseAdmin.from("platform_ad_accounts").upsert(row,{onConflict:"user_id,platform,platform_account_id"})}
+app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
+async function upsertAdAccount(userId,platform,account){
+  if(!supabaseAdmin||!userId)return null;
+  const row={
+    user_id:userId,
+    platform,
+    platform_business_id:account.business_id||null,
+    platform_account_id:normalizePlatformAccountId(account.id||account.customerId||account.account_id||account.platform_account_id),
+    account_name:account.name||account.descriptiveName||account.account_name||null,
+    currency:account.currency||account.currency_code||null,
+    timezone:account.timezone_name||account.timezone||null,
+    status:String(account.account_status||account.status||""),
+    metadata:account,
+    updated_at:new Date().toISOString()
+  };
+  if(!row.platform_account_id)return null;
+  const ownership=await ensurePlatformOwnership(userId,platform,row);
+  await supabaseAdmin.from("platform_ad_accounts").upsert(row,{onConflict:"user_id,platform,platform_account_id"});
+  await saveConnection(userId,platform,{accountId:row.platform_account_id,accountName:row.account_name,metadata:{lastOwnedPlatformAccountId:row.platform_account_id,baseCurrency:row.currency}});
+  return ownership;
+}
 async function metaGraph(pathname,params,token){const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}${pathname}`);Object.entries(params||{}).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=="")url.searchParams.set(k,v)});url.searchParams.set("access_token",token);const r=await fetch(url);const data=await r.json();if(!r.ok)throw new Error(data.error?.message||JSON.stringify(data));return data}
 app.get("/api/meta/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"meta");if(!result)return;const{user,conn}=result;const data=await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},conn.access_token);const accounts=data.data||[];for(const account of accounts)await upsertAdAccount(user.id,"meta",account);res.json({platform:"meta",accounts})}catch(e){res.status(500).json({error:e.message})}});
 function actionValue(list,type){const f=Array.isArray(list)?list.find(x=>x.action_type===type):null;return f?Number(f.value||0):null}
@@ -577,21 +839,10 @@ app.post("/api/platform/meta/disconnect",async(req,res)=>{
   try{
     const user=await requireUser(req,res);
     if(!user)return;
-
-    const {error}=await supabaseAdmin
-      .from("platform_connections")
-      .update({
-        connected:false,
-        updated_at:new Date().toISOString()
-      })
-      .eq("user_id",user.id)
-      .eq("platform","meta");
-
-    if(error)throw error;
-
-    res.json({state:"NOT_CONNECTED"});
+    const result=await disconnectPlatformLifecycle(user.id,"meta");
+    res.json({state:"NOT_CONNECTED",...result});
   }catch(e){
-    res.status(500).json({error:e.message});
+    res.status(e.status||500).json({error:e.message});
   }
 });
 // ===== END D.2A.1 META CONNECT / DISCONNECT =====
@@ -616,21 +867,10 @@ app.post("/api/platform/google/disconnect",async(req,res)=>{
   try{
     const user=await requireUser(req,res);
     if(!user)return;
-
-    const {error}=await supabaseAdmin
-      .from("platform_connections")
-      .update({
-        connected:false,
-        updated_at:new Date().toISOString()
-      })
-      .eq("user_id",user.id)
-      .eq("platform","google");
-
-    if(error)throw error;
-
-    res.json({state:"NOT_CONNECTED"});
+    const result=await disconnectPlatformLifecycle(user.id,"google");
+    res.json({state:"NOT_CONNECTED",...result});
   }catch(e){
-    res.status(500).json({error:e.message});
+    res.status(e.status||500).json({error:e.message});
   }
 });
 // ===== END D.2A.2 GOOGLE CONNECT / DISCONNECT =====
@@ -658,21 +898,10 @@ app.post("/api/platform/klaviyo/disconnect",async(req,res)=>{
   try{
     const user=await requireUser(req,res);
     if(!user)return;
-
-    const {error}=await supabaseAdmin
-      .from("platform_connections")
-      .update({
-        connected:false,
-        updated_at:new Date().toISOString()
-      })
-      .eq("user_id",user.id)
-      .eq("platform","klaviyo");
-
-    if(error)throw error;
-
-    res.json({state:"NOT_CONNECTED"});
+    const result=await disconnectPlatformLifecycle(user.id,"klaviyo");
+    res.json({state:"NOT_CONNECTED",...result});
   }catch(e){
-    res.status(500).json({error:e.message});
+    res.status(e.status||500).json({error:e.message});
   }
 });
 

@@ -3372,6 +3372,57 @@ body.account-mode .accountSettingsView{
   cursor:pointer !important;
 }
 
+
+
+/* ===== PHASE 1 REFRESH VISIBILITY PATCH ===== */
+.icons{position:relative !important;}
+.phase1RefreshBtn{
+  width:34px !important;
+  height:34px !important;
+  border:3px solid #111 !important;
+  border-radius:50% !important;
+  display:grid !important;
+  place-items:center !important;
+  background:#fff !important;
+  color:#111 !important;
+  font-size:18px !important;
+  font-weight:950 !important;
+  line-height:1 !important;
+  padding:0 !important;
+  cursor:pointer !important;
+}
+.phase1RefreshBtn.loading{
+  animation:phase1RefreshSpin .8s linear infinite;
+  opacity:.85;
+}
+.phase1RefreshBtn:disabled{
+  cursor:not-allowed !important;
+  opacity:.72 !important;
+}
+.phase1RefreshStatus{
+  position:absolute !important;
+  top:40px !important;
+  right:0 !important;
+  z-index:100000 !important;
+  display:none;
+  min-width:86px;
+  min-height:24px;
+  padding:6px 9px;
+  border:1px solid #ddd;
+  border-radius:999px;
+  background:#fff;
+  color:#111;
+  box-shadow:0 8px 20px rgba(0,0,0,.12);
+  font-size:11px;
+  font-weight:950;
+  line-height:1;
+  text-align:center;
+  white-space:nowrap;
+}
+.phase1RefreshStatus.show{display:block;}
+.phase1RefreshStatus.error{color:#b00020;}
+@keyframes phase1RefreshSpin{to{transform:rotate(360deg)}}
+/* ===== END PHASE 1 REFRESH VISIBILITY PATCH ===== */
 </style>
 
 
@@ -3506,6 +3557,8 @@ body.account-mode .accountSettingsView{
     </div>
     <div class="icons">
       <div class="ico">AI<span class="badge">3</span></div>
+      <button type="button" class="phase1RefreshBtn" id="phase1RefreshBtn" aria-label="Refresh dashboard" title="Refresh">↻</button>
+      <span class="phase1RefreshStatus" id="phase1RefreshStatus">Idle</span>
       <div class="ico">?</div>
       <button type="button" class="ico accountIconPremium" id="accountTriggerBtn" aria-label="Account menu">
         <svg class="accountUserSvg" viewBox="0 0 24 24" aria-hidden="true">
@@ -8134,6 +8187,141 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 </script>
 <!-- END D.2B.1 KLAVIYO CONNECT / DISCONNECT + ESTIMATED MONTHLY SPEND -->
 
+
+
+<script id="phase1-refresh-visibility-patch">
+(function(){
+  "use strict";
+
+  const btn = document.getElementById("phase1RefreshBtn");
+  const status = document.getElementById("phase1RefreshStatus");
+  if(!btn || !status) return;
+
+  let phase1Client = null;
+  let phase1Session = null;
+
+  function setStatus(text, isError){
+    status.textContent = text;
+    status.classList.add("show");
+    status.classList.toggle("error", !!isError);
+  }
+
+  async function getPhase1Session(){
+    if(phase1Session && phase1Session.access_token) return phase1Session;
+    const cfg = await fetch("/api/public-config").then(function(r){ return r.json(); });
+    phase1Client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    const s = await phase1Client.auth.getSession();
+    phase1Session = s && s.data ? s.data.session : null;
+    if(!phase1Session || !phase1Session.access_token){
+      throw new Error("Session not found");
+    }
+    return phase1Session;
+  }
+
+  async function authHeaders(){
+    const s = await getPhase1Session();
+    return {
+      "Accept":"application/json",
+      "Content-Type":"application/json",
+      "Authorization":"Bearer " + s.access_token
+    };
+  }
+
+  function currentDatePreset(){
+    const label = document.querySelector(".filters .filter:nth-child(1) .filterText");
+    const v = (label ? label.textContent : "Last 7 Days").trim().toLowerCase();
+    if(v === "today") return "today";
+    if(v === "yesterday") return "yesterday";
+    if(v === "this month") return "this_month";
+    return "last_7d";
+  }
+
+  function todayIso(){
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return y + "-" + m + "-" + day;
+  }
+
+  async function findMetaAccount(headers){
+    const r = await fetch("/api/accounts", {headers});
+    if(!r.ok) throw new Error("Accounts request failed");
+    const data = await r.json();
+    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    const meta = accounts.find(function(a){ return String(a.platform || "").toLowerCase() === "meta"; });
+    if(!meta) throw new Error("Meta account not found");
+    const id = meta.platform_account_id || meta.account_id || meta.id;
+    if(!id) throw new Error("Meta account id not found");
+    return id;
+  }
+
+  async function pollRefreshStatus(headers, platformAccountId){
+    const url = "/api/refresh/status?platform=meta&platform_account_id=" + encodeURIComponent(String(platformAccountId)) + "&limit=1";
+    for(let i=0;i<8;i++){
+      const r = await fetch(url, {headers});
+      if(r.ok){
+        const data = await r.json();
+        const job = Array.isArray(data.jobs) ? data.jobs[0] : null;
+        if(job && job.status){
+          setStatus(String(job.status));
+          if(job.status === "completed") return "completed";
+          if(job.status === "failed") throw new Error(job.error_message || "Refresh failed");
+        }
+      }
+      await new Promise(function(resolve){ setTimeout(resolve, 900); });
+    }
+    return "unknown";
+  }
+
+  async function runRefresh(){
+    btn.disabled = true;
+    btn.classList.add("loading");
+    setStatus("Refreshing...");
+
+    try{
+      const headers = await authHeaders();
+      const adAccountId = await findMetaAccount(headers);
+      const body = {
+        adAccountId: adAccountId,
+        date_preset: currentDatePreset(),
+        snapshot_date: todayIso(),
+        limit: "100"
+      };
+
+      const r = await fetch("/api/refresh/meta", {
+        method:"POST",
+        headers,
+        body: JSON.stringify(body)
+      });
+
+      const data = await r.json().catch(function(){ return {}; });
+      if(!r.ok || data.ok === false){
+        throw new Error(data.error || "Refresh request failed");
+      }
+
+      if(data.refresh_job && data.refresh_job.status && data.refresh_job.status !== "completed"){
+        await pollRefreshStatus(headers, adAccountId);
+      }
+
+      setStatus("Completed");
+      setTimeout(function(){ window.location.reload(); }, 900);
+    }catch(err){
+      setStatus("Failed", true);
+      console.error("[Phase 1 Refresh Visibility Patch]", err);
+      btn.disabled = false;
+      btn.classList.remove("loading");
+    }
+  }
+
+  btn.addEventListener("click", function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    if(btn.disabled) return;
+    runRefresh();
+  }, true);
+})();
+</script>
 </body>
 </html>
 <!-- =========================================================

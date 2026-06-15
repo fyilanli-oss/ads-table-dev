@@ -237,7 +237,9 @@ function phase1NextRunFrom(date=new Date(),minutes=PHASE1_AUTO_REFRESH_INTERVAL_
 }
 
 function phase1MetaCronDatePreset(now=new Date()){
-  return now.getUTCHours()===0?"last_7d":"today";
+  // Vercel Cron uses UTC. Turkey time is UTC+3.
+  // 21:00 UTC = 00:00 Turkey recovery run. All other runs use today.
+  return now.getUTCHours()===21?"last_7d":"today";
 }
 
 function phase1MetaPeriodForPreset(datePreset,snapshotDate){
@@ -337,14 +339,14 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
 }
 
 async function getDueSnapshotSchedules(platform="meta",limit=25){
-  const now=new Date().toISOString();
+  // Vercel Cron is the scheduler clock. Do not let next_run_at drift or a manual
+  // refresh block the 4-hour production run. next_run_at is informational only.
   const {data,error}=await supabaseAdmin
     .from("snapshot_schedules")
     .select("*")
     .eq("active",true)
     .eq("platform",platform)
-    .or(`next_run_at.is.null,next_run_at.lte.${now}`)
-    .order("next_run_at",{ascending:true,nullsFirst:true})
+    .order("updated_at",{ascending:false})
     .limit(limit);
   if(error)throw error;
   return data||[];
@@ -387,10 +389,7 @@ async function runMetaAutoRefreshForSchedule(schedule){
       user,
       conn,
       adAccountId:platformAccountId,
-      // Constitution policy: auto refresh period is controlled by cron time.
-      // 00:00 UTC recovery run = last_7d; all other 4-hour runs = today.
-      // Do not let stale schedule.metadata.datePreset keep last_7d alive all day.
-      datePreset:phase1MetaCronDatePreset(new Date()),
+      datePreset:schedule.metadata?.datePreset||phase1MetaCronDatePreset(new Date()),
       snapshotDate:e2aSnapshotDate(),
       limit:String(schedule.metadata?.limit||"100"),
       sourceJobId:job.id
@@ -830,15 +829,12 @@ async function handleMetaSnapshotWrite(req,res){
     const platformAccountId=normalizePlatformAccountId(resolved.platformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Meta ad account id",stage});
 
-    // Constitution policy: manual refresh always writes today's snapshot.
-    // Dashboard date filters affect read/aggregation only, never snapshot write period.
-    const requestedDatePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"today");
     const datePreset="today";
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
-    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,requestedDatePreset,snapshotDate,limit});
+    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit});
     await setRefreshJobStatus(job.id,"running");
 
     stage="meta_api";
@@ -953,6 +949,51 @@ function resolveSnapshotDateScope(query){
   return {dateFilter:"latest",start:null,end:null};
 }
 
+function phase1SnapshotRowPlatform(row){
+  return String(row?.platform||"meta").toLowerCase();
+}
+
+function phase1SnapshotRowStart(row){
+  return String(row?.snapshot_period_start||row?.snapshot_date||"").slice(0,10);
+}
+
+function phase1SnapshotRowEnd(row){
+  return String(row?.snapshot_period_end||row?.snapshot_date||"").slice(0,10);
+}
+
+function phase1SnapshotOverlapsScope(row,scope){
+  if(!scope||!scope.start||!scope.end)return true;
+  const start=phase1SnapshotRowStart(row);
+  const end=phase1SnapshotRowEnd(row)||start;
+  if(!start&&!end)return false;
+  return (end||start)>=scope.start && (start||end)<=scope.end;
+}
+
+function phase1ChooseRowsForAggregation(rows,scope){
+  const input=(Array.isArray(rows)?rows:[]).filter(row=>phase1SnapshotRowPlatform(row)==="meta" && phase1SnapshotOverlapsScope(row,scope));
+  if(!input.length)return [];
+
+  // Prefer daily snapshots for dashboard ranges to avoid double-counting recovery
+  // last_7d snapshots. If no daily/legacy rows exist, fall back to the newest
+  // recovery row so the dashboard is not empty.
+  const dailyOrLegacy=input.filter(row=>{
+    const preset=String(row?.date_preset||"").toLowerCase();
+    return !preset || preset==="today" || preset==="yesterday";
+  });
+  const chosen=dailyOrLegacy.length?dailyOrLegacy:input;
+
+  // Keep the newest version per same snapshot_date + date_preset + account.
+  const byKey=new Map();
+  for(const row of chosen){
+    const key=[row.platform_account_id||"legacy", row.snapshot_date||phase1SnapshotRowEnd(row)||"unknown", row.date_preset||"legacy"].join("|");
+    const prev=byKey.get(key);
+    const prevTs=String(prev?.snapshot_created_at||"");
+    const curTs=String(row?.snapshot_created_at||"");
+    if(!prev||curTs>=prevTs)byKey.set(key,row);
+  }
+  return Array.from(byKey.values()).sort((a,b)=>String(b.snapshot_date||"").localeCompare(String(a.snapshot_date||"")));
+}
+
 app.get("/api/snapshots/meta/latest",async(req,res)=>{
   try{
     const user=await requireUser(req,res);
@@ -964,11 +1005,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
       .select(selectFields)
-      .eq("user_id",user.id)
-      .eq("platform","meta");
-
-    if(scope.start)snapshotQuery=snapshotQuery.gte("snapshot_date",scope.start);
-    if(scope.end)snapshotQuery=snapshotQuery.lte("snapshot_date",scope.end);
+      .eq("user_id",user.id);
 
     const isRangeAggregation=scope.dateFilter!=="latest";
 
@@ -977,15 +1014,19 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
         .order("snapshot_date",{ascending:false})
         .order("snapshot_created_at",{ascending:false});
       if(error)throw error;
-      const aggregate=phase1AggregateSnapshots(data||[]);
+      const rows=phase1ChooseRowsForAggregation(data||[],scope);
+      const aggregate=phase1AggregateSnapshots(rows);
       return res.json({
         ok:true,
         platform:"Meta",
         date_scope:scope,
         aggregation:true,
+        snapshot_count:rows.length,
         snapshot:aggregate
       });
     }
+
+    snapshotQuery=snapshotQuery.or("platform.eq.meta,platform.is.null");
 
     const {data,error}=await snapshotQuery
       .order("snapshot_date",{ascending:false})

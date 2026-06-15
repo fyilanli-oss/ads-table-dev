@@ -4,5 +4,6 @@
       "path": "/api/cron/auto-refresh",
       "schedule": "0 21,1,5,9,13,17 * * *"
     }
-  ]
+  ],
+  "release_marker": "2026-06-15-force-deploy-v1"
 }

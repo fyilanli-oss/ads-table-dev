@@ -236,6 +236,75 @@ function phase1NextRunFrom(date=new Date(),minutes=PHASE1_AUTO_REFRESH_INTERVAL_
   return new Date(date.getTime()+Number(minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES)*60*1000).toISOString();
 }
 
+function phase1MetaCronDatePreset(now=new Date()){
+  return now.getUTCHours()===0?"last_7d":"today";
+}
+
+function phase1MetaPeriodForPreset(datePreset,snapshotDate){
+  const endIso=e2aSnapshotDate(snapshotDate||new Date());
+  const startForDays=days=>addUtcDays(endIso,-(days-1));
+  if(datePreset==="today")return {start:endIso,end:endIso};
+  if(datePreset==="yesterday"){const y=addUtcDays(endIso,-1);return {start:y,end:y};}
+  if(datePreset==="this_month")return {start:endIso.slice(0,7)+"-01",end:endIso};
+  if(datePreset==="last_7d"||datePreset==="last_7_days")return {start:startForDays(7),end:endIso};
+  return {start:endIso,end:endIso};
+}
+
+function phase1SumObjects(items,key){
+  return (items||[]).reduce((acc,item)=>{
+    const obj=item?.[key]||{};
+    for(const [k,v] of Object.entries(obj)){
+      const n=Number(v);
+      if(Number.isFinite(n))acc[k]=(acc[k]||0)+n;
+      else if(acc[k]===undefined&&v!==undefined)acc[k]=v;
+    }
+    return acc;
+  },{});
+}
+
+function phase1AggregateSnapshots(rows){
+  const snapshots=Array.isArray(rows)?rows:[];
+  if(!snapshots.length)return null;
+  const kpis=phase1SumObjects(snapshots,"kpis");
+  const purchase_journey=phase1SumObjects(snapshots,"purchase_journey");
+  const click_journey=phase1SumObjects(snapshots,"click_journey");
+
+  const impressions=Number(kpis.impressions||0);
+  const clicks=Number(kpis.clicks||click_journey.ad_clicks||0);
+  const spend=Number(kpis.spend||0);
+  const sales=Number(kpis.sales||kpis.revenue||0);
+  const linkClicks=Number(click_journey.link_clicks||0);
+  const lpv=Number(click_journey.landing_page_views||0);
+
+  kpis.ctr=impressions>0?(clicks/impressions)*100:(kpis.ctr??null);
+  kpis.cpc=clicks>0?spend/clicks:(kpis.cpc??null);
+  kpis.roas=spend>0?sales/spend:(kpis.roas??null);
+  click_journey.traffic_score=linkClicks>0?(lpv/linkClicks)*100:(click_journey.traffic_score??null);
+  click_journey.real_cpc=lpv>0?spend/lpv:(click_journey.real_cpc??null);
+
+  const performanceRows=[];
+  for(const snap of snapshots){
+    const rows=snap?.performance_summary?.rows;
+    if(Array.isArray(rows))performanceRows.push(...rows);
+  }
+  return {
+    platform:"meta",
+    platform_account_id:snapshots[0].platform_account_id||null,
+    platform_base_currency:snapshots[0].platform_base_currency||null,
+    account_currency:snapshots[0].account_currency||null,
+    snapshot_count:snapshots.length,
+    snapshot_date:snapshots[0].snapshot_date||null,
+    snapshot_created_at:snapshots[0].snapshot_created_at||null,
+    date_preset:null,
+    snapshot_period_start:snapshots[snapshots.length-1].snapshot_period_start||snapshots[snapshots.length-1].snapshot_date||null,
+    snapshot_period_end:snapshots[0].snapshot_period_end||snapshots[0].snapshot_date||null,
+    kpis,
+    purchase_journey,
+    click_journey,
+    performance_summary:{rows:performanceRows,counts:{total:performanceRows.length}}
+  };
+}
+
 async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata={}){
   if(!supabaseAdmin||!userId||!platformAccountId)return null;
   const now=new Date().toISOString();
@@ -318,7 +387,7 @@ async function runMetaAutoRefreshForSchedule(schedule){
       user,
       conn,
       adAccountId:platformAccountId,
-      datePreset:schedule.metadata?.datePreset||"last_7d",
+      datePreset:schedule.metadata?.datePreset||phase1MetaCronDatePreset(new Date()),
       snapshotDate:e2aSnapshotDate(),
       limit:String(schedule.metadata?.limit||"100"),
       sourceJobId:job.id
@@ -674,10 +743,11 @@ async function resolveMetaRefreshAccount(user,conn,requestedAccountId){
   return {platformAccountId:normalizePlatformAccountId(first.id),account:first};
 }
 
-async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="last_7d",snapshotDate,limit="100",sourceJobId=null}){
+async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="today",snapshotDate,limit="100",sourceJobId=null}){
   const platformAccountId=normalizePlatformAccountId(adAccountId);
   const ownership=await requireActiveOwnership(user.id,"meta",platformAccountId);
   const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate);
+  const snapshotPeriod=phase1MetaPeriodForPreset(datePreset,effectiveSnapshotDate);
 
   const campaignRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"campaign",datePreset,limit);
   const adsetRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"adset",datePreset,limit);
@@ -720,6 +790,9 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="las
     platform_base_currency:platformBaseCurrency,
     snapshot_version:snapshotVersion,
     source_job_id:sourceJobId,
+    date_preset:datePreset,
+    snapshot_period_start:snapshotPeriod.start,
+    snapshot_period_end:snapshotPeriod.end,
     snapshot_date:snapshot.snapshot_date,
     snapshot_created_at:now,
     account_currency:snapshot.account_currency,
@@ -732,7 +805,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="las
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
 
@@ -754,7 +827,7 @@ async function handleMetaSnapshotWrite(req,res){
     const platformAccountId=normalizePlatformAccountId(resolved.platformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Meta ad account id",stage});
 
-    const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"last_7d");
+    const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
     const limit=String(req.body?.limit||req.query.limit||"100");
 
@@ -776,6 +849,9 @@ async function handleMetaSnapshotWrite(req,res){
       snapshot_id:writeResult.snapshot?.id||null,
       snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,
       snapshot_version:writeResult.snapshot?.snapshot_version||null,
+      date_preset:writeResult.snapshot?.date_preset||datePreset,
+      snapshot_period_start:writeResult.snapshot?.snapshot_period_start||null,
+      snapshot_period_end:writeResult.snapshot?.snapshot_period_end||null,
       platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
       platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
       account_currency:writeResult.snapshot?.account_currency||null,
@@ -877,18 +953,37 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
     if(!user)return;
 
     const scope=resolveSnapshotDateScope(req.query||{});
+    const selectFields="platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary";
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
-      .eq("user_id",user.id);
+      .select(selectFields)
+      .eq("user_id",user.id)
+      .eq("platform","meta");
 
     if(scope.start)snapshotQuery=snapshotQuery.gte("snapshot_date",scope.start);
     if(scope.end)snapshotQuery=snapshotQuery.lte("snapshot_date",scope.end);
 
+    const isRangeAggregation=scope.dateFilter!=="latest";
+
+    if(isRangeAggregation){
+      const {data,error}=await snapshotQuery
+        .order("snapshot_date",{ascending:false})
+        .order("snapshot_created_at",{ascending:false});
+      if(error)throw error;
+      const aggregate=phase1AggregateSnapshots(data||[]);
+      return res.json({
+        ok:true,
+        platform:"Meta",
+        date_scope:scope,
+        aggregation:true,
+        snapshot:aggregate
+      });
+    }
+
     const {data,error}=await snapshotQuery
       .order("snapshot_date",{ascending:false})
-      .order("created_at",{ascending:false})
+      .order("snapshot_created_at",{ascending:false})
       .limit(1)
       .maybeSingle();
 
@@ -898,12 +993,16 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
       ok:true,
       platform:"Meta",
       date_scope:scope,
+      aggregation:false,
       snapshot:data?{
         platform:data.platform||"meta",
         platform_account_id:data.platform_account_id||null,
         platform_base_currency:data.platform_base_currency||null,
         snapshot_version:data.snapshot_version||null,
         source_job_id:data.source_job_id||null,
+        date_preset:data.date_preset||null,
+        snapshot_period_start:data.snapshot_period_start||null,
+        snapshot_period_end:data.snapshot_period_end||null,
         snapshot_date:data.snapshot_date,
         snapshot_created_at:data.snapshot_created_at||null,
         account_currency:data.account_currency,

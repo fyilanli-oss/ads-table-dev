@@ -804,7 +804,23 @@ async function phase1InsertDashboardSnapshotRichOrLegacy(row){
     .insert(row)
     .select(richSelect)
     .maybeSingle();
+
   if(!rich.error)return phase1LegacyDashboardSnapshotRow(rich.data);
+
+  if(String(rich.error?.code||'')==='23505'){
+    const existing=await supabaseAdmin
+      .from('dashboard_snapshots')
+      .select(richSelect)
+      .eq('user_id',row.user_id)
+      .eq('snapshot_date',row.snapshot_date)
+      .order('snapshot_created_at',{ascending:false})
+      .limit(1)
+      .maybeSingle();
+
+    if(!existing.error && existing.data){
+      return phase1LegacyDashboardSnapshotRow(existing.data);
+    }
+  }
 
   if(!isSupabaseSchemaError(rich.error))throw rich.error;
 

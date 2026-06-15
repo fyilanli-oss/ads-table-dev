@@ -121,7 +121,7 @@ async function ensurePlatformOwnership(userId,platform,account){
         platform_account_name:account.account_name||account.name||account.descriptiveName||null,
         account_type:phase1ReportableAccountType(platform),
         base_currency:account.currency||account.currency_code||null,
-        status:"connected",
+        status:"active",
         connected_at:now,
         updated_at:now,
         metadata:account
@@ -138,7 +138,7 @@ async function ensurePlatformOwnership(userId,platform,account){
       platform_account_name:account.account_name||account.name||account.descriptiveName||existing.platform_account_name||null,
       account_type:phase1ReportableAccountType(platform),
       base_currency:account.currency||account.currency_code||existing.base_currency||null,
-      status:"connected",
+      status:"active",
       connected_at:existing.connected_at||now,
       disconnected_at:null,
       updated_at:now,
@@ -491,6 +491,54 @@ async function e2aFetchMetaInsightsForLevel(conn,adAccountId,level,datePreset,li
   return (data.data||[]).map(row=>normalizeMetaInsight(row,level));
 }
 
+async function resolveMetaRefreshAccount(user,conn,requestedAccountId){
+  const requested=normalizePlatformAccountId(requestedAccountId);
+  if(requested){
+    const existingAdAccount=await supabaseAdmin
+      .from("platform_ad_accounts")
+      .select("platform_account_id,account_name,currency,metadata")
+      .eq("user_id",user.id)
+      .eq("platform","meta")
+      .eq("platform_account_id",requested)
+      .maybeSingle();
+    if(existingAdAccount.error)throw existingAdAccount.error;
+    const account={
+      id:requested,
+      platform_account_id:requested,
+      name:existingAdAccount.data?.account_name||conn.account_name||requested,
+      account_name:existingAdAccount.data?.account_name||conn.account_name||requested,
+      currency:existingAdAccount.data?.currency||conn.metadata?.baseCurrency||null,
+      ...(existingAdAccount.data?.metadata||{})
+    };
+    await ensurePlatformOwnership(user.id,"meta",account);
+    return {platformAccountId:requested,account};
+  }
+
+  const storedId=normalizePlatformAccountId(conn.account_id||conn.metadata?.lastOwnedPlatformAccountId||conn.metadata?.selectedPlatformAccountId);
+  if(storedId){
+    const account={
+      id:storedId,
+      platform_account_id:storedId,
+      name:conn.account_name||storedId,
+      account_name:conn.account_name||storedId,
+      currency:conn.metadata?.baseCurrency||null
+    };
+    await ensurePlatformOwnership(user.id,"meta",account);
+    return {platformAccountId:storedId,account};
+  }
+
+  const accountsData=await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},conn.access_token);
+  const accounts=accountsData.data||[];
+  if(!accounts.length){
+    const err=new Error("No Meta ad account found for connected user");
+    err.status=404;
+    throw err;
+  }
+  const first=accounts[0];
+  await upsertAdAccount(user.id,"meta",first);
+  return {platformAccountId:normalizePlatformAccountId(first.id),account:first};
+}
+
 async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="last_7d",snapshotDate,limit="100",sourceJobId=null}){
   const platformAccountId=normalizePlatformAccountId(adAccountId);
   const ownership=await requireActiveOwnership(user.id,"meta",platformAccountId);
@@ -558,25 +606,31 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="las
 
 async function handleMetaSnapshotWrite(req,res){
   let job=null;
+  let stage="connection";
   try{
     const result=await requireConnection(req,res,"meta");
     if(!result)return;
 
     const {user,conn}=result;
-    const adAccountId=req.body?.adAccountId||req.body?.ad_account_id||req.query.adAccountId||req.query.ad_account_id;
-    if(!adAccountId)return res.status(400).json({error:"Missing adAccountId"});
+    const requestedAdAccountId=req.body?.adAccountId||req.body?.ad_account_id||req.query.adAccountId||req.query.ad_account_id;
 
-    const platformAccountId=normalizePlatformAccountId(adAccountId);
-    await requireActiveOwnership(user.id,"meta",platformAccountId);
+    stage="ownership";
+    const resolved=await resolveMetaRefreshAccount(user,conn,requestedAdAccountId);
+    const platformAccountId=normalizePlatformAccountId(resolved.platformAccountId);
+    if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Meta ad account id",stage});
 
     const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"last_7d");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
     const limit=String(req.body?.limit||req.query.limit||"100");
 
+    stage="job";
     job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit});
     await setRefreshJobStatus(job.id,"running");
 
+    stage="meta_api";
     const writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,sourceJobId:job.id});
+
+    stage="snapshot";
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
 
     res.json({
@@ -597,10 +651,9 @@ async function handleMetaSnapshotWrite(req,res){
     });
   }catch(e){
     if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    res.status(e.status||500).json({error:e.message,job_id:job?.id||null});
+    res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null});
   }
 }
-
 app.post("/api/snapshots/meta/write",handleMetaSnapshotWrite);
 app.post("/api/refresh/meta",handleMetaSnapshotWrite);
 
@@ -613,7 +666,7 @@ app.get("/api/refresh/status",async(req,res)=>{
     if(req.query.platform_account_id)q=q.eq("platform_account_id",String(req.query.platform_account_id));
     const {data,error}=await q;
     if(error)throw error;
-    res.json({jobs:data||[]});
+    res.json({ok:true,jobs:data||[]});
   }catch(e){
     res.status(500).json({error:e.message});
   }

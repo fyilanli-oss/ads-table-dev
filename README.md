@@ -1,4 +1,4 @@
-# AdsTable Stabilization Build v1
+# AdsTable Stabilization Build v1 
 
 Upload/replace:
 - server.js

@@ -129,6 +129,7 @@ async function ensurePlatformOwnership(userId,platform,account){
       .select("*")
       .maybeSingle();
     if(error)throw error;
+    await ensureSnapshotSchedule(userId,platform,platformAccountId,{account_type:phase1ReportableAccountType(platform)});
     return data;
   }
   const {data,error}=await supabaseAdmin
@@ -148,6 +149,7 @@ async function ensurePlatformOwnership(userId,platform,account){
     .select("*")
     .maybeSingle();
   if(error)throw error;
+  await ensureSnapshotSchedule(userId,platform,platformAccountId,{account_type:phase1ReportableAccountType(platform)});
   return data;
 }
 async function requireActiveOwnership(userId,platform,platformAccountId){
@@ -224,6 +226,139 @@ async function setRefreshJobStatus(jobId,status,extra={}){
   const {data,error}=await supabaseAdmin.from("snapshot_jobs").update(patch).eq("id",jobId).select("*").maybeSingle();
   if(error)throw error;
   return data;
+}
+
+const PHASE1_AUTO_REFRESH_INTERVAL_MINUTES=240;
+const PHASE1_AUTO_REFRESH_INTERVAL_MS=PHASE1_AUTO_REFRESH_INTERVAL_MINUTES*60*1000;
+let phase1AutoRefreshRunning=false;
+
+function phase1NextRunFrom(date=new Date(),minutes=PHASE1_AUTO_REFRESH_INTERVAL_MINUTES){
+  return new Date(date.getTime()+Number(minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES)*60*1000).toISOString();
+}
+
+async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata={}){
+  if(!supabaseAdmin||!userId||!platformAccountId)return null;
+  const now=new Date().toISOString();
+  const {data:existing,error:existingError}=await supabaseAdmin
+    .from("snapshot_schedules")
+    .select("id,active,interval_minutes,next_run_at,metadata")
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .eq("platform_account_id",platformAccountId)
+    .maybeSingle();
+  if(existingError)throw existingError;
+  const row={
+    user_id:userId,
+    platform,
+    platform_account_id:platformAccountId,
+    active:true,
+    interval_minutes:PHASE1_AUTO_REFRESH_INTERVAL_MINUTES,
+    next_run_at:existing?.next_run_at||phase1NextRunFrom(new Date(),PHASE1_AUTO_REFRESH_INTERVAL_MINUTES),
+    metadata:{...(existing?.metadata||{}),...metadata,engine:"vercel_cron_auto_refresh"},
+    updated_at:now
+  };
+  if(existing?.id){
+    const {data,error}=await supabaseAdmin.from("snapshot_schedules").update(row).eq("id",existing.id).select("*").maybeSingle();
+    if(error)throw error;
+    return data;
+  }
+  const {data,error}=await supabaseAdmin.from("snapshot_schedules").insert({...row,created_at:now}).select("*").maybeSingle();
+  if(error)throw error;
+  return data;
+}
+
+async function getDueSnapshotSchedules(platform="meta",limit=25){
+  const now=new Date().toISOString();
+  const {data,error}=await supabaseAdmin
+    .from("snapshot_schedules")
+    .select("*")
+    .eq("active",true)
+    .eq("platform",platform)
+    .or(`next_run_at.is.null,next_run_at.lte.${now}`)
+    .order("next_run_at",{ascending:true,nullsFirst:true})
+    .limit(limit);
+  if(error)throw error;
+  return data||[];
+}
+
+async function isAutoRefreshEligible(userId){
+  const sub=await getSubscriptionForLifecycle(userId);
+  const access=getLifecycleAccess(sub?.status);
+  return Boolean(!access.blocked&&(access.dailySync||access.refresh||access.manualRefresh));
+}
+
+async function runMetaAutoRefreshForSchedule(schedule){
+  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id);
+  const now=new Date().toISOString();
+  let job=null;
+  let stage="eligibility";
+  try{
+    if(!platformAccountId)throw new Error("Schedule missing platform_account_id");
+    const eligible=await isAutoRefreshEligible(schedule.user_id);
+    if(!eligible)throw new Error("Subscription not eligible for auto refresh");
+
+    stage="ownership";
+    const ownership=await requireActiveOwnership(schedule.user_id,"meta",platformAccountId);
+
+    stage="connection";
+    const conn=await getConnection(schedule.user_id,"meta");
+    if(!conn)throw new Error("Meta not connected");
+
+    stage="job";
+    job=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
+      trigger:"auto",
+      schedule_id:schedule.id,
+      interval_minutes:schedule.interval_minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES
+    });
+    await setRefreshJobStatus(job.id,"running");
+
+    stage="snapshot";
+    const user={id:schedule.user_id};
+    const writeResult=await writeMetaSnapshotImmutable({
+      user,
+      conn,
+      adAccountId:platformAccountId,
+      datePreset:schedule.metadata?.datePreset||"last_7d",
+      snapshotDate:e2aSnapshotDate(),
+      limit:String(schedule.metadata?.limit||"100"),
+      sourceJobId:job.id
+    });
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
+
+    await supabaseAdmin.from("snapshot_schedules").update({
+      last_run_at:now,
+      next_run_at:phase1NextRunFrom(new Date(),schedule.interval_minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES),
+      updated_at:new Date().toISOString(),
+      metadata:{...(schedule.metadata||{}),last_status:"completed",last_job_id:job.id,last_snapshot_id:writeResult.snapshot?.id||null}
+    }).eq("id",schedule.id);
+
+    return {ok:true,schedule_id:schedule.id,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,platform_account_id:platformAccountId};
+  }catch(e){
+    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    await supabaseAdmin.from("snapshot_schedules").update({
+      last_run_at:now,
+      next_run_at:phase1NextRunFrom(new Date(),schedule.interval_minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES),
+      updated_at:new Date().toISOString(),
+      metadata:{...(schedule.metadata||{}),last_status:"failed",last_error:e.message,last_stage:stage,last_job_id:job?.id||null}
+    }).eq("id",schedule.id).catch(()=>null);
+    return {ok:false,schedule_id:schedule.id,job_id:job?.id||null,platform_account_id:platformAccountId,error:e.message,stage};
+  }
+}
+
+async function runPhase1MetaAutoRefresh({limit=25}={}){
+  if(phase1AutoRefreshRunning)return {ok:true,skipped:true,reason:"scheduler already running"};
+  phase1AutoRefreshRunning=true;
+  try{
+    if(!supabaseAdmin)return {ok:false,error:"Supabase not configured"};
+    const schedules=await getDueSnapshotSchedules("meta",limit);
+    const results=[];
+    for(const schedule of schedules){
+      results.push(await runMetaAutoRefreshForSchedule(schedule));
+    }
+    return {ok:true,engine:"vercel_cron",frequency_minutes:PHASE1_AUTO_REFRESH_INTERVAL_MINUTES,checked:schedules.length,results};
+  }finally{
+    phase1AutoRefreshRunning=false;
+  }
 }
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
@@ -671,6 +806,21 @@ app.get("/api/refresh/status",async(req,res)=>{
     res.status(500).json({error:e.message});
   }
 });
+
+app.get("/api/cron/auto-refresh",async(req,res)=>{
+  try{
+    const configuredSecret=process.env.CRON_SECRET||process.env.AUTO_REFRESH_SECRET||"";
+    const providedSecret=String(req.headers["x-cron-secret"]||"");
+    const bearer=String(req.headers.authorization||"").startsWith("Bearer ")?String(req.headers.authorization).slice(7):"";
+    if(configuredSecret&&providedSecret!==configuredSecret&&bearer!==configuredSecret){
+      return res.status(401).json({ok:false,error:"Unauthorized scheduler request"});
+    }
+    const result=await runPhase1MetaAutoRefresh({limit:Number(req.query.limit||25)});
+    res.json(result);
+  }catch(e){
+    res.status(500).json({ok:false,error:e.message});
+  }
+});
 // ===== END PHASE E.2A META SNAPSHOT WRITE =====
 // ===== PHASE E.2C META SNAPSHOT READ =====
 function toIsoDateOnly(value){
@@ -1102,5 +1252,6 @@ app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(re
 // ===== END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
 
 app.get("/api/tiktok/status",(_,res)=>res.json({connected:false,status:"pending_verification"}));
+
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));
 module.exports=app;

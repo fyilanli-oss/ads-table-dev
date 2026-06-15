@@ -387,7 +387,10 @@ async function runMetaAutoRefreshForSchedule(schedule){
       user,
       conn,
       adAccountId:platformAccountId,
-      datePreset:schedule.metadata?.datePreset||phase1MetaCronDatePreset(new Date()),
+      // Constitution policy: auto refresh period is controlled by cron time.
+      // 00:00 UTC recovery run = last_7d; all other 4-hour runs = today.
+      // Do not let stale schedule.metadata.datePreset keep last_7d alive all day.
+      datePreset:phase1MetaCronDatePreset(new Date()),
       snapshotDate:e2aSnapshotDate(),
       limit:String(schedule.metadata?.limit||"100"),
       sourceJobId:job.id
@@ -827,12 +830,15 @@ async function handleMetaSnapshotWrite(req,res){
     const platformAccountId=normalizePlatformAccountId(resolved.platformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Meta ad account id",stage});
 
-    const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"today");
+    // Constitution policy: manual refresh always writes today's snapshot.
+    // Dashboard date filters affect read/aggregation only, never snapshot write period.
+    const requestedDatePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"today");
+    const datePreset="today";
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
-    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit});
+    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,requestedDatePreset,snapshotDate,limit});
     await setRefreshJobStatus(job.id,"running");
 
     stage="meta_api";

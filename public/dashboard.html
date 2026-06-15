@@ -8228,9 +8228,12 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   }
 
   function currentDatePreset(){
-    // Constitution policy: Refresh always writes today.
-    // Date filter affects dashboard read only, not snapshot write period.
-    return "today";
+    const label = document.querySelector(".filters .filter:nth-child(1) .filterText");
+    const v = (label ? label.textContent : "Last 7 Days").trim().toLowerCase();
+    if(v === "today") return "today";
+    if(v === "yesterday") return "yesterday";
+    if(v === "this month") return "this_month";
+    return "last_7d";
   }
 
   function todayIso(){
@@ -8281,7 +8284,9 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       const adAccountId = await findMetaAccount(headers);
       const body = {
         adAccountId: adAccountId,
-        date_preset: currentDatePreset(),
+        // Manual refresh always writes today's incremental snapshot.
+        // Date filter only controls dashboard read/aggregation.
+        date_preset: "today",
         snapshot_date: todayIso(),
         limit: "100"
       };

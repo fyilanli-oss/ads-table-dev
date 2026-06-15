@@ -8228,12 +8228,9 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   }
 
   function currentDatePreset(){
-    const label = document.querySelector(".filters .filter:nth-child(1) .filterText");
-    const v = (label ? label.textContent : "Last 7 Days").trim().toLowerCase();
-    if(v === "today") return "today";
-    if(v === "yesterday") return "yesterday";
-    if(v === "this month") return "this_month";
-    return "last_7d";
+    // Constitution policy: Refresh always writes today.
+    // Date filter affects dashboard read only, not snapshot write period.
+    return "today";
   }
 
   function todayIso(){

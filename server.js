@@ -564,18 +564,24 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="las
     adRows
   });
 
-  const existingVersionResult=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .select("snapshot_version")
-    .eq("user_id",user.id)
-    .eq("platform","meta")
-    .eq("platform_account_id",platformAccountId)
-    .eq("snapshot_date",snapshot.snapshot_date)
-    .order("snapshot_version",{ascending:false})
-    .limit(1)
-    .maybeSingle();
-  if(existingVersionResult.error)throw existingVersionResult.error;
-  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
+  const selectCols="id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary";
+
+  const findExistingSnapshot=async()=>{
+    const {data,error}=await supabaseAdmin
+      .from("dashboard_snapshots")
+      .select(selectCols)
+      .eq("user_id",user.id)
+      .eq("snapshot_date",snapshot.snapshot_date)
+      .order("snapshot_created_at",{ascending:false})
+      .order("id",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(error)throw error;
+    return data||null;
+  };
+
+  const existing=await findExistingSnapshot();
+  const snapshotVersion=Number(existing?.snapshot_version||0)+1;
   const now=new Date().toISOString();
 
   const row={
@@ -594,12 +600,43 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="las
     performance_summary:snapshot.performance_summary
   };
 
+  if(existing?.id){
+    const {data,error}=await supabaseAdmin
+      .from("dashboard_snapshots")
+      .update(row)
+      .eq("id",existing.id)
+      .select(selectCols)
+      .maybeSingle();
+    if(error)throw error;
+    return {mode:"update_existing_same_day",snapshot:data,row_counts:snapshot.performance_summary.counts};
+  }
+
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select(selectCols)
     .maybeSingle();
-  if(error)throw error;
+
+  if(error){
+    const code=String(error.code||"");
+    const status=String(error.status||"");
+    const message=String(error.message||"").toLowerCase();
+    const isDuplicate=code==="23505"||status==="409"||message.includes("duplicate")||message.includes("unique");
+    if(isDuplicate){
+      const racedExisting=await findExistingSnapshot();
+      if(racedExisting?.id){
+        const {data:updateData,error:updateError}=await supabaseAdmin
+          .from("dashboard_snapshots")
+          .update(row)
+          .eq("id",racedExisting.id)
+          .select(selectCols)
+          .maybeSingle();
+        if(updateError)throw updateError;
+        return {mode:"update_existing_same_day_after_duplicate",snapshot:updateData,row_counts:snapshot.performance_summary.counts};
+      }
+    }
+    throw error;
+  }
 
   return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts};
 }

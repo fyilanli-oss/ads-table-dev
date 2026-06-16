@@ -845,8 +845,8 @@ function resolveSnapshotDateScope(query){
     return {dateFilter,start:yesterday,end:yesterday};
   }
 
-  if(dateFilter==="last_7_days"){
-    return {dateFilter,start:addUtcDays(today,-6),end:today};
+  if(dateFilter==="last_7_days" || dateFilter==="last_7d" || dateFilter==="last7days"){
+    return {dateFilter:"last_7_days",start:addUtcDays(today,-6),end:today};
   }
 
   if(dateFilter==="this_month"){
@@ -862,16 +862,144 @@ function resolveSnapshotDateScope(query){
   return {dateFilter:"latest",start:null,end:null};
 }
 
+
+function numberOrZero(v){
+  const n=Number(v);
+  return Number.isFinite(n)?n:0;
+}
+
+function safeDivide(a,b){
+  const x=Number(a), y=Number(b);
+  return Number.isFinite(x)&&Number.isFinite(y)&&y!==0?x/y:null;
+}
+
+function normalizeSnapshotForResponse(data){
+  if(!data)return null;
+  return {
+    platform:data.platform||"meta",
+    platform_account_id:data.platform_account_id||null,
+    platform_base_currency:data.platform_base_currency||null,
+    snapshot_version:data.snapshot_version||null,
+    source_job_id:data.source_job_id||null,
+    date_preset:data.date_preset||null,
+    snapshot_period_start:data.snapshot_period_start||null,
+    snapshot_period_end:data.snapshot_period_end||null,
+    snapshot_scope:data.snapshot_scope||null,
+    capture_reason:data.capture_reason||null,
+    snapshot_date:data.snapshot_date,
+    snapshot_created_at:data.snapshot_created_at||data.created_at||null,
+    account_currency:data.account_currency,
+    kpis:data.kpis||{},
+    purchase_journey:data.purchase_journey||{},
+    click_journey:data.click_journey||{},
+    performance_summary:data.performance_summary||{rows:[],counts:{}}
+  };
+}
+
+function pickLatestSnapshotPerDay(rows){
+  const map=new Map();
+  for(const row of rows||[]){
+    const key=String(row.snapshot_date||"");
+    const current=map.get(key);
+    const rowVersion=Number(row.snapshot_version||0);
+    const currentVersion=Number(current?.snapshot_version||0);
+    const rowCreated=new Date(row.snapshot_created_at||row.created_at||0).getTime();
+    const currentCreated=new Date(current?.snapshot_created_at||current?.created_at||0).getTime();
+
+    if(!current || rowVersion>currentVersion || (rowVersion===currentVersion && rowCreated>currentCreated)){
+      map.set(key,row);
+    }
+  }
+  return [...map.values()].sort((a,b)=>String(a.snapshot_date).localeCompare(String(b.snapshot_date)));
+}
+
+function aggregateSnapshots(rows,scope){
+  const daily=pickLatestSnapshotPerDay(rows);
+  if(!daily.length)return null;
+
+  const kpis={impressions:0,reach:0,clicks:0,spend:0,sales:0,revenue:0,cpc:null,ctr:null,roas:null};
+  const purchase_journey={add_to_cart:0,checkout:0,purchase:0,abandoned:0};
+  const click_journey={ad_clicks:0,link_clicks:0,landing_page_views:0,real_cpc:null,traffic_score:null};
+  const performanceRows=[];
+  const counts={campaign:0,adset:0,ad:0,total:0};
+
+  for(const snap of daily){
+    const sK=snap.kpis||{};
+    kpis.impressions+=numberOrZero(sK.impressions);
+    kpis.reach+=numberOrZero(sK.reach);
+    kpis.clicks+=numberOrZero(sK.clicks);
+    kpis.spend+=numberOrZero(sK.spend);
+    kpis.sales+=numberOrZero(sK.sales);
+    kpis.revenue+=numberOrZero(sK.revenue);
+
+    const pj=snap.purchase_journey||{};
+    purchase_journey.add_to_cart+=numberOrZero(pj.add_to_cart);
+    purchase_journey.checkout+=numberOrZero(pj.checkout);
+    purchase_journey.purchase+=numberOrZero(pj.purchase);
+    purchase_journey.abandoned+=numberOrZero(pj.abandoned);
+
+    const cj=snap.click_journey||{};
+    click_journey.ad_clicks+=numberOrZero(cj.ad_clicks);
+    click_journey.link_clicks+=numberOrZero(cj.link_clicks);
+    click_journey.landing_page_views+=numberOrZero(cj.landing_page_views);
+
+    const ps=snap.performance_summary||{};
+    const rows=Array.isArray(ps.rows)?ps.rows:[];
+    performanceRows.push(...rows);
+    const c=ps.counts||{};
+    counts.campaign+=numberOrZero(c.campaign);
+    counts.adset+=numberOrZero(c.adset);
+    counts.ad+=numberOrZero(c.ad);
+    counts.total+=numberOrZero(c.total||rows.length);
+  }
+
+  kpis.cpc=safeDivide(kpis.spend,kpis.clicks);
+  kpis.ctr=safeDivide(kpis.clicks*100,kpis.impressions);
+  kpis.roas=safeDivide(kpis.revenue,kpis.spend);
+  click_journey.real_cpc=safeDivide(kpis.spend,click_journey.landing_page_views);
+  click_journey.traffic_score=safeDivide(click_journey.landing_page_views*100,click_journey.ad_clicks);
+
+  const latest=daily[daily.length-1];
+  return {
+    platform:latest.platform||"meta",
+    platform_account_id:latest.platform_account_id||null,
+    platform_base_currency:latest.platform_base_currency||null,
+    snapshot_version:latest.snapshot_version||null,
+    source_job_id:latest.source_job_id||null,
+    date_preset:"aggregate",
+    snapshot_period_start:scope.start,
+    snapshot_period_end:scope.end,
+    snapshot_scope:scope.dateFilter,
+    capture_reason:"date_filter_aggregate",
+    snapshot_date:latest.snapshot_date,
+    snapshot_created_at:latest.snapshot_created_at||latest.created_at||null,
+    account_currency:latest.account_currency,
+    kpis,
+    purchase_journey,
+    click_journey,
+    performance_summary:{rows:performanceRows,counts},
+    daily_snapshots:daily.map(s=>({
+      snapshot_date:s.snapshot_date,
+      snapshot_version:s.snapshot_version,
+      snapshot_id:s.id||null,
+      snapshot_created_at:s.snapshot_created_at||s.created_at||null,
+      date_preset:s.date_preset||null,
+      capture_reason:s.capture_reason||null
+    }))
+  };
+}
+
 app.get("/api/snapshots/meta/latest",async(req,res)=>{
   try{
     const user=await requireUser(req,res);
     if(!user)return;
 
     const scope=resolveSnapshotDateScope(req.query||{});
+    const isRangeScope=["last_7_days","this_month","custom"].includes(scope.dateFilter);
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
       .eq("user_id",user.id);
 
     if(scope.start)snapshotQuery=snapshotQuery.gte("snapshot_date",scope.start);
@@ -881,39 +1009,29 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
       .order("snapshot_date",{ascending:false})
       .order("snapshot_version",{ascending:false})
       .order("created_at",{ascending:false})
-      .limit(1)
-      .maybeSingle();
+      .limit(isRangeScope?500:1);
 
     if(error)throw error;
+
+    let snapshot=null;
+    if(isRangeScope){
+      snapshot=aggregateSnapshots(data||[],scope);
+    }else{
+      snapshot=normalizeSnapshotForResponse((data||[])[0]||null);
+    }
 
     res.json({
       ok:true,
       platform:"Meta",
       date_scope:scope,
-      snapshot:data?{
-        platform:data.platform||"meta",
-        platform_account_id:data.platform_account_id||null,
-        platform_base_currency:data.platform_base_currency||null,
-        snapshot_version:data.snapshot_version||null,
-        source_job_id:data.source_job_id||null,
-        date_preset:data.date_preset||null,
-        snapshot_period_start:data.snapshot_period_start||null,
-        snapshot_period_end:data.snapshot_period_end||null,
-        snapshot_scope:data.snapshot_scope||null,
-        capture_reason:data.capture_reason||null,
-        snapshot_date:data.snapshot_date,
-        snapshot_created_at:data.snapshot_created_at||null,
-        account_currency:data.account_currency,
-        kpis:data.kpis||{},
-        purchase_journey:data.purchase_journey||{},
-        click_journey:data.click_journey||{},
-        performance_summary:data.performance_summary||[]
-      }:null
+      snapshot
     });
   }catch(e){
     res.status(500).json({error:e.message});
   }
 });
+
+
 // ===== END PHASE E.2C META SNAPSHOT READ =====
 
 

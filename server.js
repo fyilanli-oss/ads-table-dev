@@ -539,14 +539,54 @@ async function resolveMetaRefreshAccount(user,conn,requestedAccountId){
   return {platformAccountId:normalizePlatformAccountId(first.id),account:first};
 }
 
-async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="last_7d",snapshotDate,limit="100",sourceJobId=null}){
+function resolveSnapshotCapturePeriod(datePreset,snapshotDate){
+  const normalized=String(datePreset||"today").trim().toLowerCase();
+  const end=e2aSnapshotDate(snapshotDate);
+  if(normalized==="last_7d" || normalized==="last_7_days"){
+    return {
+      datePreset:"last_7d",
+      start:addUtcDays(end,-6),
+      end,
+      scope:"recovery_last_7d"
+    };
+  }
+  return {
+    datePreset:"today",
+    start:end,
+    end,
+    scope:"today"
+  };
+}
+
+function getIstanbulHour(date=new Date()){
+  const parts=new Intl.DateTimeFormat("en-GB",{
+    timeZone:"Europe/Istanbul",
+    hour:"2-digit",
+    hour12:false
+  }).formatToParts(date);
+  return Number(parts.find(p=>p.type==="hour")?.value||0);
+}
+
+function resolveAutoRefreshPolicy(date=new Date()){
+  const hour=getIstanbulHour(date);
+  const datePreset=hour===1?"last_7d":"today";
+  return {
+    hour,
+    datePreset,
+    captureReason:hour===1?"automation_recovery":"automation_today"
+  };
+}
+
+async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="today",snapshotDate,limit="100",sourceJobId=null,captureReason="manual_refresh"}){
   const platformAccountId=normalizePlatformAccountId(adAccountId);
   const ownership=await requireActiveOwnership(user.id,"meta",platformAccountId);
   const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate);
+  const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate);
+  const normalizedDatePreset=period.datePreset;
 
-  const campaignRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"campaign",datePreset,limit);
-  const adsetRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"adset",datePreset,limit);
-  const adRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"ad",datePreset,limit);
+  const campaignRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"campaign",normalizedDatePreset,limit);
+  const adsetRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"adset",normalizedDatePreset,limit);
+  const adRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"ad",normalizedDatePreset,limit);
 
   const platformBaseCurrency=
     ownership.base_currency||
@@ -585,6 +625,11 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="las
     platform_base_currency:platformBaseCurrency,
     snapshot_version:snapshotVersion,
     source_job_id:sourceJobId,
+    date_preset:normalizedDatePreset,
+    snapshot_period_start:period.start,
+    snapshot_period_end:period.end,
+    snapshot_scope:period.scope,
+    capture_reason:captureReason,
     snapshot_date:snapshot.snapshot_date,
     snapshot_created_at:now,
     account_currency:snapshot.account_currency,
@@ -597,7 +642,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="las
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
 
@@ -619,16 +664,16 @@ async function handleMetaSnapshotWrite(req,res){
     const platformAccountId=normalizePlatformAccountId(resolved.platformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Meta ad account id",stage});
 
-    const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"last_7d");
+    const datePreset="today";
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
-    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit});
+    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit,captureReason:"manual_refresh"});
     await setRefreshJobStatus(job.id,"running");
 
     stage="meta_api";
-    const writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,sourceJobId:job.id});
+    const writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,sourceJobId:job.id,captureReason:"manual_refresh"});
 
     stage="snapshot";
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
@@ -671,6 +716,102 @@ app.get("/api/refresh/status",async(req,res)=>{
     res.status(500).json({error:e.message});
   }
 });
+
+async function runMetaAutoRefreshForSchedule(schedule){
+  let job=null;
+  const policy=resolveAutoRefreshPolicy(new Date());
+  const snapshotDate=e2aSnapshotDate(new Date().toISOString());
+  const limit=String(schedule.metadata?.limit||"100");
+
+  const {data:user,error:userError}=await supabaseAdmin
+    .from("users")
+    .select("*")
+    .eq("id",schedule.user_id)
+    .maybeSingle();
+  if(userError)throw userError;
+  if(!user)throw new Error("Auto refresh user not found");
+
+  const {data:conn,error:connError}=await supabaseAdmin
+    .from("platform_connections")
+    .select("*")
+    .eq("user_id",schedule.user_id)
+    .eq("platform","meta")
+    .eq("connected",true)
+    .maybeSingle();
+  if(connError)throw connError;
+  if(!conn)throw new Error("Auto refresh Meta connection not found");
+
+  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);
+  if(!platformAccountId)throw new Error("Auto refresh missing platform account id");
+
+  job=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
+    trigger:"automation",
+    datePreset:policy.datePreset,
+    snapshotDate,
+    limit,
+    captureReason:policy.captureReason,
+    scheduleId:schedule.id,
+    istanbulHour:policy.hour
+  });
+
+  await setRefreshJobStatus(job.id,"running");
+
+  try{
+    const writeResult=await writeMetaSnapshotImmutable({
+      user,
+      conn,
+      adAccountId:platformAccountId,
+      datePreset:policy.datePreset,
+      snapshotDate,
+      limit,
+      sourceJobId:job.id,
+      captureReason:policy.captureReason
+    });
+
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
+
+    await supabaseAdmin
+      .from("snapshot_schedules")
+      .update({
+        last_run_at:new Date().toISOString(),
+        next_run_at:new Date(Date.now()+Number(schedule.interval_minutes||240)*60000).toISOString(),
+        updated_at:new Date().toISOString()
+      })
+      .eq("id",schedule.id);
+
+    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,date_preset:policy.datePreset,capture_reason:policy.captureReason};
+  }catch(e){
+    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    throw e;
+  }
+}
+
+app.get("/api/cron/auto-refresh",async(req,res)=>{
+  const startedAt=new Date().toISOString();
+  try{
+    const {data:schedules,error}=await supabaseAdmin
+      .from("snapshot_schedules")
+      .select("*")
+      .eq("active",true)
+      .eq("platform","meta");
+
+    if(error)throw error;
+
+    const results=[];
+    for(const schedule of schedules||[]){
+      try{
+        results.push(await runMetaAutoRefreshForSchedule(schedule));
+      }catch(e){
+        results.push({ok:false,schedule_id:schedule.id,error:e.message});
+      }
+    }
+
+    res.json({ok:true,started_at:startedAt,count:results.length,results});
+  }catch(e){
+    res.status(500).json({ok:false,error:e.message,started_at:startedAt});
+  }
+});
+
 // ===== END PHASE E.2A META SNAPSHOT WRITE =====
 // ===== PHASE E.2C META SNAPSHOT READ =====
 function toIsoDateOnly(value){
@@ -730,7 +871,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .select("platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
       .eq("user_id",user.id);
 
     if(scope.start)snapshotQuery=snapshotQuery.gte("snapshot_date",scope.start);
@@ -738,6 +879,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
     const {data,error}=await snapshotQuery
       .order("snapshot_date",{ascending:false})
+      .order("snapshot_version",{ascending:false})
       .order("created_at",{ascending:false})
       .limit(1)
       .maybeSingle();
@@ -754,6 +896,11 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
         platform_base_currency:data.platform_base_currency||null,
         snapshot_version:data.snapshot_version||null,
         source_job_id:data.source_job_id||null,
+        date_preset:data.date_preset||null,
+        snapshot_period_start:data.snapshot_period_start||null,
+        snapshot_period_end:data.snapshot_period_end||null,
+        snapshot_scope:data.snapshot_scope||null,
+        capture_reason:data.capture_reason||null,
         snapshot_date:data.snapshot_date,
         snapshot_created_at:data.snapshot_created_at||null,
         account_currency:data.account_currency,

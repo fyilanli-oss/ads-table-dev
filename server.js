@@ -129,7 +129,6 @@ async function ensurePlatformOwnership(userId,platform,account){
       .select("*")
       .maybeSingle();
     if(error)throw error;
-    await ensureSnapshotSchedule(userId,platform,platformAccountId,{account_type:phase1ReportableAccountType(platform)});
     return data;
   }
   const {data,error}=await supabaseAdmin
@@ -149,7 +148,6 @@ async function ensurePlatformOwnership(userId,platform,account){
     .select("*")
     .maybeSingle();
   if(error)throw error;
-  await ensureSnapshotSchedule(userId,platform,platformAccountId,{account_type:phase1ReportableAccountType(platform)});
   return data;
 }
 async function requireActiveOwnership(userId,platform,platformAccountId){
@@ -226,210 +224,6 @@ async function setRefreshJobStatus(jobId,status,extra={}){
   const {data,error}=await supabaseAdmin.from("snapshot_jobs").update(patch).eq("id",jobId).select("*").maybeSingle();
   if(error)throw error;
   return data;
-}
-
-const PHASE1_AUTO_REFRESH_INTERVAL_MINUTES=240;
-const PHASE1_AUTO_REFRESH_INTERVAL_MS=PHASE1_AUTO_REFRESH_INTERVAL_MINUTES*60*1000;
-let phase1AutoRefreshRunning=false;
-
-function phase1NextRunFrom(date=new Date(),minutes=PHASE1_AUTO_REFRESH_INTERVAL_MINUTES){
-  return new Date(date.getTime()+Number(minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES)*60*1000).toISOString();
-}
-
-function phase1MetaCronDatePreset(now=new Date()){
-  // Vercel Cron uses UTC. Turkey time is UTC+3.
-  // 21:00 UTC = 00:00 Turkey recovery run. All other runs use today.
-  return now.getUTCHours()===21?"last_7d":"today";
-}
-
-function phase1MetaPeriodForPreset(datePreset,snapshotDate){
-  const endIso=e2aSnapshotDate(snapshotDate||new Date());
-  const startForDays=days=>addUtcDays(endIso,-(days-1));
-  if(datePreset==="today")return {start:endIso,end:endIso};
-  if(datePreset==="yesterday"){const y=addUtcDays(endIso,-1);return {start:y,end:y};}
-  if(datePreset==="this_month")return {start:endIso.slice(0,7)+"-01",end:endIso};
-  if(datePreset==="last_7d"||datePreset==="last_7_days")return {start:startForDays(7),end:endIso};
-  return {start:endIso,end:endIso};
-}
-
-function phase1SumObjects(items,key){
-  return (items||[]).reduce((acc,item)=>{
-    const obj=item?.[key]||{};
-    for(const [k,v] of Object.entries(obj)){
-      const n=Number(v);
-      if(Number.isFinite(n))acc[k]=(acc[k]||0)+n;
-      else if(acc[k]===undefined&&v!==undefined)acc[k]=v;
-    }
-    return acc;
-  },{});
-}
-
-function phase1AggregateSnapshots(rows){
-  const snapshots=Array.isArray(rows)?rows:[];
-  if(!snapshots.length)return null;
-  const kpis=phase1SumObjects(snapshots,"kpis");
-  const purchase_journey=phase1SumObjects(snapshots,"purchase_journey");
-  const click_journey=phase1SumObjects(snapshots,"click_journey");
-
-  const impressions=Number(kpis.impressions||0);
-  const clicks=Number(kpis.clicks||click_journey.ad_clicks||0);
-  const spend=Number(kpis.spend||0);
-  const sales=Number(kpis.sales||kpis.revenue||0);
-  const linkClicks=Number(click_journey.link_clicks||0);
-  const lpv=Number(click_journey.landing_page_views||0);
-
-  kpis.ctr=impressions>0?(clicks/impressions)*100:(kpis.ctr??null);
-  kpis.cpc=clicks>0?spend/clicks:(kpis.cpc??null);
-  kpis.roas=spend>0?sales/spend:(kpis.roas??null);
-  click_journey.traffic_score=linkClicks>0?(lpv/linkClicks)*100:(click_journey.traffic_score??null);
-  click_journey.real_cpc=lpv>0?spend/lpv:(click_journey.real_cpc??null);
-
-  const performanceRows=[];
-  for(const snap of snapshots){
-    const rows=snap?.performance_summary?.rows;
-    if(Array.isArray(rows))performanceRows.push(...rows);
-  }
-  return {
-    platform:"meta",
-    platform_account_id:snapshots[0].platform_account_id||null,
-    platform_base_currency:snapshots[0].platform_base_currency||null,
-    account_currency:snapshots[0].account_currency||null,
-    snapshot_count:snapshots.length,
-    snapshot_date:snapshots[0].snapshot_date||null,
-    snapshot_created_at:snapshots[0].snapshot_created_at||null,
-    date_preset:null,
-    snapshot_period_start:snapshots[snapshots.length-1].snapshot_period_start||snapshots[snapshots.length-1].snapshot_date||null,
-    snapshot_period_end:snapshots[0].snapshot_period_end||snapshots[0].snapshot_date||null,
-    kpis,
-    purchase_journey,
-    click_journey,
-    performance_summary:{rows:performanceRows,counts:{total:performanceRows.length}}
-  };
-}
-
-async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata={}){
-  if(!supabaseAdmin||!userId||!platformAccountId)return null;
-  const now=new Date().toISOString();
-  const {data:existing,error:existingError}=await supabaseAdmin
-    .from("snapshot_schedules")
-    .select("id,active,interval_minutes,next_run_at,metadata")
-    .eq("user_id",userId)
-    .eq("platform",platform)
-    .eq("platform_account_id",platformAccountId)
-    .maybeSingle();
-  if(existingError)throw existingError;
-  const row={
-    user_id:userId,
-    platform,
-    platform_account_id:platformAccountId,
-    active:true,
-    interval_minutes:PHASE1_AUTO_REFRESH_INTERVAL_MINUTES,
-    next_run_at:existing?.next_run_at||phase1NextRunFrom(new Date(),PHASE1_AUTO_REFRESH_INTERVAL_MINUTES),
-    metadata:{...(existing?.metadata||{}),...metadata,engine:"vercel_cron_auto_refresh"},
-    updated_at:now
-  };
-  if(existing?.id){
-    const {data,error}=await supabaseAdmin.from("snapshot_schedules").update(row).eq("id",existing.id).select("*").maybeSingle();
-    if(error)throw error;
-    return data;
-  }
-  const {data,error}=await supabaseAdmin.from("snapshot_schedules").insert({...row,created_at:now}).select("*").maybeSingle();
-  if(error)throw error;
-  return data;
-}
-
-async function getDueSnapshotSchedules(platform="meta",limit=25){
-  // Vercel Cron is the scheduler clock. Do not let next_run_at drift or a manual
-  // refresh block the 4-hour production run. next_run_at is informational only.
-  const {data,error}=await supabaseAdmin
-    .from("snapshot_schedules")
-    .select("*")
-    .eq("active",true)
-    .eq("platform",platform)
-    .order("updated_at",{ascending:false})
-    .limit(limit);
-  if(error)throw error;
-  return data||[];
-}
-
-async function isAutoRefreshEligible(userId){
-  const sub=await getSubscriptionForLifecycle(userId);
-  const access=getLifecycleAccess(sub?.status);
-  return Boolean(!access.blocked&&(access.dailySync||access.refresh||access.manualRefresh));
-}
-
-async function runMetaAutoRefreshForSchedule(schedule){
-  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id);
-  const now=new Date().toISOString();
-  let job=null;
-  let stage="eligibility";
-  try{
-    if(!platformAccountId)throw new Error("Schedule missing platform_account_id");
-    const eligible=await isAutoRefreshEligible(schedule.user_id);
-    if(!eligible)throw new Error("Subscription not eligible for auto refresh");
-
-    stage="ownership";
-    const ownership=await requireActiveOwnership(schedule.user_id,"meta",platformAccountId);
-
-    stage="connection";
-    const conn=await getConnection(schedule.user_id,"meta");
-    if(!conn)throw new Error("Meta not connected");
-
-    stage="job";
-    job=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
-      trigger:"auto",
-      schedule_id:schedule.id,
-      interval_minutes:schedule.interval_minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES
-    });
-    await setRefreshJobStatus(job.id,"running");
-
-    stage="snapshot";
-    const user={id:schedule.user_id};
-    const writeResult=await writeMetaSnapshotImmutable({
-      user,
-      conn,
-      adAccountId:platformAccountId,
-      datePreset:schedule.metadata?.datePreset||phase1MetaCronDatePreset(new Date()),
-      snapshotDate:e2aSnapshotDate(),
-      limit:String(schedule.metadata?.limit||"100"),
-      sourceJobId:job.id
-    });
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-
-    await supabaseAdmin.from("snapshot_schedules").update({
-      last_run_at:now,
-      next_run_at:phase1NextRunFrom(new Date(),schedule.interval_minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES),
-      updated_at:new Date().toISOString(),
-      metadata:{...(schedule.metadata||{}),last_status:"completed",last_job_id:job.id,last_snapshot_id:writeResult.snapshot?.id||null}
-    }).eq("id",schedule.id);
-
-    return {ok:true,schedule_id:schedule.id,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,platform_account_id:platformAccountId};
-  }catch(e){
-    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    await supabaseAdmin.from("snapshot_schedules").update({
-      last_run_at:now,
-      next_run_at:phase1NextRunFrom(new Date(),schedule.interval_minutes||PHASE1_AUTO_REFRESH_INTERVAL_MINUTES),
-      updated_at:new Date().toISOString(),
-      metadata:{...(schedule.metadata||{}),last_status:"failed",last_error:e.message,last_stage:stage,last_job_id:job?.id||null}
-    }).eq("id",schedule.id).catch(()=>null);
-    return {ok:false,schedule_id:schedule.id,job_id:job?.id||null,platform_account_id:platformAccountId,error:e.message,stage};
-  }
-}
-
-async function runPhase1MetaAutoRefresh({limit=25}={}){
-  if(phase1AutoRefreshRunning)return {ok:true,skipped:true,reason:"scheduler already running"};
-  phase1AutoRefreshRunning=true;
-  try{
-    if(!supabaseAdmin)return {ok:false,error:"Supabase not configured"};
-    const schedules=await getDueSnapshotSchedules("meta",limit);
-    const results=[];
-    for(const schedule of schedules){
-      results.push(await runMetaAutoRefreshForSchedule(schedule));
-    }
-    return {ok:true,engine:"vercel_cron",frequency_minutes:PHASE1_AUTO_REFRESH_INTERVAL_MINUTES,checked:schedules.length,results};
-  }finally{
-    phase1AutoRefreshRunning=false;
-  }
 }
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
@@ -745,132 +539,10 @@ async function resolveMetaRefreshAccount(user,conn,requestedAccountId){
   return {platformAccountId:normalizePlatformAccountId(first.id),account:first};
 }
 
-
-// ===== CONTROLLED FIX V3: LEGACY-SAFE SNAPSHOT HELPERS =====
-function isSupabaseSchemaError(error){
-  const msg=String(error?.message||error?.hint||"").toLowerCase();
-  const code=String(error?.code||"");
-  return code==="42703" || msg.includes("column") || msg.includes("schema cache") || msg.includes("does not exist");
-}
-
-function phase1LegacyDashboardSnapshotRow(row){
-  const r=row||{};
-  return {
-    id:r.id||null,
-    platform:r.platform||"meta",
-    platform_account_id:r.platform_account_id||null,
-    platform_base_currency:r.platform_base_currency||null,
-    snapshot_version:r.snapshot_version||null,
-    source_job_id:r.source_job_id||null,
-    date_preset:r.date_preset||null,
-    snapshot_period_start:r.snapshot_period_start||r.snapshot_date||null,
-    snapshot_period_end:r.snapshot_period_end||r.snapshot_date||null,
-    snapshot_date:r.snapshot_date||null,
-    snapshot_created_at:r.snapshot_created_at||r.created_at||r.updated_at||null,
-    account_currency:r.account_currency||null,
-    kpis:r.kpis||{},
-    purchase_journey:r.purchase_journey||{},
-    click_journey:r.click_journey||{},
-    performance_summary:r.performance_summary||[]
-  };
-}
-
-async function phase1SelectDashboardSnapshots(userId){
-  const richFields="id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary";
-  let rich=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .select(richFields)
-    .eq("user_id",userId)
-    .order("snapshot_date",{ascending:false});
-  if(!rich.error){
-    return (rich.data||[]).map(phase1LegacyDashboardSnapshotRow);
-  }
-
-  if(!isSupabaseSchemaError(rich.error))throw rich.error;
-
-  const legacy=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .select("id,user_id,snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
-    .eq("user_id",userId)
-    .order("snapshot_date",{ascending:false});
-  if(legacy.error)throw legacy.error;
-  return (legacy.data||[]).map(phase1LegacyDashboardSnapshotRow);
-}
-
-async function phase1InsertDashboardSnapshotRichOrLegacy(row){
-  const richSelect="id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary";
-  const rich=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .insert(row)
-    .select(richSelect)
-    .maybeSingle();
-
-  if(!rich.error)return phase1LegacyDashboardSnapshotRow(rich.data);
-
-  if(String(rich.error?.code||'')==='23505'){
-    const existing=await supabaseAdmin
-      .from('dashboard_snapshots')
-      .select(richSelect)
-      .eq('user_id',row.user_id)
-      .eq('snapshot_date',row.snapshot_date)
-      .order('snapshot_created_at',{ascending:false})
-      .limit(1)
-      .maybeSingle();
-
-    if(!existing.error && existing.data){
-      return phase1LegacyDashboardSnapshotRow(existing.data);
-    }
-  }
-
-  if(!isSupabaseSchemaError(rich.error))throw rich.error;
-
-  const legacyRow={
-    user_id:row.user_id,
-    snapshot_date:row.snapshot_date,
-    account_currency:row.account_currency,
-    kpis:row.kpis,
-    purchase_journey:row.purchase_journey,
-    click_journey:row.click_journey,
-    performance_summary:row.performance_summary
-  };
-  const legacy=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .insert(legacyRow)
-    .select("id,user_id,snapshot_date,account_currency,kpis,purchase_journey,click_journey,performance_summary")
-    .maybeSingle();
-  if(legacy.error)throw legacy.error;
-  return phase1LegacyDashboardSnapshotRow({...legacy.data,platform:row.platform,platform_account_id:row.platform_account_id,platform_base_currency:row.platform_base_currency,snapshot_version:row.snapshot_version,source_job_id:row.source_job_id,date_preset:row.date_preset,snapshot_period_start:row.snapshot_period_start,snapshot_period_end:row.snapshot_period_end,snapshot_created_at:row.snapshot_created_at});
-}
-
-async function phase1GetNextSnapshotVersionSafe(userId,platformAccountId,snapshotDate){
-  const rich=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .select("snapshot_version")
-    .eq("user_id",userId)
-    .eq("platform","meta")
-    .eq("platform_account_id",platformAccountId)
-    .eq("snapshot_date",snapshotDate)
-    .order("snapshot_version",{ascending:false})
-    .limit(1)
-    .maybeSingle();
-  if(!rich.error)return Number(rich.data?.snapshot_version||0)+1;
-  if(!isSupabaseSchemaError(rich.error))throw rich.error;
-
-  const legacy=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .select("id")
-    .eq("user_id",userId)
-    .eq("snapshot_date",snapshotDate);
-  if(legacy.error)throw legacy.error;
-  return Number((legacy.data||[]).length||0)+1;
-}
-// ===== END CONTROLLED FIX V3 HELPERS =====
-
-async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="today",snapshotDate,limit="100",sourceJobId=null}){
+async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="last_7d",snapshotDate,limit="100",sourceJobId=null}){
   const platformAccountId=normalizePlatformAccountId(adAccountId);
   const ownership=await requireActiveOwnership(user.id,"meta",platformAccountId);
   const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate);
-  const snapshotPeriod=phase1MetaPeriodForPreset(datePreset,effectiveSnapshotDate);
 
   const campaignRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"campaign",datePreset,limit);
   const adsetRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"adset",datePreset,limit);
@@ -892,7 +564,18 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     adRows
   });
 
-  const snapshotVersion=await phase1GetNextSnapshotVersionSafe(user.id,platformAccountId,snapshot.snapshot_date);
+  const existingVersionResult=await supabaseAdmin
+    .from("dashboard_snapshots")
+    .select("snapshot_version")
+    .eq("user_id",user.id)
+    .eq("platform","meta")
+    .eq("platform_account_id",platformAccountId)
+    .eq("snapshot_date",snapshot.snapshot_date)
+    .order("snapshot_version",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(existingVersionResult.error)throw existingVersionResult.error;
+  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
   const now=new Date().toISOString();
 
   const row={
@@ -902,9 +585,6 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     platform_base_currency:platformBaseCurrency,
     snapshot_version:snapshotVersion,
     source_job_id:sourceJobId,
-    date_preset:datePreset,
-    snapshot_period_start:snapshotPeriod.start,
-    snapshot_period_end:snapshotPeriod.end,
     snapshot_date:snapshot.snapshot_date,
     snapshot_created_at:now,
     account_currency:snapshot.account_currency,
@@ -914,7 +594,13 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     performance_summary:snapshot.performance_summary
   };
 
-  const data=await phase1InsertDashboardSnapshotRichOrLegacy(row);
+  const {data,error}=await supabaseAdmin
+    .from("dashboard_snapshots")
+    .insert(row)
+    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .maybeSingle();
+  if(error)throw error;
+
   return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts};
 }
 
@@ -933,7 +619,7 @@ async function handleMetaSnapshotWrite(req,res){
     const platformAccountId=normalizePlatformAccountId(resolved.platformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Meta ad account id",stage});
 
-    const datePreset="today";
+    const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.query.date_preset||"last_7d");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
     const limit=String(req.body?.limit||req.query.limit||"100");
 
@@ -955,9 +641,6 @@ async function handleMetaSnapshotWrite(req,res){
       snapshot_id:writeResult.snapshot?.id||null,
       snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,
       snapshot_version:writeResult.snapshot?.snapshot_version||null,
-      date_preset:writeResult.snapshot?.date_preset||datePreset,
-      snapshot_period_start:writeResult.snapshot?.snapshot_period_start||null,
-      snapshot_period_end:writeResult.snapshot?.snapshot_period_end||null,
       platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
       platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
       account_currency:writeResult.snapshot?.account_currency||null,
@@ -985,22 +668,7 @@ app.get("/api/refresh/status",async(req,res)=>{
     if(error)throw error;
     res.json({ok:true,jobs:data||[]});
   }catch(e){
-    res.status(500).json({ok:false,error:e.message,stage:"refresh_status"});
-  }
-});
-
-app.get("/api/cron/auto-refresh",async(req,res)=>{
-  try{
-    const configuredSecret=process.env.CRON_SECRET||process.env.AUTO_REFRESH_SECRET||"";
-    const providedSecret=String(req.headers["x-cron-secret"]||"");
-    const bearer=String(req.headers.authorization||"").startsWith("Bearer ")?String(req.headers.authorization).slice(7):"";
-    if(configuredSecret&&providedSecret!==configuredSecret&&bearer!==configuredSecret){
-      return res.status(401).json({ok:false,error:"Unauthorized scheduler request"});
-    }
-    const result=await runPhase1MetaAutoRefresh({limit:Number(req.query.limit||25)});
-    res.json(result);
-  }catch(e){
-    res.status(500).json({ok:false,error:e.message});
+    res.status(500).json({error:e.message});
   }
 });
 // ===== END PHASE E.2A META SNAPSHOT WRITE =====
@@ -1053,71 +721,50 @@ function resolveSnapshotDateScope(query){
   return {dateFilter:"latest",start:null,end:null};
 }
 
-function phase1SnapshotRowPlatform(row){
-  return String(row?.platform||"meta").toLowerCase();
-}
-
-function phase1SnapshotRowStart(row){
-  return String(row?.snapshot_period_start||row?.snapshot_date||"").slice(0,10);
-}
-
-function phase1SnapshotRowEnd(row){
-  return String(row?.snapshot_period_end||row?.snapshot_date||"").slice(0,10);
-}
-
-function phase1SnapshotOverlapsScope(row,scope){
-  if(!scope||!scope.start||!scope.end)return true;
-  const start=phase1SnapshotRowStart(row);
-  const end=phase1SnapshotRowEnd(row)||start;
-  if(!start&&!end)return false;
-  return (end||start)>=scope.start && (start||end)<=scope.end;
-}
-
-function phase1ChooseRowsForAggregation(rows,scope){
-  const input=(Array.isArray(rows)?rows:[]).filter(row=>phase1SnapshotRowPlatform(row)==="meta" && phase1SnapshotOverlapsScope(row,scope));
-  if(!input.length)return [];
-
-  // Prefer daily snapshots for dashboard ranges to avoid double-counting recovery
-  // last_7d snapshots. If no daily/legacy rows exist, fall back to the newest
-  // recovery row so the dashboard is not empty.
-  const dailyOrLegacy=input.filter(row=>{
-    const preset=String(row?.date_preset||"").toLowerCase();
-    return !preset || preset==="today" || preset==="yesterday";
-  });
-  const chosen=dailyOrLegacy.length?dailyOrLegacy:input;
-
-  // Keep the newest version per same snapshot_date + date_preset + account.
-  const byKey=new Map();
-  for(const row of chosen){
-    const key=[row.platform_account_id||"legacy", row.snapshot_date||phase1SnapshotRowEnd(row)||"unknown", row.date_preset||"legacy"].join("|");
-    const prev=byKey.get(key);
-    const prevTs=String(prev?.snapshot_created_at||"");
-    const curTs=String(row?.snapshot_created_at||"");
-    if(!prev||curTs>=prevTs)byKey.set(key,row);
-  }
-  return Array.from(byKey.values()).sort((a,b)=>String(b.snapshot_date||"").localeCompare(String(a.snapshot_date||"")));
-}
-
 app.get("/api/snapshots/meta/latest",async(req,res)=>{
   try{
     const user=await requireUser(req,res);
     if(!user)return;
 
     const scope=resolveSnapshotDateScope(req.query||{});
-    const rowsAll=await phase1SelectDashboardSnapshots(user.id);
-    const rows=scope.dateFilter==="latest" ? rowsAll.slice(0,1) : phase1ChooseRowsForAggregation(rowsAll,scope);
-    const aggregate=scope.dateFilter==="latest" ? (rows[0]||null) : phase1AggregateSnapshots(rows);
 
-    return res.json({
+    let snapshotQuery=supabaseAdmin
+      .from("dashboard_snapshots")
+      .select("platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .eq("user_id",user.id);
+
+    if(scope.start)snapshotQuery=snapshotQuery.gte("snapshot_date",scope.start);
+    if(scope.end)snapshotQuery=snapshotQuery.lte("snapshot_date",scope.end);
+
+    const {data,error}=await snapshotQuery
+      .order("snapshot_date",{ascending:false})
+      .order("created_at",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+
+    if(error)throw error;
+
+    res.json({
       ok:true,
       platform:"Meta",
       date_scope:scope,
-      aggregation:scope.dateFilter!=="latest",
-      snapshot_count:rows.length,
-      snapshot:aggregate
+      snapshot:data?{
+        platform:data.platform||"meta",
+        platform_account_id:data.platform_account_id||null,
+        platform_base_currency:data.platform_base_currency||null,
+        snapshot_version:data.snapshot_version||null,
+        source_job_id:data.source_job_id||null,
+        snapshot_date:data.snapshot_date,
+        snapshot_created_at:data.snapshot_created_at||null,
+        account_currency:data.account_currency,
+        kpis:data.kpis||{},
+        purchase_journey:data.purchase_journey||{},
+        click_journey:data.click_journey||{},
+        performance_summary:data.performance_summary||[]
+      }:null
     });
   }catch(e){
-    res.status(500).json({ok:false,error:e.message,stage:"snapshot_read"});
+    res.status(500).json({error:e.message});
   }
 });
 // ===== END PHASE E.2C META SNAPSHOT READ =====
@@ -1455,6 +1102,5 @@ app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(re
 // ===== END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
 
 app.get("/api/tiktok/status",(_,res)=>res.json({connected:false,status:"pending_verification"}));
-
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));
 module.exports=app;

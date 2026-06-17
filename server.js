@@ -762,7 +762,6 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     .eq("platform","meta")
     .eq("platform_account_id",platformAccountId)
     .eq("snapshot_date",snapshot.snapshot_date)
-    .eq("snapshot_class",resolvedSnapshotClass)
     .order("snapshot_version",{ascending:false})
     .limit(1)
     .maybeSingle();

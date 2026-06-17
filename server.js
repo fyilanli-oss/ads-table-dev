@@ -65,6 +65,109 @@ const PHASE1_REPORTABLE_ACCOUNT_TYPES={
 function phase1ReportableAccountType(platform){return PHASE1_REPORTABLE_ACCOUNT_TYPES[platform]||`${platform}_platform_account`}
 function normalizePlatformAccountId(value){return String(value||"").trim()}
 function activeOwnershipStatuses(){return ["connected","active"]}
+
+const TIME_ENGINE_VERSION="v1";
+const AUTOMATION_PLATFORM_HOURS=[0,4,8,12,16,20];
+const DEFAULT_PLATFORM_TIMEZONE="UTC";
+const DEFAULT_DATA_MATURITY_WINDOW_HOURS={meta:3,google:3,tiktok:3,klaviyo:3,pinterest:3};
+
+function validTimeZone(tz){
+  try{
+    if(!tz)return false;
+    new Intl.DateTimeFormat("en-US",{timeZone:tz}).format(new Date());
+    return true;
+  }catch{
+    return false;
+  }
+}
+
+function normalizeTimeZone(tz){
+  return validTimeZone(tz)?tz:DEFAULT_PLATFORM_TIMEZONE;
+}
+
+function timePartsInZone(date=new Date(),timeZone=DEFAULT_PLATFORM_TIMEZONE){
+  const tz=normalizeTimeZone(timeZone);
+  const parts=new Intl.DateTimeFormat("en-CA",{
+    timeZone:tz,
+    year:"numeric",
+    month:"2-digit",
+    day:"2-digit",
+    hour:"2-digit",
+    minute:"2-digit",
+    second:"2-digit",
+    hour12:false
+  }).formatToParts(date);
+  const get=type=>parts.find(p=>p.type===type)?.value;
+  let hour=Number(get("hour")||0);
+  if(hour===24)hour=0;
+  const year=get("year");
+  const month=get("month");
+  const day=get("day");
+  const minute=get("minute");
+  const second=get("second");
+  return {
+    timeZone:tz,
+    date:`${year}-${month}-${day}`,
+    hour,
+    minute:Number(minute||0),
+    second:Number(second||0),
+    text:`${year}-${month}-${day} ${String(hour).padStart(2,"0")}:${minute}:${second}`
+  };
+}
+
+function resolveAdminTimeSync(date=new Date(),platformTimeZone=DEFAULT_PLATFORM_TIMEZONE){
+  const serverTimeUtc=date.toISOString();
+  const istanbul=timePartsInZone(date,"Europe/Istanbul");
+  const platform=timePartsInZone(date,platformTimeZone);
+  return {
+    server_time_utc:serverTimeUtc,
+    istanbul_time:istanbul.text,
+    platform_account_time:platform.text,
+    platform_account_timezone:platform.timeZone,
+    platform_business_date:platform.date,
+    platform_business_hour:platform.hour
+  };
+}
+
+function dataMaturityWindowHours(platform){
+  return DEFAULT_DATA_MATURITY_WINDOW_HOURS[platform]??3;
+}
+
+async function getPlatformAccountTimezone(userId,platform,platformAccountId,conn=null,ownership=null){
+  const normalized=normalizePlatformAccountId(platformAccountId);
+  let candidates=[
+    conn?.metadata?.timezone_name,
+    conn?.metadata?.timezone,
+    conn?.metadata?.platform_account_timezone,
+    conn?.metadata?.account_timezone,
+    ownership?.metadata?.timezone_name,
+    ownership?.metadata?.timezone,
+    ownership?.metadata?.platform_account_timezone
+  ];
+
+  if(supabaseAdmin&&userId&&normalized){
+    const {data,error}=await supabaseAdmin
+      .from("platform_ad_accounts")
+      .select("timezone,metadata")
+      .eq("user_id",userId)
+      .eq("platform",platform)
+      .eq("platform_account_id",normalized)
+      .maybeSingle();
+    if(!error&&data){
+      candidates=[
+        data.timezone,
+        data.metadata?.timezone_name,
+        data.metadata?.timezone,
+        ...candidates
+      ];
+    }
+  }
+
+  const found=candidates.find(validTimeZone);
+  return normalizeTimeZone(found);
+}
+
+
 async function getUserAccountCurrency(userId){
   const {data,error}=await supabaseAdmin.from("users").select("account_currency").eq("id",userId).maybeSingle();
   if(error)throw error;
@@ -380,10 +483,9 @@ function e2aWeightedAverage(rows,valueField,weightField){
   return weight>0?weighted/weight:null;
 }
 
-function e2aSnapshotDate(value){
-  const d=value?new Date(String(value)):new Date();
-  if(Number.isNaN(d.getTime()))return new Date().toISOString().slice(0,10);
-  return d.toISOString().slice(0,10);
+function e2aSnapshotDate(value,timeZone=DEFAULT_PLATFORM_TIMEZONE){
+  if(value)return String(value).slice(0,10);
+  return timePartsInZone(new Date(),timeZone).date;
 }
 
 function e2aBuildMetaSnapshot({snapshotDate,accountCurrency,campaignRows,adsetRows,adRows}){
@@ -539,50 +641,99 @@ async function resolveMetaRefreshAccount(user,conn,requestedAccountId){
   return {platformAccountId:normalizePlatformAccountId(first.id),account:first};
 }
 
-function resolveSnapshotCapturePeriod(datePreset,snapshotDate){
+
+function resolveSnapshotCapturePeriod(datePreset,snapshotDate,platformTimeZone=DEFAULT_PLATFORM_TIMEZONE,nowDate=new Date()){
   const normalized=String(datePreset||"today").trim().toLowerCase();
-  const end=e2aSnapshotDate(snapshotDate);
+  const nowParts=timePartsInZone(nowDate,platformTimeZone);
+  const baseDate=snapshotDate?String(snapshotDate).slice(0,10):nowParts.date;
+
   if(normalized==="last_7d" || normalized==="last_7_days"){
     return {
       datePreset:"last_7d",
-      start:addUtcDays(end,-6),
-      end,
-      scope:"recovery_last_7d"
+      start:addUtcDays(baseDate,-6),
+      end:baseDate,
+      scope:"recovery_last_7d",
+      snapshotClass:"recovery"
     };
   }
+
+  if(normalized==="yesterday"){
+    const y=addUtcDays(baseDate,-1);
+    return {
+      datePreset:"yesterday",
+      start:y,
+      end:y,
+      scope:"yesterday",
+      snapshotClass:"primary"
+    };
+  }
+
+  if(normalized==="day_close"){
+    const y=addUtcDays(baseDate,-1);
+    return {
+      datePreset:"yesterday",
+      start:y,
+      end:y,
+      scope:"final_day_close",
+      snapshotClass:"primary"
+    };
+  }
+
   return {
     datePreset:"today",
-    start:end,
-    end,
-    scope:"today"
+    start:baseDate,
+    end:baseDate,
+    scope:"today",
+    snapshotClass:"primary"
   };
 }
 
-function getIstanbulHour(date=new Date()){
-  const parts=new Intl.DateTimeFormat("en-GB",{
-    timeZone:"Europe/Istanbul",
-    hour:"2-digit",
-    hour12:false
-  }).formatToParts(date);
-  return Number(parts.find(p=>p.type==="hour")?.value||0);
-}
+function resolveAutoRefreshPolicy({date=new Date(),platformTimeZone=DEFAULT_PLATFORM_TIMEZONE,platform="meta"}={}){
+  const sync=resolveAdminTimeSync(date,platformTimeZone);
+  const platformParts=timePartsInZone(date,platformTimeZone);
+  const hour=sync.platform_business_hour;
+  const isAutomationHour=AUTOMATION_PLATFORM_HOURS.includes(hour);
+  const maturityHours=dataMaturityWindowHours(platform);
+  const isDayCloseHour=hour===maturityHours;
+  const isRecoveryHour=hour===4;
 
-function resolveAutoRefreshPolicy(date=new Date()){
-  const hour=getIstanbulHour(date);
-  const datePreset=hour===1?"last_7d":"today";
+  let datePreset="today";
+  let captureReason="automation_today";
+  let snapshotClass="primary";
+
+  if(isDayCloseHour){
+    datePreset="day_close";
+    captureReason="day_close";
+    snapshotClass="primary";
+  }else if(isRecoveryHour){
+    datePreset="last_7d";
+    captureReason="automation_recovery";
+    snapshotClass="recovery";
+  }
+
   return {
+    ...sync,
     hour,
+    minute:platformParts.minute,
+    isAutomationHour,
+    automation_hours:AUTOMATION_PLATFORM_HOURS,
     datePreset,
-    captureReason:hour===1?"automation_recovery":"automation_today"
+    captureReason,
+    snapshotClass,
+    data_maturity_window_hours:maturityHours
   };
 }
 
-async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="today",snapshotDate,limit="100",sourceJobId=null,captureReason="manual_refresh"}){
+
+async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="today",snapshotDate,limit="100",sourceJobId=null,captureReason="manual_refresh",platformTimeZone=null,snapshotClass=null,adminTimeSync=null}){
   const platformAccountId=normalizePlatformAccountId(adAccountId);
   const ownership=await requireActiveOwnership(user.id,"meta",platformAccountId);
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate);
-  const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate);
+  const resolvedTimeZone=normalizeTimeZone(platformTimeZone||await getPlatformAccountTimezone(user.id,"meta",platformAccountId,conn,ownership));
+  const timeSync=adminTimeSync||resolveAdminTimeSync(new Date(),resolvedTimeZone);
+  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,resolvedTimeZone);
+  const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,resolvedTimeZone,new Date());
   const normalizedDatePreset=period.datePreset;
+  const resolvedSnapshotClass=snapshotClass||period.snapshotClass||"primary";
 
   const campaignRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"campaign",normalizedDatePreset,limit);
   const adsetRows=await e2aFetchMetaInsightsForLevel(conn,platformAccountId,"adset",normalizedDatePreset,limit);
@@ -611,6 +762,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     .eq("platform","meta")
     .eq("platform_account_id",platformAccountId)
     .eq("snapshot_date",snapshot.snapshot_date)
+    .eq("snapshot_class",resolvedSnapshotClass)
     .order("snapshot_version",{ascending:false})
     .limit(1)
     .maybeSingle();
@@ -630,6 +782,15 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     snapshot_period_end:period.end,
     snapshot_scope:period.scope,
     capture_reason:captureReason,
+    snapshot_class:resolvedSnapshotClass,
+    platform_account_timezone:resolvedTimeZone,
+    platform_business_date:timeSync.platform_business_date,
+    platform_business_hour:timeSync.platform_business_hour,
+    data_maturity_window_hours:dataMaturityWindowHours("meta"),
+    server_time_utc:timeSync.server_time_utc,
+    istanbul_time:timeSync.istanbul_time,
+    platform_account_time:timeSync.platform_account_time,
+    time_engine_version:TIME_ENGINE_VERSION,
     snapshot_date:snapshot.snapshot_date,
     snapshot_created_at:now,
     account_currency:snapshot.account_currency,
@@ -642,7 +803,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
 
@@ -664,16 +825,18 @@ async function handleMetaSnapshotWrite(req,res){
     const platformAccountId=normalizePlatformAccountId(resolved.platformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Meta ad account id",stage});
 
+    const platformTimeZone=await getPlatformAccountTimezone(user.id,"meta",platformAccountId,conn,null);
+    const adminTimeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
     const datePreset="today";
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date);
+    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
-    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit,captureReason:"manual_refresh"});
+    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit,captureReason:"manual_refresh",snapshotClass:"primary",...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION});
     await setRefreshJobStatus(job.id,"running");
 
     stage="meta_api";
-    const writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,sourceJobId:job.id,captureReason:"manual_refresh"});
+    const writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,sourceJobId:job.id,captureReason:"manual_refresh",platformTimeZone,adminTimeSync,snapshotClass:"primary"});
 
     stage="snapshot";
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
@@ -686,6 +849,13 @@ async function handleMetaSnapshotWrite(req,res){
       snapshot_id:writeResult.snapshot?.id||null,
       snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,
       snapshot_version:writeResult.snapshot?.snapshot_version||null,
+      snapshot_class:writeResult.snapshot?.snapshot_class||null,
+      platform_account_timezone:writeResult.snapshot?.platform_account_timezone||platformTimeZone,
+      platform_business_date:writeResult.snapshot?.platform_business_date||null,
+      platform_business_hour:writeResult.snapshot?.platform_business_hour??null,
+      server_time_utc:writeResult.snapshot?.server_time_utc||adminTimeSync.server_time_utc,
+      istanbul_time:writeResult.snapshot?.istanbul_time||adminTimeSync.istanbul_time,
+      platform_account_time:writeResult.snapshot?.platform_account_time||adminTimeSync.platform_account_time,
       platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
       platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
       account_currency:writeResult.snapshot?.account_currency||null,
@@ -719,8 +889,7 @@ app.get("/api/refresh/status",async(req,res)=>{
 
 async function runMetaAutoRefreshForSchedule(schedule){
   let job=null;
-  const policy=resolveAutoRefreshPolicy(new Date());
-  const snapshotDate=e2aSnapshotDate(new Date().toISOString());
+  const runDate=new Date();
   const limit=String(schedule.metadata?.limit||"100");
 
   const {data:user,error:userError}=await supabaseAdmin
@@ -744,14 +913,43 @@ async function runMetaAutoRefreshForSchedule(schedule){
   const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);
   if(!platformAccountId)throw new Error("Auto refresh missing platform account id");
 
+  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"meta",platformAccountId,conn,null);
+  const policy=resolveAutoRefreshPolicy({date:runDate,platformTimeZone,platform:"meta"});
+  const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
+
+  if(!policy.isAutomationHour){
+    return {
+      ok:true,
+      skipped:true,
+      reason:"not_platform_automation_hour",
+      schedule_id:schedule.id,
+      platform_account_id:platformAccountId,
+      platform_account_timezone:platformTimeZone,
+      platform_business_hour:policy.platform_business_hour,
+      platform_account_time:policy.platform_account_time,
+      server_time_utc:policy.server_time_utc,
+      istanbul_time:policy.istanbul_time,
+      automation_hours:policy.automation_hours
+    };
+  }
+
   job=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
     trigger:"automation",
     datePreset:policy.datePreset,
     snapshotDate,
     limit,
     captureReason:policy.captureReason,
+    snapshotClass:policy.snapshotClass,
     scheduleId:schedule.id,
-    istanbulHour:policy.hour
+    platformHour:policy.hour,
+    platformBusinessHour:policy.platform_business_hour,
+    dataMaturityWindowHours:policy.data_maturity_window_hours,
+    server_time_utc:policy.server_time_utc,
+    istanbul_time:policy.istanbul_time,
+    platform_account_time:policy.platform_account_time,
+    platform_account_timezone:policy.platform_account_timezone,
+    platform_business_date:policy.platform_business_date,
+    timeEngineVersion:TIME_ENGINE_VERSION
   });
 
   await setRefreshJobStatus(job.id,"running");
@@ -765,7 +963,10 @@ async function runMetaAutoRefreshForSchedule(schedule){
       snapshotDate,
       limit,
       sourceJobId:job.id,
-      captureReason:policy.captureReason
+      captureReason:policy.captureReason,
+      platformTimeZone,
+      adminTimeSync:policy,
+      snapshotClass:policy.snapshotClass
     });
 
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
@@ -779,7 +980,7 @@ async function runMetaAutoRefreshForSchedule(schedule){
       })
       .eq("id",schedule.id);
 
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,date_preset:policy.datePreset,capture_reason:policy.captureReason};
+    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time};
   }catch(e){
     await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
     throw e;
@@ -831,10 +1032,10 @@ function addUtcDays(isoDate,days){
   return toIsoDateOnly(d);
 }
 
-function resolveSnapshotDateScope(query){
+function resolveSnapshotDateScope(query,platformTimeZone=DEFAULT_PLATFORM_TIMEZONE){
   const raw=String(query.date_filter||"latest").trim().toLowerCase();
   const dateFilter=raw.replace(/\s+/g,"_");
-  const today=toIsoDateOnly(new Date());
+  const today=timePartsInZone(new Date(),platformTimeZone).date;
 
   if(dateFilter==="today"){
     return {dateFilter,start:today,end:today};
@@ -845,8 +1046,8 @@ function resolveSnapshotDateScope(query){
     return {dateFilter,start:yesterday,end:yesterday};
   }
 
-  if(dateFilter==="last_7_days" || dateFilter==="last_7d" || dateFilter==="last7days"){
-    return {dateFilter:"last_7_days",start:addUtcDays(today,-6),end:today};
+  if(dateFilter==="last_7_days"){
+    return {dateFilter,start:addUtcDays(today,-6),end:today};
   }
 
   if(dateFilter==="this_month"){
@@ -863,16 +1064,6 @@ function resolveSnapshotDateScope(query){
 }
 
 
-function numberOrZero(v){
-  const n=Number(v);
-  return Number.isFinite(n)?n:0;
-}
-
-function safeDivide(a,b){
-  const x=Number(a), y=Number(b);
-  return Number.isFinite(x)&&Number.isFinite(y)&&y!==0?x/y:null;
-}
-
 function normalizeSnapshotForResponse(data){
   if(!data)return null;
   return {
@@ -886,6 +1077,14 @@ function normalizeSnapshotForResponse(data){
     snapshot_period_end:data.snapshot_period_end||null,
     snapshot_scope:data.snapshot_scope||null,
     capture_reason:data.capture_reason||null,
+    snapshot_class:data.snapshot_class||null,
+    platform_account_timezone:data.platform_account_timezone||null,
+    platform_business_date:data.platform_business_date||null,
+    platform_business_hour:data.platform_business_hour??null,
+    server_time_utc:data.server_time_utc||null,
+    istanbul_time:data.istanbul_time||null,
+    platform_account_time:data.platform_account_time||null,
+    time_engine_version:data.time_engine_version||null,
     snapshot_date:data.snapshot_date,
     snapshot_created_at:data.snapshot_created_at||data.created_at||null,
     account_currency:data.account_currency,
@@ -899,6 +1098,7 @@ function normalizeSnapshotForResponse(data){
 function pickLatestSnapshotPerDay(rows){
   const map=new Map();
   for(const row of rows||[]){
+    if(row.snapshot_class==="recovery")continue;
     const key=String(row.snapshot_date||"");
     const current=map.get(key);
     const rowVersion=Number(row.snapshot_version||0);
@@ -967,10 +1167,14 @@ function aggregateSnapshots(rows,scope){
     snapshot_version:latest.snapshot_version||null,
     source_job_id:latest.source_job_id||null,
     date_preset:"aggregate",
+    snapshot_class:"aggregate_primary",
     snapshot_period_start:scope.start,
     snapshot_period_end:scope.end,
     snapshot_scope:scope.dateFilter,
     capture_reason:"date_filter_aggregate",
+    platform_account_timezone:latest.platform_account_timezone||null,
+    platform_business_date:latest.platform_business_date||null,
+    platform_business_hour:latest.platform_business_hour??null,
     snapshot_date:latest.snapshot_date,
     snapshot_created_at:latest.snapshot_created_at||latest.created_at||null,
     account_currency:latest.account_currency,
@@ -984,7 +1188,10 @@ function aggregateSnapshots(rows,scope){
       snapshot_id:s.id||null,
       snapshot_created_at:s.snapshot_created_at||s.created_at||null,
       date_preset:s.date_preset||null,
-      capture_reason:s.capture_reason||null
+      capture_reason:s.capture_reason||null,
+      snapshot_class:s.snapshot_class||null,
+      platform_account_timezone:s.platform_account_timezone||null,
+      platform_business_date:s.platform_business_date||null
     }))
   };
 }
@@ -994,14 +1201,26 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
     const user=await requireUser(req,res);
     if(!user)return;
 
-    const scope=resolveSnapshotDateScope(req.query||{});
+    const requestedAdAccountId=req.query.adAccountId||req.query.ad_account_id||req.query.platform_account_id;
+    let platformAccountId=normalizePlatformAccountId(requestedAdAccountId);
+    let conn=null;
+    let platformTimeZone=DEFAULT_PLATFORM_TIMEZONE;
+    try{
+      conn=await getConnection(user.id,"meta");
+      platformAccountId=platformAccountId||normalizePlatformAccountId(conn?.account_id||conn?.metadata?.lastOwnedPlatformAccountId||conn?.metadata?.selectedPlatformAccountId);
+      if(platformAccountId)platformTimeZone=await getPlatformAccountTimezone(user.id,"meta",platformAccountId,conn,null);
+    }catch{}
+
+    const scope=resolveSnapshotDateScope(req.query||{},platformTimeZone);
     const isRangeScope=["last_7_days","this_month","custom"].includes(scope.dateFilter);
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
-      .eq("user_id",user.id);
+      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .eq("user_id",user.id)
+      .neq("snapshot_class","recovery");
 
+    if(platformAccountId)snapshotQuery=snapshotQuery.eq("platform_account_id",platformAccountId);
     if(scope.start)snapshotQuery=snapshotQuery.gte("snapshot_date",scope.start);
     if(scope.end)snapshotQuery=snapshotQuery.lte("snapshot_date",scope.end);
 
@@ -1023,7 +1242,14 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
     res.json({
       ok:true,
       platform:"Meta",
-      date_scope:scope,
+      date_scope:{
+        ...scope,
+        platform_account_timezone:platformTimeZone,
+        platform_account_id:platformAccountId||null,
+        server_time_utc:new Date().toISOString(),
+        istanbul_time:timePartsInZone(new Date(),"Europe/Istanbul").text,
+        platform_account_time:timePartsInZone(new Date(),platformTimeZone).text
+      },
       snapshot
     });
   }catch(e){
@@ -1034,6 +1260,22 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
 // ===== END PHASE E.2C META SNAPSHOT READ =====
 
+
+
+app.get("/api/debug/time-sync",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const platform=String(req.query.platform||"meta");
+    const conn=await getConnection(user.id,platform).catch(()=>null);
+    const platformAccountId=normalizePlatformAccountId(req.query.platform_account_id||req.query.adAccountId||conn?.account_id||conn?.metadata?.lastOwnedPlatformAccountId||conn?.metadata?.selectedPlatformAccountId);
+    const platformTimeZone=platformAccountId?await getPlatformAccountTimezone(user.id,platform,platformAccountId,conn,null):DEFAULT_PLATFORM_TIMEZONE;
+    const sync=resolveAdminTimeSync(new Date(),platformTimeZone);
+    res.json({ok:true,platform,platform_account_id:platformAccountId||null,...sync,automation_hours:AUTOMATION_PLATFORM_HOURS,data_maturity_window_hours:dataMaturityWindowHours(platform),time_engine_version:TIME_ENGINE_VERSION});
+  }catch(e){
+    res.status(500).json({ok:false,error:e.message});
+  }
+});
 
 app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});

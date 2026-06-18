@@ -67,6 +67,87 @@ function normalizePlatformAccountId(value){return String(value||"").trim()}
 function activeOwnershipStatuses(){return ["connected","active"]}
 
 const TIME_ENGINE_VERSION="v1";
+const FX_ENGINE_VERSION="v1";
+const FX_PROVIDER="snapshot_static_v1";
+const DEFAULT_REPORTING_CURRENCY="TRY";
+
+function normalizeCurrency(value){
+  const s=String(value||"").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(s)?s:null;
+}
+
+function resolveFxRate(sourceCurrency,targetCurrency){
+  const source=normalizeCurrency(sourceCurrency)||normalizeCurrency(targetCurrency)||DEFAULT_REPORTING_CURRENCY;
+  const target=normalizeCurrency(targetCurrency)||source;
+  if(source===target){
+    return {
+      fx_rate:1,
+      fx_provider:FX_PROVIDER,
+      fx_rate_timestamp:new Date().toISOString(),
+      fx_source_currency:source,
+      fx_target_currency:target,
+      fx_engine_version:FX_ENGINE_VERSION
+    };
+  }
+  const err=new Error(`FX rate missing for ${source}->${target}`);
+  err.status=422;
+  err.stage="fx";
+  throw err;
+}
+
+function convertMoney(value,fxRate){
+  const n=Number(value||0);
+  const rate=Number(fxRate||1);
+  return Number.isFinite(n)&&Number.isFinite(rate)?n*rate:0;
+}
+
+function cloneJson(value){
+  return JSON.parse(JSON.stringify(value||{}));
+}
+
+function applyFxToSnapshotPayload(snapshot,fx){
+  const fxRate=Number(fx.fx_rate||1);
+  const converted=cloneJson(snapshot);
+
+  converted.account_currency=fx.fx_target_currency||converted.account_currency||null;
+
+  if(converted.kpis){
+    converted.kpis.spend=convertMoney(converted.kpis.spend,fxRate);
+    converted.kpis.revenue=convertMoney(converted.kpis.revenue,fxRate);
+    converted.kpis.sales=convertMoney(converted.kpis.sales,fxRate);
+    converted.kpis.cpc=converted.kpis.clicks>0?converted.kpis.spend/converted.kpis.clicks:null;
+    converted.kpis.roas=converted.kpis.spend>0?converted.kpis.revenue/converted.kpis.spend:null;
+  }
+
+  if(converted.click_journey){
+    converted.click_journey.real_cpc=converted.click_journey.landing_page_views>0?converted.kpis.spend/converted.click_journey.landing_page_views:null;
+  }
+
+  const rows=converted.performance_summary?.rows;
+  if(Array.isArray(rows)){
+    for(const row of rows){
+      row.currency=converted.account_currency;
+      row.spend=convertMoney(row.spend,fxRate);
+      row.sales=convertMoney(row.sales,fxRate);
+      row.revenue=convertMoney(row.revenue,fxRate);
+      row.cpc=Number(row.clicks||0)>0?row.spend/Number(row.clicks||0):null;
+      row.roas=Number(row.spend||0)>0?Number(row.revenue||0)/Number(row.spend||0):null;
+      if(row.raw&&typeof row.raw==="object"){
+        row.raw.fx_applied={
+          fx_rate:fx.fx_rate,
+          fx_provider:fx.fx_provider,
+          fx_rate_timestamp:fx.fx_rate_timestamp,
+          fx_source_currency:fx.fx_source_currency,
+          fx_target_currency:fx.fx_target_currency,
+          fx_engine_version:fx.fx_engine_version
+        };
+      }
+    }
+  }
+
+  return converted;
+}
+
 const AUTOMATION_PLATFORM_HOURS=[0,4,8,12,16,20];
 const DEFAULT_PLATFORM_TIMEZONE="UTC";
 const DEFAULT_DATA_MATURITY_WINDOW_HOURS={meta:3,google:3,tiktok:3,klaviyo:3,pinterest:3};
@@ -171,7 +252,7 @@ async function getPlatformAccountTimezone(userId,platform,platformAccountId,conn
 async function getUserAccountCurrency(userId){
   const {data,error}=await supabaseAdmin.from("users").select("account_currency").eq("id",userId).maybeSingle();
   if(error)throw error;
-  return data?.account_currency||null;
+  return normalizeCurrency(data?.account_currency)||DEFAULT_REPORTING_CURRENCY;
 }
 async function getOwnership(platform,platformAccountId){
   const id=normalizePlatformAccountId(platformAccountId);
@@ -745,15 +826,18 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     adsetRows.find(r=>r.currency)?.currency||
     adRows.find(r=>r.currency)?.currency||
     null;
-  const accountCurrency=await getUserAccountCurrency(user.id)||platformBaseCurrency;
+  const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
+  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
 
-  const snapshot=e2aBuildMetaSnapshot({
+  const rawSnapshot=e2aBuildMetaSnapshot({
     snapshotDate:effectiveSnapshotDate,
-    accountCurrency,
+    accountCurrency:platformBaseCurrency,
     campaignRows,
     adsetRows,
     adRows
   });
+
+  const snapshot=applyFxToSnapshotPayload(rawSnapshot,fx);
 
   const existingVersionResult=await supabaseAdmin
     .from("dashboard_snapshots")
@@ -790,6 +874,12 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     istanbul_time:timeSync.istanbul_time,
     platform_account_time:timeSync.platform_account_time,
     time_engine_version:TIME_ENGINE_VERSION,
+    fx_rate:fx.fx_rate,
+    fx_provider:fx.fx_provider,
+    fx_rate_timestamp:fx.fx_rate_timestamp,
+    fx_source_currency:fx.fx_source_currency,
+    fx_target_currency:fx.fx_target_currency,
+    fx_engine_version:fx.fx_engine_version,
     snapshot_date:snapshot.snapshot_date,
     snapshot_created_at:now,
     account_currency:snapshot.account_currency,
@@ -802,7 +892,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
 
@@ -858,6 +948,12 @@ async function handleMetaSnapshotWrite(req,res){
       platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
       platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
       account_currency:writeResult.snapshot?.account_currency||null,
+      fx_rate:writeResult.snapshot?.fx_rate??null,
+      fx_provider:writeResult.snapshot?.fx_provider||null,
+      fx_rate_timestamp:writeResult.snapshot?.fx_rate_timestamp||null,
+      fx_source_currency:writeResult.snapshot?.fx_source_currency||null,
+      fx_target_currency:writeResult.snapshot?.fx_target_currency||null,
+      fx_engine_version:writeResult.snapshot?.fx_engine_version||null,
       row_counts:writeResult.row_counts,
       kpis:writeResult.snapshot?.kpis||{},
       purchase_journey:writeResult.snapshot?.purchase_journey||{},
@@ -979,7 +1075,7 @@ async function runMetaAutoRefreshForSchedule(schedule){
       })
       .eq("id",schedule.id);
 
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time};
+    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,fx_rate:writeResult.snapshot?.fx_rate??null,fx_provider:writeResult.snapshot?.fx_provider||null,fx_source_currency:writeResult.snapshot?.fx_source_currency||null,fx_target_currency:writeResult.snapshot?.fx_target_currency||null,fx_engine_version:writeResult.snapshot?.fx_engine_version||null};
   }catch(e){
     await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
     throw e;
@@ -1084,6 +1180,12 @@ function normalizeSnapshotForResponse(data){
     istanbul_time:data.istanbul_time||null,
     platform_account_time:data.platform_account_time||null,
     time_engine_version:data.time_engine_version||null,
+    fx_rate:data.fx_rate??null,
+    fx_provider:data.fx_provider||null,
+    fx_rate_timestamp:data.fx_rate_timestamp||null,
+    fx_source_currency:data.fx_source_currency||null,
+    fx_target_currency:data.fx_target_currency||null,
+    fx_engine_version:data.fx_engine_version||null,
     snapshot_date:data.snapshot_date,
     snapshot_created_at:data.snapshot_created_at||data.created_at||null,
     account_currency:data.account_currency,
@@ -1174,6 +1276,12 @@ function aggregateSnapshots(rows,scope){
     platform_account_timezone:latest.platform_account_timezone||null,
     platform_business_date:latest.platform_business_date||null,
     platform_business_hour:latest.platform_business_hour??null,
+    fx_rate:latest.fx_rate??null,
+    fx_provider:latest.fx_provider||null,
+    fx_rate_timestamp:latest.fx_rate_timestamp||null,
+    fx_source_currency:latest.fx_source_currency||null,
+    fx_target_currency:latest.fx_target_currency||null,
+    fx_engine_version:latest.fx_engine_version||null,
     snapshot_date:latest.snapshot_date,
     snapshot_created_at:latest.snapshot_created_at||latest.created_at||null,
     account_currency:latest.account_currency,
@@ -1190,7 +1298,12 @@ function aggregateSnapshots(rows,scope){
       capture_reason:s.capture_reason||null,
       snapshot_class:s.snapshot_class||null,
       platform_account_timezone:s.platform_account_timezone||null,
-      platform_business_date:s.platform_business_date||null
+      platform_business_date:s.platform_business_date||null,
+      fx_rate:s.fx_rate??null,
+      fx_provider:s.fx_provider||null,
+      fx_source_currency:s.fx_source_currency||null,
+      fx_target_currency:s.fx_target_currency||null,
+      fx_engine_version:s.fx_engine_version||null
     }))
   };
 }
@@ -1215,7 +1328,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
       .eq("user_id",user.id)
       .neq("snapshot_class","recovery");
 

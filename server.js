@@ -66,6 +66,235 @@ function phase1ReportableAccountType(platform){return PHASE1_REPORTABLE_ACCOUNT_
 function normalizePlatformAccountId(value){return String(value||"").trim()}
 function activeOwnershipStatuses(){return ["connected","active"]}
 
+
+const DISCONNECT_LIFECYCLE_VERSION="v1";
+const BACKFILL_DAYS_ON_RECONNECT=30;
+
+function disconnectReasonText(reason){
+  return String(reason||"user_disconnect").trim().slice(0,120)||"user_disconnect";
+}
+
+function hasToken(conn){
+  return Boolean(conn&&(conn.access_token||conn.refresh_token));
+}
+
+async function revokePlatformToken(platform,conn){
+  const result={platform,attempted:false,ok:true,provider:"none",error:null};
+
+  if(!conn||!hasToken(conn))return result;
+
+  try{
+    if(platform==="meta"&&conn.access_token){
+      result.attempted=true;
+      result.provider="meta";
+      const appId=process.env.META_APP_ID;
+      const appSecret=process.env.META_APP_SECRET;
+      const token=appId&&appSecret?`${appId}|${appSecret}`:conn.access_token;
+      const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/me/permissions`);
+      url.searchParams.set("access_token",token);
+      const r=await fetch(url,{method:"DELETE"});
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(data.error?.message||`Meta revoke failed ${r.status}`);
+      return result;
+    }
+
+    if(platform==="google"&&(conn.refresh_token||conn.access_token)){
+      result.attempted=true;
+      result.provider="google";
+      const url=new URL("https://oauth2.googleapis.com/revoke");
+      url.searchParams.set("token",conn.refresh_token||conn.access_token);
+      const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"}});
+      if(!r.ok&&r.status!==400)throw new Error(`Google revoke failed ${r.status}`);
+      return result;
+    }
+
+    if(platform==="klaviyo"||platform==="tiktok"){
+      result.attempted=true;
+      result.provider=platform;
+      result.error="Provider revoke endpoint not configured; internal tokens destroyed";
+      return result;
+    }
+
+    return result;
+  }catch(e){
+    result.ok=false;
+    result.error=e.message;
+    return result;
+  }
+}
+
+async function stopPlatformSchedules(userId,platform,reason="disconnect"){
+  const now=new Date().toISOString();
+  const {data,error}=await supabaseAdmin
+    .from("snapshot_schedules")
+    .update({
+      active:false,
+      stopped_at:now,
+      stop_reason:reason,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      updated_at:now
+    })
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .select("id,platform,platform_account_id,active,stopped_at,stop_reason");
+  if(error)throw error;
+  return data||[];
+}
+
+async function failOpenPlatformJobs(userId,platform,reason="Stopped by disconnect"){
+  const now=new Date().toISOString();
+  const {data,error}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .update({
+      status:"failed",
+      error_message:reason,
+      finished_at:now,
+      updated_at:now,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION
+    })
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .in("status",["queued","running"])
+    .select("id,status,platform_account_id,error_message");
+  if(error)throw error;
+  return data||[];
+}
+
+async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata={}){
+  const now=new Date().toISOString();
+  const normalized=normalizePlatformAccountId(platformAccountId);
+  if(!normalized)throw new Error("platform account id is required for schedule");
+
+  const {data:existing,error:existingError}=await supabaseAdmin
+    .from("snapshot_schedules")
+    .select("*")
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .eq("platform_account_id",normalized)
+    .maybeSingle();
+  if(existingError)throw existingError;
+
+  const patch={
+    user_id:userId,
+    platform,
+    platform_account_id:normalized,
+    active:true,
+    interval_minutes:Number(existing?.interval_minutes||240),
+    metadata:{...(existing?.metadata||{}),...metadata,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION},
+    stopped_at:null,
+    stop_reason:null,
+    lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+    updated_at:now
+  };
+
+  if(existing){
+    const {data,error}=await supabaseAdmin
+      .from("snapshot_schedules")
+      .update(patch)
+      .eq("id",existing.id)
+      .select("*")
+      .maybeSingle();
+    if(error)throw error;
+    return data;
+  }
+
+  const {data,error}=await supabaseAdmin
+    .from("snapshot_schedules")
+    .insert({...patch,created_at:now,next_run_at:now})
+    .select("*")
+    .maybeSingle();
+  if(error)throw error;
+  return data;
+}
+
+async function requestLifecycleBackfill({userId,platform,platformAccountId,reason}){
+  const now=new Date().toISOString();
+  const normalized=normalizePlatformAccountId(platformAccountId);
+  if(!normalized)throw new Error("Backfill platform account id is required");
+
+  const since=new Date(Date.now()-24*60*60*1000).toISOString();
+  const {data:existing,error:existingError}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .select("id,status,created_at,job_type,capture_reason")
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .eq("platform_account_id",normalized)
+    .eq("job_type","backfill_30d")
+    .eq("capture_reason",reason)
+    .gte("created_at",since)
+    .order("created_at",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(existingError)throw existingError;
+  if(existing)return {created:false,job:existing,reason:"existing_recent_backfill"};
+
+  const {data,error}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .insert({
+      user_id:userId,
+      platform,
+      platform_account_id:normalized,
+      status:"queued",
+      job_type:"backfill_30d",
+      capture_reason:reason,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      metadata:{
+        trigger:reason,
+        days:BACKFILL_DAYS_ON_RECONNECT,
+        datePreset:"last_30d",
+        captureReason:reason,
+        lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION
+      },
+      created_at:now,
+      updated_at:now
+    })
+    .select("*")
+    .maybeSingle();
+  if(error)throw error;
+
+  await supabaseAdmin
+    .from("platform_account_ownerships")
+    .update({last_backfill_requested_at:now,updated_at:now,lifecycle_version:DISCONNECT_LIFECYCLE_VERSION})
+    .eq("owner_user_id",userId)
+    .eq("platform",platform)
+    .eq("platform_account_id",normalized);
+
+  return {created:true,job:data};
+}
+
+async function reactivatePlatformLifecycle(userId,platform,platformAccountId,reason="account_reactivation"){
+  const normalized=normalizePlatformAccountId(platformAccountId);
+  const now=new Date().toISOString();
+  const ownership=await getOwnership(platform,normalized);
+  if(!ownership||ownership.owner_user_id!==userId){
+    const err=new Error("ownership not found for reactivation");
+    err.status=404;
+    throw err;
+  }
+
+  const {data:updatedOwnership,error:ownershipError}=await supabaseAdmin
+    .from("platform_account_ownerships")
+    .update({
+      status:"active",
+      reconnected_at:now,
+      disconnected_at:null,
+      disconnect_reason:null,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      updated_at:now
+    })
+    .eq("id",ownership.id)
+    .select("*")
+    .maybeSingle();
+  if(ownershipError)throw ownershipError;
+
+  const schedule=await ensureSnapshotSchedule(userId,platform,normalized,{reactivatedAt:now,reactivationReason:reason});
+  const backfill=await requestLifecycleBackfill({userId,platform,platformAccountId:normalized,reason});
+
+  return {ok:true,platform,platform_account_id:normalized,ownership:updatedOwnership,schedule,backfill};
+}
+
+
+
 const TIME_ENGINE_VERSION="v1";
 const FX_ENGINE_VERSION="v1";
 const FX_PROVIDER="snapshot_static_v1";
@@ -315,6 +544,7 @@ async function ensurePlatformOwnership(userId,platform,account){
     if(error)throw error;
     return data;
   }
+  const wasDisconnected=existing.status==="disconnected";
   const {data,error}=await supabaseAdmin
     .from("platform_account_ownerships")
     .update({
@@ -324,7 +554,10 @@ async function ensurePlatformOwnership(userId,platform,account){
       base_currency:account.currency||account.currency_code||existing.base_currency||null,
       status:"active",
       connected_at:existing.connected_at||now,
+      reconnected_at:wasDisconnected?now:(existing.reconnected_at||null),
       disconnected_at:null,
+      disconnect_reason:null,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
       updated_at:now,
       metadata:{...(existing.metadata||{}),...account}
     })
@@ -332,6 +565,12 @@ async function ensurePlatformOwnership(userId,platform,account){
     .select("*")
     .maybeSingle();
   if(error)throw error;
+
+  if(wasDisconnected){
+    await ensureSnapshotSchedule(userId,platform,platformAccountId,{reconnectedAt:now,reconnectSource:"ensurePlatformOwnership"});
+    await requestLifecycleBackfill({userId,platform,platformAccountId,reason:"account_reconnect"});
+  }
+
   return data;
 }
 async function requireActiveOwnership(userId,platform,platformAccountId){
@@ -343,37 +582,72 @@ async function requireActiveOwnership(userId,platform,platformAccountId){
   }
   return ownership;
 }
-async function disconnectPlatformLifecycle(userId,platform){
+async function disconnectPlatformLifecycle(userId,platform,options={}){
   const now=new Date().toISOString();
-  const {error:connError}=await supabaseAdmin
+  const reason=disconnectReasonText(options.reason||"user_disconnect");
+
+  const {data:connections,error:connReadError}=await supabaseAdmin
     .from("platform_connections")
-    .update({connected:false,updated_at:now})
+    .select("*")
     .eq("user_id",userId)
     .eq("platform",platform);
+  if(connReadError)throw connReadError;
+
+  const revoke_results=[];
+  for(const conn of connections||[]){
+    revoke_results.push(await revokePlatformToken(platform,conn));
+  }
+
+  const {data:connData,error:connError}=await supabaseAdmin
+    .from("platform_connections")
+    .update({
+      connected:false,
+      access_token:null,
+      refresh_token:null,
+      token_expires_at:null,
+      disconnected_at:now,
+      disconnect_reason:reason,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      updated_at:now
+    })
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .select("platform,account_id,account_name,connected,disconnected_at,disconnect_reason,lifecycle_version");
   if(connError)throw connError;
 
-  const {error:ownershipError}=await supabaseAdmin
+  const {data:ownershipData,error:ownershipError}=await supabaseAdmin
     .from("platform_account_ownerships")
-    .update({status:"disconnected",disconnected_at:now,updated_at:now})
+    .update({
+      status:"disconnected",
+      disconnected_at:now,
+      disconnect_reason:reason,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      updated_at:now
+    })
     .eq("owner_user_id",userId)
     .eq("platform",platform)
-    .in("status",activeOwnershipStatuses());
+    .in("status",activeOwnershipStatuses())
+    .select("id,platform,platform_account_id,platform_account_name,status,disconnected_at,disconnect_reason,lifecycle_version");
   if(ownershipError)throw ownershipError;
 
-  await supabaseAdmin
-    .from("snapshot_schedules")
-    .update({active:false,updated_at:now})
-    .eq("user_id",userId)
-    .eq("platform",platform);
+  const stopped_schedules=await stopPlatformSchedules(userId,platform,reason);
+  const stopped_jobs=await failOpenPlatformJobs(userId,platform,"Stopped by disconnect");
 
-  await supabaseAdmin
-    .from("snapshot_jobs")
-    .update({status:"failed",error_message:"Stopped by disconnect",finished_at:now,updated_at:now})
-    .eq("user_id",userId)
-    .eq("platform",platform)
-    .in("status",["queued","running"]);
-
-  return {ok:true,platform,connected:false,ownership:"disconnected",snapshot_generation:"stopped"};
+  return {
+    ok:true,
+    platform,
+    connected:false,
+    lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+    disconnected_at:now,
+    reason,
+    revoke_results,
+    connections:connData||[],
+    ownerships:ownershipData||[],
+    stopped_schedules,
+    stopped_jobs,
+    snapshot_generation:"stopped",
+    snapshots:"preserved"
+  };
 }
 async function createRefreshJob(userId,platform,platformAccountId,metadata={}){
   const existing=await supabaseAdmin
@@ -394,7 +668,18 @@ async function createRefreshJob(userId,platform,platformAccountId,metadata={}){
   }
   const {data,error}=await supabaseAdmin
     .from("snapshot_jobs")
-    .insert({user_id:userId,platform,platform_account_id:platformAccountId,status:"queued",metadata,created_at:new Date().toISOString(),updated_at:new Date().toISOString()})
+    .insert({
+      user_id:userId,
+      platform,
+      platform_account_id:platformAccountId,
+      status:"queued",
+      job_type:metadata.jobType||metadata.job_type||metadata.trigger||"refresh",
+      capture_reason:metadata.captureReason||metadata.capture_reason||null,
+      lifecycle_version:metadata.lifecycleVersion||metadata.lifecycle_version||DISCONNECT_LIFECYCLE_VERSION,
+      metadata,
+      created_at:new Date().toISOString(),
+      updated_at:new Date().toISOString()
+    })
     .select("*")
     .maybeSingle();
   if(error)throw error;
@@ -533,6 +818,108 @@ for(const campaign of campaigns){
 }
 res.json({platform:"Klaviyo",level:"campaign",date_range:range,start:w.start,end:w.end,selected_day_count:w.selected_day_count,rows,rawCount:rows.length,errors,metadata:{campaignCount:campaigns.length,placedOrderMetricId:placedOrderMetricId||null}})
 }catch(e){res.status(500).json({error:e.message})}});
+
+
+
+app.post("/api/disconnect/:platform",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const platform=String(req.params.platform||"").toLowerCase();
+    if(!platform)return res.status(400).json({ok:false,error:"platform is required"});
+    const result=await disconnectPlatformLifecycle(user.id,platform,{reason:req.body?.reason||"user_disconnect"});
+    res.json(result);
+  }catch(e){
+    res.status(e.status||500).json({ok:false,error:e.message,stage:"disconnect_lifecycle"});
+  }
+});
+
+app.post("/api/reconnect/:platform",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const platform=String(req.params.platform||"").toLowerCase();
+    const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.body?.adAccountId||req.query.platform_account_id);
+    if(!platformAccountId)return res.status(400).json({ok:false,error:"platform_account_id is required"});
+    const result=await reactivatePlatformLifecycle(user.id,platform,platformAccountId,"account_reconnect");
+    res.json(result);
+  }catch(e){
+    res.status(e.status||500).json({ok:false,error:e.message,stage:"reconnect_lifecycle"});
+  }
+});
+
+app.post("/api/lifecycle/reactivate",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const platform=String(req.body?.platform||req.query.platform||"meta").toLowerCase();
+    const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.body?.adAccountId||req.query.platform_account_id);
+    if(!platformAccountId)return res.status(400).json({ok:false,error:"platform_account_id is required"});
+    const result=await reactivatePlatformLifecycle(user.id,platform,platformAccountId,"account_reactivation");
+    res.json(result);
+  }catch(e){
+    res.status(e.status||500).json({ok:false,error:e.message,stage:"reactivation_lifecycle"});
+  }
+});
+
+app.get("/api/lifecycle/status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const platform=String(req.query.platform||"meta").toLowerCase();
+    const platformAccountId=normalizePlatformAccountId(req.query.platform_account_id||req.query.adAccountId||"");
+
+    let ownershipQuery=supabaseAdmin
+      .from("platform_account_ownerships")
+      .select("*")
+      .eq("owner_user_id",user.id)
+      .eq("platform",platform)
+      .order("updated_at",{ascending:false});
+    if(platformAccountId)ownershipQuery=ownershipQuery.eq("platform_account_id",platformAccountId);
+
+    let scheduleQuery=supabaseAdmin
+      .from("snapshot_schedules")
+      .select("*")
+      .eq("user_id",user.id)
+      .eq("platform",platform)
+      .order("updated_at",{ascending:false});
+    if(platformAccountId)scheduleQuery=scheduleQuery.eq("platform_account_id",platformAccountId);
+
+    let jobQuery=supabaseAdmin
+      .from("snapshot_jobs")
+      .select("*")
+      .eq("user_id",user.id)
+      .eq("platform",platform)
+      .order("created_at",{ascending:false})
+      .limit(10);
+    if(platformAccountId)jobQuery=jobQuery.eq("platform_account_id",platformAccountId);
+
+    const [ownerships,schedules,jobs,connections]=await Promise.all([
+      ownershipQuery,
+      scheduleQuery,
+      jobQuery,
+      supabaseAdmin.from("platform_connections").select("platform,account_id,account_name,connected,updated_at,disconnected_at,disconnect_reason,lifecycle_version").eq("user_id",user.id).eq("platform",platform)
+    ]);
+
+    if(ownerships.error)throw ownerships.error;
+    if(schedules.error)throw schedules.error;
+    if(jobs.error)throw jobs.error;
+    if(connections.error)throw connections.error;
+
+    res.json({
+      ok:true,
+      platform,
+      platform_account_id:platformAccountId||null,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      connections:connections.data||[],
+      ownerships:ownerships.data||[],
+      schedules:schedules.data||[],
+      jobs:jobs.data||[]
+    });
+  }catch(e){
+    res.status(e.status||500).json({ok:false,error:e.message,stage:"lifecycle_status"});
+  }
+});
 
 
 // ===== PHASE E.2A META SNAPSHOT WRITE =====
@@ -1008,7 +1395,16 @@ async function runMetaAutoRefreshForSchedule(schedule){
   const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);
   if(!platformAccountId)throw new Error("Auto refresh missing platform account id");
 
-  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"meta",platformAccountId,conn,null);
+  if(schedule.active===false){
+    return {ok:true,skipped:true,reason:"schedule_inactive",schedule_id:schedule.id,platform_account_id:platformAccountId};
+  }
+
+  const ownership=await getOwnership("meta",platformAccountId);
+  if(!ownership||ownership.owner_user_id!==schedule.user_id||!activeOwnershipStatuses().includes(ownership.status)){
+    return {ok:true,skipped:true,reason:"ownership_not_active",schedule_id:schedule.id,platform_account_id:platformAccountId,ownership_status:ownership?.status||null};
+  }
+
+  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"meta",platformAccountId,conn,ownership);
   const policy=resolveAutoRefreshPolicy({date:runDate,platformTimeZone,platform:"meta"});
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
 

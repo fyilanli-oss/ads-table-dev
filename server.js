@@ -79,22 +79,33 @@ function hasToken(conn){
 }
 
 async function revokePlatformToken(platform,conn){
-  const result={platform,attempted:false,ok:true,provider:"none",error:null};
+  const result={platform,attempted:false,ok:true,provider:"none",error:null,response:null};
 
   if(!conn||!hasToken(conn))return result;
 
   try{
-    if(platform==="meta"&&conn.access_token){
+    if(platform==="meta"){
       result.attempted=true;
       result.provider="meta";
-      const appId=process.env.META_APP_ID;
-      const appSecret=process.env.META_APP_SECRET;
-      const token=appId&&appSecret?`${appId}|${appSecret}`:conn.access_token;
+
+      if(!conn.access_token){
+        throw new Error("Meta revoke requires active user access token before disconnect");
+      }
+
+      // Meta app/user authorization revoke must use the connected USER access token.
+      // App access token does not remove the user's Business Integration authorization.
       const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/me/permissions`);
-      url.searchParams.set("access_token",token);
+      url.searchParams.set("access_token",conn.access_token);
+
       const r=await fetch(url,{method:"DELETE"});
       const data=await r.json().catch(()=>({}));
-      if(!r.ok)throw new Error(data.error?.message||`Meta revoke failed ${r.status}`);
+      result.response=data;
+
+      if(!r.ok || data?.success===false){
+        throw new Error(data.error?.message||`Meta revoke failed ${r.status}`);
+      }
+
+      result.ok=true;
       return result;
     }
 
@@ -104,13 +115,16 @@ async function revokePlatformToken(platform,conn){
       const url=new URL("https://oauth2.googleapis.com/revoke");
       url.searchParams.set("token",conn.refresh_token||conn.access_token);
       const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"}});
+      result.response={status:r.status};
       if(!r.ok&&r.status!==400)throw new Error(`Google revoke failed ${r.status}`);
+      result.ok=true;
       return result;
     }
 
     if(platform==="klaviyo"||platform==="tiktok"){
       result.attempted=true;
       result.provider=platform;
+      result.ok=true;
       result.error="Provider revoke endpoint not configured; internal tokens destroyed";
       return result;
     }
@@ -610,6 +624,14 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
   const revoke_results=[];
   for(const conn of connections||[]){
     revoke_results.push(await revokePlatformToken(platform,conn));
+  }
+
+  const failedRevoke=revoke_results.find(r=>r.attempted&&r.ok===false);
+  if(failedRevoke){
+    const err=new Error(`${platform} revoke failed: ${failedRevoke.error}`);
+    err.status=502;
+    err.revoke_results=revoke_results;
+    throw err;
   }
 
   const {data:connData,error:connError}=await supabaseAdmin

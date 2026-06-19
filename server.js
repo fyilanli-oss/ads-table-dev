@@ -986,6 +986,124 @@ app.get("/api/lifecycle/status",async(req,res)=>{
 });
 
 
+
+// ===== DB SPREAD SCHEMA v1 / JAS SPREAD ENGINE =====
+const DB_SPREAD_ENGINE_VERSION="v1";
+const PURCHASE_STEPS=["add_to_cart","checkout","abandoned","purchase"];
+
+function spreadNumber(value){const n=Number(value);return Number.isFinite(n)?n:0}
+function spreadNullableNumber(value){if(value===null||value===undefined||value==="")return null;const n=Number(value);return Number.isFinite(n)?n:null}
+function spreadSafeDivide(a,b){const n=Number(a||0);const d=Number(b||0);return d>0?n/d:null}
+function spreadPct(part,total){const v=spreadSafeDivide(part,total);return v===null?null:v*100}
+function normalizeJasPlatform(platform){const p=String(platform||"meta").toLowerCase();return p==="tik_tok"?"tiktok":p}
+function normalizeJasChannel(channel){const c=String(channel||"unknown").toLowerCase();if(c==="organic")return "organics";return ["ads","organics"].includes(c)?c:"unknown"}
+function normalizeJasVisitor(visitor){const v=String(visitor||"unknown").toLowerCase();if(v==="new"||v==="new_visitor")return "new_visit";if(v==="returning"||v==="returning_visit")return "returned";return ["new_visit","returned","unknown"].includes(v)?v:"unknown"}
+function normalizeConfidence(value,fallback="unavailable"){const v=String(value||fallback).toLowerCase();return ["exact","estimated","unavailable"].includes(v)?v:fallback}
+function spreadSnapshotCore(snapshot){return{snapshot_id:snapshot.id,user_id:snapshot.user_id,platform:snapshot.platform||"meta",platform_account_id:snapshot.platform_account_id||null,snapshot_date:snapshot.snapshot_date,snapshot_version:snapshot.snapshot_version||null,snapshot_class:snapshot.snapshot_class||null}}
+
+function kpiSpreadRow(snapshot){
+  const core=spreadSnapshotCore(snapshot), k=snapshot.kpis||{};
+  return {...core,account_currency:snapshot.account_currency||null,impressions:spreadNumber(k.impressions),reach:spreadNumber(k.reach),clicks:spreadNumber(k.clicks),spend:spreadNumber(k.spend),sales:spreadNumber(k.sales),revenue:spreadNumber(k.revenue),cpc:spreadNullableNumber(k.cpc),ctr:spreadNullableNumber(k.ctr),roas:spreadNullableNumber(k.roas),source_confidence:"exact",spread_engine_version:DB_SPREAD_ENGINE_VERSION};
+}
+
+function newPurchaseBreakdownRows(snapshot){
+  const block=snapshot.purchase_journey_breakdown;if(!block||typeof block!=="object")return null;
+  const core=spreadSnapshotCore(snapshot), rows=[], platforms=block.platforms||{};
+  for(const [platformKey,platformObj] of Object.entries(platforms)){
+    for(const [channelKey,channelObj] of Object.entries(platformObj||{})){
+      if(!["ads","organic","organics"].includes(channelKey))continue;
+      for(const [visitorKey,visitorObj] of Object.entries(channelObj||{})){
+        if(!["new_visit","returned","unknown"].includes(visitorKey))continue;
+        const steps=visitorObj?.steps||{};
+        for(const [stepName,step] of Object.entries(steps)){
+          rows.push({...core,platform:normalizeJasPlatform(platformKey),channel_type:normalizeJasChannel(channelKey),visitor_type:normalizeJasVisitor(visitorKey),step_name:String(stepName),count:spreadNumber(step?.count),share_of_parent_pct:spreadNullableNumber(step?.share_of_parent_pct),share_of_total_pct:spreadNullableNumber(step?.share_of_total_pct),cost:spreadNumber(step?.cost),cost_per_event:spreadNullableNumber(step?.cost_per_event),source_confidence:normalizeConfidence(step?.source_confidence),data_source:step?.data_source||null,notes:step?.notes||null,spread_engine_version:DB_SPREAD_ENGINE_VERSION});
+        }
+      }
+    }
+  }
+  return rows.length?rows:null;
+}
+
+function legacyPurchaseBreakdownRows(snapshot){
+  const core=spreadSnapshotCore(snapshot), pj=snapshot.purchase_journey||{}, kpis=snapshot.kpis||{}, spend=spreadNumber(kpis.spend);
+  const totals={add_to_cart:spreadNumber(pj.add_to_cart),checkout:spreadNumber(pj.checkout),abandoned:spreadNumber(pj.abandoned),purchase:spreadNumber(pj.purchase)};
+  return PURCHASE_STEPS.map(step=>({...core,channel_type:"unknown",visitor_type:"unknown",step_name:step,count:totals[step],share_of_parent_pct:null,share_of_total_pct:totals[step]>0?100:null,cost:spend,cost_per_event:spreadSafeDivide(spend,totals[step]),source_confidence:"estimated",data_source:"legacy_snapshot.purchase_journey",notes:"Spread from legacy aggregated purchase_journey; no channel/visitor breakdown available.",spread_engine_version:DB_SPREAD_ENGINE_VERSION}));
+}
+
+function newClickBreakdownRows(snapshot){
+  const block=snapshot.click_journey_breakdown;if(!block||typeof block!=="object")return null;
+  const core=spreadSnapshotCore(snapshot), rows=[], platforms=block.platforms||{};
+  for(const [platformKey,platformObj] of Object.entries(platforms)){
+    for(const [channelKey,channelObj] of Object.entries(platformObj||{})){
+      if(!["ads","organic","organics"].includes(channelKey))continue;
+      const steps=channelObj?.steps||{};
+      for(const [stepName,step] of Object.entries(steps)){
+        rows.push({...core,platform:normalizeJasPlatform(platformKey),channel_type:normalizeJasChannel(channelKey),step_name:String(stepName),count:spreadNumber(step?.count),share_of_parent_pct:spreadNullableNumber(step?.share_of_parent_pct),share_of_total_pct:spreadNullableNumber(step?.share_of_total_pct),cost:spreadNumber(step?.cost),cost_per_event:spreadNullableNumber(step?.cost_per_event),source_confidence:normalizeConfidence(step?.source_confidence),data_source:step?.data_source||null,notes:step?.notes||null,spread_engine_version:DB_SPREAD_ENGINE_VERSION});
+      }
+    }
+  }
+  return rows.length?rows:null;
+}
+
+function legacyClickBreakdownRows(snapshot){
+  const core=spreadSnapshotCore(snapshot), cj=snapshot.click_journey||{}, kpis=snapshot.kpis||{}, spend=spreadNumber(kpis.spend);
+  const data=[["ad_click",spreadNumber(cj.ad_clicks||kpis.clicks),"legacy_snapshot.click_journey"],["link_click",spreadNumber(cj.link_clicks),"legacy_snapshot.click_journey"],["arrived",spreadNumber(cj.landing_page_views),"legacy_snapshot.click_journey"],["purchase",spreadNumber(snapshot.purchase_journey?.purchase),"legacy_snapshot.purchase_journey"]];
+  return data.map(([step,count,source],idx)=>({...core,channel_type:"ads",step_name:step,count,share_of_parent_pct:idx===0?100:spreadPct(count,data[idx-1][1]),share_of_total_pct:null,cost:spend,cost_per_event:spreadSafeDivide(spend,count),source_confidence:"estimated",data_source:source,notes:"Spread from legacy aggregated click_journey.",spread_engine_version:DB_SPREAD_ENGINE_VERSION}));
+}
+
+async function spreadSnapshotToJasTables(snapshot){
+  if(!snapshot?.id)throw new Error("snapshot.id is required for DB spread");
+  const kpiRow=kpiSpreadRow(snapshot);
+  const purchaseRows=newPurchaseBreakdownRows(snapshot)||legacyPurchaseBreakdownRows(snapshot);
+  const clickRows=newClickBreakdownRows(snapshot)||legacyClickBreakdownRows(snapshot);
+
+  const kpiResult=await supabaseAdmin.from("jas_kpis").upsert(kpiRow,{onConflict:"snapshot_id"}).select("id").maybeSingle();
+  if(kpiResult.error)throw kpiResult.error;
+
+  const purchaseResult=await supabaseAdmin.from("jas_purchase_journey").upsert(purchaseRows,{onConflict:"snapshot_id,platform,channel_type,visitor_type,step_name"}).select("id");
+  if(purchaseResult.error)throw purchaseResult.error;
+
+  const clickResult=await supabaseAdmin.from("jas_click_journey").upsert(clickRows,{onConflict:"snapshot_id,platform,channel_type,step_name"}).select("id");
+  if(clickResult.error)throw clickResult.error;
+
+  return {ok:true,spread_engine_version:DB_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,jas_kpis:1,jas_purchase_journey:purchaseRows.length,jas_click_journey:clickRows.length};
+}
+
+async function readSnapshotForSpread({userId,snapshotId,platform="meta",platformAccountId=null}){
+  let query=supabaseAdmin.from("dashboard_snapshots").select("*").eq("user_id",userId).order("snapshot_created_at",{ascending:false}).limit(1);
+  if(snapshotId)query=query.eq("id",snapshotId);
+  if(platform)query=query.eq("platform",platform);
+  if(platformAccountId)query=query.eq("platform_account_id",platformAccountId);
+  const {data,error}=await query.maybeSingle();
+  if(error)throw error;
+  if(!data){const err=new Error("Snapshot not found for spread");err.status=404;throw err}
+  return data;
+}
+
+app.post("/api/jas/spread",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const snapshot=await readSnapshotForSpread({userId:user.id,snapshotId:req.body?.snapshot_id||req.query.snapshot_id||null,platform:String(req.body?.platform||req.query.platform||"meta"),platformAccountId:req.body?.platform_account_id||req.query.platform_account_id||null});
+    res.json(await spreadSnapshotToJasTables(snapshot));
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"jas_spread"})}
+});
+
+app.get("/api/jas/status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const platform=String(req.query.platform||"meta"), platformAccountId=req.query.platform_account_id||null;
+    let k=supabaseAdmin.from("jas_kpis").select("*").eq("user_id",user.id).eq("platform",platform).order("snapshot_date",{ascending:false}).limit(5);
+    let p=supabaseAdmin.from("jas_purchase_journey").select("*").eq("user_id",user.id).eq("platform",platform).order("snapshot_date",{ascending:false}).limit(20);
+    let c=supabaseAdmin.from("jas_click_journey").select("*").eq("user_id",user.id).eq("platform",platform).order("snapshot_date",{ascending:false}).limit(20);
+    if(platformAccountId){k=k.eq("platform_account_id",platformAccountId);p=p.eq("platform_account_id",platformAccountId);c=c.eq("platform_account_id",platformAccountId)}
+    const [kr,pr,cr]=await Promise.all([k,p,c]);
+    if(kr.error)throw kr.error;if(pr.error)throw pr.error;if(cr.error)throw cr.error;
+    res.json({ok:true,spread_engine_version:DB_SPREAD_ENGINE_VERSION,jas_kpis:kr.data||[],jas_purchase_journey:pr.data||[],jas_click_journey:cr.data||[]});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"jas_status"})}
+});
+// ===== END DB SPREAD SCHEMA v1 / JAS SPREAD ENGINE =====
+
+
 // ===== PHASE E.2A META SNAPSHOT WRITE =====
 function e2aNumber(value){
   const n=Number(value);
@@ -1347,7 +1465,14 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     .maybeSingle();
   if(error)throw error;
 
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts};
+  let spread_result=null;
+  try{
+    spread_result=await spreadSnapshotToJasTables(data);
+  }catch(spreadError){
+    spread_result={ok:false,error:spreadError.message};
+  }
+
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,spread_result};
 }
 
 async function handleMetaSnapshotWrite(req,res){
@@ -1406,6 +1531,7 @@ async function handleMetaSnapshotWrite(req,res){
       fx_target_currency:writeResult.snapshot?.fx_target_currency||null,
       fx_engine_version:writeResult.snapshot?.fx_engine_version||null,
       row_counts:writeResult.row_counts,
+      spread_result:writeResult.spread_result||null,
       kpis:writeResult.snapshot?.kpis||{},
       purchase_journey:writeResult.snapshot?.purchase_journey||{},
       click_journey:writeResult.snapshot?.click_journey||{}
@@ -1535,7 +1661,7 @@ async function runMetaAutoRefreshForSchedule(schedule){
       })
       .eq("id",schedule.id);
 
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,fx_rate:writeResult.snapshot?.fx_rate??null,fx_provider:writeResult.snapshot?.fx_provider||null,fx_source_currency:writeResult.snapshot?.fx_source_currency||null,fx_target_currency:writeResult.snapshot?.fx_target_currency||null,fx_engine_version:writeResult.snapshot?.fx_engine_version||null};
+    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,fx_rate:writeResult.snapshot?.fx_rate??null,fx_provider:writeResult.snapshot?.fx_provider||null,fx_source_currency:writeResult.snapshot?.fx_source_currency||null,fx_target_currency:writeResult.snapshot?.fx_target_currency||null,fx_engine_version:writeResult.snapshot?.fx_engine_version||null,spread_result:writeResult.spread_result||null};
   }catch(e){
     await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
     throw e;

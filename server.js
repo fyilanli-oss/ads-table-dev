@@ -2407,7 +2407,7 @@ async function tiktokReportFetch(conn,{sandbox=false,sandboxAccessToken="",adver
   url.searchParams.set("end_date",window.end_date);
   url.searchParams.set("page","1");
   url.searchParams.set("page_size","20");
-  const headers=sandbox?{Authorization:`Bearer ${token}`,Accept:"application/json"}:{"Access-Token":token,Accept:"application/json"};
+  const headers=sandbox?{"Access-Token":token,Accept:"application/json"}:{"Access-Token":token,Accept:"application/json"};
   const r=await fetch(url,{method:"GET",headers});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.message||data.error_description||data.error||`TikTok report API error ${r.status}`);

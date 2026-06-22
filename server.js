@@ -2315,24 +2315,19 @@ app.post("/api/account/request-delete",async(req,res)=>{try{const result=await r
 app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(req.query.token||"");if(!token)return res.status(400).send("Missing delete token.");const{data,error}=await supabaseAdmin.from("subscriptions").select("user_id,status,deletion_token_expires_at").eq("deletion_token",token).maybeSingle();if(error)throw error;if(!data)return res.status(400).send("Invalid or expired delete token.");if(data.status==="deleted")return res.redirect("/login?account_deleted=1");const expiresAt=data.deletion_token_expires_at?new Date(data.deletion_token_expires_at).getTime():0;if(!expiresAt||expiresAt<Date.now())return res.status(400).send("Invalid or expired delete token.");const deletedAt=new Date();const hardDeleteAt=new Date(deletedAt.getTime()+90*24*60*60*1000);const{error:updateError}=await supabaseAdmin.from("subscriptions").update({status:"deleted",deleted_at:deletedAt.toISOString(),hard_delete_at:hardDeleteAt.toISOString(),deletion_token:null,deletion_token_expires_at:null,updated_at:deletedAt.toISOString()}).eq("user_id",data.user_id);if(updateError)throw updateError;res.redirect("/login?account_deleted=1")}catch(e){res.status(500).send(e.message)}});
 // ===== END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
 
+// ===== TIKTOK CONSOLIDATED READ/VALIDATE TEST PATCH =====
 function normalizeTikTokAdvertiser(item){
+  const attr=item?.attributes||item||{};
   return {
-    advertiser_id:String(item?.advertiser_id||item?.advertiserId||item?.id||""),
-    advertiser_name:item?.advertiser_name||item?.advertiserName||item?.name||null,
-    status:item?.status||item?.advertiser_status||item?.advertiserStatus||null,
-    currency:item?.currency||item?.currency_code||item?.currencyCode||null
+    advertiser_id:String(attr.advertiser_id||attr.advertiserId||attr.id||item?.id||""),
+    advertiser_name:attr.advertiser_name||attr.advertiserName||attr.name||item?.name||null,
+    status:attr.status||attr.advertiser_status||attr.advertiserStatus||null,
+    currency:attr.currency||attr.currency_code||attr.currencyCode||null
   };
 }
 function extractTikTokAdvertisers(raw){
   const data=raw?.data||raw||{};
-  const candidates=[
-    data.list,
-    data.advertisers,
-    data.advertiser_list,
-    data.advertiserList,
-    data?.advertiser_ids,
-    raw?.advertisers
-  ];
+  const candidates=[data.list,data.advertisers,data.advertiser_list,data.advertiserList,data?.advertiser_ids,raw?.advertisers];
   const found=candidates.find(Array.isArray)||[];
   return found.map(item=>typeof item==="string"?{advertiser_id:item,advertiser_name:null,status:null,currency:null}:normalizeTikTokAdvertiser(item));
 }
@@ -2365,7 +2360,6 @@ app.get("/api/tiktok/status",async(req,res)=>{
   }
 });
 
-
 function boolQuery(value){return String(value||"").toLowerCase()==="true"||String(value||"")==="1"}
 function tiktokReportDateWindow(dateRange){
   const end=new Date();
@@ -2396,10 +2390,13 @@ function normalizeTikTokReportRows(raw){
     raw:row
   })):[];
 }
-async function tiktokReportFetch(conn,{sandbox=false,advertiserId,level="campaign",dateRange="last_7d"}){
+async function tiktokReportFetch(conn,{sandbox=false,sandboxAccessToken="",advertiserId,level="campaign",dateRange="last_7d"}){
   const report=tiktokReportLevel(level);
   const window=tiktokReportDateWindow(dateRange);
   const base=sandbox?"https://sandbox-ads.tiktok.com/open_api":"https://business-api.tiktok.com/open_api";
+  const token=sandbox?String(sandboxAccessToken||"").trim():conn.access_token;
+  if(sandbox&&!token){const err=new Error("sandbox_access_token is required when sandbox=true");err.status=400;throw err}
+  if(!sandbox&&!token){const err=new Error("TikTok access token missing");err.status=401;throw err}
   const url=new URL(`${base}/v1.3/report/integrated/get/`);
   url.searchParams.set("advertiser_id",String(advertiserId));
   url.searchParams.set("report_type","BASIC");
@@ -2410,11 +2407,12 @@ async function tiktokReportFetch(conn,{sandbox=false,advertiserId,level="campaig
   url.searchParams.set("end_date",window.end_date);
   url.searchParams.set("page","1");
   url.searchParams.set("page_size","20");
-  const r=await fetch(url,{method:"GET",headers:{"Access-Token":conn.access_token,Accept:"application/json"}});
+  const headers=sandbox?{Authorization:`Bearer ${token}`,Accept:"application/json"}:{"Access-Token":token,Accept:"application/json"};
+  const r=await fetch(url,{method:"GET",headers});
   const data=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(data.message||data.error_description||data.error||`TikTok report API error ${r.status}`);
   if(data.code&&Number(data.code)!==0)throw new Error(data.message||data.error_description||`TikTok report API code ${data.code}`);
-  return {raw:data,request:{sandbox,base,endpoint:"/v1.3/report/integrated/get/",advertiser_id:String(advertiserId),level,date:dateRange,...window,data_level:report.data_level,dimensions:report.dimensions,metrics:["spend","impressions","clicks","ctr","cpc","conversion"]}};
+  return {raw:data,request:{sandbox,base,endpoint:"/v1.3/report/integrated/get/",advertiser_id:String(advertiserId),level,date:dateRange,...window,data_level:report.data_level,dimensions:report.dimensions,metrics:["spend","impressions","clicks","ctr","cpc","conversion"],token_source:sandbox?"manual_sandbox_access_token":"platform_connections.access_token"}};
 }
 
 app.get("/api/tiktok/report",async(req,res)=>{
@@ -2426,18 +2424,10 @@ app.get("/api/tiktok/report",async(req,res)=>{
     const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
     const level=String(req.query.level||"campaign").toLowerCase();
     const dateRange=String(req.query.date||req.query.date_range||"last_7d");
+    const sandboxAccessToken=String(req.query.sandbox_access_token||req.query.sandboxAccessToken||"").trim();
     if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
-    const {raw,request}=await tiktokReportFetch(conn,{sandbox,advertiserId,level,dateRange});
-    res.json({
-      platform:"tiktok",
-      sandbox,
-      advertiser_id:advertiserId,
-      level,
-      date:dateRange,
-      rows:normalizeTikTokReportRows(raw),
-      request,
-      raw
-    });
+    const {raw,request}=await tiktokReportFetch(conn,{sandbox,sandboxAccessToken,advertiserId,level,dateRange});
+    res.json({platform:"tiktok",sandbox,advertiser_id:advertiserId,level,date:dateRange,rows:normalizeTikTokReportRows(raw),request,raw});
   }catch(e){
     res.status(e.status||500).json({error:e.message});
   }
@@ -2449,15 +2439,13 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
     if(!result)return;
     const {conn}=result;
     if(!process.env.TIKTOK_CLIENT_ID||!process.env.TIKTOK_CLIENT_SECRET)throw new Error("Missing TikTok env");
-    const raw=await tiktokApiFetch(conn,"/open_api/v1.3/oauth2/advertiser/get/",{
-      app_id:process.env.TIKTOK_CLIENT_ID,
-      secret:process.env.TIKTOK_CLIENT_SECRET
-    });
+    const raw=await tiktokApiFetch(conn,"/open_api/v1.3/oauth2/advertiser/get/",{app_id:process.env.TIKTOK_CLIENT_ID,secret:process.env.TIKTOK_CLIENT_SECRET});
     const advertisers=extractTikTokAdvertisers(raw);
     res.json({platform:"tiktok",advertisers,raw});
   }catch(e){
     res.status(e.status||500).json({error:e.message});
   }
 });
+// ===== END TIKTOK CONSOLIDATED READ/VALIDATE TEST PATCH =====
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));
 module.exports=app;

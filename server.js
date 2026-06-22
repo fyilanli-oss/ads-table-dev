@@ -2374,13 +2374,16 @@ function tiktokReportDateWindow(dateRange){
 }
 function tiktokReportLevel(level){
   const l=String(level||"campaign").toLowerCase();
-  if(l==="campaign")return {data_level:"AUCTION_CAMPAIGN",dimensions:["campaign_id"]};
-  return {data_level:"AUCTION_CAMPAIGN",dimensions:["campaign_id"]};
+  if(l==="adgroup")return {level:"adgroup",data_level:"AUCTION_ADGROUP",dimensions:["adgroup_id"]};
+  if(l==="ad")return {level:"ad",data_level:"AUCTION_AD",dimensions:["ad_id"]};
+  return {level:"campaign",data_level:"AUCTION_CAMPAIGN",dimensions:["campaign_id"]};
 }
 function normalizeTikTokReportRows(raw){
   const list=raw?.data?.list||raw?.data?.rows||raw?.list||[];
   return Array.isArray(list)?list.map(row=>({
-    campaign_id:row?.dimensions?.campaign_id||row?.campaign_id||row?.dimensions?.stat_id||null,
+    campaign_id:row?.dimensions?.campaign_id||row?.campaign_id||null,
+    adgroup_id:row?.dimensions?.adgroup_id||row?.adgroup_id||null,
+    ad_id:row?.dimensions?.ad_id||row?.ad_id||null,
     spend:row?.metrics?.spend??row?.spend??null,
     impressions:row?.metrics?.impressions??row?.impressions??null,
     clicks:row?.metrics?.clicks??row?.clicks??null,
@@ -2392,6 +2395,7 @@ function normalizeTikTokReportRows(raw){
 }
 async function tiktokReportFetch(conn,{sandbox=false,sandboxAccessToken="",advertiserId,level="campaign",dateRange="last_7d"}){
   const report=tiktokReportLevel(level);
+  level=report.level;
   const window=tiktokReportDateWindow(dateRange);
   const base=sandbox?"https://sandbox-ads.tiktok.com/open_api/":"https://business-api.tiktok.com/open_api/";
   const token=sandbox?String(sandboxAccessToken||"").trim():conn?.access_token;

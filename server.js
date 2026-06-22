@@ -765,60 +765,6 @@ if(reconnectLifecycleAccountId){
 req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
-
-app.get("/auth/tiktok",async(req,res)=>{try{
-const accessCheck=await requireConnectAccessForOAuth(req,res);
-if(!accessCheck)return;
-const userId=accessCheck.userId;
-const state=Math.random().toString(36).slice(2);
-req.session.tiktokOAuthState=state;
-req.session.oauthUserId=userId;
-const params=new URLSearchParams({
-client_key:process.env.TIKTOK_APP_ID,
-response_type:"code",
-redirect_uri:process.env.TIKTOK_REDIRECT_URI,
-scope:"user.info.basic",
-state
-});
-res.redirect(`https://business-api.tiktok.com/portal/auth/?${params.toString()}`);
-}catch(e){res.status(500).send(e.message)}});
-
-app.get("/auth/tiktok/callback",async(req,res)=>{try{
-const{code,state,error}=req.query;
-if(error)return res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(error)}`);
-if(!code)return res.redirect("/dashboard?tiktok_error=missing_code");
-if(!state||state!==req.session.tiktokOAuthState)return res.redirect("/dashboard?tiktok_error=invalid_state");
-const userId=req.session.oauthUserId;
-if(!userId)return res.redirect("/dashboard?tiktok_error=missing_user_id");
-
-const tokenResponse=await fetch("https://open.tiktokapis.com/v2/oauth/token/",{
-method:"POST",
-headers:{"Content-Type":"application/x-www-form-urlencoded"},
-body:new URLSearchParams({
-client_key:process.env.TIKTOK_APP_ID,
-client_secret:process.env.TIKTOK_APP_SECRET,
-code,
-grant_type:"authorization_code",
-redirect_uri:process.env.TIKTOK_REDIRECT_URI
-})
-});
-
-const tokenData=await tokenResponse.json();
-if(!tokenResponse.ok)throw new Error(tokenData.error?.message||"tiktok_token_failed");
-
-await saveConnection(userId,"tiktok",{
-accessToken:tokenData.access_token,
-refreshToken:tokenData.refresh_token||null,
-tokenExpiresAt:tokenData.expires_in?new Date(Date.now()+tokenData.expires_in*1000).toISOString():null,
-metadata:{advertiser_id:null}
-});
-
-req.session.tiktokOAuthState=null;
-res.redirect("/dashboard?tiktok_connected=1");
-}catch(e){
-res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`);
-}});
-
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.PINTEREST_CLIENT_ID||!process.env.PINTEREST_REDIRECT_URI)throw new Error("Missing Pinterest env");const state=Math.random().toString(36).slice(2);req.session.pinterestOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.PINTEREST_CLIENT_ID,redirect_uri:process.env.PINTEREST_REDIRECT_URI,scope:"ads:read",state});res.redirect(`https://www.pinterest.com/oauth/?${p}`)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/pinterest/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?pinterest_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?pinterest_error=missing_code");if(!state||state!==req.session.pinterestOAuthState)return res.redirect("/dashboard?pinterest_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?pinterest_error=missing_user_id");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.PINTEREST_REDIRECT_URI});const r=await fetch(`${PINTEREST_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${pinterestBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.message||data.error_description||data.error||"Pinterest token exchange failed");await saveConnection(userId,"pinterest",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||null,expiresIn:data.expires_in||null}});req.session.pinterestOAuthState=null;res.redirect("/dashboard?pinterest_connected=1")}catch(e){res.redirect(`/dashboard?pinterest_error=${encodeURIComponent(e.message)}`)}});

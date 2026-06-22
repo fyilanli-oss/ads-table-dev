@@ -2365,6 +2365,84 @@ app.get("/api/tiktok/status",async(req,res)=>{
   }
 });
 
+
+function boolQuery(value){return String(value||"").toLowerCase()==="true"||String(value||"")==="1"}
+function tiktokReportDateWindow(dateRange){
+  const end=new Date();
+  const start=new Date(end);
+  const range=String(dateRange||"last_7d");
+  if(range==="today"){}
+  else if(range==="yesterday"){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1)}
+  else if(range==="last_30d")start.setDate(start.getDate()-29);
+  else start.setDate(start.getDate()-6);
+  const fmt=d=>d.toISOString().slice(0,10);
+  return {start_date:fmt(start),end_date:fmt(end)};
+}
+function tiktokReportLevel(level){
+  const l=String(level||"campaign").toLowerCase();
+  if(l==="campaign")return {data_level:"AUCTION_CAMPAIGN",dimensions:["campaign_id"]};
+  return {data_level:"AUCTION_CAMPAIGN",dimensions:["campaign_id"]};
+}
+function normalizeTikTokReportRows(raw){
+  const list=raw?.data?.list||raw?.data?.rows||raw?.list||[];
+  return Array.isArray(list)?list.map(row=>({
+    campaign_id:row?.dimensions?.campaign_id||row?.campaign_id||row?.dimensions?.stat_id||null,
+    spend:row?.metrics?.spend??row?.spend??null,
+    impressions:row?.metrics?.impressions??row?.impressions??null,
+    clicks:row?.metrics?.clicks??row?.clicks??null,
+    ctr:row?.metrics?.ctr??row?.ctr??null,
+    cpc:row?.metrics?.cpc??row?.cpc??null,
+    conversion:row?.metrics?.conversion??row?.conversion??null,
+    raw:row
+  })):[];
+}
+async function tiktokReportFetch(conn,{sandbox=false,advertiserId,level="campaign",dateRange="last_7d"}){
+  const report=tiktokReportLevel(level);
+  const window=tiktokReportDateWindow(dateRange);
+  const base=sandbox?"https://sandbox-ads.tiktok.com/open_api":"https://business-api.tiktok.com/open_api";
+  const url=new URL(`${base}/v1.3/report/integrated/get/`);
+  url.searchParams.set("advertiser_id",String(advertiserId));
+  url.searchParams.set("report_type","BASIC");
+  url.searchParams.set("data_level",report.data_level);
+  url.searchParams.set("dimensions",JSON.stringify(report.dimensions));
+  url.searchParams.set("metrics",JSON.stringify(["spend","impressions","clicks","ctr","cpc","conversion"]));
+  url.searchParams.set("start_date",window.start_date);
+  url.searchParams.set("end_date",window.end_date);
+  url.searchParams.set("page","1");
+  url.searchParams.set("page_size","20");
+  const r=await fetch(url,{method:"GET",headers:{"Access-Token":conn.access_token,Accept:"application/json"}});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.message||data.error_description||data.error||`TikTok report API error ${r.status}`);
+  if(data.code&&Number(data.code)!==0)throw new Error(data.message||data.error_description||`TikTok report API code ${data.code}`);
+  return {raw:data,request:{sandbox,base,endpoint:"/v1.3/report/integrated/get/",advertiser_id:String(advertiserId),level,date:dateRange,...window,data_level:report.data_level,dimensions:report.dimensions,metrics:["spend","impressions","clicks","ctr","cpc","conversion"]}};
+}
+
+app.get("/api/tiktok/report",async(req,res)=>{
+  try{
+    const result=await requireConnection(req,res,"tiktok");
+    if(!result)return;
+    const {conn}=result;
+    const sandbox=boolQuery(req.query.sandbox);
+    const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
+    const level=String(req.query.level||"campaign").toLowerCase();
+    const dateRange=String(req.query.date||req.query.date_range||"last_7d");
+    if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
+    const {raw,request}=await tiktokReportFetch(conn,{sandbox,advertiserId,level,dateRange});
+    res.json({
+      platform:"tiktok",
+      sandbox,
+      advertiser_id:advertiserId,
+      level,
+      date:dateRange,
+      rows:normalizeTikTokReportRows(raw),
+      request,
+      raw
+    });
+  }catch(e){
+    res.status(e.status||500).json({error:e.message});
+  }
+});
+
 app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");

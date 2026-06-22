@@ -18,7 +18,7 @@ const TIKTOK_API_BASE="https://business-api.tiktok.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
-app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html"));
+app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>sendFile(res,"tiktok-test.html"));
 app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));
 async function getUserFromRequest(req){const a=req.headers.authorization||"";const t=a.startsWith("Bearer ")?a.slice(7):null;if(!t||!supabaseAdmin)return null;const {data,error}=await supabaseAdmin.auth.getUser(t);if(error||!data?.user?.id)return null;return data.user}
 async function requireUser(req,res){const u=await getUserFromRequest(req);if(!u){res.status(401).json({error:"Not authenticated"});return null}return u}
@@ -2315,6 +2315,71 @@ app.post("/api/account/request-delete",async(req,res)=>{try{const result=await r
 app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(req.query.token||"");if(!token)return res.status(400).send("Missing delete token.");const{data,error}=await supabaseAdmin.from("subscriptions").select("user_id,status,deletion_token_expires_at").eq("deletion_token",token).maybeSingle();if(error)throw error;if(!data)return res.status(400).send("Invalid or expired delete token.");if(data.status==="deleted")return res.redirect("/login?account_deleted=1");const expiresAt=data.deletion_token_expires_at?new Date(data.deletion_token_expires_at).getTime():0;if(!expiresAt||expiresAt<Date.now())return res.status(400).send("Invalid or expired delete token.");const deletedAt=new Date();const hardDeleteAt=new Date(deletedAt.getTime()+90*24*60*60*1000);const{error:updateError}=await supabaseAdmin.from("subscriptions").update({status:"deleted",deleted_at:deletedAt.toISOString(),hard_delete_at:hardDeleteAt.toISOString(),deletion_token:null,deletion_token_expires_at:null,updated_at:deletedAt.toISOString()}).eq("user_id",data.user_id);if(updateError)throw updateError;res.redirect("/login?account_deleted=1")}catch(e){res.status(500).send(e.message)}});
 // ===== END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
 
-app.get("/api/tiktok/status",(_,res)=>res.json({connected:false,status:"pending_verification"}));
+function normalizeTikTokAdvertiser(item){
+  return {
+    advertiser_id:String(item?.advertiser_id||item?.advertiserId||item?.id||""),
+    advertiser_name:item?.advertiser_name||item?.advertiserName||item?.name||null,
+    status:item?.status||item?.advertiser_status||item?.advertiserStatus||null,
+    currency:item?.currency||item?.currency_code||item?.currencyCode||null
+  };
+}
+function extractTikTokAdvertisers(raw){
+  const data=raw?.data||raw||{};
+  const candidates=[
+    data.list,
+    data.advertisers,
+    data.advertiser_list,
+    data.advertiserList,
+    data?.advertiser_ids,
+    raw?.advertisers
+  ];
+  const found=candidates.find(Array.isArray)||[];
+  return found.map(item=>typeof item==="string"?{advertiser_id:item,advertiser_name:null,status:null,currency:null}:normalizeTikTokAdvertiser(item));
+}
+async function tiktokApiFetch(conn,endpoint,query={}){
+  const url=new URL(`${TIKTOK_API_BASE}${endpoint}`);
+  for(const [k,v] of Object.entries(query||{})){
+    if(v!==undefined&&v!==null&&v!=="")url.searchParams.set(k,String(v));
+  }
+  const r=await fetch(url,{method:"GET",headers:{"Access-Token":conn.access_token,Accept:"application/json"}});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.message||data.error_description||data.error||`TikTok API error ${r.status}`);
+  if(data.code&&Number(data.code)!==0)throw new Error(data.message||data.error_description||`TikTok API code ${data.code}`);
+  return data;
+}
+
+app.get("/api/tiktok/status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const conn=await getConnection(user.id,"tiktok");
+    res.json({
+      connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),
+      account_id:conn?.account_id||null,
+      account_name:conn?.account_name||null,
+      token_expires_at:conn?.token_expires_at||null,
+      metadata:conn?.metadata||null
+    });
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+
+app.get("/api/tiktok/advertisers",async(req,res)=>{
+  try{
+    const result=await requireConnection(req,res,"tiktok");
+    if(!result)return;
+    const {conn}=result;
+    if(!process.env.TIKTOK_CLIENT_ID||!process.env.TIKTOK_CLIENT_SECRET)throw new Error("Missing TikTok env");
+    const raw=await tiktokApiFetch(conn,"/open_api/v1.3/oauth2/advertiser/get/",{
+      app_id:process.env.TIKTOK_CLIENT_ID,
+      secret:process.env.TIKTOK_CLIENT_SECRET
+    });
+    const advertisers=extractTikTokAdvertisers(raw);
+    res.json({platform:"tiktok",advertisers,raw});
+  }catch(e){
+    res.status(e.status||500).json({error:e.message});
+  }
+});
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));
 module.exports=app;

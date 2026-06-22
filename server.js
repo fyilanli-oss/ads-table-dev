@@ -780,7 +780,7 @@ redirect_uri:process.env.TIKTOK_REDIRECT_URI,
 scope:"user.info.basic",
 state
 });
-res.redirect(`https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`);
+res.redirect(`https://business-api.tiktok.com/portal/auth/?${params.toString()}`);
 }catch(e){res.status(500).send(e.message)}});
 
 app.get("/auth/tiktok/callback",async(req,res)=>{try{

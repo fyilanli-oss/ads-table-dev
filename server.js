@@ -2393,11 +2393,11 @@ function normalizeTikTokReportRows(raw){
 async function tiktokReportFetch(conn,{sandbox=false,sandboxAccessToken="",advertiserId,level="campaign",dateRange="last_7d"}){
   const report=tiktokReportLevel(level);
   const window=tiktokReportDateWindow(dateRange);
-  const base=sandbox?"https://sandbox-ads.tiktok.com/open_api":"https://business-api.tiktok.com/open_api";
-  const token=sandbox?String(sandboxAccessToken||"").trim():conn.access_token;
+  const base=sandbox?"https://sandbox-ads.tiktok.com/open_api/":"https://business-api.tiktok.com/open_api/";
+  const token=sandbox?String(sandboxAccessToken||"").trim():conn?.access_token;
   if(sandbox&&!token){const err=new Error("sandbox_access_token is required when sandbox=true");err.status=400;throw err}
   if(!sandbox&&!token){const err=new Error("TikTok access token missing");err.status=401;throw err}
-  const url=new URL(`${base}/v1.3/report/integrated/get/`);
+  const url=new URL("v1.3/report/integrated/get/",base);
   url.searchParams.set("advertiser_id",String(advertiserId));
   url.searchParams.set("report_type","BASIC");
   url.searchParams.set("data_level",report.data_level);
@@ -2417,15 +2417,23 @@ async function tiktokReportFetch(conn,{sandbox=false,sandboxAccessToken="",adver
 
 app.get("/api/tiktok/report",async(req,res)=>{
   try{
-    const result=await requireConnection(req,res,"tiktok");
-    if(!result)return;
-    const {conn}=result;
     const sandbox=boolQuery(req.query.sandbox);
     const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
     const level=String(req.query.level||"campaign").toLowerCase();
     const dateRange=String(req.query.date||req.query.date_range||"last_7d");
     const sandboxAccessToken=String(req.query.sandbox_access_token||req.query.sandboxAccessToken||"").trim();
     if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
+
+    let conn=null;
+    if(sandbox){
+      const user=await requireUser(req,res);
+      if(!user)return;
+    }else{
+      const result=await requireConnection(req,res,"tiktok");
+      if(!result)return;
+      conn=result.conn;
+    }
+
     const {raw,request}=await tiktokReportFetch(conn,{sandbox,sandboxAccessToken,advertiserId,level,dateRange});
     res.json({platform:"tiktok",sandbox,advertiser_id:advertiserId,level,date:dateRange,rows:normalizeTikTokReportRows(raw),request,raw});
   }catch(e){

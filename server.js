@@ -2319,7 +2319,61 @@ function tiktokClientId(){return process.env.TIKTOK_CLIENT_ID||process.env.TIKTO
 function tiktokClientSecret(){return process.env.TIKTOK_CLIENT_SECRET||process.env.TIKTOK_SECRET||process.env.TIKTOK_APP_SECRET||""}
 function tiktokRedirectUri(){return process.env.TIKTOK_REDIRECT_URI||""}
 function parseTikTokExpiry(value){return value?new Date(Date.now()+Number(value)*1000).toISOString():null}
-function normalizeTikTokRows(data){const list=Array.isArray(data?.data?.list)?data.data.list:[];return list.map(item=>({dimensions:item.dimensions||{},metrics:item.metrics||{},raw:item}))}
+const TIKTOK_TRUTH_CONTRACT_VERSION="v1";
+const TIKTOK_TRUTH_FIELDS=[
+  {field:"campaign_name",category:"documented",default_behavior:null,null_reason:"Campaign detail/read response has not provided campaign_name for this row."},
+  {field:"campaign_status",category:"documented",default_behavior:null,null_reason:"Campaign detail/read response has not provided campaign_status for this row."},
+  {field:"adgroup_name",category:"documented",default_behavior:null,null_reason:"AdGroup detail/read response has not provided adgroup_name for this row."},
+  {field:"adgroup_status",category:"documented",default_behavior:null,null_reason:"AdGroup detail/read response has not provided adgroup_status for this row."},
+  {field:"ad_name",category:"documented",default_behavior:null,null_reason:"Ad detail/read response has not provided ad_name for this row."},
+  {field:"ad_status",category:"documented",default_behavior:null,null_reason:"Ad detail/read response has not provided ad_status for this row."},
+  {field:"currency",category:"advertiser_validation_required",default_behavior:"N/A",null_reason:"Advertiser/account currency has not been validated for this row."},
+  {field:"destination_click",category:"advertiser_validation_required",default_behavior:"N/A",null_reason:"TikTok response did not provide destination_click for this advertiser/report configuration."},
+  {field:"landing_page_click",category:"advertiser_validation_required",default_behavior:"N/A",null_reason:"TikTok response did not provide landing_page_click for this advertiser/report configuration."},
+  {field:"landing_page_view",category:"tracking_dependent",default_behavior:0,null_reason:"Pixel/website tracking did not provide landing_page_view."},
+  {field:"add_to_cart",category:"tracking_dependent",default_behavior:0,null_reason:"Pixel event add_to_cart is not available for this response."},
+  {field:"checkout",category:"tracking_dependent",default_behavior:0,null_reason:"Checkout event is not available for this response."},
+  {field:"initiate_checkout",category:"tracking_dependent",default_behavior:0,null_reason:"Initiate checkout event is not available for this response."},
+  {field:"complete_payment_count",category:"advertiser_validation_required",default_behavior:null,null_reason:"Complete payment count has not been validated from advertiser reporting."},
+  {field:"complete_payment_value",category:"advertiser_validation_required",default_behavior:null,null_reason:"Complete payment value/revenue has not been validated from advertiser reporting."},
+  {field:"roas",category:"calculated",default_behavior:null,null_reason:"ROAS is disabled until complete_payment_value is validated."},
+  {field:"acos",category:"calculated",default_behavior:null,null_reason:"ACOS is disabled until complete_payment_value is validated."},
+  {field:"cvr",category:"calculated",default_behavior:null,null_reason:"CVR is disabled until complete_payment_count is validated."},
+  {field:"traffic_score",category:"calculated",default_behavior:null,null_reason:"Traffic score is disabled until landing_page_view and link click family are validated."},
+  {field:"real_cpc",category:"calculated",default_behavior:null,null_reason:"Real CPC is disabled until landing_page_view is validated."},
+  {field:"abandoned",category:"calculated",default_behavior:null,null_reason:"Abandoned is disabled until checkout and complete_payment_count are validated."}
+];
+function tiktokTruthContract(){return {version:TIKTOK_TRUTH_CONTRACT_VERSION,fields:TIKTOK_TRUTH_FIELDS,hard_rules:{conversion_cannot_equal_purchase:true,roas_requires_validated_complete_payment_value:true,tracking_events_cannot_be_inferred:true,snapshot_write:false,jas_write:false,db_spread_write:false,production_write:false}}}
+function tiktokTruthMetaFor(field){return TIKTOK_TRUTH_FIELDS.find(x=>x.field===field)||null}
+function tiktokFirstValue(sources,keys){for(const src of sources){if(!src||typeof src!=="object")continue;for(const key of keys){if(src[key]!==undefined&&src[key]!==null&&src[key]!=="")return src[key]}}return undefined}
+function tiktokApplyTruthField(output,sources,field,keys){const meta=tiktokTruthMetaFor(field);const found=tiktokFirstValue(sources,keys||[field]);const value=found!==undefined?found:meta?.default_behavior??null;output[field]=value;output.truth[field]={category:meta?.category||"unknown",value_source:found!==undefined?"api_response":"default",default_behavior:meta?.default_behavior??null,null_reason:found!==undefined?null:(meta?.null_reason||null)};}
+function normalizeTikTokRows(data,level="campaign"){
+  const list=Array.isArray(data?.data?.list)?data.data.list:[];
+  return list.map(item=>{
+    const dimensions=item.dimensions||{};
+    const metrics=item.metrics||{};
+    const sources=[dimensions,metrics,item];
+    const row={dimensions,metrics,raw:item,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION,truth:{}};
+    tiktokApplyTruthField(row,sources,"campaign_name",["campaign_name","campaignName"]);
+    tiktokApplyTruthField(row,sources,"campaign_status",["campaign_status","campaignStatus","campaign_operation_status","operation_status"]);
+    tiktokApplyTruthField(row,sources,"adgroup_name",["adgroup_name","ad_group_name","adgroupName"]);
+    tiktokApplyTruthField(row,sources,"adgroup_status",["adgroup_status","ad_group_status","adgroupStatus","operation_status"]);
+    tiktokApplyTruthField(row,sources,"ad_name",["ad_name","adName"]);
+    tiktokApplyTruthField(row,sources,"ad_status",["ad_status","adStatus","operation_status"]);
+    tiktokApplyTruthField(row,sources,"currency",["currency","currency_code"]);
+    tiktokApplyTruthField(row,sources,"destination_click",["destination_click","destination_clicks"]);
+    tiktokApplyTruthField(row,sources,"landing_page_click",["landing_page_click","landing_page_clicks"]);
+    tiktokApplyTruthField(row,sources,"landing_page_view",["landing_page_view","landing_page_views"]);
+    tiktokApplyTruthField(row,sources,"add_to_cart",["add_to_cart","add_to_cart_count"]);
+    tiktokApplyTruthField(row,sources,"checkout",["checkout","checkout_count"]);
+    tiktokApplyTruthField(row,sources,"initiate_checkout",["initiate_checkout","initiate_checkout_count"]);
+    tiktokApplyTruthField(row,sources,"complete_payment_count",["complete_payment_count","complete_payment","complete_payment_events"]);
+    tiktokApplyTruthField(row,sources,"complete_payment_value",["complete_payment_value","complete_payment_value_onsite","total_complete_payment_rate_value"]);
+    for(const field of ["roas","acos","cvr","traffic_score","real_cpc","abandoned"]){tiktokApplyTruthField(row,sources,field,[field])}
+    row.hard_rules={conversion_is_purchase:false,calculated_fields_disabled:true,level};
+    return row;
+  })
+}
 function tiktokDateWindow(range,startDate,endDate){
   const end=endDate?new Date(`${endDate}T00:00:00Z`):new Date();
   const start=startDate?new Date(`${startDate}T00:00:00Z`):new Date(end);
@@ -2408,6 +2462,13 @@ app.get("/api/tiktok/status",async(req,res)=>{
   }catch(e){res.status(500).json({error:e.message})}
 });
 
+app.get("/api/tiktok/truth-contract",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    res.json({platform:"tiktok",truth_contract:tiktokTruthContract()});
+  }catch(e){res.status(500).json({error:e.message})}
+});
+
 app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
@@ -2470,8 +2531,9 @@ app.get("/api/tiktok/report",async(req,res)=>{
       advertiser_id:advertiserId,
       level:levelInfo.level,
       date,
-      rows:normalizeTikTokRows(data),
-      request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource},
+      rows:normalizeTikTokRows(data,levelInfo.level),
+      request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION},
+      truth_contract:tiktokTruthContract(),
       raw:data
     });
   }catch(e){res.status(e.status||500).json({error:e.message})}

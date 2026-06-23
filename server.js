@@ -13,9 +13,10 @@ const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
 const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
-const TIKTOK_AUTH_BASE="https://business-api.tiktok.com";
-const TIKTOK_API_BASE="https://business-api.tiktok.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
+const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
+const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
+const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
 app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>sendFile(res,"tiktok-test.html"));
@@ -774,9 +775,6 @@ app.get("/auth/pinterest/callback",async(req,res)=>{try{const{code,state,error,e
 function base64Url(input){return Buffer.from(input).toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 function klaviyoBasic(){return Buffer.from(`${process.env.KLAVIYO_CLIENT_ID}:${process.env.KLAVIYO_CLIENT_SECRET}`).toString("base64")}
 function klaviyoScopes(){return process.env.KLAVIYO_SCOPES||"accounts:read campaigns:read events:read metrics:read conversations:read"}
-function tiktokScopes(){return process.env.TIKTOK_SCOPES||"user.info.basic"}
-app.get("/auth/tiktok",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.TIKTOK_CLIENT_ID||!process.env.TIKTOK_CLIENT_SECRET||!process.env.TIKTOK_REDIRECT_URI)throw new Error("Missing TikTok env");const state=Math.random().toString(36).slice(2);req.session.tiktokOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({app_id:process.env.TIKTOK_CLIENT_ID,redirect_uri:process.env.TIKTOK_REDIRECT_URI,state});res.redirect(`${TIKTOK_AUTH_BASE}/portal/auth?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/tiktok/callback",async(req,res)=>{try{const{auth_code,code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(error_description||error)}`);const authCode=auth_code||code;if(!authCode)return res.redirect("/dashboard?tiktok_error=missing_code");if(!state||state!==req.session.tiktokOAuthState)return res.redirect("/dashboard?tiktok_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?tiktok_error=missing_user_id");const body={app_id:process.env.TIKTOK_CLIENT_ID,secret:process.env.TIKTOK_CLIENT_SECRET,auth_code:authCode};const r=await fetch(`${TIKTOK_API_BASE}/open_api/v1.3/oauth2/access_token/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const data=await r.json().catch(()=>({}));const tokenData=data.data||data;if(!r.ok||!tokenData.access_token)throw new Error(data.message||data.error_description||data.error||"TikTok token exchange failed");await saveConnection(userId,"tiktok",{accessToken:tokenData.access_token,refreshToken:tokenData.refresh_token||null,tokenExpiresAt:parseExpiry(tokenData.expires_in),metadata:{scope:tokenData.scope||tiktokScopes(),tokenType:tokenData.token_type||null,expiresIn:tokenData.expires_in||null,openId:tokenData.open_id||null}});req.session.tiktokOAuthState=null;res.redirect("/dashboard?tiktok_connected=1")}catch(e){res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`)}});
 function klaviyoDateWindow(range,startDate,endDate){
   const end=endDate?new Date(`${endDate}T23:59:59Z`):new Date();
   const start=startDate?new Date(`${startDate}T00:00:00Z`):new Date(end);
@@ -2315,149 +2313,170 @@ app.post("/api/account/request-delete",async(req,res)=>{try{const result=await r
 app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(req.query.token||"");if(!token)return res.status(400).send("Missing delete token.");const{data,error}=await supabaseAdmin.from("subscriptions").select("user_id,status,deletion_token_expires_at").eq("deletion_token",token).maybeSingle();if(error)throw error;if(!data)return res.status(400).send("Invalid or expired delete token.");if(data.status==="deleted")return res.redirect("/login?account_deleted=1");const expiresAt=data.deletion_token_expires_at?new Date(data.deletion_token_expires_at).getTime():0;if(!expiresAt||expiresAt<Date.now())return res.status(400).send("Invalid or expired delete token.");const deletedAt=new Date();const hardDeleteAt=new Date(deletedAt.getTime()+90*24*60*60*1000);const{error:updateError}=await supabaseAdmin.from("subscriptions").update({status:"deleted",deleted_at:deletedAt.toISOString(),hard_delete_at:hardDeleteAt.toISOString(),deletion_token:null,deletion_token_expires_at:null,updated_at:deletedAt.toISOString()}).eq("user_id",data.user_id);if(updateError)throw updateError;res.redirect("/login?account_deleted=1")}catch(e){res.status(500).send(e.message)}});
 // ===== END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
 
-// ===== TIKTOK CONSOLIDATED READ/VALIDATE TEST PATCH =====
-function normalizeTikTokAdvertiser(item){
-  const attr=item?.attributes||item||{};
-  return {
-    advertiser_id:String(attr.advertiser_id||attr.advertiserId||attr.id||item?.id||""),
-    advertiser_name:attr.advertiser_name||attr.advertiserName||attr.name||item?.name||null,
-    status:attr.status||attr.advertiser_status||attr.advertiserStatus||null,
-    currency:attr.currency||attr.currency_code||attr.currencyCode||null
-  };
-}
-function extractTikTokAdvertisers(raw){
-  const data=raw?.data||raw||{};
-  const candidates=[data.list,data.advertisers,data.advertiser_list,data.advertiserList,data?.advertiser_ids,raw?.advertisers];
-  const found=candidates.find(Array.isArray)||[];
-  return found.map(item=>typeof item==="string"?{advertiser_id:item,advertiser_name:null,status:null,currency:null}:normalizeTikTokAdvertiser(item));
-}
-async function tiktokApiFetch(conn,endpoint,query={}){
-  const url=new URL(`${TIKTOK_API_BASE}${endpoint}`);
-  for(const [k,v] of Object.entries(query||{})){
-    if(v!==undefined&&v!==null&&v!=="")url.searchParams.set(k,String(v));
+
+// ===== TIKTOK READ LAYER (OAuth + Test Reads Only) =====
+function tiktokClientId(){return process.env.TIKTOK_CLIENT_ID||process.env.TIKTOK_APP_ID||""}
+function tiktokClientSecret(){return process.env.TIKTOK_CLIENT_SECRET||process.env.TIKTOK_SECRET||process.env.TIKTOK_APP_SECRET||""}
+function tiktokRedirectUri(){return process.env.TIKTOK_REDIRECT_URI||""}
+function parseTikTokExpiry(value){return value?new Date(Date.now()+Number(value)*1000).toISOString():null}
+function normalizeTikTokRows(data){const list=Array.isArray(data?.data?.list)?data.data.list:[];return list.map(item=>({dimensions:item.dimensions||{},metrics:item.metrics||{},raw:item}))}
+function tiktokDateWindow(range,startDate,endDate){
+  const end=endDate?new Date(`${endDate}T00:00:00Z`):new Date();
+  const start=startDate?new Date(`${startDate}T00:00:00Z`):new Date(end);
+  if(!startDate){
+    if(range==="today"){}
+    else if(range==="yesterday"){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1)}
+    else if(range==="last_30d")start.setDate(start.getDate()-29);
+    else start.setDate(start.getDate()-6);
   }
-  const r=await fetch(url,{method:"GET",headers:{"Access-Token":conn.access_token,Accept:"application/json"}});
-  const data=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(data.message||data.error_description||data.error||`TikTok API error ${r.status}`);
-  if(data.code&&Number(data.code)!==0)throw new Error(data.message||data.error_description||`TikTok API code ${data.code}`);
+  const fmt=d=>d.toISOString().slice(0,10);
+  return {start:fmt(start),end:fmt(end)};
+}
+function resolveTikTokReportLevel(level){
+  const l=String(level||"campaign").toLowerCase();
+  if(l==="adgroup"||l==="ad_group")return {level:"adgroup",dataLevel:"AUCTION_ADGROUP",dimension:"adgroup_id"};
+  if(l==="ad")return {level:"ad",dataLevel:"AUCTION_AD",dimension:"ad_id"};
+  return {level:"campaign",dataLevel:"AUCTION_CAMPAIGN",dimension:"campaign_id"};
+}
+async function tiktokApiFetch({base=TIKTOK_API_BASE,endpoint,token,headers={},params={}}){
+  const cleanBase=String(base).replace(/\/+$/,"");
+  const cleanEndpoint=String(endpoint||"").startsWith("/")?endpoint:`/${endpoint}`;
+  const url=new URL(`${cleanBase}${cleanEndpoint}`);
+  for(const [k,v] of Object.entries(params||{})){
+    if(v===undefined||v===null||v==="")continue;
+    url.searchParams.set(k,Array.isArray(v)||typeof v==="object"?JSON.stringify(v):String(v));
+  }
+  const r=await fetch(url,{headers:{...headers}});
+  const text=await r.text();
+  let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
+  if(!r.ok)throw new Error(data.message||data.error?.message||text||`TikTok API error ${r.status}`);
   return data;
 }
 
+app.get("/auth/tiktok",async(req,res)=>{
+  try{
+    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
+    const userId=accessCheck.userId;
+    if(!tiktokClientId()||!tiktokRedirectUri())throw new Error("Missing TikTok OAuth env");
+    const state=Math.random().toString(36).slice(2);
+    req.session.tiktokOAuthState=state;
+    req.session.oauthUserId=userId;
+    const p=new URLSearchParams({app_id:tiktokClientId(),redirect_uri:tiktokRedirectUri(),state});
+    res.redirect(`${TIKTOK_AUTH_BASE}?${p}`);
+  }catch(e){res.status(500).send(e.message)}
+});
+
+app.get("/auth/tiktok/callback",async(req,res)=>{
+  try{
+    const {state,error,error_description}=req.query;
+    const authCode=req.query.auth_code||req.query.code;
+    if(error)return res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(error_description||error)}`);
+    if(!authCode)return res.redirect("/dashboard?tiktok_error=missing_code");
+    if(!state||state!==req.session.tiktokOAuthState)return res.redirect("/dashboard?tiktok_error=invalid_state");
+    const userId=req.session.oauthUserId;
+    if(!userId)return res.redirect("/dashboard?tiktok_error=missing_user_id");
+    if(!tiktokClientId()||!tiktokClientSecret())throw new Error("Missing TikTok token env");
+    const r=await fetch(`${TIKTOK_API_BASE}/v1.3/oauth2/access_token/`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({app_id:tiktokClientId(),secret:tiktokClientSecret(),auth_code:String(authCode)})
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||data.code!==0||!data.data?.access_token)throw new Error(data.message||data.error?.message||"TikTok token exchange failed");
+    await saveConnection(userId,"tiktok",{
+      accessToken:data.data.access_token,
+      refreshToken:data.data.refresh_token||null,
+      tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
+      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null}
+    });
+    req.session.tiktokOAuthState=null;
+    res.redirect("/dashboard?tiktok_connected=1");
+  }catch(e){res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`)}
+});
+
 app.get("/api/tiktok/status",async(req,res)=>{
   try{
-    const user=await requireUser(req,res);
-    if(!user)return;
+    const user=await requireUser(req,res);if(!user)return;
     const conn=await getConnection(user.id,"tiktok");
     res.json({
       connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),
       account_id:conn?.account_id||null,
       account_name:conn?.account_name||null,
       token_expires_at:conn?.token_expires_at||null,
-      metadata:conn?.metadata||null
+      metadata:conn?.metadata||{}
     });
-  }catch(e){
-    res.status(500).json({error:e.message});
-  }
-});
-
-function boolQuery(value){return String(value||"").toLowerCase()==="true"||String(value||"")==="1"}
-function tiktokReportDateWindow(dateRange){
-  const end=new Date();
-  const start=new Date(end);
-  const range=String(dateRange||"last_7d");
-  if(range==="today"){}
-  else if(range==="yesterday"){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1)}
-  else if(range==="last_30d")start.setDate(start.getDate()-29);
-  else start.setDate(start.getDate()-6);
-  const fmt=d=>d.toISOString().slice(0,10);
-  return {start_date:fmt(start),end_date:fmt(end)};
-}
-function tiktokReportLevel(level){
-  const l=String(level||"campaign").toLowerCase();
-  if(l==="adgroup")return {level:"adgroup",data_level:"AUCTION_ADGROUP",dimensions:["adgroup_id"]};
-  if(l==="ad")return {level:"ad",data_level:"AUCTION_AD",dimensions:["ad_id"]};
-  return {level:"campaign",data_level:"AUCTION_CAMPAIGN",dimensions:["campaign_id"]};
-}
-function normalizeTikTokReportRows(raw){
-  const list=raw?.data?.list||raw?.data?.rows||raw?.list||[];
-  return Array.isArray(list)?list.map(row=>({
-    campaign_id:row?.dimensions?.campaign_id||row?.campaign_id||null,
-    adgroup_id:row?.dimensions?.adgroup_id||row?.adgroup_id||null,
-    ad_id:row?.dimensions?.ad_id||row?.ad_id||null,
-    spend:row?.metrics?.spend??row?.spend??null,
-    impressions:row?.metrics?.impressions??row?.impressions??null,
-    clicks:row?.metrics?.clicks??row?.clicks??null,
-    ctr:row?.metrics?.ctr??row?.ctr??null,
-    cpc:row?.metrics?.cpc??row?.cpc??null,
-    conversion:row?.metrics?.conversion??row?.conversion??null,
-    raw:row
-  })):[];
-}
-async function tiktokReportFetch(conn,{sandbox=false,sandboxAccessToken="",advertiserId,level="campaign",dateRange="last_7d"}){
-  const report=tiktokReportLevel(level);
-  level=report.level;
-  const window=tiktokReportDateWindow(dateRange);
-  const base=sandbox?"https://sandbox-ads.tiktok.com/open_api/":"https://business-api.tiktok.com/open_api/";
-  const token=sandbox?String(sandboxAccessToken||"").trim():conn?.access_token;
-  if(sandbox&&!token){const err=new Error("sandbox_access_token is required when sandbox=true");err.status=400;throw err}
-  if(!sandbox&&!token){const err=new Error("TikTok access token missing");err.status=401;throw err}
-  const url=new URL("v1.3/report/integrated/get/",base);
-  url.searchParams.set("advertiser_id",String(advertiserId));
-  url.searchParams.set("report_type","BASIC");
-  url.searchParams.set("data_level",report.data_level);
-  url.searchParams.set("dimensions",JSON.stringify(report.dimensions));
-  url.searchParams.set("metrics",JSON.stringify(["spend","impressions","clicks","ctr","cpc","conversion"]));
-  url.searchParams.set("start_date",window.start_date);
-  url.searchParams.set("end_date",window.end_date);
-  url.searchParams.set("page","1");
-  url.searchParams.set("page_size","20");
-  const headers=sandbox?{"Access-Token":token,Accept:"application/json"}:{"Access-Token":token,Accept:"application/json"};
-  const r=await fetch(url,{method:"GET",headers});
-  const data=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(data.message||data.error_description||data.error||`TikTok report API error ${r.status}`);
-  if(data.code&&Number(data.code)!==0)throw new Error(data.message||data.error_description||`TikTok report API code ${data.code}`);
-  return {raw:data,request:{sandbox,base,endpoint:"/v1.3/report/integrated/get/",advertiser_id:String(advertiserId),level,date:dateRange,...window,data_level:report.data_level,dimensions:report.dimensions,metrics:["spend","impressions","clicks","ctr","cpc","conversion"],token_source:sandbox?"manual_sandbox_access_token":"platform_connections.access_token"}};
-}
-
-app.get("/api/tiktok/report",async(req,res)=>{
-  try{
-    const sandbox=boolQuery(req.query.sandbox);
-    const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
-    const level=String(req.query.level||"campaign").toLowerCase();
-    const dateRange=String(req.query.date||req.query.date_range||"last_7d");
-    const sandboxAccessToken=String(req.query.sandbox_access_token||req.query.sandboxAccessToken||"").trim();
-    if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
-
-    let conn=null;
-    if(sandbox){
-      const user=await requireUser(req,res);
-      if(!user)return;
-    }else{
-      const result=await requireConnection(req,res,"tiktok");
-      if(!result)return;
-      conn=result.conn;
-    }
-
-    const {raw,request}=await tiktokReportFetch(conn,{sandbox,sandboxAccessToken,advertiserId,level,dateRange});
-    res.json({platform:"tiktok",sandbox,advertiser_id:advertiserId,level,date:dateRange,rows:normalizeTikTokReportRows(raw),request,raw});
-  }catch(e){
-    res.status(e.status||500).json({error:e.message});
-  }
+  }catch(e){res.status(500).json({error:e.message})}
 });
 
 app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
-    const result=await requireConnection(req,res,"tiktok");
-    if(!result)return;
+    const result=await requireConnection(req,res,"tiktok");if(!result)return;
     const {conn}=result;
-    if(!process.env.TIKTOK_CLIENT_ID||!process.env.TIKTOK_CLIENT_SECRET)throw new Error("Missing TikTok env");
-    const raw=await tiktokApiFetch(conn,"/open_api/v1.3/oauth2/advertiser/get/",{app_id:process.env.TIKTOK_CLIENT_ID,secret:process.env.TIKTOK_CLIENT_SECRET});
-    const advertisers=extractTikTokAdvertisers(raw);
-    res.json({platform:"tiktok",advertisers,raw});
-  }catch(e){
-    res.status(e.status||500).json({error:e.message});
-  }
+    const data=await tiktokApiFetch({
+      base:TIKTOK_API_BASE,
+      endpoint:"/v1.3/oauth2/advertiser/get/",
+      headers:{"Access-Token":conn.access_token}
+    });
+    const list=Array.isArray(data?.data?.list)?data.data.list:[];
+    const advertisers=list.map(a=>({
+      advertiser_id:a.advertiser_id||a.id||null,
+      advertiser_name:a.advertiser_name||a.name||null,
+      status:a.status||a.advertiser_status||null,
+      currency:a.currency||a.currency_code||null
+    }));
+    res.json({platform:"tiktok",advertisers,raw:data});
+  }catch(e){res.status(e.status||500).json({error:e.message})}
 });
-// ===== END TIKTOK CONSOLIDATED READ/VALIDATE TEST PATCH =====
+
+app.get("/api/tiktok/report",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const sandbox=String(req.query.sandbox||"false").toLowerCase()==="true";
+    let token=null,tokenSource=null;
+    if(sandbox){
+      token=String(req.query.sandbox_access_token||req.headers["x-sandbox-access-token"]||"").trim();
+      tokenSource="manual_sandbox_access_token";
+      if(!token)return res.status(400).json({error:"sandbox_access_token is required when sandbox=true"});
+    }else{
+      const conn=await getConnection(user.id,"tiktok");
+      if(!conn?.access_token)return res.status(404).json({error:"tiktok not connected"});
+      token=conn.access_token;
+      tokenSource="platform_connections.access_token";
+    }
+    const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
+    if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
+    const levelInfo=resolveTikTokReportLevel(req.query.level);
+    const date=String(req.query.date||req.query.date_range||"last_7d");
+    const w=tiktokDateWindow(date,req.query.start_date,req.query.end_date);
+    const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
+    const base=sandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
+    const endpoint="/v1.3/report/integrated/get/";
+    const headers=sandbox?{"Access-Token":token}:{"Authorization":`Bearer ${token}`};
+    const params={
+      report_type:"BASIC",
+      data_level:levelInfo.dataLevel,
+      advertiser_id:advertiserId,
+      start_date:w.start,
+      end_date:w.end,
+      dimensions:[levelInfo.dimension],
+      metrics,
+      page:1,
+      page_size:20
+    };
+    const data=await tiktokApiFetch({base,endpoint,headers,params});
+    res.json({
+      platform:"tiktok",
+      sandbox,
+      advertiser_id:advertiserId,
+      level:levelInfo.level,
+      date,
+      rows:normalizeTikTokRows(data),
+      request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource},
+      raw:data
+    });
+  }catch(e){res.status(e.status||500).json({error:e.message})}
+});
+// ===== END TIKTOK READ LAYER =====
+
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));
 module.exports=app;

@@ -1525,6 +1525,7 @@ async function handleMetaSnapshotWrite(req,res){
       istanbul_time:writeResult.snapshot?.istanbul_time||adminTimeSync.istanbul_time,
       platform_account_time:writeResult.snapshot?.platform_account_time||adminTimeSync.platform_account_time,
       platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
+      account_resolution_source:resolvedGoogleAccount.source,
       platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
       account_currency:writeResult.snapshot?.account_currency||null,
       fx_rate:writeResult.snapshot?.fx_rate??null,
@@ -1545,7 +1546,63 @@ async function handleMetaSnapshotWrite(req,res){
   }
 }
 app.post("/api/snapshots/meta/write",handleMetaSnapshotWrite);
-app.post("/api/refresh/meta",handleMetaSnapshotWrite);
+
+function makeRefreshCaptureRes(){
+  return {
+    statusCode:200,
+    payload:null,
+    headers:{},
+    finished:false,
+    status(code){this.statusCode=code;return this},
+    json(data){this.payload=data;this.finished=true;return this},
+    send(data){this.payload=data;this.finished=true;return this},
+    redirect(url){this.statusCode=302;this.payload={redirect:url};this.finished=true;return this},
+    set(field,value){this.headers[field]=value;return this}
+  };
+}
+
+async function invokeRefreshHandler(handler,req){
+  const capture=makeRefreshCaptureRes();
+  await handler(req,capture);
+  const ok=capture.statusCode>=200&&capture.statusCode<300&&capture.payload?.ok!==false;
+  return {ok,status:capture.statusCode,data:capture.payload};
+}
+
+async function handleGlobalRefresh(req,res){
+  const results={};
+  try{
+    results.meta=await invokeRefreshHandler(handleMetaSnapshotWrite,req);
+  }catch(e){
+    results.meta={ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||"meta_refresh"}};
+  }
+  try{
+    results.google=await invokeRefreshHandler(handleGoogleSnapshotWrite,req);
+  }catch(e){
+    results.google={ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||"google_refresh"}};
+  }
+
+  const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
+  const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
+  const metaPayload=results.meta?.data||{};
+
+  res.status(completed.length?200:500).json({
+    ok:completed.length>0,
+    refresh_scope:"global",
+    completed,
+    failed,
+    refresh_job:metaPayload.refresh_job||null,
+    snapshot_id:metaPayload.snapshot_id||null,
+    snapshot_date:metaPayload.snapshot_date||null,
+    platforms:{
+      meta:results.meta?.data||null,
+      google:results.google?.data||null
+    }
+  });
+}
+
+app.post("/api/refresh/meta",handleGlobalRefresh);
+app.post("/api/refresh/all",handleGlobalRefresh);
+app.get("/api/refresh/all",handleGlobalRefresh);
 
 app.get("/api/refresh/status",async(req,res)=>{
   try{
@@ -2283,6 +2340,56 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   if(error)throw error;
   return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
 }
+
+async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
+  const requested=normalizeCustomerId(requestedCustomerId);
+  if(requested)return {customerId:requested,source:"request"};
+
+  const conn=await getConnection(user.id,"google").catch(()=>null);
+  const fromConn=normalizeCustomerId(
+    conn?.account_id||
+    conn?.metadata?.selectedCustomerId||
+    conn?.metadata?.selected_customer_id||
+    conn?.metadata?.customerId||
+    conn?.metadata?.customer_id||
+    conn?.metadata?.lastOwnedPlatformAccountId||
+    conn?.metadata?.platform_account_id
+  );
+  if(fromConn)return {customerId:fromConn,loginCustomerId:conn?.metadata?.loginCustomerId||conn?.metadata?.login_customer_id||"",source:"platform_connections"};
+
+  if(supabaseAdmin){
+    const {data,error}=await supabaseAdmin
+      .from("platform_ad_accounts")
+      .select("platform_account_id,metadata")
+      .eq("user_id",user.id)
+      .eq("platform","google")
+      .order("updated_at",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(error)throw error;
+    const fromAccount=normalizeCustomerId(data?.platform_account_id);
+    if(fromAccount)return {customerId:fromAccount,loginCustomerId:data?.metadata?.loginCustomerId||data?.metadata?.login_customer_id||"",source:"platform_ad_accounts"};
+
+    const ownership=await supabaseAdmin
+      .from("platform_account_ownerships")
+      .select("platform_account_id,metadata")
+      .eq("owner_user_id",user.id)
+      .eq("platform","google")
+      .in("status",activeOwnershipStatuses())
+      .order("updated_at",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(ownership.error)throw ownership.error;
+    const fromOwnership=normalizeCustomerId(ownership.data?.platform_account_id);
+    if(fromOwnership)return {customerId:fromOwnership,loginCustomerId:ownership.data?.metadata?.loginCustomerId||ownership.data?.metadata?.login_customer_id||"",source:"platform_account_ownerships"};
+  }
+
+  const err=new Error("Missing Google customerId and no saved Google account found");
+  err.status=400;
+  err.stage="input";
+  throw err;
+}
+
 async function handleGoogleSnapshotWrite(req,res){
   let job=null;
   let stage="auth";
@@ -2291,14 +2398,14 @@ async function handleGoogleSnapshotWrite(req,res){
     if(!user)return;
     const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");
     if(!accessCheck)return;
-    const customerId=req.body?.customerId||req.body?.customer_id||req.query.customerId||req.query.customer_id;
-    if(!customerId)return res.status(400).json({ok:false,error:"Missing Google customerId",stage:"input"});
-    const platformAccountId=normalizeCustomerId(customerId);
-    const loginCustomerId=req.body?.loginCustomerId||req.body?.login_customer_id||req.query.loginCustomerId||req.query.login_customer_id||"";
+    const requestedCustomerId=req.body?.customerId||req.body?.customer_id||req.query.customerId||req.query.customer_id;
+    const resolvedGoogleAccount=await resolveGoogleRefreshAccount(user,requestedCustomerId);
+    const platformAccountId=normalizeCustomerId(resolvedGoogleAccount.customerId);
+    const loginCustomerId=req.body?.loginCustomerId||req.body?.login_customer_id||req.query.loginCustomerId||req.query.login_customer_id||resolvedGoogleAccount.loginCustomerId||"";
     const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
     stage="job";
-    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION});
+    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source});
     await setRefreshJobStatus(job.id,"running");
     stage="google_api";
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});

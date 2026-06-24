@@ -2329,7 +2329,9 @@ async function handleGoogleSnapshotWrite(req,res){
     res.status(e.status||500).json({ok:false,error:e.message,stage,refresh_job_id:job?.id||null});
   }
 }
+app.get("/api/snapshots/google/write",handleGoogleSnapshotWrite);
 app.post("/api/snapshots/google/write",handleGoogleSnapshotWrite);
+app.get("/api/refresh/google",handleGoogleSnapshotWrite);
 app.post("/api/refresh/google",handleGoogleSnapshotWrite);
 // ===== END GOOGLE SNAPSHOT WRITE v1 =====
 

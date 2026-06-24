@@ -14,6 +14,8 @@ const PINTEREST_API_BASE="https://api.pinterest.com/v5";
 const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
+const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||process.env.GOOGLE_TEST_CUSTOMER_ID||"5580593360";
+const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||process.env.GOOGLE_TEST_LOGIN_CUSTOMER_ID||"5383556660";
 const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
@@ -2343,48 +2345,33 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
 
 async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
   const requested=normalizeCustomerId(requestedCustomerId);
-  if(requested)return {customerId:requested,source:"request"};
+  const requestedLogin=normalizeCustomerId(
+    arguments.length>2?arguments[2]:""
+  );
+  if(requested)return {customerId:requested,loginCustomerId:requestedLogin,source:"request"};
+
+  // Google Snapshot must follow the same working account pair as Google Test:
+  // loginCustomerId = Manager/MCC, customerId = test Ad Account.
+  // Do not fall back to the first platform_ad_accounts row; it may select a non-test account.
+  const snapshotCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_CUSTOMER_ID);
+  const snapshotLoginCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
+  if(snapshotCustomerId){
+    return {customerId:snapshotCustomerId,loginCustomerId:snapshotLoginCustomerId,source:"google_snapshot_config"};
+  }
 
   const conn=await getConnection(user.id,"google").catch(()=>null);
   const fromConn=normalizeCustomerId(
-    conn?.account_id||
     conn?.metadata?.selectedCustomerId||
     conn?.metadata?.selected_customer_id||
     conn?.metadata?.customerId||
     conn?.metadata?.customer_id||
+    conn?.account_id||
     conn?.metadata?.lastOwnedPlatformAccountId||
     conn?.metadata?.platform_account_id
   );
   if(fromConn)return {customerId:fromConn,loginCustomerId:conn?.metadata?.loginCustomerId||conn?.metadata?.login_customer_id||"",source:"platform_connections"};
 
-  if(supabaseAdmin){
-    const {data,error}=await supabaseAdmin
-      .from("platform_ad_accounts")
-      .select("platform_account_id,metadata")
-      .eq("user_id",user.id)
-      .eq("platform","google")
-      .order("updated_at",{ascending:false})
-      .limit(1)
-      .maybeSingle();
-    if(error)throw error;
-    const fromAccount=normalizeCustomerId(data?.platform_account_id);
-    if(fromAccount)return {customerId:fromAccount,loginCustomerId:data?.metadata?.loginCustomerId||data?.metadata?.login_customer_id||"",source:"platform_ad_accounts"};
-
-    const ownership=await supabaseAdmin
-      .from("platform_account_ownerships")
-      .select("platform_account_id,metadata")
-      .eq("owner_user_id",user.id)
-      .eq("platform","google")
-      .in("status",activeOwnershipStatuses())
-      .order("updated_at",{ascending:false})
-      .limit(1)
-      .maybeSingle();
-    if(ownership.error)throw ownership.error;
-    const fromOwnership=normalizeCustomerId(ownership.data?.platform_account_id);
-    if(fromOwnership)return {customerId:fromOwnership,loginCustomerId:ownership.data?.metadata?.loginCustomerId||ownership.data?.metadata?.login_customer_id||"",source:"platform_account_ownerships"};
-  }
-
-  const err=new Error("Missing Google customerId and no saved Google account found");
+  const err=new Error("Missing Google customerId and no configured Google snapshot account found");
   err.status=400;
   err.stage="input";
   throw err;
@@ -2399,13 +2386,14 @@ async function handleGoogleSnapshotWrite(req,res){
     const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");
     if(!accessCheck)return;
     const requestedCustomerId=req.body?.customerId||req.body?.customer_id||req.query.customerId||req.query.customer_id;
-    const resolvedGoogleAccount=await resolveGoogleRefreshAccount(user,requestedCustomerId);
+    const requestedLoginCustomerId=req.body?.loginCustomerId||req.body?.login_customer_id||req.query.loginCustomerId||req.query.login_customer_id||"";
+    const resolvedGoogleAccount=await resolveGoogleRefreshAccount(user,requestedCustomerId,requestedLoginCustomerId);
     const platformAccountId=normalizeCustomerId(resolvedGoogleAccount.customerId);
-    const loginCustomerId=req.body?.loginCustomerId||req.body?.login_customer_id||req.query.loginCustomerId||req.query.login_customer_id||resolvedGoogleAccount.loginCustomerId||"";
+    const loginCustomerId=normalizeCustomerId(requestedLoginCustomerId||resolvedGoogleAccount.loginCustomerId||"");
     const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
     stage="job";
-    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source});
+    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId});
     await setRefreshJobStatus(job.id,"running");
     stage="google_api";
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});

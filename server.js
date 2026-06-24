@@ -1525,7 +1525,7 @@ async function handleMetaSnapshotWrite(req,res){
       istanbul_time:writeResult.snapshot?.istanbul_time||adminTimeSync.istanbul_time,
       platform_account_time:writeResult.snapshot?.platform_account_time||adminTimeSync.platform_account_time,
       platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
-      account_resolution_source:resolvedGoogleAccount.source,
+      account_resolution_source:resolved.source,
       platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
       account_currency:writeResult.snapshot?.account_currency||null,
       fx_rate:writeResult.snapshot?.fx_rate??null,

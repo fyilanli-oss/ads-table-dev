@@ -2027,6 +2027,312 @@ function googleMatchConversion(actions,kind){const list=Array.isArray(actions)?a
 function normalizeGoogleInsight(row,level){const m=row.metrics||{},c=row.campaign||{},ag=row.adGroup||row.ad_group||{},aga=row.adGroupAd||row.ad_group_ad||{},cust=row.customer||{},seg=row.segments||{};const spend=microsToMoney(m.costMicros??m.cost_micros),cpc=microsToMoney(m.averageCpc??m.average_cpc),genericRevenue=Number(m.conversionsValue??m.conversions_value??0),genericConversions=Number(m.conversions??0),invalidClicks=Number(m.invalidClicks??m.invalid_clicks??0),clicks=Number(m.clicks||0),validClicks=Math.max(clicks-invalidClicks,0),landingPageViews=row.__landing_page_views===undefined?null:row.__landing_page_views;const actions=row.__conversion_actions||[];const atc=googleMatchConversion(actions,"add_to_cart"),chk=googleMatchConversion(actions,"checkout"),pur=googleMatchConversion(actions,"purchase");const addToCart=atc?atc.count:null,checkout=chk?chk.count:null,purchase=pur?pur.count:null,purchaseValue=pur?pur.value:genericRevenue||null;const abandoned=checkout!==null&&purchase!==null?Math.max((checkout||0)-(purchase||0),0):null;const sales=purchaseValue;const roas=spend&&spend>0&&sales!==null?sales/spend:null;const acos=sales&&sales>0&&spend!==null?(spend/sales)*100:null;return{platform:"Google",level,date:seg.date||null,campaign_id:c.id||null,campaign_name:c.name||null,campaign_status:c.status||null,channel_type:c.advertisingChannelType||c.advertising_channel_type||null,bidding_strategy_type:nested(row,"biddingStrategy.type")||nested(row,"bidding_strategy.type")||null,adgroup_id:ag.id||null,adgroup_name:ag.name||null,adgroup_status:ag.status||null,ad_id:nested(aga,"ad.id")||null,ad_name:nested(aga,"ad.name")||null,ad_status:aga.status||null,currency:cust.currencyCode||cust.currency_code||null,impressions:Number(m.impressions||0),clicks,ad_clicks:clicks,link_clicks:clicks,landing_page_views:landingPageViews,traffic_score:clicks>0&&landingPageViews!==null?(landingPageViews/clicks)*100:null,real_cpc:landingPageViews>0&&spend!==null?spend/landingPageViews:null,lpv_merge_status:row.__landing_page_view_merge_status||null,invalid_clicks:invalidClicks,valid_clicks:validClicks,ctr:m.ctr!==undefined?Number(m.ctr)*100:null,cpc,spend,conversions:genericConversions,all_conversions:Number(m.allConversions??m.all_conversions??0),add_to_cart:addToCart,checkout,purchase,purchases:purchase,abandoned,purchase_value:purchaseValue,revenue:sales,sales,conversion_rate:m.conversionsFromInteractionsRate!==undefined?Number(m.conversionsFromInteractionsRate)*100:m.conversions_from_interactions_rate!==undefined?Number(m.conversions_from_interactions_rate)*100:null,cvr:clicks&&purchase!==null?(purchase/clicks)*100:null,roas,acos,conversion_actions:actions,raw:{...row,landing_page_view_rows:row.__landing_page_view_rows||[]}}}
 app.get("/api/google/customers",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const token=await getFreshGoogleAccessToken(user.id);const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,{method:"GET",headers:googleHeaders(token)});const data=await r.json();if(!r.ok)return res.status(r.status).json({error:JSON.stringify(data),status:r.status});const customers=(data.resourceNames||[]).map(resourceName=>({resourceName,customerId:String(resourceName).replace("customers/","")}));res.json({customers})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/google/insights",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const customerId=req.query.customerId||req.query.customer_id;if(!customerId)return res.status(400).json({error:"Missing customerId"});const level=["campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const loginCustomerId=req.query.loginCustomerId||req.query.login_customer_id||"";const query=googleQuery(level,dateRange);const data=await googleAdsSearch(user.id,customerId,query,loginCustomerId);let breakdownData={results:[]},breakdownError=null;try{breakdownData=await googleAdsSearch(user.id,customerId,googleConversionBreakdownQuery(level,dateRange),loginCustomerId)}catch(err){breakdownError=err.message}const performanceRows=data.results||[];let lpvData={results:[]},lpvError=null;try{lpvData=await googleAdsSearch(user.id,customerId,googleLandingPageViewQuery(level,dateRange),loginCustomerId)}catch(err){lpvError=err.message}const withConversions=mergeGoogleConversionActions(performanceRows,breakdownData.results||[],level);const mergedRows=mergeGoogleLandingPageViews(withConversions,lpvData.results||[],level);res.json({platform:"Google",level,customerId:normalizeCustomerId(customerId),loginCustomerId:loginCustomerId?normalizeCustomerId(loginCustomerId):null,date_range:dateRange,rows:mergedRows.map(r=>normalizeGoogleInsight(r,level)),rawCount:mergedRows.length,conversionBreakdownCount:breakdownData.results?breakdownData.results.length:0,conversionBreakdownError:breakdownError,landingPageViewCount:lpvData.results?lpvData.results.length:0,landingPageViewError:lpvError,fieldMask:data.fieldMask||null,conversionFieldMask:breakdownData.fieldMask||null,landingPageViewFieldMask:lpvData.fieldMask||null,requestId:data.requestId||null,nextPageToken:data.nextPageToken||null})}catch(e){res.status(e.status||500).json({error:e.message})}});
+
+// ===== GOOGLE SNAPSHOT WRITE v1 (Snapshot Layer only) =====
+function googleDateRangeWindow(range,snapshotDate){
+  const end=snapshotDate?new Date(`${snapshotDate}T00:00:00Z`):new Date();
+  const start=new Date(end);
+  if(range==="today"){}
+  else if(range==="yesterday"){start.setDate(start.getDate()-1);end.setDate(end.getDate()-1)}
+  else if(range==="last_30d")start.setDate(start.getDate()-29);
+  else start.setDate(start.getDate()-6);
+  const fmt=d=>d.toISOString().slice(0,10);
+  return {start:fmt(start),end:fmt(end)};
+}
+function googleSafeNumber(value){const n=Number(value);return Number.isFinite(n)?n:0}
+function googleNullableNumber(value){if(value===null||value===undefined||value==="")return null;const n=Number(value);return Number.isFinite(n)?n:null}
+function googleSum(rows,field){return (rows||[]).reduce((t,r)=>t+googleSafeNumber(r?.[field]),0)}
+function googleWeightedAverage(rows,valueField,weightField){let weighted=0,weight=0;for(const row of rows||[]){const value=googleNullableNumber(row?.[valueField]);const w=googleSafeNumber(row?.[weightField]);if(value!==null&&w>0){weighted+=value*w;weight+=w}}return weight>0?weighted/weight:null}
+function googleSnapshotNullReasons(row){return {
+  sales: googleSafeNumber(row.sales)>0?null:"Google purchase/revenue mapping is present but no validated value returned for this row.",
+  revenue: googleSafeNumber(row.revenue)>0?null:"Google revenue field returned no positive value for this row.",
+  roas: row.roas!==null&&row.roas!==undefined?null:"ROAS is null until revenue is validated and spend is greater than zero.",
+  landing_page_views: row.landing_page_views!==null&&row.landing_page_views!==undefined?null:"Landing page view is unavailable unless the Google LPV query can be merged safely.",
+  purchase_journey: "Purchase journey fields are kept in schema but remain zero/null when conversion-action mapping does not validate matching actions."
+}}
+function normalizeGoogleSnapshotRow(row){return {
+  platform:"Google",
+  level:row.level||null,
+  campaign_id:row.campaign_id||null,
+  campaign_name:row.campaign_name||null,
+  campaign_status:row.campaign_status||null,
+  channel_type:row.channel_type||null,
+  bidding_strategy_type:row.bidding_strategy_type||null,
+  adgroup_id:row.adgroup_id||null,
+  adgroup_name:row.adgroup_name||null,
+  adgroup_status:row.adgroup_status||null,
+  ad_id:row.ad_id||null,
+  ad_name:row.ad_name||null,
+  ad_status:row.ad_status||null,
+  currency:row.currency||null,
+  spend:googleSafeNumber(row.spend),
+  sales:googleSafeNumber(row.sales),
+  revenue:googleSafeNumber(row.revenue),
+  impressions:googleSafeNumber(row.impressions),
+  clicks:googleSafeNumber(row.clicks),
+  ctr:googleNullableNumber(row.ctr),
+  cpc:googleNullableNumber(row.cpc),
+  roas:googleNullableNumber(row.roas),
+  conversions:googleSafeNumber(row.conversions),
+  all_conversions:googleSafeNumber(row.all_conversions),
+  conversion_rate:googleNullableNumber(row.conversion_rate),
+  cvr:googleNullableNumber(row.cvr),
+  acos:googleNullableNumber(row.acos),
+  ad_clicks:googleSafeNumber(row.ad_clicks??row.clicks),
+  link_clicks:googleSafeNumber(row.link_clicks??row.clicks),
+  landing_page_views:row.landing_page_views===null||row.landing_page_views===undefined?0:googleSafeNumber(row.landing_page_views),
+  traffic_score:googleNullableNumber(row.traffic_score),
+  real_cpc:googleNullableNumber(row.real_cpc),
+  invalid_clicks:googleSafeNumber(row.invalid_clicks),
+  valid_clicks:googleSafeNumber(row.valid_clicks),
+  add_to_cart:row.add_to_cart===null||row.add_to_cart===undefined?0:googleSafeNumber(row.add_to_cart),
+  checkout:row.checkout===null||row.checkout===undefined?0:googleSafeNumber(row.checkout),
+  purchase:row.purchase===null||row.purchase===undefined?0:googleSafeNumber(row.purchase),
+  purchases:row.purchases===null||row.purchases===undefined?0:googleSafeNumber(row.purchases),
+  purchase_value:row.purchase_value===null||row.purchase_value===undefined?0:googleSafeNumber(row.purchase_value),
+  abandoned:row.abandoned===null||row.abandoned===undefined?0:googleSafeNumber(row.abandoned),
+  source_confidence:{
+    spend:"exact_google_ads_api",
+    impressions:"exact_google_ads_api",
+    clicks:"exact_google_ads_api",
+    ctr:"google_ads_api_or_weighted",
+    cpc:"google_ads_api_or_weighted",
+    sales:googleSafeNumber(row.sales)>0?"google_conversions_value":"unavailable",
+    revenue:googleSafeNumber(row.revenue)>0?"google_conversions_value":"unavailable",
+    roas:row.roas!==null&&row.roas!==undefined?"calculated_from_revenue_and_spend":"unavailable",
+    landing_page_views:row.landing_page_views!==null&&row.landing_page_views!==undefined?"google_lpv_merge":"unavailable"
+  },
+  null_reasons:googleSnapshotNullReasons(row),
+  raw:row.raw||{}
+}}
+async function googleFetchInsightsForLevel({user,customerId,loginCustomerId,dateRange,level}){
+  const data=await googleAdsSearch(user.id,customerId,googleQuery(level,dateRange),loginCustomerId);
+  let breakdownData={results:[]},breakdownError=null;
+  try{breakdownData=await googleAdsSearch(user.id,customerId,googleConversionBreakdownQuery(level,dateRange),loginCustomerId)}catch(err){breakdownError=err.message}
+  let lpvData={results:[]},lpvError=null;
+  try{lpvData=await googleAdsSearch(user.id,customerId,googleLandingPageViewQuery(level,dateRange),loginCustomerId)}catch(err){lpvError=err.message}
+  const withConversions=mergeGoogleConversionActions(data.results||[],breakdownData.results||[],level);
+  const mergedRows=mergeGoogleLandingPageViews(withConversions,lpvData.results||[],level);
+  return {
+    level,
+    rows:mergedRows.map(r=>normalizeGoogleSnapshotRow(normalizeGoogleInsight(r,level))),
+    rawCount:mergedRows.length,
+    conversionBreakdownCount:(breakdownData.results||[]).length,
+    conversionBreakdownError:breakdownError,
+    landingPageViewCount:(lpvData.results||[]).length,
+    landingPageViewError:lpvError,
+    requestId:data.requestId||null
+  };
+}
+function buildGoogleSnapshotPayload({snapshotDate,accountCurrency,campaignRows,adgroupRows,adRows}){
+  const rows=[...(campaignRows||[]),...(adgroupRows||[]),...(adRows||[])];
+  const aggregateRows=(campaignRows&&campaignRows.length)?campaignRows:rows;
+  const spend=googleSum(aggregateRows,"spend");
+  const revenue=googleSum(aggregateRows,"revenue");
+  const sales=googleSum(aggregateRows,"sales");
+  const impressions=googleSum(aggregateRows,"impressions");
+  const clicks=googleSum(aggregateRows,"clicks");
+  const ctr=clicks>0&&impressions>0?(clicks/impressions)*100:googleWeightedAverage(aggregateRows,"ctr","impressions");
+  const cpc=clicks>0?spend/clicks:googleWeightedAverage(aggregateRows,"cpc","clicks");
+  const roas=spend>0&&revenue>0?revenue/spend:null;
+  const addToCart=googleSum(aggregateRows,"add_to_cart");
+  const checkout=googleSum(aggregateRows,"checkout");
+  const purchase=googleSum(aggregateRows,"purchase");
+  const purchaseValue=googleSum(aggregateRows,"purchase_value");
+  const abandoned=Math.max(checkout-purchase,0);
+  const linkClicks=googleSum(aggregateRows,"link_clicks")||clicks;
+  const landingPageViews=googleSum(aggregateRows,"landing_page_views");
+  return {
+    snapshot_date:snapshotDate,
+    account_currency:accountCurrency||null,
+    kpis:{
+      spend,
+      sales,
+      revenue,
+      impressions,
+      clicks,
+      ctr,
+      cpc,
+      roas,
+      source_confidence:{
+        spend:"exact_google_ads_api",
+        impressions:"exact_google_ads_api",
+        clicks:"exact_google_ads_api",
+        ctr:"google_ads_api_or_calculated",
+        cpc:"google_ads_api_or_calculated",
+        sales:sales>0?"google_conversions_value":"unavailable",
+        revenue:revenue>0?"google_conversions_value":"unavailable",
+        roas:roas!==null?"calculated_from_revenue_and_spend":"unavailable"
+      },
+      null_reasons:{
+        sales:sales>0?null:"Google purchase/revenue mapping returned no positive validated value.",
+        revenue:revenue>0?null:"Google revenue field returned no positive validated value.",
+        roas:roas!==null?null:"ROAS is null until revenue is validated and spend is greater than zero."
+      }
+    },
+    purchase_journey:{
+      arrived:landingPageViews||0,
+      add_to_cart:addToCart||0,
+      checkout:checkout||0,
+      purchase:purchase||0,
+      purchase_count:purchase||0,
+      purchase_value:purchaseValue||0,
+      abandoned,
+      source_confidence:addToCart||checkout||purchase?"google_conversion_action_mapping":"unavailable",
+      null_reasons:{
+        add_to_cart:addToCart?null:"Add-to-cart conversion action not validated or no value returned.",
+        checkout:checkout?null:"Checkout conversion action not validated or no value returned.",
+        purchase:purchase?null:"Purchase conversion action not validated or no value returned.",
+        purchase_value:purchaseValue?null:"Purchase value not validated or no value returned."
+      }
+    },
+    click_journey:{
+      ad_clicks:clicks,
+      link_clicks:linkClicks,
+      landing_page_views:landingPageViews||0,
+      traffic_score:linkClicks>0&&landingPageViews>0?(landingPageViews/linkClicks)*100:null,
+      real_cpc:landingPageViews>0?spend/landingPageViews:null,
+      source_confidence:{
+        ad_clicks:"exact_google_ads_api",
+        link_clicks:"fallback_to_clicks",
+        landing_page_views:landingPageViews>0?"google_lpv_merge":"unavailable"
+      },
+      null_reasons:{
+        landing_page_views:landingPageViews>0?null:"Landing page view unavailable or could not be safely merged."
+      }
+    },
+    performance_summary:{
+      rows,
+      counts:{campaign:(campaignRows||[]).length,adgroup:(adgroupRows||[]).length,ad:(adRows||[]).length},
+      source_confidence:"snapshot_layer_google_v1",
+      null_policy:"Fields are present even when values are zero/null; null_reasons explain missing data."
+    }
+  };
+}
+async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",dateRange="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
+  const platformAccountId=normalizeCustomerId(customerId);
+  if(!platformAccountId)throw new Error("Missing Google customerId");
+  const platformTimeZone=await getPlatformAccountTimezone(user.id,"google",platformAccountId,null,null);
+  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
+  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
+  const period=googleDateRangeWindow(dateRange,effectiveSnapshotDate);
+  const [campaignResult,adgroupResult,adResult]=await Promise.all([
+    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange,level:"campaign"}),
+    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange,level:"adgroup"}),
+    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange,level:"ad"})
+  ]);
+  const allRows=[...campaignResult.rows,...adgroupResult.rows,...adResult.rows];
+  const platformBaseCurrency=(allRows.find(r=>r.currency)?.currency)||null;
+  const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
+  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
+  const rawSnapshot=buildGoogleSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,campaignRows:campaignResult.rows,adgroupRows:adgroupResult.rows,adRows:adResult.rows});
+  const snapshot=applyFxToSnapshotPayload(rawSnapshot,fx);
+  const existingVersionResult=await supabaseAdmin
+    .from("dashboard_snapshots")
+    .select("snapshot_version")
+    .eq("user_id",user.id)
+    .eq("platform","google")
+    .eq("platform_account_id",platformAccountId)
+    .eq("snapshot_date",snapshot.snapshot_date)
+    .order("snapshot_version",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(existingVersionResult.error)throw existingVersionResult.error;
+  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
+  const now=new Date().toISOString();
+  const row={
+    user_id:user.id,
+    platform:"google",
+    platform_account_id:platformAccountId,
+    platform_base_currency:platformBaseCurrency,
+    snapshot_version:snapshotVersion,
+    source_job_id:sourceJobId,
+    date_preset:dateRange,
+    snapshot_period_start:period.start,
+    snapshot_period_end:period.end,
+    snapshot_scope:dateRange,
+    capture_reason:captureReason,
+    snapshot_class,
+    platform_account_timezone:platformTimeZone,
+    platform_business_date:timeSync.platform_business_date,
+    platform_business_hour:timeSync.platform_business_hour,
+    data_maturity_window_hours:dataMaturityWindowHours("google"),
+    server_time_utc:timeSync.server_time_utc,
+    istanbul_time:timeSync.istanbul_time,
+    platform_account_time:timeSync.platform_account_time,
+    time_engine_version:TIME_ENGINE_VERSION,
+    fx_rate:fx.fx_rate,
+    fx_provider:fx.fx_provider,
+    fx_rate_timestamp:fx.fx_rate_timestamp,
+    fx_source_currency:fx.fx_source_currency,
+    fx_target_currency:fx.fx_target_currency,
+    fx_engine_version:fx.fx_engine_version,
+    snapshot_date:snapshot.snapshot_date,
+    snapshot_created_at:now,
+    account_currency:snapshot.account_currency,
+    kpis:snapshot.kpis,
+    purchase_journey:snapshot.purchase_journey,
+    click_journey:snapshot.click_journey,
+    performance_summary:snapshot.performance_summary
+  };
+  const {data,error}=await supabaseAdmin
+    .from("dashboard_snapshots")
+    .insert(row)
+    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .maybeSingle();
+  if(error)throw error;
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
+}
+async function handleGoogleSnapshotWrite(req,res){
+  let job=null;
+  let stage="auth";
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");
+    if(!accessCheck)return;
+    const customerId=req.body?.customerId||req.body?.customer_id||req.query.customerId||req.query.customer_id;
+    if(!customerId)return res.status(400).json({ok:false,error:"Missing Google customerId",stage:"input"});
+    const platformAccountId=normalizeCustomerId(customerId);
+    const loginCustomerId=req.body?.loginCustomerId||req.body?.login_customer_id||req.query.loginCustomerId||req.query.login_customer_id||"";
+    const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
+    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
+    stage="job";
+    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION});
+    await setRefreshJobStatus(job.id,"running");
+    stage="google_api";
+    const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
+    stage="snapshot";
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
+    res.json({
+      ok:true,
+      platform:"Google",
+      refresh_job:{id:job.id,status:"completed"},
+      mode:writeResult.mode,
+      snapshot_id:writeResult.snapshot?.id||null,
+      snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,
+      snapshot_version:writeResult.snapshot?.snapshot_version||null,
+      snapshot_class:writeResult.snapshot?.snapshot_class||null,
+      platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
+      platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
+      account_currency:writeResult.snapshot?.account_currency||null,
+      row_counts:writeResult.row_counts,
+      kpis:writeResult.snapshot?.kpis||{},
+      purchase_journey:writeResult.snapshot?.purchase_journey||{},
+      click_journey:writeResult.snapshot?.click_journey||{},
+      performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{},
+      spread_result:null,
+      jas_spread:"not_called_by_google_snapshot_write_v1"
+    });
+  }catch(e){
+    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    res.status(e.status||500).json({ok:false,error:e.message,stage,refresh_job_id:job?.id||null});
+  }
+}
+app.post("/api/snapshots/google/write",handleGoogleSnapshotWrite);
+app.post("/api/refresh/google",handleGoogleSnapshotWrite);
+// ===== END GOOGLE SNAPSHOT WRITE v1 =====
+
 async function pinterestFetch(conn,endpoint,options={}){const r=await fetch(`${PINTEREST_API_BASE}${endpoint}`,{...options,headers:{Authorization:`Bearer ${conn.access_token}`,"Content-Type":"application/json",...(options.headers||{})}});const text=await r.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}if(!r.ok)throw new Error(data.message||text||`Pinterest API error ${r.status}`);return data}
 
 function dateRangeToPinterestDates(range){

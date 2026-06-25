@@ -1074,6 +1074,103 @@ async function spreadSnapshotToJasTables(snapshot){
   return {ok:true,spread_engine_version:DB_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,jas_kpis:1,jas_purchase_journey:purchaseRows.length,jas_click_journey:clickRows.length};
 }
 
+
+// ===== PERFORMANCE SPREAD ENGINE v1 =====
+const PERFORMANCE_SPREAD_ENGINE_VERSION="v1";
+function perfHasValue(value){return value!==null&&value!==undefined&&value!==""}
+function perfNullableNumber(value){if(!perfHasValue(value))return null;const n=Number(value);return Number.isFinite(n)?n:null}
+function perfText(value){const s=String(value??"").trim();return s?s:null}
+function perfDate(value){return value?String(value).slice(0,10):null}
+function perfNormalizeLevel(level){const l=String(level||"").toLowerCase();if(l==="adset")return "adgroup";if(["campaign","adgroup","ad"].includes(l))return l;return null}
+function perfCtrRatio(value){const n=perfNullableNumber(value);if(n===null)return null;return Math.abs(n)>1?n/100:n}
+function perfEntityId(row,level){
+  if(level==="campaign")return perfText(row.id_in_platform||row.campaign_id||row.id);
+  if(level==="adgroup")return perfText(row.id_in_platform||row.adgroup_id||row.adset_id||row.id);
+  if(level==="ad")return perfText(row.id_in_platform||row.ad_id||row.id);
+  return perfText(row.id_in_platform||row.id||row.campaign_id||row.adgroup_id||row.adset_id||row.ad_id);
+}
+function perfParentId(row,level){
+  if(level==="campaign")return null;
+  if(level==="adgroup")return perfText(row.parent_id||row.campaign_id);
+  if(level==="ad")return perfText(row.parent_id||row.adgroup_id||row.adset_id||row.campaign_id);
+  return perfText(row.parent_id);
+}
+function perfEntityName(row,level){
+  if(level==="campaign")return perfText(row.name||row.campaign_name);
+  if(level==="adgroup")return perfText(row.name||row.adgroup_name||row.adset_name);
+  if(level==="ad")return perfText(row.name||row.ad_name);
+  return perfText(row.name);
+}
+function perfEntityStatus(row,level){
+  if(level==="campaign")return perfText(row.status||row.campaign_status);
+  if(level==="adgroup")return perfText(row.status||row.adgroup_status||row.adset_status);
+  if(level==="ad")return perfText(row.status||row.ad_status);
+  return perfText(row.status);
+}
+function performanceDatasetRowFromSnapshotRow(snapshot,row){
+  const level=perfNormalizeLevel(row?.level);
+  if(!level)return null;
+  const idInPlatform=perfEntityId(row,level);
+  if(!idInPlatform)return null;
+  const revenue=perfNullableNumber(row.revenue);
+  const sales=perfNullableNumber(row.sales);
+  const conversionValue=perfNullableNumber(row.conversion_value??row.purchase_value);
+  return {
+    snapshot_id:snapshot.id,
+    user_id:snapshot.user_id,
+    platform:normalizeJasPlatform(snapshot.platform||row.platform),
+    platform_account_id:perfText(snapshot.platform_account_id),
+    level,
+    id_in_platform:idInPlatform,
+    parent_id:perfParentId(row,level),
+    name:perfEntityName(row,level),
+    status:perfEntityStatus(row,level),
+    currency:perfText(row.currency||snapshot.account_currency),
+    date_start:perfDate(snapshot.snapshot_period_start),
+    date_end:perfDate(snapshot.snapshot_period_end),
+    date_range:perfText(snapshot.date_preset),
+    snapshot_date:perfDate(snapshot.snapshot_date),
+    spend:perfNullableNumber(row.spend),
+    impressions:perfNullableNumber(row.impressions),
+    reach:perfNullableNumber(row.reach),
+    clicks:perfNullableNumber(row.clicks),
+    ctr:perfCtrRatio(row.ctr),
+    cpc:perfNullableNumber(row.cpc),
+    sales,
+    revenue,
+    roas:perfNullableNumber(row.roas),
+    conversions:perfNullableNumber(row.conversions??row.purchase??row.purchases),
+    conversion_value:conversionValue!==null?conversionValue:revenue,
+    raw:{
+      ...((row&&typeof row.raw==="object")?row.raw:{}),
+      performance_dataset_source_row:row,
+      performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,
+      ctr_storage_standard:"ratio",
+      zero_null_policy:"0 is measured zero; null is unknown/unavailable/not computable"
+    }
+  };
+}
+async function spreadSnapshotToPerformanceDataset(snapshot){
+  if(!snapshot?.id)throw new Error("snapshot.id is required for Performance Spread");
+  const rows=Array.isArray(snapshot.performance_summary?.rows)?snapshot.performance_summary.rows:[];
+  const {error:deleteError}=await supabaseAdmin
+    .from("performance_dataset_rows")
+    .delete()
+    .eq("snapshot_id",snapshot.id);
+  if(deleteError)throw deleteError;
+  const datasetRows=rows.map(row=>performanceDatasetRowFromSnapshotRow(snapshot,row)).filter(Boolean);
+  if(!datasetRows.length){
+    return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:0,source_rows:rows.length};
+  }
+  const {data,error}=await supabaseAdmin
+    .from("performance_dataset_rows")
+    .insert(datasetRows)
+    .select("id");
+  if(error)throw error;
+  return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:(data||[]).length,source_rows:rows.length};
+}
+// ===== END PERFORMANCE SPREAD ENGINE v1 =====
+
 async function readSnapshotForSpread({userId,snapshotId,platform="meta",platformAccountId=null}){
   let query=supabaseAdmin.from("dashboard_snapshots").select("*").eq("user_id",userId).order("snapshot_created_at",{ascending:false}).limit(1);
   if(snapshotId)query=query.eq("id",snapshotId);
@@ -1477,7 +1574,14 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     spread_result={ok:false,error:spreadError.message};
   }
 
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,spread_result};
+  let performance_spread_result=null;
+  try{
+    performance_spread_result=await spreadSnapshotToPerformanceDataset(data);
+  }catch(performanceSpreadError){
+    performance_spread_result={ok:false,error:performanceSpreadError.message};
+  }
+
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,spread_result,performance_spread_result};
 }
 
 async function handleMetaSnapshotWrite(req,res){
@@ -2340,7 +2444,13 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
     .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
+  let performance_spread_result=null;
+  try{
+    performance_spread_result=await spreadSnapshotToPerformanceDataset(data);
+  }catch(performanceSpreadError){
+    performance_spread_result={ok:false,error:performanceSpreadError.message};
+  }
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
 }
 
 async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){

@@ -1330,6 +1330,35 @@ function e2aBuildMetaSnapshot({snapshotDate,accountCurrency,campaignRows,adsetRo
   };
 }
 
+function e2aZeroMetaEntityRow(entity,level,accountCurrency=null){
+  const row={
+    platform:"Meta",
+    level,
+    campaign_id:entity.campaign_id||entity.id||null,
+    campaign_name:entity.campaign_name||(level==="campaign"?entity.name:null)||null,
+    campaign_status:level==="campaign"?(entity.effective_status||entity.status||null):null,
+    adset_id:entity.adset_id||(level==="adset"?entity.id:null)||null,
+    adset_name:entity.adset_name||(level==="adset"?entity.name:null)||null,
+    adset_status:level==="adset"?(entity.effective_status||entity.status||null):null,
+    ad_id:level==="ad"?entity.id:null,
+    ad_name:level==="ad"?entity.name:null,
+    ad_status:level==="ad"?(entity.effective_status||entity.status||null):null,
+    currency:accountCurrency||null,
+    impressions:0, reach:null, clicks:0, ctr:null, cpc:null, spend:0,
+    link_clicks:0, landing_page_views:0, add_to_cart:0, checkout:0, purchase:0, purchases:0,
+    abandoned:0, sales:null, revenue:null, roas:null,
+    raw:{entity,entity_fallback:true,reason:"No insights row returned for selected date range; entity row preserved with zero/unknown metrics."}
+  };
+  if(level==="ad"&&entity.adset_id&&!row.adset_name)row.adset_name=null;
+  return row;
+}
+async function e2aFetchMetaEntityRowsForLevel(conn,adAccountId,level,limit,accountCurrency=null){
+  let endpoint="campaigns", fields="id,name,status,effective_status";
+  if(level==="adset"){endpoint="adsets";fields="id,name,status,effective_status,campaign_id"}
+  if(level==="ad"){endpoint="ads";fields="id,name,status,effective_status,adset_id,campaign_id"}
+  const data=await metaGraph(`/${adAccountId}/${endpoint}`,{fields,limit},conn.access_token);
+  return (data.data||[]).map(entity=>e2aZeroMetaEntityRow(entity,level,accountCurrency));
+}
 async function e2aFetchMetaInsightsForLevel(conn,adAccountId,level,datePreset,limit){
   const fields=["campaign_id","campaign_name","account_currency","impressions","reach","clicks","ctr","cpc","spend","actions","action_values","cost_per_action_type","conversion_rate_ranking"];
   if(level==="adset")fields.splice(2,0,"adset_id","adset_name");
@@ -1342,7 +1371,10 @@ async function e2aFetchMetaInsightsForLevel(conn,adAccountId,level,datePreset,li
     limit
   },conn.access_token);
 
-  return (data.data||[]).map(row=>normalizeMetaInsight(row,level));
+  const insightRows=(data.data||[]).map(row=>normalizeMetaInsight(row,level));
+  if(insightRows.length)return insightRows;
+  const accountCurrency=(data.data||[]).find(r=>r.account_currency)?.account_currency||null;
+  return e2aFetchMetaEntityRowsForLevel(conn,adAccountId,level,limit,accountCurrency);
 }
 
 async function resolveMetaRefreshAccount(user,conn,requestedAccountId){
@@ -2268,6 +2300,21 @@ function normalizeGoogleSnapshotRow(row){return {
   null_reasons:googleSnapshotNullReasons(row),
   raw:row.raw||{}
 }}
+function googleEntityQuery(level){
+  if(level==="adgroup")return `SELECT customer.currency_code, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group.status FROM ad_group ORDER BY ad_group.id LIMIT 100`;
+  if(level==="ad")return `SELECT customer.currency_code, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status FROM ad_group_ad ORDER BY ad_group_ad.ad.id LIMIT 100`;
+  return `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type FROM campaign ORDER BY campaign.id LIMIT 100`;
+}
+function googleZeroEntitySnapshotRow(row,level){
+  const normalized=normalizeGoogleInsight({...row,metrics:{},__entity_fallback:true},level);
+  const out=normalizeGoogleSnapshotRow(normalized);
+  out.raw={...(out.raw||{}),entity_fallback:true,reason:"No metrics row returned for selected date range; entity row preserved with zero/unknown metrics."};
+  return out;
+}
+async function googleFetchEntityRowsForLevel({user,customerId,loginCustomerId,level}){
+  const data=await googleAdsSearch(user.id,customerId,googleEntityQuery(level),loginCustomerId);
+  return {rows:(data.results||[]).map(r=>googleZeroEntitySnapshotRow(r,level)),requestId:data.requestId||null,rawCount:(data.results||[]).length};
+}
 async function googleFetchInsightsForLevel({user,customerId,loginCustomerId,dateRange,level}){
   const data=await googleAdsSearch(user.id,customerId,googleQuery(level,dateRange),loginCustomerId);
   let breakdownData={results:[]},breakdownError=null;
@@ -2276,10 +2323,22 @@ async function googleFetchInsightsForLevel({user,customerId,loginCustomerId,date
   try{lpvData=await googleAdsSearch(user.id,customerId,googleLandingPageViewQuery(level,dateRange),loginCustomerId)}catch(err){lpvError=err.message}
   const withConversions=mergeGoogleConversionActions(data.results||[],breakdownData.results||[],level);
   const mergedRows=mergeGoogleLandingPageViews(withConversions,lpvData.results||[],level);
+  let rows=mergedRows.map(r=>normalizeGoogleSnapshotRow(normalizeGoogleInsight(r,level)));
+  let entityFallback=false, entityRequestId=null, entityRawCount=0;
+  if(!rows.length){
+    const entityResult=await googleFetchEntityRowsForLevel({user,customerId,loginCustomerId,level});
+    rows=entityResult.rows;
+    entityFallback=rows.length>0;
+    entityRequestId=entityResult.requestId;
+    entityRawCount=entityResult.rawCount;
+  }
   return {
     level,
-    rows:mergedRows.map(r=>normalizeGoogleSnapshotRow(normalizeGoogleInsight(r,level))),
+    rows,
     rawCount:mergedRows.length,
+    entityFallback,
+    entityRawCount,
+    entityRequestId,
     conversionBreakdownCount:(breakdownData.results||[]).length,
     conversionBreakdownError:breakdownError,
     landingPageViewCount:(lpvData.results||[]).length,

@@ -2301,9 +2301,9 @@ function normalizeGoogleSnapshotRow(row){return {
   raw:row.raw||{}
 }}
 function googleEntityQuery(level){
-  if(level==="adgroup")return `SELECT customer.currency_code, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group.status FROM ad_group ORDER BY ad_group.id LIMIT 100`;
-  if(level==="ad")return `SELECT customer.currency_code, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status FROM ad_group_ad ORDER BY ad_group_ad.ad.id LIMIT 100`;
-  return `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type FROM campaign ORDER BY campaign.id LIMIT 100`;
+  if(level==="adgroup")return `SELECT customer.currency_code, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group.status FROM ad_group WHERE ad_group.status != REMOVED ORDER BY ad_group.id LIMIT 100`;
+  if(level==="ad")return `SELECT customer.currency_code, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status FROM ad_group_ad WHERE ad_group_ad.status != REMOVED ORDER BY ad_group_ad.ad.id LIMIT 100`;
+  return `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type FROM campaign WHERE campaign.status != REMOVED ORDER BY campaign.id LIMIT 100`;
 }
 function googleZeroEntitySnapshotRow(row,level){
   const normalized=normalizeGoogleInsight({...row,metrics:{},__entity_fallback:true},level);
@@ -2312,8 +2312,13 @@ function googleZeroEntitySnapshotRow(row,level){
   return out;
 }
 async function googleFetchEntityRowsForLevel({user,customerId,loginCustomerId,level}){
-  const data=await googleAdsSearch(user.id,customerId,googleEntityQuery(level),loginCustomerId);
-  return {rows:(data.results||[]).map(r=>googleZeroEntitySnapshotRow(r,level)),requestId:data.requestId||null,rawCount:(data.results||[]).length};
+  try{
+    const data=await googleAdsSearch(user.id,customerId,googleEntityQuery(level),loginCustomerId);
+    const results=data.results||[];
+    return {rows:results.map(r=>googleZeroEntitySnapshotRow(r,level)),requestId:data.requestId||null,rawCount:results.length,error:null};
+  }catch(err){
+    return {rows:[],requestId:null,rawCount:0,error:err.message};
+  }
 }
 async function googleFetchInsightsForLevel({user,customerId,loginCustomerId,dateRange,level}){
   const data=await googleAdsSearch(user.id,customerId,googleQuery(level,dateRange),loginCustomerId);
@@ -2324,9 +2329,9 @@ async function googleFetchInsightsForLevel({user,customerId,loginCustomerId,date
   const withConversions=mergeGoogleConversionActions(data.results||[],breakdownData.results||[],level);
   const mergedRows=mergeGoogleLandingPageViews(withConversions,lpvData.results||[],level);
   let rows=mergedRows.map(r=>normalizeGoogleSnapshotRow(normalizeGoogleInsight(r,level)));
-  let entityFallback=false, entityRequestId=null, entityRawCount=0;
+  let entityFallback=false, entityRequestId=null, entityRawCount=0, entityResult=null;
   if(!rows.length){
-    const entityResult=await googleFetchEntityRowsForLevel({user,customerId,loginCustomerId,level});
+    entityResult=await googleFetchEntityRowsForLevel({user,customerId,loginCustomerId,level});
     rows=entityResult.rows;
     entityFallback=rows.length>0;
     entityRequestId=entityResult.requestId;
@@ -2339,6 +2344,7 @@ async function googleFetchInsightsForLevel({user,customerId,loginCustomerId,date
     entityFallback,
     entityRawCount,
     entityRequestId,
+    entityFallbackError:entityResult?.error||null,
     conversionBreakdownCount:(breakdownData.results||[]).length,
     conversionBreakdownError:breakdownError,
     landingPageViewCount:(lpvData.results||[]).length,
@@ -2567,7 +2573,7 @@ async function handleGoogleSnapshotWrite(req,res){
     stage="google_api";
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
     res.json({
       ok:true,
       platform:"Google",

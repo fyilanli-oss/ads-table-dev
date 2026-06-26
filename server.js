@@ -2546,14 +2546,14 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
     performance_spread_result={ok:false,error:performanceSpreadError.message};
   }
 
-  let jas_spread_result=null;
+  let spread_result=null;
   try{
-    jas_spread_result=await spreadSnapshotToJasTables(data);
-  }catch(jasSpreadError){
-    jas_spread_result={ok:false,error:jasSpreadError.message};
+    spread_result=await spreadSnapshotToJasTables(data);
+  }catch(spreadError){
+    spread_result={ok:false,error:spreadError.message};
   }
 
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,jas_spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
 }
 
 async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
@@ -2757,7 +2757,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
       snapshotClass:policy.snapshotClass
     });
 
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null,jas_spread_result:writeResult.jas_spread_result||null}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null,jas_spread_result:writeResult.spread_result||null}});
 
     await supabaseAdmin
       .from("snapshot_schedules")
@@ -2768,7 +2768,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
       })
       .eq("id",schedule.id);
 
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null,jas_spread_result:writeResult.jas_spread_result||null};
+    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null,jas_spread_result:writeResult.spread_result||null};
   }catch(e){
     await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
     throw e;
@@ -2798,7 +2798,7 @@ async function handleGoogleSnapshotWrite(req,res){
     stage="google_api";
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,jas_spread_result:writeResult.jas_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null,jas_spread_result:writeResult.spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
     res.json({
       ok:true,
       platform:"Google",
@@ -2816,8 +2816,9 @@ async function handleGoogleSnapshotWrite(req,res){
       purchase_journey:writeResult.snapshot?.purchase_journey||{},
       click_journey:writeResult.snapshot?.click_journey||{},
       performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{},
-      performance_spread_result:writeResult.performance_spread_result||null,
-      jas_spread_result:writeResult.jas_spread_result||null
+      spread_result:writeResult.spread_result||null,
+      jas_spread_result:writeResult.spread_result||null,
+      jas_spread:writeResult.spread_result?.ok?"called":"called_with_error"
     });
   }catch(e){
     if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);

@@ -1718,13 +1718,6 @@ async function handleGlobalRefresh(req,res){
   }catch(e){
     results.google={ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||"google_refresh"}};
   }
-  if(typeof handleTikTokSnapshotWrite==="function"){
-    try{
-      results.tiktok=await invokeRefreshHandler(handleTikTokSnapshotWrite,req);
-    }catch(e){
-      results.tiktok={ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||"tiktok_refresh"}};
-    }
-  }
 
   const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
   const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
@@ -1740,8 +1733,7 @@ async function handleGlobalRefresh(req,res){
     snapshot_date:metaPayload.snapshot_date||null,
     platforms:{
       meta:results.meta?.data||null,
-      google:results.google?.data||null,
-      tiktok:results.tiktok?.data||null
+      google:results.google?.data||null
     }
   });
 }
@@ -2182,7 +2174,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,tiktokStatus:tiktok.connected?"connected":"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -2553,15 +2545,7 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   }catch(performanceSpreadError){
     performance_spread_result={ok:false,error:performanceSpreadError.message};
   }
-
-  let spread_result=null;
-  try{
-    spread_result=await spreadSnapshotToJasTables(data);
-  }catch(spreadError){
-    spread_result={ok:false,error:spreadError.message};
-  }
-
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
 }
 
 async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
@@ -2765,7 +2749,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
       snapshotClass:policy.snapshotClass
     });
 
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null,jas_spread_result:writeResult.spread_result||null}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null}});
 
     await supabaseAdmin
       .from("snapshot_schedules")
@@ -2776,7 +2760,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
       })
       .eq("id",schedule.id);
 
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null,jas_spread_result:writeResult.spread_result||null};
+    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null};
   }catch(e){
     await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
     throw e;
@@ -2806,7 +2790,7 @@ async function handleGoogleSnapshotWrite(req,res){
     stage="google_api";
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null,jas_spread_result:writeResult.spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
     res.json({
       ok:true,
       platform:"Google",
@@ -2824,9 +2808,8 @@ async function handleGoogleSnapshotWrite(req,res){
       purchase_journey:writeResult.snapshot?.purchase_journey||{},
       click_journey:writeResult.snapshot?.click_journey||{},
       performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{},
-      spread_result:writeResult.spread_result||null,
-      jas_spread_result:writeResult.spread_result||null,
-      jas_spread:writeResult.spread_result?.ok?"called":"called_with_error"
+      spread_result:null,
+      jas_spread:"not_called_by_google_snapshot_write_v1"
     });
   }catch(e){
     if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
@@ -3219,6 +3202,69 @@ async function tiktokApiFetch({base=TIKTOK_API_BASE,endpoint,token,headers={},pa
   return data;
 }
 
+async function getTikTokAdvertisersForToken(accessToken){
+  if(!accessToken)throw new Error("TikTok access token is required for advertiser bootstrap");
+  const data=await tiktokApiFetch({
+    base:TIKTOK_API_BASE,
+    endpoint:"/v1.3/oauth2/advertiser/get/",
+    headers:{"Access-Token":accessToken}
+  });
+  const list=Array.isArray(data?.data?.list)?data.data.list:[];
+  return list.map(a=>({
+    id:normalizePlatformAccountId(a.advertiser_id||a.id),
+    account_name:a.advertiser_name||a.name||null,
+    name:a.advertiser_name||a.name||null,
+    status:a.status||a.advertiser_status||null,
+    currency:a.currency||a.currency_code||null,
+    timezone:a.timezone||a.timezone_name||null,
+    raw:a
+  })).filter(a=>a.id);
+}
+
+async function bootstrapTikTokConnectionLifecycle(userId,options={}){
+  const conn=options.conn||await getConnection(userId,"tiktok");
+  const accessToken=options.accessToken||conn?.access_token;
+  if(!conn&&!accessToken)throw new Error("TikTok connection not found for bootstrap");
+  const advertisers=await getTikTokAdvertisersForToken(accessToken);
+  if(!advertisers.length){
+    const err=new Error("TikTok advertiser list is empty; cannot create ownership/schedule");
+    err.status=422;
+    throw err;
+  }
+  const selected=advertisers[0];
+  await upsertAdAccount(userId,"tiktok",{
+    id:selected.id,
+    account_name:selected.account_name,
+    name:selected.name,
+    status:selected.status,
+    currency:selected.currency,
+    timezone:selected.timezone,
+    advertiser_id:selected.id,
+    advertiser_name:selected.account_name,
+    metadata:selected.raw,
+    raw:selected.raw
+  });
+  const schedule=await ensureSnapshotSchedule(userId,"tiktok",selected.id,{
+    engine:"vercel_cron_auto_refresh",
+    account_type:phase1ReportableAccountType("tiktok"),
+    bootstrapSource:options.source||"tiktok_connection_bootstrap",
+    lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION
+  });
+  await saveConnection(userId,"tiktok",{
+    accountId:selected.id,
+    accountName:selected.account_name,
+    metadata:{
+      lastOwnedPlatformAccountId:selected.id,
+      selectedAdvertiserId:selected.id,
+      selectedAdvertiserName:selected.account_name,
+      advertiserCount:advertisers.length,
+      bootstrapCompletedAt:new Date().toISOString(),
+      bootstrapSource:options.source||"tiktok_connection_bootstrap"
+    }
+  });
+  return {ok:true,platform:"tiktok",platform_account_id:selected.id,account_name:selected.account_name,advertiser_count:advertisers.length,schedule_id:schedule?.id||null,ownership_status:"active"};
+}
+
 app.get("/auth/tiktok",async(req,res)=>{
   try{
     const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
@@ -3255,9 +3301,37 @@ app.get("/auth/tiktok/callback",async(req,res)=>{
       tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
       metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null}
     });
+    let bootstrapResult=null;
+    try{
+      bootstrapResult=await bootstrapTikTokConnectionLifecycle(userId,{accessToken:data.data.access_token,source:"tiktok_oauth_callback"});
+    }catch(bootstrapError){
+      await saveConnection(userId,"tiktok",{
+        accessToken:data.data.access_token,
+        refreshToken:data.data.refresh_token||null,
+        tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
+        metadata:{tiktokBootstrapError:bootstrapError.message,tiktokBootstrapFailedAt:new Date().toISOString()}
+      }).catch(()=>null);
+    }
     req.session.tiktokOAuthState=null;
-    res.redirect("/dashboard?tiktok_connected=1");
+    res.redirect(bootstrapResult?.ok?"/dashboard?tiktok_connected=1&tiktok_bootstrap=1":"/dashboard?tiktok_connected=1&tiktok_bootstrap=pending");
   }catch(e){res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`)}
+});
+
+
+app.post("/api/tiktok/bootstrap",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const result=await bootstrapTikTokConnectionLifecycle(user.id,{source:"manual_tiktok_bootstrap"});
+    res.json(result);
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"tiktok_connection_bootstrap"})}
+});
+
+app.get("/api/tiktok/bootstrap",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const result=await bootstrapTikTokConnectionLifecycle(user.id,{source:"manual_tiktok_bootstrap"});
+    res.json(result);
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"tiktok_connection_bootstrap"})}
 });
 
 app.get("/api/tiktok/status",async(req,res)=>{
@@ -3350,175 +3424,6 @@ app.get("/api/tiktok/report",async(req,res)=>{
     });
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
-
-
-// ===== TIKTOK SNAPSHOT LAYER v1 =====
-function tiktokNumber(value){const n=Number(value);return Number.isFinite(n)?n:0}
-function tiktokNullableNumber(value){if(value===null||value===undefined||value===""||value==="N/A")return null;const n=Number(value);return Number.isFinite(n)?n:null}
-function tiktokMetric(row,key){return tiktokFirstValue([row?.metrics,row?.dimensions,row?.raw,row],Array.isArray(key)?key:[key])}
-function tiktokDim(row,key){return tiktokFirstValue([row?.dimensions,row?.raw,row],Array.isArray(key)?key:[key])}
-function tiktokSnapshotEntityId(row,level,advertiserId){
-  if(level==="campaign")return String(tiktokDim(row,["campaign_id","campaignId","id"])||`${advertiserId}:no_campaign`);
-  if(level==="adgroup")return String(tiktokDim(row,["adgroup_id","ad_group_id","adgroupId","id"])||`${advertiserId}:no_adgroup`);
-  if(level==="ad")return String(tiktokDim(row,["ad_id","adId","id"])||`${advertiserId}:no_ad`);
-  return String(tiktokDim(row,["id"])||`${advertiserId}:unknown`);
-}
-function tiktokSnapshotRow(row,level,advertiserId,currency){
-  const spend=tiktokNullableNumber(tiktokMetric(row,"spend"))||0;
-  const impressions=tiktokNullableNumber(tiktokMetric(row,"impressions"))||0;
-  const clicks=tiktokNullableNumber(tiktokMetric(row,"clicks"))||0;
-  const ctr=tiktokNullableNumber(tiktokMetric(row,"ctr"));
-  const cpc=tiktokNullableNumber(tiktokMetric(row,"cpc"));
-  const completePaymentCount=tiktokNullableNumber(row?.complete_payment_count);
-  const completePaymentValue=tiktokNullableNumber(row?.complete_payment_value);
-  const addToCart=tiktokNullableNumber(row?.add_to_cart)||0;
-  const checkout=tiktokNullableNumber(row?.checkout??row?.initiate_checkout)||0;
-  const purchase=completePaymentCount||0;
-  const revenue=completePaymentValue||0;
-  const landingPageViews=tiktokNullableNumber(row?.landing_page_view)||0;
-  const linkClicks=tiktokNullableNumber(row?.landing_page_click??row?.destination_click)||clicks;
-  const campaignId=String(tiktokDim(row,["campaign_id","campaignId"])||advertiserId);
-  const adgroupId=level==="campaign"?null:String(tiktokDim(row,["adgroup_id","ad_group_id","adgroupId"])||`${advertiserId}:no_adgroup`);
-  const adId=level==="ad"?String(tiktokDim(row,["ad_id","adId"])||`${advertiserId}:no_ad`):null;
-  return {
-    platform:"TikTok",
-    level,
-    campaign_id:campaignId,
-    campaign_name:row?.campaign_name||tiktokDim(row,["campaign_name","campaignName"])||null,
-    campaign_status:row?.campaign_status||tiktokDim(row,["campaign_status","operation_status"])||null,
-    adgroup_id:adgroupId,
-    adgroup_name:row?.adgroup_name||tiktokDim(row,["adgroup_name","ad_group_name","adgroupName"])||null,
-    adgroup_status:row?.adgroup_status||tiktokDim(row,["adgroup_status","operation_status"])||null,
-    ad_id:adId,
-    ad_name:row?.ad_name||tiktokDim(row,["ad_name","adName"])||null,
-    ad_status:row?.ad_status||tiktokDim(row,["ad_status","operation_status"])||null,
-    currency:currency||row?.currency||null,
-    spend,impressions,clicks,ctr,cpc,
-    sales:revenue,revenue,roas:spend>0?revenue/spend:null,
-    conversions:tiktokNullableNumber(tiktokMetric(row,"conversion"))||purchase,
-    add_to_cart:addToCart,checkout,purchase,purchases:purchase,purchase_value:revenue,
-    abandoned:checkout!==null?Math.max((checkout||0)-(purchase||0),0):null,
-    ad_clicks:clicks,
-    link_clicks:linkClicks,
-    landing_page_views:landingPageViews,
-    traffic_score:linkClicks>0?landingPageViews/linkClicks*100:null,
-    real_cpc:landingPageViews>0?spend/landingPageViews:null,
-    raw:{...((row&&typeof row==="object")?row:{}),truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION}
-  };
-}
-function tiktokDiagnosticRow(level,advertiserId,currency){
-  const base={dimensions:{},metrics:{},raw:{reason:"TikTok report query returned zero rows; diagnostic row keeps Snapshot pipeline visible with zero metrics.",diagnostic_empty_account:true,advertiserId}};
-  if(level==="campaign")base.dimensions.campaign_id=`${advertiserId}:no_campaign`;
-  if(level==="adgroup"){base.dimensions.campaign_id=`${advertiserId}:no_campaign`;base.dimensions.adgroup_id=`${advertiserId}:no_adgroup`}
-  if(level==="ad"){base.dimensions.campaign_id=`${advertiserId}:no_campaign`;base.dimensions.adgroup_id=`${advertiserId}:no_adgroup`;base.dimensions.ad_id=`${advertiserId}:no_ad`}
-  const row=tiktokSnapshotRow(base,level,advertiserId,currency);
-  row.raw={...row.raw,...base.raw};
-  if(level==="campaign"){row.campaign_name="No TikTok campaign rows returned";row.campaign_status="NO_ENTITY_RETURNED"}
-  if(level==="adgroup"){row.adgroup_name="No TikTok adgroup rows returned";row.adgroup_status="NO_ENTITY_RETURNED"}
-  if(level==="ad"){row.ad_name="No TikTok ad rows returned";row.ad_status="NO_ENTITY_RETURNED"}
-  return row;
-}
-async function resolveTikTokAdvertiser(user,requestedAdvertiserId=null){
-  const requested=normalizePlatformAccountId(requestedAdvertiserId);
-  if(requested)return {advertiserId:requested,source:"request"};
-  const conn=await getConnection(user.id,"tiktok").catch(()=>null);
-  const fromConn=normalizePlatformAccountId(conn?.metadata?.advertiser_id||conn?.metadata?.advertiserId||conn?.account_id||conn?.metadata?.selectedAdvertiserId);
-  if(fromConn)return {advertiserId:fromConn,source:"platform_connections"};
-  if(conn?.access_token){
-    const data=await tiktokApiFetch({base:TIKTOK_API_BASE,endpoint:"/v1.3/oauth2/advertiser/get/",headers:{"Access-Token":conn.access_token}});
-    const first=(Array.isArray(data?.data?.list)?data.data.list:[])[0];
-    const advertiserId=normalizePlatformAccountId(first?.advertiser_id||first?.id);
-    if(advertiserId){
-      await saveConnection(user.id,"tiktok",{accountId:advertiserId,accountName:first?.advertiser_name||first?.name||`TikTok advertiser ${advertiserId}`,metadata:{...(conn.metadata||{}),advertiser_id:advertiserId,advertiser_name:first?.advertiser_name||first?.name||null,currency:first?.currency||first?.currency_code||null}});
-      return {advertiserId,source:"advertiser_list",advertiser:first};
-    }
-  }
-  const err=new Error("Missing TikTok advertiser_id and no advertiser could be resolved");err.status=400;err.stage="input";throw err;
-}
-async function ensureTikTokSnapshotLifecycle(user,advertiserId,metadata={}){
-  const normalized=normalizePlatformAccountId(advertiserId);
-  if(!normalized)throw new Error("TikTok advertiser id is required for lifecycle");
-  const account={id:normalized,platform_account_id:normalized,advertiser_id:normalized,account_name:metadata.accountName||metadata.name||`TikTok advertiser ${normalized}`,name:metadata.accountName||metadata.name||`TikTok advertiser ${normalized}`,currency:metadata.currency||metadata.currency_code||null,timezone:metadata.timezone||metadata.timezone_name||DEFAULT_PLATFORM_TIMEZONE,...metadata};
-  let ownership=await getOwnership("tiktok",normalized);
-  if(!ownership||ownership.owner_user_id!==user.id){ownership=await ensurePlatformOwnership(user.id,"tiktok",account)}
-  const schedule=await ensureSnapshotSchedule(user.id,"tiktok",normalized,{source:"tiktok_snapshot_lifecycle",timeEngineVersion:TIME_ENGINE_VERSION});
-  return {ownership,schedule};
-}
-async function fetchTikTokReportRows({user,advertiserId,dateRange,level}){
-  const conn=await getConnection(user.id,"tiktok");
-  if(!conn?.access_token){const err=new Error("TikTok not connected");err.status=404;throw err}
-  const levelInfo=resolveTikTokReportLevel(level);
-  const w=tiktokDateWindow(dateRange);
-  const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
-  const data=await tiktokApiFetch({base:TIKTOK_API_BASE,endpoint:"/v1.3/report/integrated/get/",headers:{Authorization:`Bearer ${conn.access_token}`},params:{report_type:"BASIC",data_level:levelInfo.dataLevel,advertiser_id:advertiserId,start_date:w.start,end_date:w.end,dimensions:[levelInfo.dimension],metrics,page:1,page_size:50}});
-  const rows=normalizeTikTokRows(data,levelInfo.level).map(r=>tiktokSnapshotRow(r,levelInfo.level,advertiserId,conn?.metadata?.currency||null));
-  return {rawCount:Array.isArray(data?.data?.list)?data.data.list.length:0,rows,raw:data};
-}
-function buildTikTokSnapshotPayload({snapshotDate,accountCurrency,campaignRows,adgroupRows,adRows}){
-  const rows=[...campaignRows,...adgroupRows,...adRows];
-  const sum=k=>rows.reduce((a,r)=>a+tiktokNumber(r[k]),0);
-  const spend=sum("spend"), impressions=sum("impressions"), clicks=sum("clicks"), revenue=sum("revenue"), purchase=sum("purchase"), addToCart=sum("add_to_cart"), checkout=sum("checkout"), lpv=sum("landing_page_views"), linkClicks=sum("link_clicks");
-  const kpis={spend,impressions,clicks,ctr:impressions>0?clicks/impressions:null,cpc:clicks>0?spend/clicks:null,sales:revenue,revenue,roas:spend>0?revenue/spend:null};
-  const purchase_journey={add_to_cart:addToCart,checkout,purchase,purchase_count:purchase,purchase_value:revenue,abandoned:Math.max((checkout||0)-(purchase||0),0)};
-  const click_journey={ad_clicks:clicks,link_clicks:linkClicks,landing_page_views:lpv,traffic_score:linkClicks>0?lpv/linkClicks*100:null,real_cpc:lpv>0?spend/lpv:null};
-  const performance_summary={rows,counts:{campaign:campaignRows.length,adgroup:adgroupRows.length,ad:adRows.length,total:rows.length},null_policy:"Fields are present even when values are zero/null; raw.truth explains source/default behavior.",source_confidence:"snapshot_layer_tiktok_v1"};
-  return {platform:"tiktok",snapshot_date:snapshotDate,account_currency:accountCurrency||null,kpis,purchase_journey,click_journey,performance_summary};
-}
-async function writeTikTokSnapshotImmutable({user,advertiserId,dateRange="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
-  const platformAccountId=normalizePlatformAccountId(advertiserId);
-  if(!platformAccountId)throw new Error("Missing TikTok advertiserId");
-  const conn=await getConnection(user.id,"tiktok");
-  const ownership=await getOwnership("tiktok",platformAccountId).catch(()=>null);
-  const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,ownership);
-  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
-  const period=googleDateRangeWindow(dateRange,effectiveSnapshotDate);
-  const [campaignResult,adgroupResult,adResult]=await Promise.all([
-    fetchTikTokReportRows({user,advertiserId:platformAccountId,dateRange,level:"campaign"}).catch(e=>({rawCount:0,rows:[],error:e.message})),
-    fetchTikTokReportRows({user,advertiserId:platformAccountId,dateRange,level:"adgroup"}).catch(e=>({rawCount:0,rows:[],error:e.message})),
-    fetchTikTokReportRows({user,advertiserId:platformAccountId,dateRange,level:"ad"}).catch(e=>({rawCount:0,rows:[],error:e.message}))
-  ]);
-  if(!campaignResult.rows.length)campaignResult.rows=[tiktokDiagnosticRow("campaign",platformAccountId,conn?.metadata?.currency||null)];
-  if(!adgroupResult.rows.length)adgroupResult.rows=[tiktokDiagnosticRow("adgroup",platformAccountId,conn?.metadata?.currency||null)];
-  if(!adResult.rows.length)adResult.rows=[tiktokDiagnosticRow("ad",platformAccountId,conn?.metadata?.currency||null)];
-  const allRows=[...campaignResult.rows,...adgroupResult.rows,...adResult.rows];
-  const platformBaseCurrency=(allRows.find(r=>r.currency)?.currency)||conn?.metadata?.currency||null;
-  const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
-  const rawSnapshot=buildTikTokSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,campaignRows:campaignResult.rows,adgroupRows:adgroupResult.rows,adRows:adResult.rows});
-  const snapshot=applyFxToSnapshotPayload(rawSnapshot,fx);
-  const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform","tiktok").eq("platform_account_id",platformAccountId).eq("snapshot_date",snapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();
-  if(existingVersionResult.error)throw existingVersionResult.error;
-  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
-  const now=new Date().toISOString();
-  const row={user_id:user.id,platform:"tiktok",platform_account_id:platformAccountId,platform_base_currency:platformBaseCurrency,snapshot_version:snapshotVersion,source_job_id:sourceJobId,date_preset:dateRange,snapshot_period_start:period.start,snapshot_period_end:period.end,snapshot_scope:dateRange,capture_reason:captureReason,snapshot_class:snapshotClass,platform_account_timezone:platformTimeZone,platform_business_date:timeSync.platform_business_date,platform_business_hour:timeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours("tiktok"),server_time_utc:timeSync.server_time_utc,istanbul_time:timeSync.istanbul_time,platform_account_time:timeSync.platform_account_time,time_engine_version:TIME_ENGINE_VERSION,fx_rate:fx.fx_rate,fx_provider:fx.fx_provider,fx_rate_timestamp:fx.fx_rate_timestamp,fx_source_currency:fx.fx_source_currency,fx_target_currency:fx.fx_target_currency,fx_engine_version:fx.fx_engine_version,snapshot_date:snapshot.snapshot_date,snapshot_created_at:now,account_currency:snapshot.account_currency,kpis:snapshot.kpis,purchase_journey:snapshot.purchase_journey,click_journey:snapshot.click_journey,performance_summary:snapshot.performance_summary};
-  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("*").maybeSingle();
-  if(error)throw error;
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,tiktok_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
-}
-async function handleTikTokSnapshotWrite(req,res){
-  let job=null;let stage="auth";
-  try{
-    const user=await requireUser(req,res);if(!user)return;
-    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
-    const requestedAdvertiserId=req.body?.advertiser_id||req.body?.advertiserId||req.query.advertiser_id||req.query.advertiserId;
-    const resolved=await resolveTikTokAdvertiser(user,requestedAdvertiserId);
-    const platformAccountId=normalizePlatformAccountId(resolved.advertiserId);
-    const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
-    stage="lifecycle";await ensureTikTokSnapshotLifecycle(user,platformAccountId,{source:"manual_tiktok_refresh"});
-    stage="job";job=await createRefreshJob(user.id,"tiktok",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolved.source});
-    await setRefreshJobStatus(job.id,"running");
-    stage="tiktok_api";const writeResult=await writeTikTokSnapshotImmutable({user,advertiserId:platformAccountId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
-    stage="snapshot";await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,tiktok_api:{campaign:{rawCount:writeResult.tiktok_api.campaign.rawCount,error:writeResult.tiktok_api.campaign.error||null},adgroup:{rawCount:writeResult.tiktok_api.adgroup.rawCount,error:writeResult.tiktok_api.adgroup.error||null},ad:{rawCount:writeResult.tiktok_api.ad.rawCount,error:writeResult.tiktok_api.ad.error||null}}}});
-    res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},mode:writeResult.mode,snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||null,platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,row_counts:writeResult.row_counts,kpis:writeResult.snapshot?.kpis||{},purchase_journey:writeResult.snapshot?.purchase_journey||{},click_journey:writeResult.snapshot?.click_journey||{},performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{}});
-  }catch(e){if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);res.status(e.status||500).json({ok:false,error:e.message,stage,refresh_job_id:job?.id||null})}
-}
-app.post("/api/snapshots/tiktok/write",handleTikTokSnapshotWrite);
-app.post("/api/refresh/tiktok",handleTikTokSnapshotWrite);
-app.get("/api/refresh/tiktok",handleTikTokSnapshotWrite);
-// ===== END TIKTOK SNAPSHOT LAYER v1 =====
-
 // ===== END TIKTOK READ LAYER =====
 
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));

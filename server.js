@@ -2174,7 +2174,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,tiktokStatus:tiktok.connected?"connected":"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -3202,73 +3202,6 @@ async function tiktokApiFetch({base=TIKTOK_API_BASE,endpoint,token,headers={},pa
   return data;
 }
 
-function normalizeTikTokAdvertiserAccount(advertiser){
-  const advertiserId=normalizePlatformAccountId(advertiser?.advertiser_id||advertiser?.id||advertiser?.advertiserId||advertiser?.account_id);
-  if(!advertiserId)return null;
-  const name=advertiser?.advertiser_name||advertiser?.name||advertiser?.account_name||`TikTok Advertiser ${advertiserId}`;
-  return {
-    ...advertiser,
-    id:advertiserId,
-    account_id:advertiserId,
-    platform_account_id:advertiserId,
-    name,
-    account_name:name,
-    advertiser_id:advertiserId,
-    advertiser_name:name,
-    currency:advertiser?.currency||advertiser?.currency_code||null,
-    currency_code:advertiser?.currency_code||advertiser?.currency||null,
-    timezone:advertiser?.timezone||advertiser?.timezone_name||advertiser?.time_zone||null,
-    timezone_name:advertiser?.timezone_name||advertiser?.timezone||advertiser?.time_zone||null,
-    status:advertiser?.status||advertiser?.advertiser_status||advertiser?.operation_status||null
-  };
-}
-
-async function fetchTikTokAdvertisers(accessToken){
-  if(!accessToken)throw new Error("TikTok access token is required for advertiser resolution");
-  const data=await tiktokApiFetch({
-    base:TIKTOK_API_BASE,
-    endpoint:"/v1.3/oauth2/advertiser/get/",
-    headers:{"Access-Token":accessToken}
-  });
-  const list=Array.isArray(data?.data?.list)?data.data.list:[];
-  return {raw:data,advertisers:list.map(normalizeTikTokAdvertiserAccount).filter(Boolean)};
-}
-
-async function bootstrapTikTokAdvertiserConnection(userId,conn,options={}){
-  const accessToken=conn?.access_token||conn?.accessToken;
-  const preferred=normalizePlatformAccountId(options.advertiser_id||options.advertiserId||conn?.account_id||conn?.metadata?.selectedAdvertiserId||conn?.metadata?.lastOwnedPlatformAccountId);
-  const resolved=await fetchTikTokAdvertisers(accessToken);
-  const advertiser=(preferred?resolved.advertisers.find(a=>a.platform_account_id===preferred):null)||resolved.advertisers[0]||null;
-  if(!advertiser){
-    await saveConnection(userId,"tiktok",{metadata:{...(conn?.metadata||{}),advertiserResolutionSource:"oauth2_advertiser_get",advertiserResolutionStatus:"no_advertisers_returned",advertiserResolutionAt:new Date().toISOString(),advertiserRaw:resolved.raw}});
-    return {ok:false,reason:"no_advertisers_returned",advertisers:[],raw:resolved.raw};
-  }
-  const ownership=await upsertAdAccount(userId,"tiktok",advertiser);
-  const schedule=await ensureSnapshotSchedule(userId,"tiktok",advertiser.platform_account_id,{
-    engine:"vercel_cron_auto_refresh",
-    account_type:phase1ReportableAccountType("tiktok"),
-    advertiserResolutionSource:"oauth2_advertiser_get",
-    advertiserResolutionAt:new Date().toISOString()
-  });
-  await saveConnection(userId,"tiktok",{
-    accountId:advertiser.platform_account_id,
-    accountName:advertiser.account_name,
-    metadata:{
-      ...(conn?.metadata||{}),
-      advertiser_id:advertiser.platform_account_id,
-      advertiser_name:advertiser.account_name,
-      lastOwnedPlatformAccountId:advertiser.platform_account_id,
-      baseCurrency:advertiser.currency||null,
-      timezone:advertiser.timezone||null,
-      advertiserResolutionSource:"oauth2_advertiser_get",
-      advertiserResolutionStatus:"resolved",
-      advertiserResolutionAt:new Date().toISOString(),
-      advertiserCount:resolved.advertisers.length
-    }
-  });
-  return {ok:true,advertiser,ownership,schedule,advertiser_count:resolved.advertisers.length};
-}
-
 app.get("/auth/tiktok",async(req,res)=>{
   try{
     const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
@@ -3299,32 +3232,15 @@ app.get("/auth/tiktok/callback",async(req,res)=>{
     });
     const data=await r.json().catch(()=>({}));
     if(!r.ok||data.code!==0||!data.data?.access_token)throw new Error(data.message||data.error?.message||"TikTok token exchange failed");
-    const tiktokTokenMetadata={scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null};
     await saveConnection(userId,"tiktok",{
       accessToken:data.data.access_token,
       refreshToken:data.data.refresh_token||null,
       tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
-      metadata:tiktokTokenMetadata
+      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null}
     });
-    let bootstrapResult=null;
-    try{
-      bootstrapResult=await bootstrapTikTokAdvertiserConnection(userId,{access_token:data.data.access_token,metadata:tiktokTokenMetadata});
-    }catch(bootstrapError){
-      await saveConnection(userId,"tiktok",{metadata:{...tiktokTokenMetadata,advertiserResolutionStatus:"failed",advertiserResolutionError:bootstrapError.message,advertiserResolutionAt:new Date().toISOString()}}).catch(()=>null);
-      req.session.tiktokOAuthState=null;
-      return res.redirect(`/dashboard?tiktok_connected=1&tiktok_bootstrap=failed&tiktok_bootstrap_error=${encodeURIComponent(bootstrapError.message)}`);
-    }
     req.session.tiktokOAuthState=null;
-    res.redirect(`/dashboard?tiktok_connected=1&tiktok_bootstrap=${bootstrapResult?.ok?"resolved":"no_advertisers"}`);
+    res.redirect("/dashboard?tiktok_connected=1");
   }catch(e){res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`)}
-});
-
-app.post("/api/tiktok/bootstrap",async(req,res)=>{
-  try{
-    const result=await requireConnection(req,res,"tiktok");if(!result)return;
-    const bootstrap=await bootstrapTikTokAdvertiserConnection(result.user.id,result.conn,{advertiser_id:req.body?.advertiser_id||req.query.advertiser_id||req.body?.advertiserId||req.query.advertiserId||null});
-    res.json({ok:Boolean(bootstrap?.ok),platform:"tiktok",bootstrap});
-  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"tiktok_advertiser_bootstrap"})}
 });
 
 app.get("/api/tiktok/status",async(req,res)=>{
@@ -3352,12 +3268,20 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
     const {conn}=result;
-    const resolved=await fetchTikTokAdvertisers(conn.access_token);
-    let bootstrap=null;
-    if(String(req.query.bootstrap||"false").toLowerCase()==="true"){
-      bootstrap=await bootstrapTikTokAdvertiserConnection(result.user.id,conn,{advertiser_id:req.query.advertiser_id||req.query.advertiserId||null});
-    }
-    res.json({platform:"tiktok",advertisers:resolved.advertisers,bootstrap,raw:resolved.raw});
+    const data=await tiktokApiFetch({
+      base:TIKTOK_API_BASE,
+      endpoint:"/v1.3/oauth2/advertiser/get/",
+      params:{app_id:tiktokClientId()},
+      headers:{"Access-Token":conn.access_token}
+    });
+    const list=Array.isArray(data?.data?.list)?data.data.list:[];
+    const advertisers=list.map(a=>({
+      advertiser_id:a.advertiser_id||a.id||null,
+      advertiser_name:a.advertiser_name||a.name||null,
+      status:a.status||a.advertiser_status||null,
+      currency:a.currency||a.currency_code||null
+    }));
+    res.json({platform:"tiktok",advertisers,raw:data});
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
 

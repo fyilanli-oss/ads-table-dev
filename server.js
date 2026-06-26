@@ -2466,17 +2466,20 @@ function buildGoogleSnapshotPayload({snapshotDate,accountCurrency,campaignRows,a
     }
   };
 }
-async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",dateRange="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
+async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",dateRange="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass=null,platformTimeZone=null,adminTimeSync=null}){
   const platformAccountId=normalizeCustomerId(customerId);
   if(!platformAccountId)throw new Error("Missing Google customerId");
-  const platformTimeZone=await getPlatformAccountTimezone(user.id,"google",platformAccountId,null,null);
-  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
-  const period=googleDateRangeWindow(dateRange,effectiveSnapshotDate);
+  const resolvedTimeZone=normalizeTimeZone(platformTimeZone||await getPlatformAccountTimezone(user.id,"google",platformAccountId,null,null));
+  const timeSync=adminTimeSync||resolveAdminTimeSync(new Date(),resolvedTimeZone);
+  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,resolvedTimeZone);
+  const period=resolveSnapshotCapturePeriod(dateRange,effectiveSnapshotDate,resolvedTimeZone,new Date());
+  const normalizedDateRange=period.datePreset;
+  const resolvedSnapshotClass=snapshotClass||period.snapshotClass||"primary";
+  const googleReportDateRange=normalizedDateRange==="day_close"?"yesterday":normalizedDateRange;
   const [campaignResult,adgroupResult,adResult]=await Promise.all([
-    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange,level:"campaign"}),
-    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange,level:"adgroup"}),
-    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange,level:"ad"})
+    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange:googleReportDateRange,level:"campaign"}),
+    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange:googleReportDateRange,level:"adgroup"}),
+    googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange:googleReportDateRange,level:"ad"})
   ]);
   const allRows=[...campaignResult.rows,...adgroupResult.rows,...adResult.rows];
   const platformBaseCurrency=(allRows.find(r=>r.currency)?.currency)||null;
@@ -2504,13 +2507,13 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
     platform_base_currency:platformBaseCurrency,
     snapshot_version:snapshotVersion,
     source_job_id:sourceJobId,
-    date_preset:dateRange,
+    date_preset:normalizedDateRange,
     snapshot_period_start:period.start,
     snapshot_period_end:period.end,
-    snapshot_scope:dateRange,
+    snapshot_scope:period.scope,
     capture_reason:captureReason,
-    snapshot_class:snapshotClass,
-    platform_account_timezone:platformTimeZone,
+    snapshot_class:resolvedSnapshotClass,
+    platform_account_timezone:resolvedTimeZone,
     platform_business_date:timeSync.platform_business_date,
     platform_business_hour:timeSync.platform_business_hour,
     data_maturity_window_hours:dataMaturityWindowHours("google"),
@@ -2594,13 +2597,19 @@ async function handleGoogleSnapshotWrite(req,res){
     const resolvedGoogleAccount=await resolveGoogleRefreshAccount(user,requestedCustomerId,requestedLoginCustomerId);
     const platformAccountId=normalizeCustomerId(resolvedGoogleAccount.customerId);
     const loginCustomerId=normalizeCustomerId(requestedLoginCustomerId||resolvedGoogleAccount.loginCustomerId||"");
-    const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
+    const requestedDateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
+    const platformTimeZone=await getPlatformAccountTimezone(user.id,"google",platformAccountId,null,null);
+    const adminTimeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
+    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
+    const capturePeriod=resolveSnapshotCapturePeriod(requestedDateRange,snapshotDate,platformTimeZone,new Date());
+    const dateRange=capturePeriod.datePreset;
+    const captureReason="manual_refresh";
+    const snapshotClass="primary";
     stage="job";
-    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId});
+    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason,snapshotClass,timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId,server_time_utc:adminTimeSync.server_time_utc,istanbul_time:adminTimeSync.istanbul_time,platform_account_time:adminTimeSync.platform_account_time,platform_account_timezone:adminTimeSync.platform_account_timezone,platform_business_date:adminTimeSync.platform_business_date,platform_business_hour:adminTimeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours("google"),snapshot_period_start:capturePeriod.start,snapshot_period_end:capturePeriod.end,snapshot_scope:capturePeriod.scope});
     await setRefreshJobStatus(job.id,"running");
     stage="google_api";
-    const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
+    const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason,snapshotClass,platformTimeZone,adminTimeSync});
     stage="snapshot";
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
     res.json({

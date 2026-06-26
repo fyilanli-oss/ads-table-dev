@@ -2585,6 +2585,7 @@ async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
 async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustomerId="",metadata={}){
   const normalized=normalizeCustomerId(platformAccountId);
   if(!normalized)throw new Error("Google platform account id is required for lifecycle");
+
   const account={
     id:normalized,
     platform_account_id:normalized,
@@ -2594,10 +2595,63 @@ async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustome
     currency:metadata.currency||metadata.currency_code||null,
     timezone:metadata.timezone||metadata.timezone_name||DEFAULT_PLATFORM_TIMEZONE,
     loginCustomerId:loginCustomerId||null,
+    accountResolutionSource:metadata.accountResolutionSource||"google_snapshot_config",
     ...metadata
   };
-  const ownership=await ensurePlatformOwnership(user.id,"google",account);
-  const schedule=await ensureSnapshotSchedule(user.id,"google",normalized,{loginCustomerId:loginCustomerId||null,source:"google_snapshot_lifecycle",timeEngineVersion:TIME_ENGINE_VERSION});
+
+  let ownership=await getOwnership("google",normalized);
+  if(ownership&&ownership.owner_user_id!==user.id&&activeOwnershipStatuses().includes(ownership.status)){
+    const err=new Error("Platform account already owned by another user");
+    err.status=409;
+    throw err;
+  }
+
+  if(!ownership||ownership.owner_user_id!==user.id){
+    try{
+      ownership=await ensurePlatformOwnership(user.id,"google",account);
+    }catch(e){
+      // Google Snapshot uses a fixed tested account pair. Older reconnect flows may have
+      // created stale Google ownership rows, causing the generic ownership guard to hit
+      // the per-platform limit before the configured snapshot account can be registered.
+      // In that case, reuse the user's most recent active Google ownership row instead
+      // of creating a fourth reportable account. This keeps the ownership lifecycle
+      // aligned with the schedule/account-resolution source and preserves the global limit.
+      if(!String(e.message||"").includes("Connected reportable platform account limit reached for google"))throw e;
+
+      const {data:existingRows,error:existingError}=await supabaseAdmin
+        .from("platform_account_ownerships")
+        .select("*")
+        .eq("owner_user_id",user.id)
+        .eq("platform","google")
+        .in("status",activeOwnershipStatuses())
+        .order("updated_at",{ascending:false})
+        .limit(1);
+      if(existingError)throw existingError;
+      const reusable=(existingRows||[])[0];
+      if(!reusable)throw e;
+
+      const now=new Date().toISOString();
+      const {data:updated,error:updateError}=await supabaseAdmin
+        .from("platform_account_ownerships")
+        .update({
+          platform_account_id:normalized,
+          platform_account_name:account.account_name||account.name||reusable.platform_account_name||null,
+          account_type:phase1ReportableAccountType("google"),
+          base_currency:account.currency||account.currency_code||reusable.base_currency||null,
+          status:"active",
+          lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+          updated_at:now,
+          metadata:{...(reusable.metadata||{}),...account,reusedOwnershipId:reusable.id,reusedForGoogleSnapshotAccount:true,loginCustomerId:loginCustomerId||null}
+        })
+        .eq("id",reusable.id)
+        .select("*")
+        .maybeSingle();
+      if(updateError)throw updateError;
+      ownership=updated;
+    }
+  }
+
+  const schedule=await ensureSnapshotSchedule(user.id,"google",normalized,{loginCustomerId:loginCustomerId||null,source:"google_snapshot_lifecycle",accountResolutionSource:"google_snapshot_config",timeEngineVersion:TIME_ENGINE_VERSION});
   return {ownership,schedule};
 }
 

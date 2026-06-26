@@ -1718,6 +1718,11 @@ async function handleGlobalRefresh(req,res){
   }catch(e){
     results.google={ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||"google_refresh"}};
   }
+  try{
+    results.tiktok=await invokeRefreshHandler(handleTikTokSnapshotWrite,req);
+  }catch(e){
+    results.tiktok={ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||"tiktok_refresh"}};
+  }
 
   const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
   const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
@@ -1733,7 +1738,8 @@ async function handleGlobalRefresh(req,res){
     snapshot_date:metaPayload.snapshot_date||null,
     platforms:{
       meta:results.meta?.data||null,
-      google:results.google?.data||null
+      google:results.google?.data||null,
+      tiktok:results.tiktok?.data||null
     }
   });
 }
@@ -3342,6 +3348,236 @@ app.get("/api/tiktok/report",async(req,res)=>{
     });
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
+
+
+// ===== TIKTOK SNAPSHOT WRITE v1 =====
+function tiktokMetricNumber(row,key){
+  const sources=[row?.metrics,row?.dimensions,row];
+  for(const src of sources){
+    if(!src||typeof src!=="object")continue;
+    const value=src[key]??src[key.replace(/[A-Z]/g,x=>"_"+x.toLowerCase())];
+    if(value!==undefined&&value!==null&&value!==""&&!Number.isNaN(Number(value)))return Number(value);
+  }
+  return 0;
+}
+function tiktokMetricNullable(row,key){
+  const sources=[row?.metrics,row?.dimensions,row];
+  for(const src of sources){
+    if(!src||typeof src!=="object")continue;
+    const value=src[key]??src[key.replace(/[A-Z]/g,x=>"_"+x.toLowerCase())];
+    if(value!==undefined&&value!==null&&value!==""&&!Number.isNaN(Number(value)))return Number(value);
+  }
+  return null;
+}
+function tiktokText(value){const s=String(value??"").trim();return s?s:null}
+function tiktokField(row,field){return row?.[field]??row?.dimensions?.[field]??row?.metrics?.[field]??null}
+function normalizeTikTokSnapshotRow(row,level,advertiserId,accountCurrency){
+  const campaignId=tiktokText(tiktokField(row,"campaign_id")||advertiserId);
+  const adgroupId=tiktokText(tiktokField(row,"adgroup_id")||tiktokField(row,"ad_group_id"));
+  const adId=tiktokText(tiktokField(row,"ad_id"));
+  const spend=tiktokMetricNumber(row,"spend");
+  const impressions=tiktokMetricNumber(row,"impressions");
+  const clicks=tiktokMetricNumber(row,"clicks");
+  const ctr=tiktokMetricNullable(row,"ctr");
+  const cpc=tiktokMetricNullable(row,"cpc");
+  const conversions=tiktokMetricNumber(row,"conversion");
+  const landingPageViews=tiktokMetricNumber(row,"landing_page_view");
+  const destinationClicks=tiktokMetricNumber(row,"destination_click");
+  const landingPageClicks=tiktokMetricNumber(row,"landing_page_click");
+  const addToCart=tiktokMetricNumber(row,"add_to_cart");
+  const checkout=tiktokMetricNumber(row,"checkout")||tiktokMetricNumber(row,"initiate_checkout");
+  const purchase=tiktokMetricNumber(row,"complete_payment_count");
+  const purchaseValue=tiktokMetricNumber(row,"complete_payment_value");
+  const revenue=purchaseValue>0?purchaseValue:null;
+  const roas=spend>0&&revenue!==null?revenue/spend:null;
+  const base={
+    platform:"TikTok",
+    level,
+    campaign_id:campaignId,
+    campaign_name:tiktokText(row.campaign_name)||null,
+    campaign_status:tiktokText(row.campaign_status)||null,
+    adgroup_id:level==="campaign"?null:(adgroupId||`${campaignId}:no_adgroup`),
+    adgroup_name:tiktokText(row.adgroup_name)||null,
+    adgroup_status:tiktokText(row.adgroup_status)||null,
+    ad_id:level==="ad"?(adId||`${adgroupId||campaignId}:no_ad`):null,
+    ad_name:tiktokText(row.ad_name)||null,
+    ad_status:tiktokText(row.ad_status)||null,
+    currency:tiktokText(row.currency)||accountCurrency||null,
+    spend,
+    impressions,
+    clicks,
+    ad_clicks:clicks,
+    link_clicks:destinationClicks||landingPageClicks||clicks,
+    landing_page_views:landingPageViews,
+    ctr,
+    cpc,
+    conversions,
+    add_to_cart:addToCart,
+    checkout,
+    purchase,
+    purchases:purchase,
+    purchase_value:purchaseValue,
+    revenue,
+    sales:revenue,
+    roas,
+    abandoned:Math.max((checkout||0)-(purchase||0),0),
+    traffic_score:(destinationClicks||clicks)>0&&landingPageViews>0?(landingPageViews/(destinationClicks||clicks))*100:null,
+    real_cpc:landingPageViews>0?spend/landingPageViews:null,
+    source_confidence:{
+      spend:"tiktok_ads_api",
+      impressions:"tiktok_ads_api",
+      clicks:"tiktok_ads_api",
+      conversion:"tiktok_ads_api",
+      purchase_value:purchaseValue>0?"tiktok_complete_payment_value":"unavailable",
+      landing_page_views:landingPageViews>0?"tiktok_tracking_dependent":"unavailable"
+    },
+    null_reasons:{
+      revenue:revenue!==null?null:"TikTok complete_payment_value returned no positive value.",
+      roas:roas!==null?null:"ROAS is null until complete_payment_value is validated and spend is greater than zero.",
+      landing_page_views:landingPageViews>0?null:"TikTok landing_page_view is tracking dependent or unavailable for this report.",
+      purchase_journey:addToCart||checkout||purchase?null:"TikTok purchase journey events are tracking dependent or unavailable for this advertiser/report."
+    },
+    raw:{...row,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION}
+  };
+  return base;
+}
+function tiktokDiagnosticRow(level,advertiserId,accountCurrency){
+  const campaignId=String(advertiserId||"unknown_tiktok_advertiser");
+  const adgroupId=`${campaignId}:no_adgroup`;
+  const adId=`${campaignId}:no_ad`;
+  return normalizeTikTokSnapshotRow({
+    dimensions:{campaign_id:campaignId,adgroup_id:adgroupId,ad_id:adId},
+    metrics:{},
+    campaign_name:level==="campaign"?"No TikTok campaign rows returned":`TikTok advertiser ${campaignId}`,
+    campaign_status:"NO_ENTITY_RETURNED",
+    adgroup_name:level==="adgroup"||level==="ad"?"No TikTok adgroup rows returned":null,
+    adgroup_status:level==="adgroup"||level==="ad"?"NO_ENTITY_RETURNED":null,
+    ad_name:level==="ad"?"No TikTok ad rows returned":null,
+    ad_status:level==="ad"?"NO_ENTITY_RETURNED":null,
+    currency:accountCurrency,
+    raw:{diagnostic_empty_account:true,reason:"TikTok report query returned zero rows; diagnostic row keeps Snapshot pipeline visible with zero metrics."}
+  },level,campaignId,accountCurrency);
+}
+function tiktokRowsForSnapshot(apiRows,level,advertiserId,accountCurrency){
+  const rows=(apiRows||[]).map(r=>normalizeTikTokSnapshotRow(r,level,advertiserId,accountCurrency)).filter(Boolean);
+  return rows.length?rows:[tiktokDiagnosticRow(level,advertiserId,accountCurrency)];
+}
+function buildTikTokSnapshotPayload({snapshotDate,accountCurrency,campaignRows,adgroupRows,adRows}){
+  const rows=[...(campaignRows||[]),...(adgroupRows||[]),...(adRows||[])];
+  const aggregateRows=(campaignRows&&campaignRows.length)?campaignRows:rows;
+  const sum=field=>(aggregateRows||[]).reduce((t,r)=>t+Number(r?.[field]||0),0);
+  const spend=sum("spend"), impressions=sum("impressions"), clicks=sum("clicks"), revenue=sum("revenue"), sales=sum("sales");
+  const ctr=impressions>0?(clicks/impressions)*100:null;
+  const cpc=clicks>0?spend/clicks:null;
+  const roas=spend>0&&revenue>0?revenue/spend:null;
+  const addToCart=sum("add_to_cart"), checkout=sum("checkout"), purchase=sum("purchase"), purchaseValue=sum("purchase_value");
+  const landingPageViews=sum("landing_page_views"), linkClicks=sum("link_clicks")||clicks;
+  return {
+    snapshot_date:snapshotDate,
+    account_currency:accountCurrency||null,
+    kpis:{
+      spend,sales,revenue,impressions,clicks,ctr,cpc,roas,
+      source_confidence:{spend:"tiktok_ads_api",impressions:"tiktok_ads_api",clicks:"tiktok_ads_api",ctr:"tiktok_ads_api_or_calculated",cpc:"tiktok_ads_api_or_calculated",sales:sales>0?"tiktok_complete_payment_value":"unavailable",revenue:revenue>0?"tiktok_complete_payment_value":"unavailable",roas:roas!==null?"calculated_from_revenue_and_spend":"unavailable"},
+      null_reasons:{sales:sales>0?null:"TikTok purchase/revenue mapping returned no positive validated value.",revenue:revenue>0?null:"TikTok revenue field returned no positive validated value.",roas:roas!==null?null:"ROAS is null until revenue is validated and spend is greater than zero."}
+    },
+    purchase_journey:{arrived:landingPageViews||0,add_to_cart:addToCart||0,checkout:checkout||0,purchase:purchase||0,purchase_count:purchase||0,purchase_value:purchaseValue||0,abandoned:Math.max((checkout||0)-(purchase||0),0),source_confidence:addToCart||checkout||purchase?"tiktok_tracking_events":"unavailable",null_reasons:{add_to_cart:addToCart?null:"Add-to-cart event not validated or no value returned.",checkout:checkout?null:"Checkout event not validated or no value returned.",purchase:purchase?null:"Complete payment event not validated or no value returned.",purchase_value:purchaseValue?null:"Complete payment value not validated or no value returned."}},
+    click_journey:{ad_clicks:clicks,link_clicks:linkClicks,landing_page_views:landingPageViews||0,traffic_score:linkClicks>0&&landingPageViews>0?(landingPageViews/linkClicks)*100:null,real_cpc:landingPageViews>0?spend/landingPageViews:null,source_confidence:{ad_clicks:"tiktok_ads_api",link_clicks:"tiktok_destination_or_landing_click_or_clicks",landing_page_views:landingPageViews>0?"tiktok_tracking_dependent":"unavailable"},null_reasons:{landing_page_views:landingPageViews>0?null:"Landing page view unavailable or tracking dependent."}},
+    performance_summary:{rows,counts:{campaign:(campaignRows||[]).length,adgroup:(adgroupRows||[]).length,ad:(adRows||[]).length},source_confidence:"snapshot_layer_tiktok_v1",null_policy:"Fields are present even when values are zero/null; null_reasons explain missing data."}
+  };
+}
+async function tiktokFetchReportRows({user,conn,advertiserId,dateRange,level,sandbox=false,sandboxToken=null}){
+  const levelInfo=resolveTikTokReportLevel(level);
+  const w=tiktokDateWindow(dateRange);
+  const metrics=["spend","impressions","clicks","ctr","cpc","conversion","destination_click","landing_page_click","landing_page_view","add_to_cart","checkout","initiate_checkout","complete_payment_count","complete_payment_value"];
+  const base=sandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
+  const token=sandbox?sandboxToken:conn.access_token;
+  const headers=sandbox?{"Access-Token":token}:{"Access-Token":token};
+  const params={report_type:"BASIC",data_level:levelInfo.dataLevel,advertiser_id:advertiserId,start_date:w.start,end_date:w.end,dimensions:[levelInfo.dimension],metrics,page:1,page_size:100};
+  try{
+    const data=await tiktokApiFetch({base,endpoint:"/v1.3/report/integrated/get/",headers,params});
+    return {rows:normalizeTikTokRows(data,levelInfo.level),rawCount:Array.isArray(data?.data?.list)?data.data.list.length:0,error:null,raw:data,request:{base,endpoint:"/v1.3/report/integrated/get/",params:{...params,metrics}}};
+  }catch(e){
+    return {rows:[],rawCount:0,error:e.message,raw:null,request:{base,endpoint:"/v1.3/report/integrated/get/",params:{...params,metrics}}};
+  }
+}
+async function tiktokResolveAdvertiser(user,conn,requestedAdvertiserId){
+  const requested=tiktokText(requestedAdvertiserId||conn?.account_id||conn?.metadata?.advertiser_id||conn?.metadata?.selectedAdvertiserId);
+  if(requested)return {advertiser_id:requested,advertiser_name:conn?.account_name||conn?.metadata?.advertiser_name||`TikTok advertiser ${requested}`,currency:conn?.metadata?.currency||null,source:"request_or_connection"};
+  const data=await tiktokApiFetch({base:TIKTOK_API_BASE,endpoint:"/v1.3/oauth2/advertiser/get/",headers:{"Access-Token":conn.access_token}});
+  const first=(Array.isArray(data?.data?.list)?data.data.list:[])[0];
+  if(!first)throw new Error("No TikTok advertiser found for connected account");
+  return {advertiser_id:first.advertiser_id||first.id,advertiser_name:first.advertiser_name||first.name||null,currency:first.currency||first.currency_code||null,source:"advertiser_api_first"};
+}
+async function writeTikTokSnapshotImmutable({user,conn,advertiserId,dateRange="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary",sandbox=false,sandboxToken=null}){
+  const platformAccountId=normalizePlatformAccountId(advertiserId);
+  if(!platformAccountId)throw new Error("Missing TikTok advertiser_id");
+  const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,null);
+  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
+  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
+  const period=googleDateRangeWindow(dateRange,effectiveSnapshotDate);
+  const [campaignResult,adgroupResult,adResult]=await Promise.all([
+    tiktokFetchReportRows({user,conn,advertiserId:platformAccountId,dateRange,level:"campaign",sandbox,sandboxToken}),
+    tiktokFetchReportRows({user,conn,advertiserId:platformAccountId,dateRange,level:"adgroup",sandbox,sandboxToken}),
+    tiktokFetchReportRows({user,conn,advertiserId:platformAccountId,dateRange,level:"ad",sandbox,sandboxToken})
+  ]);
+  const platformBaseCurrency=tiktokText(conn?.metadata?.currency)||null;
+  const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
+  const campaignRows=tiktokRowsForSnapshot(campaignResult.rows,"campaign",platformAccountId,platformBaseCurrency||accountCurrency);
+  const adgroupRows=tiktokRowsForSnapshot(adgroupResult.rows,"adgroup",platformAccountId,platformBaseCurrency||accountCurrency);
+  const adRows=tiktokRowsForSnapshot(adResult.rows,"ad",platformAccountId,platformBaseCurrency||accountCurrency);
+  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
+  const rawSnapshot=buildTikTokSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,campaignRows,adgroupRows,adRows});
+  const snapshot=applyFxToSnapshotPayload(rawSnapshot,fx);
+  const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform","tiktok").eq("platform_account_id",platformAccountId).eq("snapshot_date",snapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();
+  if(existingVersionResult.error)throw existingVersionResult.error;
+  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
+  const now=new Date().toISOString();
+  const row={user_id:user.id,platform:"tiktok",platform_account_id:platformAccountId,platform_base_currency:platformBaseCurrency,snapshot_version:snapshotVersion,source_job_id:sourceJobId,date_preset:dateRange,snapshot_period_start:period.start,snapshot_period_end:period.end,snapshot_scope:dateRange,capture_reason:captureReason,snapshot_class:snapshotClass,platform_account_timezone:platformTimeZone,platform_business_date:timeSync.platform_business_date,platform_business_hour:timeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours("tiktok"),server_time_utc:timeSync.server_time_utc,istanbul_time:timeSync.istanbul_time,platform_account_time:timeSync.platform_account_time,time_engine_version:TIME_ENGINE_VERSION,fx_rate:fx.fx_rate,fx_provider:fx.fx_provider,fx_rate_timestamp:fx.fx_rate_timestamp,fx_source_currency:fx.fx_source_currency,fx_target_currency:fx.fx_target_currency,fx_engine_version:fx.fx_engine_version,snapshot_date:snapshot.snapshot_date,snapshot_created_at:now,account_currency:snapshot.account_currency,kpis:snapshot.kpis,purchase_journey:snapshot.purchase_journey,click_journey:snapshot.click_journey,performance_summary:snapshot.performance_summary};
+  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
+  if(error)throw error;
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,tiktok_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
+}
+async function handleTikTokSnapshotWrite(req,res){
+  let job=null;
+  let stage="auth";
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
+    const sandbox=String(req.body?.sandbox||req.query.sandbox||"false").toLowerCase()==="true";
+    const result=sandbox?{user,conn:{access_token:null,metadata:{}}}:await requireConnection(req,res,"tiktok");
+    if(!result)return;
+    const conn=result.conn;
+    const sandboxToken=String(req.body?.sandbox_access_token||req.query.sandbox_access_token||req.headers["x-sandbox-access-token"]||"").trim();
+    if(sandbox&&!sandboxToken)return res.status(400).json({ok:false,error:"sandbox_access_token is required when sandbox=true",stage});
+    const requestedAdvertiserId=req.body?.advertiser_id||req.body?.advertiserId||req.query.advertiser_id||req.query.advertiserId;
+    const advertiser=sandbox?{advertiser_id:requestedAdvertiserId,advertiser_name:`TikTok sandbox advertiser ${requestedAdvertiserId}`,currency:null,source:"sandbox_request"}:await tiktokResolveAdvertiser(user,conn,requestedAdvertiserId);
+    const platformAccountId=normalizePlatformAccountId(advertiser.advertiser_id);
+    if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing TikTok advertiser_id",stage:"account_resolution"});
+    if(!sandbox){
+      await ensurePlatformOwnership(user.id,"tiktok",{platform_account_id:platformAccountId,account_name:advertiser.advertiser_name,currency:advertiser.currency,source:advertiser.source});
+      await saveConnection(user.id,"tiktok",{accessToken:conn.access_token,refreshToken:conn.refresh_token,tokenExpiresAt:conn.token_expires_at,accountId:platformAccountId,accountName:advertiser.advertiser_name,metadata:{...(conn.metadata||{}),advertiser_id:platformAccountId,advertiser_name:advertiser.advertiser_name,currency:advertiser.currency||conn.metadata?.currency||null}});
+    }
+    const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
+    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
+    stage="job";
+    job=await createRefreshJob(user.id,"tiktok",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",sandbox,timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:advertiser.source});
+    await setRefreshJobStatus(job.id,"running");
+    stage="tiktok_api";
+    const writeResult=await writeTikTokSnapshotImmutable({user,conn,advertiserId:platformAccountId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary",sandbox,sandboxToken});
+    stage="snapshot";
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,tiktok_api:{campaign:{rawCount:writeResult.tiktok_api.campaign.rawCount,error:writeResult.tiktok_api.campaign.error},adgroup:{rawCount:writeResult.tiktok_api.adgroup.rawCount,error:writeResult.tiktok_api.adgroup.error},ad:{rawCount:writeResult.tiktok_api.ad.rawCount,error:writeResult.tiktok_api.ad.error}}}});
+    res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},mode:writeResult.mode,snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||null,platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,platform_base_currency:writeResult.snapshot?.platform_base_currency||null,account_currency:writeResult.snapshot?.account_currency||null,row_counts:writeResult.row_counts,kpis:writeResult.snapshot?.kpis||{},purchase_journey:writeResult.snapshot?.purchase_journey||{},click_journey:writeResult.snapshot?.click_journey||{},performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{},tiktok_api:{campaign:{rawCount:writeResult.tiktok_api.campaign.rawCount,error:writeResult.tiktok_api.campaign.error},adgroup:{rawCount:writeResult.tiktok_api.adgroup.rawCount,error:writeResult.tiktok_api.adgroup.error},ad:{rawCount:writeResult.tiktok_api.ad.rawCount,error:writeResult.tiktok_api.ad.error}}});
+  }catch(e){
+    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    res.status(e.status||500).json({ok:false,error:e.message,stage,refresh_job_id:job?.id||null});
+  }
+}
+app.get("/api/snapshots/tiktok/write",handleTikTokSnapshotWrite);
+app.post("/api/snapshots/tiktok/write",handleTikTokSnapshotWrite);
+app.get("/api/refresh/tiktok",handleTikTokSnapshotWrite);
+app.post("/api/refresh/tiktok",handleTikTokSnapshotWrite);
+// ===== END TIKTOK SNAPSHOT WRITE v1 =====
+
 // ===== END TIKTOK READ LAYER =====
 
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));

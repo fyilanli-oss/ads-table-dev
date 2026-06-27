@@ -35,7 +35,7 @@ async function saveConnection(userId,platform,payload){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
   const {data:existing,error:existingError}=await supabaseAdmin
     .from("platform_connections")
-    .select("account_id,account_name,metadata,refresh_token,token_expires_at")
+    .select("account_id,account_name,metadata,access_token,refresh_token,token_expires_at")
     .eq("user_id",userId)
     .eq("platform",platform)
     .maybeSingle();
@@ -43,7 +43,7 @@ async function saveConnection(userId,platform,payload){
   const row={
     user_id:userId,
     platform,
-    access_token:payload.accessToken||null,
+    access_token:payload.accessToken!==undefined?payload.accessToken:(existing?.access_token||null),
     refresh_token:payload.refreshToken!==undefined?payload.refreshToken:(existing?.refresh_token||null),
     token_expires_at:payload.tokenExpiresAt!==undefined?payload.tokenExpiresAt:(existing?.token_expires_at||null),
     account_id:payload.accountId!==undefined?payload.accountId:(existing?.account_id||null),
@@ -2174,9 +2174,9 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,tiktokStatus:tiktok.connected?"connected":"not_connected",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:false,tiktokStatus:"pending_verification",sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
-app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
+app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
   if(!supabaseAdmin||!userId)return null;
   const row={
@@ -3202,27 +3202,6 @@ async function tiktokApiFetch({base=TIKTOK_API_BASE,endpoint,token,headers={},pa
   return data;
 }
 
-async function fetchTikTokAdvertisersWithAppCredentials(token){
-  if(!token)throw new Error("TikTok access token is required for advertiser resolution");
-  if(!tiktokClientId()||!tiktokClientSecret())throw new Error("Missing TikTok advertiser resolution env");
-  const data=await tiktokApiFetch({
-    base:TIKTOK_API_BASE,
-    endpoint:"/v1.3/oauth2/advertiser/get/",
-    headers:{"Access-Token":token},
-    params:{app_id:tiktokClientId(),secret:tiktokClientSecret()}
-  });
-  const list=Array.isArray(data?.data?.list)?data.data.list:[];
-  const advertisers=list.map(a=>({
-    advertiser_id:a.advertiser_id||a.id||a.advertiserId||null,
-    advertiser_name:a.advertiser_name||a.name||a.advertiserName||null,
-    status:a.status||a.advertiser_status||a.advertiserStatus||null,
-    currency:a.currency||a.currency_code||null,
-    timezone:a.timezone||a.timezone_name||null,
-    raw:a
-  })).filter(a=>a.advertiser_id);
-  return {raw:data,advertisers};
-}
-
 async function bootstrapTikTokFromReport(userId,conn,advertiserId,context={}){
   const normalized=normalizePlatformAccountId(advertiserId);
   if(!normalized)throw new Error("TikTok advertiser_id is required for report bootstrap");
@@ -3307,49 +3286,10 @@ app.get("/auth/tiktok/callback",async(req,res)=>{
       accessToken:data.data.access_token,
       refreshToken:data.data.refresh_token||null,
       tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
-      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null,oauthLifecycleVersion:"v1"}
+      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null}
     });
-
-    let lifecycleBootstrap=null;
-    try{
-      const advertiserResult=await fetchTikTokAdvertisersWithAppCredentials(data.data.access_token);
-      const first=advertiserResult.advertisers[0]||null;
-      if(first?.advertiser_id){
-        const connAfterSave=await getConnection(userId,"tiktok");
-        lifecycleBootstrap=await bootstrapTikTokFromReport(userId,connAfterSave,first.advertiser_id,{
-          account_name:first.advertiser_name,
-          currency:first.currency,
-          timezone:first.timezone,
-          base:TIKTOK_API_BASE,
-          endpoint:"/v1.3/oauth2/advertiser/get/",
-          level:"advertiser",
-          date:null,
-          tokenSource:"oauth_callback_advertiser_resolution"
-        });
-      }else{
-        await saveConnection(userId,"tiktok",{
-          metadata:{
-            oauthLifecycleVersion:"v1",
-            advertiserResolutionStatus:"empty",
-            advertiserResolutionAt:new Date().toISOString(),
-            advertiserResolutionRaw:advertiserResult.raw||null
-          }
-        });
-      }
-    }catch(bootstrapErr){
-      await saveConnection(userId,"tiktok",{
-        metadata:{
-          oauthLifecycleVersion:"v1",
-          advertiserResolutionStatus:"failed",
-          advertiserResolutionError:bootstrapErr.message,
-          advertiserResolutionAt:new Date().toISOString()
-        }
-      });
-    }
-
     req.session.tiktokOAuthState=null;
-    const suffix=lifecycleBootstrap?.platform_account_id?`&tiktok_account_id=${encodeURIComponent(lifecycleBootstrap.platform_account_id)}`:"";
-    res.redirect(`/dashboard?tiktok_connected=1${suffix}`);
+    res.redirect("/dashboard?tiktok_connected=1");
   }catch(e){res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`)}
 });
 
@@ -3378,22 +3318,21 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
     const {conn}=result;
-    const advertiserResolution=await fetchTikTokAdvertisersWithAppCredentials(conn.access_token);
-    let bootstrap=null;
-    const first=advertiserResolution.advertisers[0]||null;
-    if(first?.advertiser_id){
-      bootstrap=await bootstrapTikTokFromReport(user.id,conn,first.advertiser_id,{
-        account_name:first.advertiser_name,
-        currency:first.currency,
-        timezone:first.timezone,
-        base:TIKTOK_API_BASE,
-        endpoint:"/v1.3/oauth2/advertiser/get/",
-        level:"advertiser",
-        date:null,
-        tokenSource:"advertisers_endpoint"
-      });
-    }
-    res.json({platform:"tiktok",advertisers:advertiserResolution.advertisers,bootstrap,raw:advertiserResolution.raw});
+    if(!conn?.access_token)return res.status(400).json({error:"TikTok access token is required for advertiser resolution"});
+    const data=await tiktokApiFetch({
+      base:TIKTOK_API_BASE,
+      endpoint:"/v1.3/oauth2/advertiser/get/",
+      headers:{"Access-Token":conn.access_token},
+      params:{app_id:tiktokClientId(),secret:tiktokClientSecret()}
+    });
+    const list=Array.isArray(data?.data?.list)?data.data.list:[];
+    const advertisers=list.map(a=>({
+      advertiser_id:a.advertiser_id||a.id||null,
+      advertiser_name:a.advertiser_name||a.name||null,
+      status:a.status||a.advertiser_status||null,
+      currency:a.currency||a.currency_code||null
+    }));
+    res.json({platform:"tiktok",advertisers,raw:data});
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
 

@@ -3365,7 +3365,7 @@ app.get("/api/tiktok/truth-contract",async(req,res)=>{
 app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
-    const {conn}=result;
+    const {user,conn}=result;
     if(!conn?.access_token)return res.status(400).json({error:"TikTok access token is required for advertiser resolution"});
     const data=await tiktokApiFetch({
       base:TIKTOK_API_BASE,
@@ -3460,7 +3460,7 @@ app.get("/api/tiktok/report",async(req,res)=>{
     };
     const data=await tiktokApiFetch({base,endpoint,headers,params});
     let bootstrap=null;
-    if(!sandbox&&data?.code===0){
+    if(!sandbox){
       const conn=await getConnection(user.id,"tiktok");
       bootstrap=await bootstrapTikTokFromReport(user.id,conn,advertiserId,{base,endpoint,level:levelInfo.level,date,tokenSource});
     }

@@ -3321,7 +3321,8 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
     const data=await tiktokApiFetch({
       base:TIKTOK_API_BASE,
       endpoint:"/v1.3/oauth2/advertiser/get/",
-      headers:{"Access-Token":conn.access_token}
+      headers:{"Access-Token":conn.access_token},
+      params:{app_id:tiktokClientId(),secret:tiktokClientSecret()}
     });
     const list=Array.isArray(data?.data?.list)?data.data.list:[];
     const advertisers=list.map(a=>({

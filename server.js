@@ -3113,54 +3113,7 @@ app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(re
 function tiktokClientId(){return process.env.TIKTOK_CLIENT_ID||process.env.TIKTOK_APP_ID||""}
 function tiktokClientSecret(){return process.env.TIKTOK_CLIENT_SECRET||process.env.TIKTOK_SECRET||process.env.TIKTOK_APP_SECRET||""}
 function tiktokRedirectUri(){return process.env.TIKTOK_REDIRECT_URI||""}
-function parseTikTokExpiry(value){
-  if(value===null||value===undefined||value==="")return null;
-  const n=Number(value);
-  if(!Number.isFinite(n)||n<=0)return null;
-  const ms=n>1000000000000?n:n>1000000000?n*1000:Date.now()+n*1000;
-  return new Date(ms).toISOString();
-}
-function tiktokDeepFirst(obj,keys){
-  if(!obj||typeof obj!=="object")return null;
-  for(const key of keys){
-    if(obj[key]!==undefined&&obj[key]!==null&&obj[key]!=="")return obj[key];
-  }
-  for(const value of Object.values(obj)){
-    if(value&&typeof value==="object"){
-      const found=tiktokDeepFirst(value,keys);
-      if(found!==null&&found!==undefined&&found!=="")return found;
-    }
-  }
-  return null;
-}
-function normalizeTikTokTokenResponse(raw){
-  const root=raw&&typeof raw==="object"?raw:{};
-  const payload=(root.data&&typeof root.data==="object")?root.data:root;
-  const accessToken=tiktokDeepFirst(payload,["access_token","accessToken"]);
-  const refreshToken=tiktokDeepFirst(payload,["refresh_token","refreshToken"]);
-  const expiresIn=tiktokDeepFirst(payload,["expires_in","expiresIn","access_token_expires_in","accessTokenExpiresIn","expires","expire_in","expireIn","expires_at","expiresAt"]);
-  const refreshExpiresIn=tiktokDeepFirst(payload,["refresh_expires_in","refreshTokenExpiresIn","refresh_token_expires_in","refresh_expires","refreshExpiresIn"]);
-  const openId=tiktokDeepFirst(payload,["open_id","openId","openIdStr","open_id_str","creator_id","bc_id","business_center_id"]);
-  const tokenType=tiktokDeepFirst(payload,["token_type","tokenType"]);
-  const scope=tiktokDeepFirst(payload,["scope","scopes"]);
-  return {
-    accessToken:accessToken?String(accessToken):null,
-    refreshToken:refreshToken?String(refreshToken):null,
-    tokenExpiresAt:parseTikTokExpiry(expiresIn),
-    metadata:{
-      scope:scope||null,
-      openId:openId||null,
-      expiresIn:expiresIn||null,
-      refreshExpiresIn:refreshExpiresIn||null,
-      tokenType:tokenType||null,
-      tokenResponseShape:Object.keys(root),
-      tokenDataShape:payload&&typeof payload==="object"?Object.keys(payload):[],
-      tokenNormalizedAt:new Date().toISOString(),
-      oauthLifecycleVersion:"v2",
-      rawTokenResponse:root
-    }
-  };
-}
+function parseTikTokExpiry(value){return value?new Date(Date.now()+Number(value)*1000).toISOString():null}
 const TIKTOK_TRUTH_CONTRACT_VERSION="v1";
 const TIKTOK_TRUTH_FIELDS=[
   {field:"campaign_name",category:"documented",default_behavior:null,null_reason:"Campaign detail/read response has not provided campaign_name for this row."},
@@ -3303,6 +3256,14 @@ app.get("/auth/tiktok",async(req,res)=>{
   try{
     const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
     const userId=accessCheck.userId;
+
+    // TIKTOK_AUTH_GUARD_FIX_v1
+    // If TikTok is already connected and lifecycle-bound to an account, do not restart OAuth.
+    const existingTikTokConnection=await getConnection(userId,"tiktok").catch(()=>null);
+    if(existingTikTokConnection?.access_token&&normalizePlatformAccountId(existingTikTokConnection.account_id)){
+      return res.redirect("/dashboard?tiktok_already_connected=1");
+    }
+
     if(!tiktokClientId()||!tiktokRedirectUri())throw new Error("Missing TikTok OAuth env");
     const state=Math.random().toString(36).slice(2);
     req.session.tiktokOAuthState=state;
@@ -3328,13 +3289,12 @@ app.get("/auth/tiktok/callback",async(req,res)=>{
       body:JSON.stringify({app_id:tiktokClientId(),secret:tiktokClientSecret(),auth_code:String(authCode)})
     });
     const data=await r.json().catch(()=>({}));
-    const normalizedToken=normalizeTikTokTokenResponse(data);
-    if(!r.ok||data.code!==0||!normalizedToken.accessToken)throw new Error(data.message||data.error?.message||"TikTok token exchange failed");
+    if(!r.ok||data.code!==0||!data.data?.access_token)throw new Error(data.message||data.error?.message||"TikTok token exchange failed");
     await saveConnection(userId,"tiktok",{
-      accessToken:normalizedToken.accessToken,
-      refreshToken:normalizedToken.refreshToken,
-      tokenExpiresAt:normalizedToken.tokenExpiresAt,
-      metadata:normalizedToken.metadata
+      accessToken:data.data.access_token,
+      refreshToken:data.data.refresh_token||null,
+      tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
+      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null}
     });
     req.session.tiktokOAuthState=null;
     res.redirect("/dashboard?tiktok_connected=1");
@@ -3365,7 +3325,7 @@ app.get("/api/tiktok/truth-contract",async(req,res)=>{
 app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
-    const {user,conn}=result;
+    const {conn}=result;
     if(!conn?.access_token)return res.status(400).json({error:"TikTok access token is required for advertiser resolution"});
     const data=await tiktokApiFetch({
       base:TIKTOK_API_BASE,
@@ -3378,48 +3338,9 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
       advertiser_id:a.advertiser_id||a.id||null,
       advertiser_name:a.advertiser_name||a.name||null,
       status:a.status||a.advertiser_status||null,
-      currency:a.currency||a.currency_code||null,
-      timezone:a.timezone||a.timezone_name||null
-    })).filter(a=>a.advertiser_id);
-    let bootstrap=null;
-    if(advertisers.length){
-      const first=advertisers[0];
-      const ownership=await upsertAdAccount(user.id,"tiktok",{
-        id:first.advertiser_id,
-        advertiser_id:first.advertiser_id,
-        account_name:first.advertiser_name||`TikTok Advertiser ${first.advertiser_id}`,
-        name:first.advertiser_name||`TikTok Advertiser ${first.advertiser_id}`,
-        status:first.status||"active",
-        currency:first.currency||null,
-        timezone:first.timezone||DEFAULT_PLATFORM_TIMEZONE,
-        bootstrap_source:"advertisers_endpoint",
-        resolved_at:new Date().toISOString(),
-        raw:data
-      });
-      const schedule=await ensureSnapshotSchedule(user.id,"tiktok",first.advertiser_id,{
-        engine:"vercel_cron_auto_refresh",
-        account_type:phase1ReportableAccountType("tiktok"),
-        accountResolutionSource:"tiktok_advertisers_endpoint",
-        lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION,
-        bootstrappedAt:new Date().toISOString()
-      });
-      await saveConnection(user.id,"tiktok",{
-        accountId:first.advertiser_id,
-        accountName:first.advertiser_name||`TikTok Advertiser ${first.advertiser_id}`,
-        metadata:{
-          advertiserResolutionStatus:"resolved",
-          advertiserResolutionSource:"advertisers_endpoint",
-          lastOwnedPlatformAccountId:first.advertiser_id,
-          selectedPlatformAccountId:first.advertiser_id,
-          advertiserResolutionRaw:data,
-          advertiserResolutionAt:new Date().toISOString()
-        }
-      });
-      bootstrap={ok:true,platform_account_id:first.advertiser_id,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null,source:"advertisers_endpoint"};
-    }else{
-      await saveConnection(user.id,"tiktok",{metadata:{advertiserResolutionStatus:"empty",advertiserResolutionSource:"advertisers_endpoint",advertiserResolutionRaw:data,advertiserResolutionAt:new Date().toISOString()}});
-    }
-    res.json({platform:"tiktok",advertisers,bootstrap,raw:data});
+      currency:a.currency||a.currency_code||null
+    }));
+    res.json({platform:"tiktok",advertisers,raw:data});
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
 
@@ -3460,7 +3381,7 @@ app.get("/api/tiktok/report",async(req,res)=>{
     };
     const data=await tiktokApiFetch({base,endpoint,headers,params});
     let bootstrap=null;
-    if(!sandbox){
+    if(!sandbox&&data?.code===0){
       const conn=await getConnection(user.id,"tiktok");
       bootstrap=await bootstrapTikTokFromReport(user.id,conn,advertiserId,{base,endpoint,level:levelInfo.level,date,tokenSource});
     }

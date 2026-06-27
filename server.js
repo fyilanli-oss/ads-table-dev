@@ -3202,6 +3202,56 @@ async function tiktokApiFetch({base=TIKTOK_API_BASE,endpoint,token,headers={},pa
   return data;
 }
 
+async function bootstrapTikTokFromReport(userId,conn,advertiserId,context={}){
+  const normalized=normalizePlatformAccountId(advertiserId);
+  if(!normalized)throw new Error("TikTok advertiser_id is required for report bootstrap");
+  const now=new Date().toISOString();
+  const account={
+    id:normalized,
+    advertiser_id:normalized,
+    account_name:context.account_name||conn?.account_name||`TikTok Advertiser ${normalized}`,
+    name:context.account_name||conn?.account_name||`TikTok Advertiser ${normalized}`,
+    status:"active",
+    currency:context.currency||conn?.metadata?.baseCurrency||null,
+    timezone:context.timezone||conn?.metadata?.timezone||DEFAULT_PLATFORM_TIMEZONE,
+    bootstrap_source:"report",
+    report_base:context.base||TIKTOK_API_BASE,
+    report_endpoint:context.endpoint||"/v1.3/report/integrated/get/",
+    report_level:context.level||null,
+    report_date:context.date||null,
+    token_source:context.tokenSource||"platform_connections.access_token",
+    bootstrapped_at:now
+  };
+  const ownership=await upsertAdAccount(userId,"tiktok",account);
+  const schedule=await ensureSnapshotSchedule(userId,"tiktok",normalized,{
+    engine:"vercel_cron_auto_refresh",
+    account_type:phase1ReportableAccountType("tiktok"),
+    accountResolutionSource:"tiktok_report_bootstrap",
+    bootstrapSource:"report",
+    reportBase:context.base||TIKTOK_API_BASE,
+    reportEndpoint:context.endpoint||"/v1.3/report/integrated/get/",
+    tokenSource:context.tokenSource||"platform_connections.access_token",
+    lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION,
+    bootstrappedAt:now
+  });
+  await saveConnection(userId,"tiktok",{
+    accountId:normalized,
+    accountName:account.account_name,
+    metadata:{
+      ...(conn?.metadata||{}),
+      lastOwnedPlatformAccountId:normalized,
+      selectedPlatformAccountId:normalized,
+      accountResolutionSource:"tiktok_report_bootstrap",
+      bootstrapSource:"report",
+      bootstrapAt:now,
+      reportBase:context.base||TIKTOK_API_BASE,
+      tokenSource:context.tokenSource||"platform_connections.access_token"
+    }
+  });
+  return {ok:true,platform:"tiktok",platform_account_id:normalized,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null,accountResolutionSource:"tiktok_report_bootstrap"};
+}
+
+
 app.get("/auth/tiktok",async(req,res)=>{
   try{
     const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
@@ -3271,8 +3321,7 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
     const data=await tiktokApiFetch({
       base:TIKTOK_API_BASE,
       endpoint:"/v1.3/oauth2/advertiser/get/",
-      headers:{"Access-Token":conn.access_token},
-      params:{app_id:tiktokClientId(),secret:tiktokClientSecret()}
+      headers:{"Access-Token":conn.access_token}
     });
     const list=Array.isArray(data?.data?.list)?data.data.list:[];
     const advertisers=list.map(a=>({
@@ -3321,6 +3370,11 @@ app.get("/api/tiktok/report",async(req,res)=>{
       page_size:20
     };
     const data=await tiktokApiFetch({base,endpoint,headers,params});
+    let bootstrap=null;
+    if(!sandbox&&data?.code===0){
+      const conn=await getConnection(user.id,"tiktok");
+      bootstrap=await bootstrapTikTokFromReport(user.id,conn,advertiserId,{base,endpoint,level:levelInfo.level,date,tokenSource});
+    }
     res.json({
       platform:"tiktok",
       sandbox,
@@ -3328,6 +3382,7 @@ app.get("/api/tiktok/report",async(req,res)=>{
       level:levelInfo.level,
       date,
       rows:normalizeTikTokRows(data,levelInfo.level),
+      bootstrap,
       request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION},
       truth_contract:tiktokTruthContract(),
       raw:data

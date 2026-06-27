@@ -3317,7 +3317,7 @@ app.get("/api/tiktok/truth-contract",async(req,res)=>{
 app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
-    const {conn}=result;
+    const {user,conn}=result;
     const data=await tiktokApiFetch({
       base:TIKTOK_API_BASE,
       endpoint:"/v1.3/oauth2/advertiser/get/",
@@ -3329,9 +3329,34 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
       advertiser_id:a.advertiser_id||a.id||null,
       advertiser_name:a.advertiser_name||a.name||null,
       status:a.status||a.advertiser_status||null,
-      currency:a.currency||a.currency_code||null
+      currency:a.currency||a.currency_code||null,
+      timezone:a.timezone||a.timezone_name||null
     }));
-    res.json({platform:"tiktok",advertisers,raw:data});
+    let bootstrap=null;
+    const first=advertisers.find(a=>a.advertiser_id);
+    if(first){
+      const account={
+        id:first.advertiser_id,
+        advertiser_id:first.advertiser_id,
+        name:first.advertiser_name||`TikTok Advertiser ${first.advertiser_id}`,
+        account_name:first.advertiser_name||`TikTok Advertiser ${first.advertiser_id}`,
+        status:first.status||"active",
+        currency:first.currency||null,
+        timezone:first.timezone||DEFAULT_PLATFORM_TIMEZONE,
+        bootstrap_source:"advertisers_endpoint",
+        bootstrapped_at:new Date().toISOString()
+      };
+      const ownership=await upsertAdAccount(user.id,"tiktok",account);
+      const schedule=await ensureSnapshotSchedule(user.id,"tiktok",first.advertiser_id,{
+        engine:"vercel_cron_auto_refresh",
+        account_type:phase1ReportableAccountType("tiktok"),
+        accountResolutionSource:"tiktok_advertisers_endpoint",
+        bootstrapSource:"advertisers_endpoint",
+        lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION
+      });
+      bootstrap={ok:true,platform:"tiktok",platform_account_id:first.advertiser_id,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null,accountResolutionSource:"tiktok_advertisers_endpoint"};
+    }
+    res.json({platform:"tiktok",advertisers,bootstrap,raw:data});
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
 

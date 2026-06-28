@@ -3375,7 +3375,7 @@ app.get("/api/tiktok/report",async(req,res)=>{
     const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
     const base=sandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
     const endpoint="/v1.3/report/integrated/get/";
-    const headers=sandbox?{"Access-Token":token}:{"Authorization":`Bearer ${token}`};
+    const headers={"Access-Token":token};
     const params={
       report_type:"BASIC",
       data_level:levelInfo.dataLevel,
@@ -3547,7 +3547,7 @@ async function fetchTikTokSnapshotLevel({conn,advertiserId,datePreset,level}){
   const data=await tiktokApiFetch({
     base:TIKTOK_API_BASE,
     endpoint,
-    headers:{Authorization:`Bearer ${conn.access_token}`},
+    headers:{"Access-Token":conn.access_token},
     params:{
       report_type:"BASIC",
       data_level:levelInfo.dataLevel,

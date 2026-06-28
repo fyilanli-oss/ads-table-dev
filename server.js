@@ -3123,7 +3123,8 @@ function tiktokClientSecret(){return process.env.TIKTOK_CLIENT_SECRET||process.e
 function tiktokRedirectUri(){return process.env.TIKTOK_REDIRECT_URI||""}
 function tiktokSandboxAccessToken(){return process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||process.env.TIKTOK_SANDBOX_TOKEN||process.env.TIKTOK_TEST_ADVERTISER_ACCESS_TOKEN||""}
 function tiktokSandboxAdvertiserId(){return normalizePlatformAccountId(process.env.TIKTOK_SANDBOX_ADVERTISER_ID||process.env.TIKTOK_TEST_ADVERTISER_ID||process.env.TIKTOK_TEST_AD_ACCOUNT_ID||"7654240828777955348")}
-function tiktokShouldUseSandboxToken(advertiserId){const sandboxId=tiktokSandboxAdvertiserId();return Boolean(sandboxId&&normalizePlatformAccountId(advertiserId)===sandboxId&&tiktokSandboxAccessToken())}
+function tiktokIsSandboxAdvertiser(advertiserId){const sandboxId=tiktokSandboxAdvertiserId();return Boolean(sandboxId&&normalizePlatformAccountId(advertiserId)===sandboxId)}
+function tiktokShouldUseSandboxToken(advertiserId){return Boolean(tiktokIsSandboxAdvertiser(advertiserId)&&tiktokSandboxAccessToken())}
 function parseTikTokExpiry(value){return value?new Date(Date.now()+Number(value)*1000).toISOString():null}
 const TIKTOK_TRUTH_CONTRACT_VERSION="v1";
 const TIKTOK_TRUTH_FIELDS=[
@@ -3490,15 +3491,17 @@ app.get("/api/tiktok/report",async(req,res)=>{
       const conn=await getConnection(user.id,"tiktok");
       bootstrap=await bootstrapTikTokFromReport(user.id,conn,advertiserId,{base,endpoint,level:levelInfo.level,date,tokenSource});
     }
+    const normalizedRows=normalizeTikTokRows(data,levelInfo.level);
+    const responseRows=normalizedRows.length?normalizedRows:((sandbox||tiktokIsSandboxAdvertiser(advertiserId))?tiktokSandboxEmptyReportRows({advertiserId,level:levelInfo.level,accountName:`TikTok Sandbox Advertiser ${advertiserId}`,currency:"TRY",raw:data,window:w,tokenSource}):[]);
     res.json({
       platform:"tiktok",
       sandbox,
       advertiser_id:advertiserId,
       level:levelInfo.level,
       date,
-      rows:(()=>{const normalizedRows=normalizeTikTokRows(data,levelInfo.level);return normalizedRows.length?normalizedRows:tiktokSandboxEmptyReportRows({advertiserId,level:levelInfo.level,accountName:`TikTok Sandbox Advertiser ${advertiserId}`,currency:"TRY",raw:data,window:w,tokenSource});})(),
+      rows:responseRows,
       bootstrap,
-      request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION},
+      request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION,row_source:normalizedRows.length?"report":((sandbox||tiktokIsSandboxAdvertiser(advertiserId))?"sandbox_empty_report_fallback":"empty")},
       truth_contract:tiktokTruthContract(),
       raw:data
     });
@@ -3641,33 +3644,43 @@ async function fetchTikTokSnapshotLevel({conn,advertiserId,datePreset,level}){
   const w=tiktokDateWindow(datePreset);
   const endpoint="/v1.3/report/integrated/get/";
   const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
-  const useSandboxToken=tiktokShouldUseSandboxToken(advertiserId);
+  const sandboxAdvertiser=tiktokIsSandboxAdvertiser(advertiserId);
+  const hasSandboxToken=Boolean(tiktokSandboxAccessToken());
+  const useSandboxToken=sandboxAdvertiser&&hasSandboxToken;
   const accessToken=useSandboxToken?tiktokSandboxAccessToken():conn.access_token;
   const base=useSandboxToken?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
   const tokenSource=useSandboxToken?"env_sandbox_access_token":"platform_connections.access_token";
-  const data=await tiktokApiFetch({
-    base,
-    endpoint,
-    headers:{"Access-Token":accessToken},
-    params:{
-      report_type:"BASIC",
-      data_level:levelInfo.dataLevel,
-      advertiser_id:advertiserId,
-      start_date:w.start,
-      end_date:w.end,
-      dimensions:[levelInfo.dimension],
-      metrics,
-      page:1,
-      page_size:100
-    }
-  });
+  let data=null;
+  let reportError=null;
+  try{
+    data=await tiktokApiFetch({
+      base,
+      endpoint,
+      headers:{"Access-Token":accessToken},
+      params:{
+        report_type:"BASIC",
+        data_level:levelInfo.dataLevel,
+        advertiser_id:advertiserId,
+        start_date:w.start,
+        end_date:w.end,
+        dimensions:[levelInfo.dimension],
+        metrics,
+        page:1,
+        page_size:100
+      }
+    });
+  }catch(e){
+    reportError=e;
+    data={code:"fetch_error",message:e.message,data:{}};
+  }
   let reportRows=normalizeTikTokRows(data,levelInfo.level);
-  if(!reportRows.length&&useSandboxToken&&data?.code===0){
-    reportRows=tiktokSandboxEmptyReportRows({advertiserId,level:levelInfo.level,accountName:conn?.account_name||`TikTok Sandbox Advertiser ${advertiserId}`,currency:conn?.metadata?.baseCurrency||"TRY",raw:data,window:w,tokenSource});
+  if(!reportRows.length&&sandboxAdvertiser){
+    reportRows=tiktokSandboxEmptyReportRows({advertiserId,level:levelInfo.level,accountName:conn?.account_name||`TikTok Sandbox Advertiser ${advertiserId}`,currency:conn?.metadata?.baseCurrency||"TRY",raw:{report:data,error:reportError?.message||null,base,token_source:tokenSource,has_sandbox_token:hasSandboxToken},window:w,tokenSource});
   }
   if(reportRows.length){
-    return {level:levelInfo.level,rows:reportRows,raw:{report:data,row_source:reportRows[0]?.fallback_source||"report",token_source:tokenSource,base},window:w};
+    return {level:levelInfo.level,rows:reportRows,raw:{report:data,row_source:reportRows[0]?.raw?.source||"report",token_source:tokenSource,base,report_error:reportError?.message||null,has_sandbox_token:hasSandboxToken},window:w};
   }
+  if(reportError)throw reportError;
   let fallback={rows:[],raw:null,endpoint:null,error:null};
   try{
     fallback=await fetchTikTokEntityFallbackLevel({conn,advertiserId,level:levelInfo.level});

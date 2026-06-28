@@ -1150,6 +1150,45 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
     }
   };
 }
+function performanceDatasetFallbackRows(snapshot){
+  const platform=normalizeJasPlatform(snapshot?.platform);
+  if(platform!=="tiktok")return [];
+  const rows=Array.isArray(snapshot.performance_summary?.rows)?snapshot.performance_summary.rows:[];
+  if(rows.length)return [];
+  const k=snapshot.kpis||{};
+  const pj=snapshot.purchase_journey||{};
+  const cj=snapshot.click_journey||{};
+  const accountId=perfText(snapshot.platform_account_id);
+  if(!accountId)return [];
+  return [{
+    level:"campaign",
+    id_in_platform:`account_summary:${accountId}`,
+    campaign_id:`account_summary:${accountId}`,
+    name:"TikTok Account Summary",
+    status:"report_empty",
+    currency:snapshot.account_currency||null,
+    spend:k.spend,
+    impressions:k.impressions,
+    reach:k.reach,
+    clicks:k.clicks,
+    ctr:k.ctr,
+    cpc:k.cpc,
+    sales:k.sales,
+    revenue:k.revenue,
+    roas:k.roas,
+    conversions:pj.purchase,
+    purchase:pj.purchase,
+    purchases:pj.purchase,
+    conversion_value:k.revenue,
+    raw:{
+      performance_dataset_fallback:"tiktok_account_summary_when_report_rows_empty",
+      reason:"TikTok report returned no campaign/adgroup/ad rows for this snapshot period; dataset row mirrors snapshot KPI totals without inventing campaign entities.",
+      source_counts:snapshot.performance_summary?.counts||null,
+      purchase_journey:pj,
+      click_journey:cj
+    }
+  }];
+}
 async function spreadSnapshotToPerformanceDataset(snapshot){
   if(!snapshot?.id)throw new Error("snapshot.id is required for Performance Spread");
   const rows=Array.isArray(snapshot.performance_summary?.rows)?snapshot.performance_summary.rows:[];
@@ -1158,16 +1197,19 @@ async function spreadSnapshotToPerformanceDataset(snapshot){
     .delete()
     .eq("snapshot_id",snapshot.id);
   if(deleteError)throw deleteError;
-  const datasetRows=rows.map(row=>performanceDatasetRowFromSnapshotRow(snapshot,row)).filter(Boolean);
+  let datasetRows=rows.map(row=>performanceDatasetRowFromSnapshotRow(snapshot,row)).filter(Boolean);
   if(!datasetRows.length){
-    return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:0,source_rows:rows.length};
+    datasetRows=performanceDatasetFallbackRows(snapshot).map(row=>performanceDatasetRowFromSnapshotRow(snapshot,row)).filter(Boolean);
+  }
+  if(!datasetRows.length){
+    return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:0,source_rows:rows.length,fallback_rows:0};
   }
   const {data,error}=await supabaseAdmin
     .from("performance_dataset_rows")
     .insert(datasetRows)
     .select("id");
   if(error)throw error;
-  return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:(data||[]).length,source_rows:rows.length};
+  return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:(data||[]).length,source_rows:rows.length,fallback_rows:rows.length?0:datasetRows.length};
 }
 // ===== END PERFORMANCE SPREAD ENGINE v1 =====
 

@@ -1150,45 +1150,6 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
     }
   };
 }
-function performanceDatasetFallbackRows(snapshot){
-  const platform=normalizeJasPlatform(snapshot?.platform);
-  if(platform!=="tiktok")return [];
-  const rows=Array.isArray(snapshot.performance_summary?.rows)?snapshot.performance_summary.rows:[];
-  if(rows.length)return [];
-  const k=snapshot.kpis||{};
-  const pj=snapshot.purchase_journey||{};
-  const cj=snapshot.click_journey||{};
-  const accountId=perfText(snapshot.platform_account_id);
-  if(!accountId)return [];
-  return [{
-    level:"campaign",
-    id_in_platform:`account_summary:${accountId}`,
-    campaign_id:`account_summary:${accountId}`,
-    name:"TikTok Account Summary",
-    status:"report_empty",
-    currency:snapshot.account_currency||null,
-    spend:k.spend,
-    impressions:k.impressions,
-    reach:k.reach,
-    clicks:k.clicks,
-    ctr:k.ctr,
-    cpc:k.cpc,
-    sales:k.sales,
-    revenue:k.revenue,
-    roas:k.roas,
-    conversions:pj.purchase,
-    purchase:pj.purchase,
-    purchases:pj.purchase,
-    conversion_value:k.revenue,
-    raw:{
-      performance_dataset_fallback:"tiktok_account_summary_when_report_rows_empty",
-      reason:"TikTok report returned no campaign/adgroup/ad rows for this snapshot period; dataset row mirrors snapshot KPI totals without inventing campaign entities.",
-      source_counts:snapshot.performance_summary?.counts||null,
-      purchase_journey:pj,
-      click_journey:cj
-    }
-  }];
-}
 async function spreadSnapshotToPerformanceDataset(snapshot){
   if(!snapshot?.id)throw new Error("snapshot.id is required for Performance Spread");
   const rows=Array.isArray(snapshot.performance_summary?.rows)?snapshot.performance_summary.rows:[];
@@ -1197,19 +1158,16 @@ async function spreadSnapshotToPerformanceDataset(snapshot){
     .delete()
     .eq("snapshot_id",snapshot.id);
   if(deleteError)throw deleteError;
-  let datasetRows=rows.map(row=>performanceDatasetRowFromSnapshotRow(snapshot,row)).filter(Boolean);
+  const datasetRows=rows.map(row=>performanceDatasetRowFromSnapshotRow(snapshot,row)).filter(Boolean);
   if(!datasetRows.length){
-    datasetRows=performanceDatasetFallbackRows(snapshot).map(row=>performanceDatasetRowFromSnapshotRow(snapshot,row)).filter(Boolean);
-  }
-  if(!datasetRows.length){
-    return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:0,source_rows:rows.length,fallback_rows:0};
+    return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:0,source_rows:rows.length};
   }
   const {data,error}=await supabaseAdmin
     .from("performance_dataset_rows")
     .insert(datasetRows)
     .select("id");
   if(error)throw error;
-  return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:(data||[]).length,source_rows:rows.length,fallback_rows:rows.length?0:datasetRows.length};
+  return {ok:true,performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,snapshot_id:snapshot.id,rows:(data||[]).length,source_rows:rows.length};
 }
 // ===== END PERFORMANCE SPREAD ENGINE v1 =====
 
@@ -3219,6 +3177,62 @@ function normalizeTikTokRows(data,level="campaign"){
     return row;
   })
 }
+
+function tiktokEntityValue(item,keys){
+  const stack=[item,item?.basic_info,item?.campaign,item?.adgroup,item?.ad_group,item?.ad,item?.dimensions,item?.metrics];
+  for(const src of stack){
+    if(!src||typeof src!=="object")continue;
+    for(const key of keys){
+      if(src[key]!==undefined&&src[key]!==null&&src[key]!=="")return src[key];
+    }
+  }
+  return null;
+}
+function normalizeTikTokEntityFallbackRows(data,level="campaign"){
+  const list=Array.isArray(data?.data?.list)?data.data.list:[];
+  return list.map(item=>{
+    const dimensions={};
+    const metrics={spend:0,impressions:0,clicks:0,ctr:null,cpc:null,conversion:0};
+    const row={dimensions,metrics,raw:item,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION,truth:{},fallback_source:"tiktok_entity_list"};
+    if(level==="campaign"){
+      dimensions.campaign_id=String(tiktokEntityValue(item,["campaign_id","id"])||"").trim();
+      row.campaign_name=tiktokEntityValue(item,["campaign_name","name"]);
+      row.campaign_status=tiktokEntityValue(item,["campaign_status","status","operation_status","campaign_operation_status"]);
+    }else if(level==="adgroup"){
+      dimensions.adgroup_id=String(tiktokEntityValue(item,["adgroup_id","ad_group_id","id"])||"").trim();
+      dimensions.campaign_id=String(tiktokEntityValue(item,["campaign_id"])||"").trim()||null;
+      row.adgroup_name=tiktokEntityValue(item,["adgroup_name","ad_group_name","name"]);
+      row.adgroup_status=tiktokEntityValue(item,["adgroup_status","ad_group_status","status","operation_status"]);
+      row.campaign_name=tiktokEntityValue(item,["campaign_name"]);
+    }else if(level==="ad"){
+      dimensions.ad_id=String(tiktokEntityValue(item,["ad_id","id"])||"").trim();
+      dimensions.adgroup_id=String(tiktokEntityValue(item,["adgroup_id","ad_group_id"])||"").trim()||null;
+      dimensions.campaign_id=String(tiktokEntityValue(item,["campaign_id"])||"").trim()||null;
+      row.ad_name=tiktokEntityValue(item,["ad_name","name"]);
+      row.ad_status=tiktokEntityValue(item,["ad_status","status","operation_status"]);
+      row.adgroup_name=tiktokEntityValue(item,["adgroup_name","ad_group_name"]);
+      row.campaign_name=tiktokEntityValue(item,["campaign_name"]);
+    }
+    row.currency=tiktokEntityValue(item,["currency","currency_code"]);
+    return row;
+  }).filter(row=>tiktokRowId(row,level));
+}
+function tiktokEntityEndpointForLevel(level){
+  if(level==="adgroup")return "/v1.3/adgroup/get/";
+  if(level==="ad")return "/v1.3/ad/get/";
+  return "/v1.3/campaign/get/";
+}
+async function fetchTikTokEntityFallbackLevel({conn,advertiserId,level}){
+  const endpoint=tiktokEntityEndpointForLevel(level);
+  const data=await tiktokApiFetch({
+    base:TIKTOK_API_BASE,
+    endpoint,
+    headers:{"Access-Token":conn.access_token},
+    params:{advertiser_id:advertiserId,page:1,page_size:100}
+  });
+  return {endpoint,rows:normalizeTikTokEntityFallbackRows(data,level),raw:data};
+}
+
 function tiktokDateWindow(range,startDate,endDate){
   const end=endDate?new Date(`${endDate}T00:00:00Z`):new Date();
   const start=startDate?new Date(`${startDate}T00:00:00Z`):new Date(end);
@@ -3602,7 +3616,22 @@ async function fetchTikTokSnapshotLevel({conn,advertiserId,datePreset,level}){
       page_size:100
     }
   });
-  return {level:levelInfo.level,rows:normalizeTikTokRows(data,levelInfo.level),raw:data,window:w};
+  const reportRows=normalizeTikTokRows(data,levelInfo.level);
+  if(reportRows.length){
+    return {level:levelInfo.level,rows:reportRows,raw:{report:data,row_source:"report"},window:w};
+  }
+  let fallback={rows:[],raw:null,endpoint:null,error:null};
+  try{
+    fallback=await fetchTikTokEntityFallbackLevel({conn,advertiserId,level:levelInfo.level});
+  }catch(fallbackError){
+    fallback={rows:[],raw:null,endpoint:tiktokEntityEndpointForLevel(levelInfo.level),error:fallbackError.message};
+  }
+  return {
+    level:levelInfo.level,
+    rows:fallback.rows||[],
+    raw:{report:data,fallback:fallback.raw||null,fallback_endpoint:fallback.endpoint||null,fallback_error:fallback.error||null,row_source:(fallback.rows||[]).length?"entity_fallback":"empty"},
+    window:w
+  };
 }
 async function writeTikTokSnapshotImmutable({user,conn,advertiserId,datePreset="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
   const platformAccountId=normalizePlatformAccountId(advertiserId||conn?.account_id||conn?.metadata?.selectedPlatformAccountId||conn?.metadata?.lastOwnedPlatformAccountId);

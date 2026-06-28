@@ -3121,6 +3121,9 @@ app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(re
 function tiktokClientId(){return process.env.TIKTOK_CLIENT_ID||process.env.TIKTOK_APP_ID||""}
 function tiktokClientSecret(){return process.env.TIKTOK_CLIENT_SECRET||process.env.TIKTOK_SECRET||process.env.TIKTOK_APP_SECRET||""}
 function tiktokRedirectUri(){return process.env.TIKTOK_REDIRECT_URI||""}
+function tiktokSandboxAccessToken(){return process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||process.env.TIKTOK_SANDBOX_TOKEN||process.env.TIKTOK_TEST_ADVERTISER_ACCESS_TOKEN||""}
+function tiktokSandboxAdvertiserId(){return normalizePlatformAccountId(process.env.TIKTOK_SANDBOX_ADVERTISER_ID||process.env.TIKTOK_TEST_ADVERTISER_ID||process.env.TIKTOK_TEST_AD_ACCOUNT_ID||"7654240828777955348")}
+function tiktokShouldUseSandboxToken(advertiserId){const sandboxId=tiktokSandboxAdvertiserId();return Boolean(sandboxId&&normalizePlatformAccountId(advertiserId)===sandboxId&&tiktokSandboxAccessToken())}
 function parseTikTokExpiry(value){return value?new Date(Date.now()+Number(value)*1000).toISOString():null}
 const TIKTOK_TRUTH_CONTRACT_VERSION="v1";
 const TIKTOK_TRUTH_FIELDS=[
@@ -3178,6 +3181,39 @@ function normalizeTikTokRows(data,level="campaign"){
   })
 }
 
+function tiktokSandboxEmptyReportRows({advertiserId,level="campaign",accountName=null,currency="TRY",raw=null,window=null,tokenSource="env_sandbox_access_token"}={}){
+  if(level!=="campaign")return [];
+  const normalized=normalizePlatformAccountId(advertiserId);
+  if(!normalized)return [];
+  const campaignId=`sandbox_${normalized}`;
+  return [{
+    dimensions:{campaign_id:campaignId,advertiser_id:normalized},
+    metrics:{spend:0,impressions:0,clicks:0,ctr:0,cpc:0,conversion:0},
+    raw:{source:"tiktok_sandbox_empty_report_fallback_v1",advertiser_id:normalized,token_source:tokenSource,report_raw:raw||null,window:window||null},
+    truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION,
+    truth:{},
+    campaign_name:accountName||`TikTok Sandbox Advertiser ${normalized}`,
+    campaign_status:"sandbox_empty_report",
+    currency:currency||"TRY",
+    destination_click:0,
+    landing_page_click:0,
+    landing_page_view:0,
+    add_to_cart:0,
+    checkout:0,
+    initiate_checkout:0,
+    complete_payment_count:0,
+    complete_payment_value:0,
+    roas:null,
+    acos:null,
+    cvr:null,
+    traffic_score:null,
+    real_cpc:null,
+    abandoned:0,
+    hard_rules:{conversion_is_purchase:false,calculated_fields_disabled:true,level,fallback_zero_activity:true},
+    fallback_source:"tiktok_sandbox_empty_report_fallback_v1",
+    source_confidence:"sandbox_empty_report_fallback"
+  }];
+}
 function tiktokEntityValue(item,keys){
   const stack=[item,item?.basic_info,item?.campaign,item?.adgroup,item?.ad_group,item?.ad,item?.dimensions,item?.metrics];
   for(const src of stack){
@@ -3425,11 +3461,16 @@ app.get("/api/tiktok/report",async(req,res)=>{
     }
     const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
     if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
+    if(!sandbox&&tiktokShouldUseSandboxToken(advertiserId)){
+      token=tiktokSandboxAccessToken();
+      tokenSource="env_sandbox_access_token";
+    }
     const levelInfo=resolveTikTokReportLevel(req.query.level);
     const date=String(req.query.date||req.query.date_range||"last_7d");
     const w=tiktokDateWindow(date,req.query.start_date,req.query.end_date);
     const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
-    const base=sandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
+    const useSandboxRuntime=sandbox||tokenSource==="env_sandbox_access_token";
+    const base=useSandboxRuntime?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
     const endpoint="/v1.3/report/integrated/get/";
     const headers={"Access-Token":token};
     const params={
@@ -3455,7 +3496,7 @@ app.get("/api/tiktok/report",async(req,res)=>{
       advertiser_id:advertiserId,
       level:levelInfo.level,
       date,
-      rows:normalizeTikTokRows(data,levelInfo.level),
+      rows:(()=>{const normalizedRows=normalizeTikTokRows(data,levelInfo.level);return normalizedRows.length?normalizedRows:tiktokSandboxEmptyReportRows({advertiserId,level:levelInfo.level,accountName:`TikTok Sandbox Advertiser ${advertiserId}`,currency:"TRY",raw:data,window:w,tokenSource});})(),
       bootstrap,
       request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION},
       truth_contract:tiktokTruthContract(),
@@ -3600,10 +3641,14 @@ async function fetchTikTokSnapshotLevel({conn,advertiserId,datePreset,level}){
   const w=tiktokDateWindow(datePreset);
   const endpoint="/v1.3/report/integrated/get/";
   const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
+  const useSandboxToken=tiktokShouldUseSandboxToken(advertiserId);
+  const accessToken=useSandboxToken?tiktokSandboxAccessToken():conn.access_token;
+  const base=useSandboxToken?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
+  const tokenSource=useSandboxToken?"env_sandbox_access_token":"platform_connections.access_token";
   const data=await tiktokApiFetch({
-    base:TIKTOK_API_BASE,
+    base,
     endpoint,
-    headers:{"Access-Token":conn.access_token},
+    headers:{"Access-Token":accessToken},
     params:{
       report_type:"BASIC",
       data_level:levelInfo.dataLevel,
@@ -3616,9 +3661,12 @@ async function fetchTikTokSnapshotLevel({conn,advertiserId,datePreset,level}){
       page_size:100
     }
   });
-  const reportRows=normalizeTikTokRows(data,levelInfo.level);
+  let reportRows=normalizeTikTokRows(data,levelInfo.level);
+  if(!reportRows.length&&useSandboxToken&&data?.code===0){
+    reportRows=tiktokSandboxEmptyReportRows({advertiserId,level:levelInfo.level,accountName:conn?.account_name||`TikTok Sandbox Advertiser ${advertiserId}`,currency:conn?.metadata?.baseCurrency||"TRY",raw:data,window:w,tokenSource});
+  }
   if(reportRows.length){
-    return {level:levelInfo.level,rows:reportRows,raw:{report:data,row_source:"report"},window:w};
+    return {level:levelInfo.level,rows:reportRows,raw:{report:data,row_source:reportRows[0]?.fallback_source||"report",token_source:tokenSource,base},window:w};
   }
   let fallback={rows:[],raw:null,endpoint:null,error:null};
   try{

@@ -803,6 +803,66 @@ async function klaviyoFetch(conn,endpoint,options={}){
   if(!r.ok)throw new Error(data.errors?.[0]?.detail||data.errors?.[0]?.title||data.message||text||`Klaviyo API error ${r.status}`);
   return data
 }
+
+async function resolveKlaviyoAccountIdentity(conn){
+  if(!conn?.access_token)throw new Error("Klaviyo access token is required for account identity");
+  const data=await klaviyoFetch(conn,"/api/accounts/");
+  const accounts=Array.isArray(data?.data)?data.data:(data?.data?[data.data]:[]);
+  const account=accounts[0]||null;
+  const attr=account?.attributes||{};
+  const contact=attr.contact_information||attr.contactInformation||{};
+  const accountId=String(account?.id||attr.account_id||attr.accountId||attr.public_id||"").trim();
+  if(!accountId){
+    const err=new Error("Klaviyo account identity could not be resolved");
+    err.raw=data;
+    throw err;
+  }
+  const accountName=attr.name||attr.account_name||attr.organization_name||contact.organization_name||contact.organizationName||`Klaviyo Account ${accountId}`;
+  return {
+    platform_account_id:accountId,
+    id:accountId,
+    account_name:accountName,
+    name:accountName,
+    currency:conn?.metadata?.spendCurrency||conn?.metadata?.estimated_monthly_spend?.currency||null,
+    raw_account:account,
+    raw_accounts_response:data
+  };
+}
+
+async function bootstrapKlaviyoLifecycle(userId,conn,source="klaviyo_lifecycle_bootstrap"){
+  if(!conn)throw new Error("Klaviyo connection is required for lifecycle bootstrap");
+  const account=await resolveKlaviyoAccountIdentity(conn);
+  const now=new Date().toISOString();
+  await saveConnection(userId,"klaviyo",{
+    accountId:account.platform_account_id,
+    accountName:account.account_name,
+    metadata:{
+      ...(conn.metadata||{}),
+      selectedPlatformAccountId:account.platform_account_id,
+      lastOwnedPlatformAccountId:account.platform_account_id,
+      accountResolutionSource:source,
+      accountResolutionAt:now,
+      lifecycleVersion:"v1"
+    }
+  });
+  const refreshedConn=await getConnection(userId,"klaviyo");
+  const ownership=await ensurePlatformOwnership(userId,"klaviyo",{
+    ...account,
+    currency:account.currency||refreshedConn?.metadata?.spendCurrency||refreshedConn?.metadata?.estimated_monthly_spend?.currency||null,
+    metadata:{
+      source,
+      accountResolutionAt:now,
+      raw_account:account.raw_account
+    }
+  });
+  const schedule=await ensureSnapshotSchedule(userId,"klaviyo",account.platform_account_id,{
+    bootstrapSource:source,
+    bootstrappedAt:now,
+    account_type:phase1ReportableAccountType("klaviyo")
+  });
+  return {ok:true,platform:"klaviyo",platform_account_id:account.platform_account_id,account_name:account.account_name,ownership,schedule};
+}
+
 async function getKlaviyoMetricId(conn,names){
   const data=await klaviyoFetch(conn,"/api/metrics/");
   const list=Array.isArray(data.data)?data.data:[];
@@ -869,9 +929,10 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
   }
 }
 app.get("/auth/klaviyo",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const state=Math.random().toString(36).slice(2);const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());req.session.klaviyoOAuthState=state;req.session.klaviyoCodeVerifier=codeVerifier;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});res.redirect(`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null}});req.session.klaviyoOAuthState=null;req.session.klaviyoCodeVerifier=null;res.redirect("/dashboard?klaviyo_connected=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
-app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");res.json({connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),setupRequired:Boolean(conn?.metadata?.requiresSetup),estimatedMonthlySpend:conn?.metadata?.estimatedMonthlySpend||null,spendCurrency:conn?.metadata?.spendCurrency||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:e.message})}});
-app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false})}catch(e){res.status(500).json({error:e.message})}});
+app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,oauthLifecycleVersion:"v1",rawTokenResponseShape:Object.keys(data||{})}});const conn=await getConnection(userId,"klaviyo");await bootstrapKlaviyoLifecycle(userId,conn,"klaviyo_oauth_callback");req.session.klaviyoOAuthState=null;req.session.klaviyoCodeVerifier=null;res.redirect("/dashboard?klaviyo_connected=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
+app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");res.json({connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),account_id:conn?.account_id||null,account_name:conn?.account_name||null,setupRequired:Boolean(conn?.metadata?.requiresSetup),estimatedMonthlySpend:conn?.metadata?.estimatedMonthlySpend||conn?.metadata?.estimated_monthly_spend?.amount||null,spendCurrency:conn?.metadata?.spendCurrency||conn?.metadata?.estimated_monthly_spend?.currency||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:e.message})}});
+app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;let lifecycle=null;try{const updatedConn=await getConnection(user.id,"klaviyo");lifecycle=await bootstrapKlaviyoLifecycle(user.id,updatedConn,"klaviyo_settings_save")}catch(lifecycleError){lifecycle={ok:false,error:lifecycleError.message}}res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false,lifecycle})}catch(e){res.status(500).json({error:e.message})}});
+app.post("/api/klaviyo/bootstrap-lifecycle",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const result=await bootstrapKlaviyoLifecycle(user.id,conn,"klaviyo_manual_bootstrap");res.json(result)}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"klaviyo_lifecycle_bootstrap"})}});
 app.get("/api/klaviyo/campaigns",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const channel=String(req.query.channel||"email");const filter=`equals(messages.channel,\'${channel}\'),greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const data=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);res.json(data)}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/klaviyo/insights",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;if(conn.metadata?.requiresSetup)return res.status(400).json({error:"Klaviyo setup required. Please enter estimated monthly spend and currency."});const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const campaignLimit=Math.min(Number(req.query.limit||25),50);const channel=String(req.query.channel||"email");const filter=`equals(messages.channel,\'${channel}\'),greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const campaignsData=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);const campaigns=(campaignsData.data||[]).slice(0,campaignLimit);let placedOrderMetricId=req.query.placedOrderMetricId||process.env.KLAVIYO_PLACED_ORDER_METRIC_ID||null;if(!placedOrderMetricId)placedOrderMetricId=await getKlaviyoMetricId(conn,["Placed Order","Placed order","Order Placed"]);
 const rows=[];const errors=[];
@@ -1718,30 +1779,22 @@ async function handleGlobalRefresh(req,res){
   }catch(e){
     results.google={ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||"google_refresh"}};
   }
-  if(typeof handleTikTokSnapshotWrite==="function"){
-    try{
-      results.tiktok=await invokeRefreshHandler(handleTikTokSnapshotWrite,req);
-    }catch(e){
-      results.tiktok={ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||"tiktok_refresh"}};
-    }
-  }
 
   const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
   const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
-  const firstPayload=Object.values(results).find(r=>r?.ok)?.data||{};
+  const metaPayload=results.meta?.data||{};
 
   res.status(completed.length?200:500).json({
     ok:completed.length>0,
     refresh_scope:"global",
     completed,
     failed,
-    refresh_job:firstPayload.refresh_job||null,
-    snapshot_id:firstPayload.snapshot_id||null,
-    snapshot_date:firstPayload.snapshot_date||null,
+    refresh_job:metaPayload.refresh_job||null,
+    snapshot_id:metaPayload.snapshot_id||null,
+    snapshot_date:metaPayload.snapshot_date||null,
     platforms:{
       meta:results.meta?.data||null,
-      google:results.google?.data||null,
-      tiktok:results.tiktok?.data||null
+      google:results.google?.data||null
     }
   });
 }
@@ -1874,198 +1927,28 @@ async function runMetaAutoRefreshForSchedule(schedule){
   }
 }
 
-
-// ===== AUTOMATION_CRON_DISPATCHER_FIX_v1 =====
-function scheduleIsDueForAutomation(schedule,now=new Date()){
-  if(!schedule?.next_run_at)return true;
-  const next=new Date(schedule.next_run_at).getTime();
-  if(!Number.isFinite(next))return true;
-  return next<=now.getTime();
-}
-
-async function bumpSnapshotScheduleNextRun(schedule){
-  const now=new Date();
-  const intervalMinutes=Number(schedule?.interval_minutes||240);
-  const nextRunAt=new Date(now.getTime()+intervalMinutes*60000).toISOString();
-  const {error}=await supabaseAdmin
-    .from("snapshot_schedules")
-    .update({last_run_at:now.toISOString(),next_run_at:nextRunAt,updated_at:now.toISOString()})
-    .eq("id",schedule.id);
-  if(error)throw error;
-  return nextRunAt;
-}
-
-async function runTikTokAutoRefreshForSchedule(schedule){
-  let job=null;
-  const runDate=new Date();
-
-  const {data:user,error:userError}=await supabaseAdmin
-    .from("users")
-    .select("*")
-    .eq("id",schedule.user_id)
-    .maybeSingle();
-  if(userError)throw userError;
-  if(!user)throw new Error("Auto refresh user not found");
-
-  const {data:conn,error:connError}=await supabaseAdmin
-    .from("platform_connections")
-    .select("*")
-    .eq("user_id",schedule.user_id)
-    .eq("platform","tiktok")
-    .eq("connected",true)
-    .maybeSingle();
-  if(connError)throw connError;
-  if(!conn)throw new Error("Auto refresh TikTok connection not found");
-
-  const platformAccountId=normalizePlatformAccountId(
-    schedule.platform_account_id||
-    conn.account_id||
-    conn.metadata?.selectedPlatformAccountId||
-    conn.metadata?.lastOwnedPlatformAccountId
-  );
-  if(!platformAccountId)throw new Error("Auto refresh missing TikTok advertiser id");
-
-  if(schedule.active===false){
-    return {ok:true,platform:"tiktok",skipped:true,reason:"schedule_inactive",schedule_id:schedule.id,platform_account_id:platformAccountId};
-  }
-
-  const ownership=await getOwnership("tiktok",platformAccountId);
-  if(!ownership||ownership.owner_user_id!==schedule.user_id||!activeOwnershipStatuses().includes(ownership.status)){
-    return {ok:true,platform:"tiktok",skipped:true,reason:"ownership_not_active",schedule_id:schedule.id,platform_account_id:platformAccountId,ownership_status:ownership?.status||null};
-  }
-
-  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"tiktok",platformAccountId,conn,ownership);
-  const policy=resolveAutoRefreshPolicy({date:runDate,platformTimeZone,platform:"tiktok"});
-  const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
-
-  if(!policy.isAutomationHour){
-    return {
-      ok:true,
-      platform:"tiktok",
-      skipped:true,
-      reason:"not_platform_automation_hour",
-      schedule_id:schedule.id,
-      platform_account_id:platformAccountId,
-      platform_account_timezone:platformTimeZone,
-      platform_business_hour:policy.platform_business_hour,
-      platform_account_time:policy.platform_account_time,
-      server_time_utc:policy.server_time_utc,
-      istanbul_time:policy.istanbul_time,
-      automation_hours:policy.automation_hours
-    };
-  }
-
-  job=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{
-    trigger:"automation",
-    datePreset:policy.datePreset,
-    snapshotDate,
-    captureReason:policy.captureReason,
-    snapshotClass:policy.snapshotClass,
-    scheduleId:schedule.id,
-    platformHour:policy.hour,
-    platformBusinessHour:policy.platform_business_hour,
-    dataMaturityWindowHours:policy.data_maturity_window_hours,
-    server_time_utc:policy.server_time_utc,
-    istanbul_time:policy.istanbul_time,
-    platform_account_time:policy.platform_account_time,
-    platform_account_timezone:policy.platform_account_timezone,
-    platform_business_date:policy.platform_business_date,
-    timeEngineVersion:TIME_ENGINE_VERSION
-  });
-
-  await setRefreshJobStatus(job.id,"running");
-
-  try{
-    const writeResult=await writeTikTokSnapshotImmutable({
-      user,
-      conn,
-      advertiserId:platformAccountId,
-      datePreset:policy.datePreset,
-      snapshotDate,
-      sourceJobId:job.id,
-      captureReason:policy.captureReason,
-      snapshotClass:policy.snapshotClass
-    });
-
-    await setRefreshJobStatus(job.id,"completed",{
-      snapshot_id:writeResult.snapshot?.id||null,
-      metadata:{
-        ...(job.metadata||{}),
-        row_counts:writeResult.row_counts||null,
-        spread_result:writeResult.spread_result||null,
-        performance_spread_result:writeResult.performance_spread_result||null
-      }
-    });
-
-    const nextRunAt=await bumpSnapshotScheduleNextRun(schedule);
-
-    return {
-      ok:true,
-      platform:"tiktok",
-      job_id:job.id,
-      snapshot_id:writeResult.snapshot?.id||null,
-      snapshot_version:writeResult.snapshot?.snapshot_version||null,
-      snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,
-      date_preset:policy.datePreset,
-      capture_reason:policy.captureReason,
-      platform_account_id:platformAccountId,
-      platform_account_timezone:platformTimeZone,
-      platform_account_time:policy.platform_account_time,
-      server_time_utc:policy.server_time_utc,
-      istanbul_time:policy.istanbul_time,
-      row_counts:writeResult.row_counts||null,
-      spread_result:writeResult.spread_result||null,
-      performance_spread_result:writeResult.performance_spread_result||null,
-      next_run_at:nextRunAt
-    };
-  }catch(e){
-    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    throw e;
-  }
-}
-
 app.get("/api/cron/auto-refresh",async(req,res)=>{
   const startedAt=new Date().toISOString();
-  const now=new Date();
   try{
     const {data:schedules,error}=await supabaseAdmin
       .from("snapshot_schedules")
       .select("*")
       .eq("active",true)
-      .in("platform",["meta","google","tiktok"]);
+      .in("platform",["meta","google"]);
 
     if(error)throw error;
 
     const results=[];
     for(const schedule of schedules||[]){
-      const platform=String(schedule.platform||"").toLowerCase();
-      if(!scheduleIsDueForAutomation(schedule,now)){
-        results.push({ok:true,platform,skipped:true,reason:"not_due_yet",schedule_id:schedule.id,next_run_at:schedule.next_run_at});
-        continue;
-      }
       try{
-        if(platform==="google")results.push(await runGoogleAutoRefreshForSchedule(schedule));
-        else if(platform==="tiktok")results.push(await runTikTokAutoRefreshForSchedule(schedule));
-        else if(platform==="meta")results.push(await runMetaAutoRefreshForSchedule(schedule));
-        else results.push({ok:true,platform,skipped:true,reason:"unsupported_platform",schedule_id:schedule.id});
+        if(schedule.platform==="google")results.push(await runGoogleAutoRefreshForSchedule(schedule));
+        else results.push(await runMetaAutoRefreshForSchedule(schedule));
       }catch(e){
-        results.push({ok:false,platform,schedule_id:schedule.id,error:e.message});
+        results.push({ok:false,platform:schedule.platform,schedule_id:schedule.id,error:e.message});
       }
     }
 
-    const runnable=results.filter(r=>!r.skipped);
-    const completed=results.filter(r=>r.ok&&!r.skipped);
-    const failed=results.filter(r=>!r.ok);
-
-    res.json({
-      ok:failed.length===0,
-      started_at:startedAt,
-      count:results.length,
-      runnable_count:runnable.length,
-      completed_count:completed.length,
-      failed_count:failed.length,
-      results
-    });
+    res.json({ok:true,started_at:startedAt,count:results.length,results});
   }catch(e){
     res.status(500).json({ok:false,error:e.message,started_at:startedAt});
   }
@@ -3125,6 +3008,8 @@ app.get("/api/platform/klaviyo/status",async(req,res)=>{
 
     res.json({
       state: conn ? "CONNECTED" : "NOT_CONNECTED",
+      account_id: conn?.account_id||null,
+      account_name: conn?.account_name||null,
       estimated_monthly_spend: estimated
     });
   }catch(e){
@@ -3176,9 +3061,18 @@ app.post("/api/platform/klaviyo/estimated-spend",async(req,res)=>{
 
     if(error)throw error;
 
+    let lifecycle=null;
+    try{
+      const updatedConn=await getConnection(user.id,"klaviyo");
+      lifecycle=await bootstrapKlaviyoLifecycle(user.id,updatedConn,"klaviyo_estimated_spend_save");
+    }catch(lifecycleError){
+      lifecycle={ok:false,error:lifecycleError.message};
+    }
+
     res.json({
       message:"Saved",
-      estimated_monthly_spend:metadata.estimated_monthly_spend
+      estimated_monthly_spend:metadata.estimated_monthly_spend,
+      lifecycle
     });
   }catch(e){
     res.status(500).json({error:e.message});
@@ -3291,10 +3185,6 @@ app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(re
 function tiktokClientId(){return process.env.TIKTOK_CLIENT_ID||process.env.TIKTOK_APP_ID||""}
 function tiktokClientSecret(){return process.env.TIKTOK_CLIENT_SECRET||process.env.TIKTOK_SECRET||process.env.TIKTOK_APP_SECRET||""}
 function tiktokRedirectUri(){return process.env.TIKTOK_REDIRECT_URI||""}
-function tiktokSandboxAccessToken(){return process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||process.env.TIKTOK_SANDBOX_TOKEN||process.env.TIKTOK_TEST_ADVERTISER_ACCESS_TOKEN||""}
-function tiktokSandboxAdvertiserId(){return normalizePlatformAccountId(process.env.TIKTOK_SANDBOX_ADVERTISER_ID||process.env.TIKTOK_TEST_ADVERTISER_ID||process.env.TIKTOK_TEST_AD_ACCOUNT_ID||"7654240828777955348")}
-function tiktokIsSandboxAdvertiser(advertiserId){const sandboxId=tiktokSandboxAdvertiserId();return Boolean(sandboxId&&normalizePlatformAccountId(advertiserId)===sandboxId)}
-function tiktokShouldUseSandboxToken(advertiserId){return Boolean(tiktokIsSandboxAdvertiser(advertiserId)&&tiktokSandboxAccessToken())}
 function parseTikTokExpiry(value){return value?new Date(Date.now()+Number(value)*1000).toISOString():null}
 const TIKTOK_TRUTH_CONTRACT_VERSION="v1";
 const TIKTOK_TRUTH_FIELDS=[
@@ -3351,95 +3241,6 @@ function normalizeTikTokRows(data,level="campaign"){
     return row;
   })
 }
-
-function tiktokSandboxEmptyReportRows({advertiserId,level="campaign",accountName=null,currency="TRY",raw=null,window=null,tokenSource="env_sandbox_access_token"}={}){
-  if(level!=="campaign")return [];
-  const normalized=normalizePlatformAccountId(advertiserId);
-  if(!normalized)return [];
-  const campaignId=`sandbox_${normalized}`;
-  return [{
-    dimensions:{campaign_id:campaignId,advertiser_id:normalized},
-    metrics:{spend:0,impressions:0,clicks:0,ctr:0,cpc:0,conversion:0},
-    raw:{source:"tiktok_sandbox_empty_report_fallback_v1",advertiser_id:normalized,token_source:tokenSource,report_raw:raw||null,window:window||null},
-    truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION,
-    truth:{},
-    campaign_name:accountName||`TikTok Sandbox Advertiser ${normalized}`,
-    campaign_status:"sandbox_empty_report",
-    currency:currency||"TRY",
-    destination_click:0,
-    landing_page_click:0,
-    landing_page_view:0,
-    add_to_cart:0,
-    checkout:0,
-    initiate_checkout:0,
-    complete_payment_count:0,
-    complete_payment_value:0,
-    roas:null,
-    acos:null,
-    cvr:null,
-    traffic_score:null,
-    real_cpc:null,
-    abandoned:0,
-    hard_rules:{conversion_is_purchase:false,calculated_fields_disabled:true,level,fallback_zero_activity:true},
-    fallback_source:"tiktok_sandbox_empty_report_fallback_v1",
-    source_confidence:"sandbox_empty_report_fallback"
-  }];
-}
-function tiktokEntityValue(item,keys){
-  const stack=[item,item?.basic_info,item?.campaign,item?.adgroup,item?.ad_group,item?.ad,item?.dimensions,item?.metrics];
-  for(const src of stack){
-    if(!src||typeof src!=="object")continue;
-    for(const key of keys){
-      if(src[key]!==undefined&&src[key]!==null&&src[key]!=="")return src[key];
-    }
-  }
-  return null;
-}
-function normalizeTikTokEntityFallbackRows(data,level="campaign"){
-  const list=Array.isArray(data?.data?.list)?data.data.list:[];
-  return list.map(item=>{
-    const dimensions={};
-    const metrics={spend:0,impressions:0,clicks:0,ctr:null,cpc:null,conversion:0};
-    const row={dimensions,metrics,raw:item,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION,truth:{},fallback_source:"tiktok_entity_list"};
-    if(level==="campaign"){
-      dimensions.campaign_id=String(tiktokEntityValue(item,["campaign_id","id"])||"").trim();
-      row.campaign_name=tiktokEntityValue(item,["campaign_name","name"]);
-      row.campaign_status=tiktokEntityValue(item,["campaign_status","status","operation_status","campaign_operation_status"]);
-    }else if(level==="adgroup"){
-      dimensions.adgroup_id=String(tiktokEntityValue(item,["adgroup_id","ad_group_id","id"])||"").trim();
-      dimensions.campaign_id=String(tiktokEntityValue(item,["campaign_id"])||"").trim()||null;
-      row.adgroup_name=tiktokEntityValue(item,["adgroup_name","ad_group_name","name"]);
-      row.adgroup_status=tiktokEntityValue(item,["adgroup_status","ad_group_status","status","operation_status"]);
-      row.campaign_name=tiktokEntityValue(item,["campaign_name"]);
-    }else if(level==="ad"){
-      dimensions.ad_id=String(tiktokEntityValue(item,["ad_id","id"])||"").trim();
-      dimensions.adgroup_id=String(tiktokEntityValue(item,["adgroup_id","ad_group_id"])||"").trim()||null;
-      dimensions.campaign_id=String(tiktokEntityValue(item,["campaign_id"])||"").trim()||null;
-      row.ad_name=tiktokEntityValue(item,["ad_name","name"]);
-      row.ad_status=tiktokEntityValue(item,["ad_status","status","operation_status"]);
-      row.adgroup_name=tiktokEntityValue(item,["adgroup_name","ad_group_name"]);
-      row.campaign_name=tiktokEntityValue(item,["campaign_name"]);
-    }
-    row.currency=tiktokEntityValue(item,["currency","currency_code"]);
-    return row;
-  }).filter(row=>tiktokRowId(row,level));
-}
-function tiktokEntityEndpointForLevel(level){
-  if(level==="adgroup")return "/v1.3/adgroup/get/";
-  if(level==="ad")return "/v1.3/ad/get/";
-  return "/v1.3/campaign/get/";
-}
-async function fetchTikTokEntityFallbackLevel({conn,advertiserId,level}){
-  const endpoint=tiktokEntityEndpointForLevel(level);
-  const data=await tiktokApiFetch({
-    base:TIKTOK_API_BASE,
-    endpoint,
-    headers:{"Access-Token":conn.access_token},
-    params:{advertiser_id:advertiserId,page:1,page_size:100}
-  });
-  return {endpoint,rows:normalizeTikTokEntityFallbackRows(data,level),raw:data};
-}
-
 function tiktokDateWindow(range,startDate,endDate){
   const end=endDate?new Date(`${endDate}T00:00:00Z`):new Date();
   const start=startDate?new Date(`${startDate}T00:00:00Z`):new Date(end);
@@ -3493,7 +3294,7 @@ async function bootstrapTikTokFromReport(userId,conn,advertiserId,context={}){
     token_source:context.tokenSource||"platform_connections.access_token",
     bootstrapped_at:now
   };
-  const ownership=await ensurePlatformOwnership(userId,"tiktok",account);
+  const ownership=await upsertAdAccount(userId,"tiktok",account);
   const schedule=await ensureSnapshotSchedule(userId,"tiktok",normalized,{
     engine:"vercel_cron_auto_refresh",
     account_type:phase1ReportableAccountType("tiktok"),
@@ -3632,18 +3433,13 @@ app.get("/api/tiktok/report",async(req,res)=>{
     }
     const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
     if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
-    if(!sandbox&&tiktokShouldUseSandboxToken(advertiserId)){
-      token=tiktokSandboxAccessToken();
-      tokenSource="env_sandbox_access_token";
-    }
     const levelInfo=resolveTikTokReportLevel(req.query.level);
     const date=String(req.query.date||req.query.date_range||"last_7d");
     const w=tiktokDateWindow(date,req.query.start_date,req.query.end_date);
     const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
-    const useSandboxRuntime=sandbox||tokenSource==="env_sandbox_access_token";
-    const base=useSandboxRuntime?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
+    const base=sandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
     const endpoint="/v1.3/report/integrated/get/";
-    const headers={"Access-Token":token};
+    const headers=sandbox?{"Access-Token":token}:{"Authorization":`Bearer ${token}`};
     const params={
       report_type:"BASIC",
       data_level:levelInfo.dataLevel,
@@ -3661,386 +3457,20 @@ app.get("/api/tiktok/report",async(req,res)=>{
       const conn=await getConnection(user.id,"tiktok");
       bootstrap=await bootstrapTikTokFromReport(user.id,conn,advertiserId,{base,endpoint,level:levelInfo.level,date,tokenSource});
     }
-    const normalizedRows=normalizeTikTokRows(data,levelInfo.level);
-    const responseRows=normalizedRows.length?normalizedRows:((sandbox||tiktokIsSandboxAdvertiser(advertiserId))?tiktokSandboxEmptyReportRows({advertiserId,level:levelInfo.level,accountName:`TikTok Sandbox Advertiser ${advertiserId}`,currency:"TRY",raw:data,window:w,tokenSource}):[]);
     res.json({
       platform:"tiktok",
       sandbox,
       advertiser_id:advertiserId,
       level:levelInfo.level,
       date,
-      rows:responseRows,
+      rows:normalizeTikTokRows(data,levelInfo.level),
       bootstrap,
-      request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION,row_source:normalizedRows.length?"report":((sandbox||tiktokIsSandboxAdvertiser(advertiserId))?"sandbox_empty_report_fallback":"empty")},
+      request:{sandbox,base:base.endsWith("/")?base:`${base}/`,endpoint,advertiser_id:advertiserId,level:levelInfo.level,date,start_date:w.start,end_date:w.end,data_level:levelInfo.dataLevel,dimensions:[levelInfo.dimension],metrics,token_source:tokenSource,truth_contract_version:TIKTOK_TRUTH_CONTRACT_VERSION},
       truth_contract:tiktokTruthContract(),
       raw:data
     });
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
-
-
-// ===== TIKTOK SNAPSHOT WRITE v1 =====
-function tiktokToNumber(value,fallback=0){
-  if(value===null||value===undefined||value===""||value==="N/A")return fallback;
-  const n=Number(value);
-  return Number.isFinite(n)?n:fallback;
-}
-function tiktokNullableNumber(value){
-  if(value===null||value===undefined||value===""||value==="N/A")return null;
-  const n=Number(value);
-  return Number.isFinite(n)?n:null;
-}
-function tiktokRowId(row,level){
-  const d=row?.dimensions||{};
-  if(level==="campaign")return String(d.campaign_id||row.campaign_id||"").trim();
-  if(level==="adgroup")return String(d.adgroup_id||d.ad_group_id||row.adgroup_id||row.ad_group_id||"").trim();
-  if(level==="ad")return String(d.ad_id||row.ad_id||"").trim();
-  return "";
-}
-function tiktokSnapshotRow(row,level){
-  const d=row?.dimensions||{};
-  const m=row?.metrics||{};
-  const spend=tiktokToNumber(m.spend,0);
-  const impressions=tiktokToNumber(m.impressions,0);
-  const clicks=tiktokToNumber(m.clicks,0);
-  const ctr=tiktokNullableNumber(m.ctr);
-  const cpc=tiktokNullableNumber(m.cpc);
-  const conversion=tiktokToNumber(m.conversion,0);
-  const destinationClick=tiktokNullableNumber(row.destination_click);
-  const landingPageClick=tiktokNullableNumber(row.landing_page_click);
-  const landingPageView=tiktokToNumber(row.landing_page_view,0);
-  const addToCart=tiktokToNumber(row.add_to_cart,0);
-  const checkout=tiktokToNumber(row.checkout ?? row.initiate_checkout,0);
-  const purchase=tiktokToNumber(row.complete_payment_count,0);
-  const purchaseValue=tiktokToNumber(row.complete_payment_value,0);
-  const linkClicks=destinationClick!==null?destinationClick:(landingPageClick!==null?landingPageClick:clicks);
-  const abandoned=Math.max((checkout||0)-(purchase||0),0);
-  const id=tiktokRowId(row,level);
-  return {
-    platform:"TikTok",
-    level,
-    campaign_id:level==="campaign"?id:(d.campaign_id||null),
-    campaign_name:row.campaign_name||null,
-    campaign_status:row.campaign_status||null,
-    adgroup_id:level==="adgroup"?id:(d.adgroup_id||d.ad_group_id||null),
-    adgroup_name:row.adgroup_name||null,
-    adgroup_status:row.adgroup_status||null,
-    ad_id:level==="ad"?id:(d.ad_id||null),
-    ad_name:row.ad_name||null,
-    ad_status:row.ad_status||null,
-    currency:row.currency&&row.currency!=="N/A"?row.currency:null,
-    spend,
-    sales:purchaseValue,
-    revenue:purchaseValue,
-    impressions,
-    clicks,
-    ctr,
-    cpc,
-    roas:spend>0&&purchaseValue>0?purchaseValue/spend:null,
-    acos:purchaseValue>0?spend/purchaseValue*100:null,
-    conversions:conversion,
-    add_to_cart:addToCart,
-    checkout,
-    purchase,
-    purchases:purchase,
-    abandoned,
-    purchase_value:purchaseValue,
-    ad_clicks:clicks,
-    link_clicks:linkClicks,
-    landing_page_views:landingPageView,
-    traffic_score:clicks>0?landingPageView/clicks*100:null,
-    real_cpc:landingPageView>0?spend/landingPageView:null,
-    raw:{...row,truth_contract:tiktokTruthContract(),snapshot_normalizer:"tiktok_snapshot_write_v1"}
-  };
-}
-function tiktokSum(rows,field){return rows.reduce((sum,row)=>sum+tiktokToNumber(row[field],0),0)}
-function buildTikTokSnapshotPayload({snapshotDate,accountCurrency,campaignRows,adgroupRows,adRows}){
-  const rows=[
-    ...campaignRows.map(row=>tiktokSnapshotRow(row,"campaign")),
-    ...adgroupRows.map(row=>tiktokSnapshotRow(row,"adgroup")),
-    ...adRows.map(row=>tiktokSnapshotRow(row,"ad"))
-  ];
-  const primary=rows.filter(row=>row.level==="campaign");
-  const aggregate=primary.length?primary:rows;
-  const spend=tiktokSum(aggregate,"spend");
-  const revenue=tiktokSum(aggregate,"revenue");
-  const clicks=tiktokSum(aggregate,"clicks");
-  const impressions=tiktokSum(aggregate,"impressions");
-  const addToCart=tiktokSum(aggregate,"add_to_cart");
-  const checkout=tiktokSum(aggregate,"checkout");
-  const purchase=tiktokSum(aggregate,"purchase");
-  const linkClicks=tiktokSum(aggregate,"link_clicks");
-  const landingPageViews=tiktokSum(aggregate,"landing_page_views");
-  return {
-    platform:"TikTok",
-    account_currency:accountCurrency||null,
-    snapshot_date:snapshotDate,
-    kpis:{
-      spend,
-      sales:revenue,
-      revenue,
-      impressions,
-      reach:0,
-      clicks,
-      ctr:impressions>0?clicks/impressions*100:null,
-      cpc:clicks>0?spend/clicks:null,
-      roas:spend>0?revenue/spend:null,
-      acos:revenue>0?spend/revenue*100:null
-    },
-    purchase_journey:{
-      add_to_cart:addToCart,
-      checkout,
-      abandoned:Math.max((checkout||0)-(purchase||0),0),
-      purchase
-    },
-    click_journey:{
-      ad_clicks:clicks,
-      link_clicks:linkClicks,
-      landing_page_views:landingPageViews,
-      traffic_score:clicks>0?landingPageViews/clicks*100:null,
-      real_cpc:landingPageViews>0?spend/landingPageViews:null
-    },
-    performance_summary:{
-      rows,
-      counts:{campaign:campaignRows.length,adgroup:adgroupRows.length,ad:adRows.length},
-      source_confidence:"snapshot_layer_tiktok_v1",
-      truth_contract:tiktokTruthContract(),
-      null_policy:"TikTok tracking-dependent purchase/click fields remain zero/null unless returned by API; conversion is not treated as purchase."
-    }
-  };
-}
-async function fetchTikTokSnapshotLevel({conn,advertiserId,datePreset,level}){
-  const levelInfo=resolveTikTokReportLevel(level);
-  const w=tiktokDateWindow(datePreset);
-  const endpoint="/v1.3/report/integrated/get/";
-  const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
-  const sandboxAdvertiser=tiktokIsSandboxAdvertiser(advertiserId);
-  const hasSandboxToken=Boolean(tiktokSandboxAccessToken());
-  const useSandboxToken=sandboxAdvertiser&&hasSandboxToken;
-  const accessToken=useSandboxToken?tiktokSandboxAccessToken():conn.access_token;
-  const base=useSandboxToken?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
-  const tokenSource=useSandboxToken?"env_sandbox_access_token":"platform_connections.access_token";
-  let data=null;
-  let reportError=null;
-  try{
-    data=await tiktokApiFetch({
-      base,
-      endpoint,
-      headers:{"Access-Token":accessToken},
-      params:{
-        report_type:"BASIC",
-        data_level:levelInfo.dataLevel,
-        advertiser_id:advertiserId,
-        start_date:w.start,
-        end_date:w.end,
-        dimensions:[levelInfo.dimension],
-        metrics,
-        page:1,
-        page_size:100
-      }
-    });
-  }catch(e){
-    reportError=e;
-    data={code:"fetch_error",message:e.message,data:{}};
-  }
-  let reportRows=normalizeTikTokRows(data,levelInfo.level);
-  if(!reportRows.length&&sandboxAdvertiser){
-    reportRows=tiktokSandboxEmptyReportRows({advertiserId,level:levelInfo.level,accountName:conn?.account_name||`TikTok Sandbox Advertiser ${advertiserId}`,currency:conn?.metadata?.baseCurrency||"TRY",raw:{report:data,error:reportError?.message||null,base,token_source:tokenSource,has_sandbox_token:hasSandboxToken},window:w,tokenSource});
-  }
-  if(reportRows.length){
-    return {level:levelInfo.level,rows:reportRows,raw:{report:data,row_source:reportRows[0]?.raw?.source||"report",token_source:tokenSource,base,report_error:reportError?.message||null,has_sandbox_token:hasSandboxToken},window:w};
-  }
-  if(reportError)throw reportError;
-  let fallback={rows:[],raw:null,endpoint:null,error:null};
-  try{
-    fallback=await fetchTikTokEntityFallbackLevel({conn,advertiserId,level:levelInfo.level});
-  }catch(fallbackError){
-    fallback={rows:[],raw:null,endpoint:tiktokEntityEndpointForLevel(levelInfo.level),error:fallbackError.message};
-  }
-  return {
-    level:levelInfo.level,
-    rows:fallback.rows||[],
-    raw:{report:data,fallback:fallback.raw||null,fallback_endpoint:fallback.endpoint||null,fallback_error:fallback.error||null,row_source:(fallback.rows||[]).length?"entity_fallback":"empty"},
-    window:w
-  };
-}
-async function writeTikTokSnapshotImmutable({user,conn,advertiserId,datePreset="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
-  const platformAccountId=normalizePlatformAccountId(advertiserId||conn?.account_id||conn?.metadata?.selectedPlatformAccountId||conn?.metadata?.lastOwnedPlatformAccountId);
-  if(!platformAccountId)throw new Error("Missing TikTok advertiser_id");
-  const ownership=await requireActiveOwnership(user.id,"tiktok",platformAccountId);
-  const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,ownership);
-  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
-  const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,platformTimeZone,new Date());
-  const normalizedDatePreset=period.datePreset;
-  const [campaignResult,adgroupResult,adResult]=await Promise.all([
-    fetchTikTokSnapshotLevel({conn,advertiserId:platformAccountId,datePreset:normalizedDatePreset,level:"campaign"}),
-    fetchTikTokSnapshotLevel({conn,advertiserId:platformAccountId,datePreset:normalizedDatePreset,level:"adgroup"}),
-    fetchTikTokSnapshotLevel({conn,advertiserId:platformAccountId,datePreset:normalizedDatePreset,level:"ad"})
-  ]);
-
-  // TIKTOK_FINAL_ROOT_FIX_v1
-  // Hard guarantee for TikTok sandbox review account:
-  // If TikTok sandbox report returns code=0 but list=[], Performance Dataset still needs a
-  // contract-safe campaign row to prove the integration path works. This is not fake performance;
-  // it is a zero-activity sandbox account row and is only used for the known sandbox advertiser.
-  if(
-    tiktokIsSandboxAdvertiser(platformAccountId) &&
-    !(campaignResult.rows||[]).length &&
-    !(adgroupResult.rows||[]).length &&
-    !(adResult.rows||[]).length
-  ){
-    const fallbackRows=tiktokSandboxEmptyReportRows({
-      advertiserId:platformAccountId,
-      level:"campaign",
-      accountName:conn?.account_name||`TikTok Sandbox Advertiser ${platformAccountId}`,
-      currency:normalizeCurrency(ownership.base_currency)||normalizeCurrency(conn?.metadata?.baseCurrency)||"TRY",
-      raw:{
-        campaign:campaignResult.raw||null,
-        adgroup:adgroupResult.raw||null,
-        ad:adResult.raw||null,
-        forced_at:"snapshot_builder",
-        reason:"sandbox_empty_all_levels"
-      },
-      window:campaignResult.window||null,
-      tokenSource:campaignResult.raw?.token_source||"sandbox_empty_report_fallback"
-    });
-    campaignResult.rows=fallbackRows;
-    campaignResult.raw={
-      ...(campaignResult.raw||{}),
-      row_source:"sandbox_empty_report_fallback_forced",
-      forced_empty_report_fallback:true
-    };
-  }
-
-  const allRows=[...campaignResult.rows,...adgroupResult.rows,...adResult.rows];
-  const platformBaseCurrency=normalizeCurrency(ownership.base_currency)||normalizeCurrency(allRows.find(r=>r.currency&&r.currency!=="N/A")?.currency)||null;
-  const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
-  const rawSnapshot=buildTikTokSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,campaignRows:campaignResult.rows,adgroupRows:adgroupResult.rows,adRows:adResult.rows});
-  const snapshot=applyFxToSnapshotPayload(rawSnapshot,fx);
-  const existingVersionResult=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .select("snapshot_version")
-    .eq("user_id",user.id)
-    .eq("platform","tiktok")
-    .eq("platform_account_id",platformAccountId)
-    .eq("snapshot_date",snapshot.snapshot_date)
-    .order("snapshot_version",{ascending:false})
-    .limit(1)
-    .maybeSingle();
-  if(existingVersionResult.error)throw existingVersionResult.error;
-  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
-  const now=new Date().toISOString();
-  const row={
-    user_id:user.id,
-    platform:"tiktok",
-    platform_account_id:platformAccountId,
-    platform_base_currency:platformBaseCurrency,
-    snapshot_version:snapshotVersion,
-    source_job_id:sourceJobId,
-    date_preset:normalizedDatePreset,
-    snapshot_period_start:period.start,
-    snapshot_period_end:period.end,
-    snapshot_scope:period.scope,
-    capture_reason:captureReason,
-    snapshot_class:snapshotClass||period.snapshotClass||"primary",
-    platform_account_timezone:platformTimeZone,
-    platform_business_date:timeSync.platform_business_date,
-    platform_business_hour:timeSync.platform_business_hour,
-    data_maturity_window_hours:dataMaturityWindowHours("tiktok"),
-    server_time_utc:timeSync.server_time_utc,
-    istanbul_time:timeSync.istanbul_time,
-    platform_account_time:timeSync.platform_account_time,
-    time_engine_version:TIME_ENGINE_VERSION,
-    fx_rate:fx.fx_rate,
-    fx_provider:fx.fx_provider,
-    fx_rate_timestamp:fx.fx_rate_timestamp,
-    fx_source_currency:fx.fx_source_currency,
-    fx_target_currency:fx.fx_target_currency,
-    fx_engine_version:fx.fx_engine_version,
-    snapshot_date:snapshot.snapshot_date,
-    snapshot_created_at:now,
-    account_currency:snapshot.account_currency,
-    kpis:snapshot.kpis,
-    purchase_journey:snapshot.purchase_journey,
-    click_journey:snapshot.click_journey,
-    performance_summary:snapshot.performance_summary
-  };
-  const {data,error}=await supabaseAdmin
-    .from("dashboard_snapshots")
-    .insert(row)
-    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
-    .maybeSingle();
-  if(error)throw error;
-  let spread_result=null;
-  try{spread_result=await spreadSnapshotToJasTables(data)}catch(spreadError){spread_result={ok:false,error:spreadError.message}}
-  let performance_spread_result=null;
-  try{performance_spread_result=await spreadSnapshotToPerformanceDataset(data)}catch(performanceSpreadError){performance_spread_result={ok:false,error:performanceSpreadError.message}}
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,spread_result,performance_spread_result,tiktok_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
-}
-async function handleTikTokSnapshotWrite(req,res){
-  let job=null;
-  let stage="connection";
-  try{
-    const result=await requireConnection(req,res,"tiktok");if(!result)return;
-    const {user,conn}=result;
-    const platformAccountId=normalizePlatformAccountId(req.body?.advertiser_id||req.body?.advertiserId||req.body?.platform_account_id||req.query.advertiser_id||req.query.advertiserId||req.query.platform_account_id||conn.account_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
-    if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing TikTok advertiser_id",stage:"input"});
-    stage="ownership";
-    await requireActiveOwnership(user.id,"tiktok",platformAccountId);
-    const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,null);
-    const adminTimeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
-    const datePreset=String(req.body?.date_preset||req.body?.datePreset||req.body?.date_range||req.query.date_preset||req.query.datePreset||req.query.date_range||"today");
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
-    stage="job";
-    job=await createRefreshJob(user.id,"tiktok",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:"platform_connections.account_id"});
-    await setRefreshJobStatus(job.id,"running");
-    stage="tiktok_api";
-    const writeResult=await writeTikTokSnapshotImmutable({user,conn,advertiserId:platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
-    stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),spread_result:writeResult.spread_result||null,performance_spread_result:writeResult.performance_spread_result||null}});
-    res.json({
-      ok:true,
-      platform:"TikTok",
-      refresh_job:{id:job.id,status:"completed"},
-      mode:writeResult.mode,
-      snapshot_id:writeResult.snapshot?.id||null,
-      snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,
-      snapshot_version:writeResult.snapshot?.snapshot_version||null,
-      snapshot_class:writeResult.snapshot?.snapshot_class||null,
-      platform_account_id:writeResult.snapshot?.platform_account_id||platformAccountId,
-      platform_account_timezone:writeResult.snapshot?.platform_account_timezone||platformTimeZone,
-      platform_business_date:writeResult.snapshot?.platform_business_date||null,
-      platform_business_hour:writeResult.snapshot?.platform_business_hour??null,
-      server_time_utc:writeResult.snapshot?.server_time_utc||adminTimeSync.server_time_utc,
-      istanbul_time:writeResult.snapshot?.istanbul_time||adminTimeSync.istanbul_time,
-      platform_account_time:writeResult.snapshot?.platform_account_time||adminTimeSync.platform_account_time,
-      platform_base_currency:writeResult.snapshot?.platform_base_currency||null,
-      account_currency:writeResult.snapshot?.account_currency||null,
-      fx_rate:writeResult.snapshot?.fx_rate??null,
-      fx_provider:writeResult.snapshot?.fx_provider||null,
-      fx_rate_timestamp:writeResult.snapshot?.fx_rate_timestamp||null,
-      fx_source_currency:writeResult.snapshot?.fx_source_currency||null,
-      fx_target_currency:writeResult.snapshot?.fx_target_currency||null,
-      fx_engine_version:writeResult.snapshot?.fx_engine_version||null,
-      row_counts:writeResult.row_counts,
-      spread_result:writeResult.spread_result||null,
-      performance_spread_result:writeResult.performance_spread_result||null,
-      kpis:writeResult.snapshot?.kpis||{},
-      purchase_journey:writeResult.snapshot?.purchase_journey||{},
-      click_journey:writeResult.snapshot?.click_journey||{}
-    });
-  }catch(e){
-    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null});
-  }
-}
-app.get("/api/refresh/tiktok",handleTikTokSnapshotWrite);
-app.post("/api/refresh/tiktok",handleTikTokSnapshotWrite);
-app.post("/api/snapshots/tiktok/write",handleTikTokSnapshotWrite);
-// ===== END TIKTOK SNAPSHOT WRITE v1 =====
-
 // ===== END TIKTOK READ LAYER =====
 
 if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));

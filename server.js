@@ -1874,28 +1874,198 @@ async function runMetaAutoRefreshForSchedule(schedule){
   }
 }
 
+
+// ===== AUTOMATION_CRON_DISPATCHER_FIX_v1 =====
+function scheduleIsDueForAutomation(schedule,now=new Date()){
+  if(!schedule?.next_run_at)return true;
+  const next=new Date(schedule.next_run_at).getTime();
+  if(!Number.isFinite(next))return true;
+  return next<=now.getTime();
+}
+
+async function bumpSnapshotScheduleNextRun(schedule){
+  const now=new Date();
+  const intervalMinutes=Number(schedule?.interval_minutes||240);
+  const nextRunAt=new Date(now.getTime()+intervalMinutes*60000).toISOString();
+  const {error}=await supabaseAdmin
+    .from("snapshot_schedules")
+    .update({last_run_at:now.toISOString(),next_run_at:nextRunAt,updated_at:now.toISOString()})
+    .eq("id",schedule.id);
+  if(error)throw error;
+  return nextRunAt;
+}
+
+async function runTikTokAutoRefreshForSchedule(schedule){
+  let job=null;
+  const runDate=new Date();
+
+  const {data:user,error:userError}=await supabaseAdmin
+    .from("users")
+    .select("*")
+    .eq("id",schedule.user_id)
+    .maybeSingle();
+  if(userError)throw userError;
+  if(!user)throw new Error("Auto refresh user not found");
+
+  const {data:conn,error:connError}=await supabaseAdmin
+    .from("platform_connections")
+    .select("*")
+    .eq("user_id",schedule.user_id)
+    .eq("platform","tiktok")
+    .eq("connected",true)
+    .maybeSingle();
+  if(connError)throw connError;
+  if(!conn)throw new Error("Auto refresh TikTok connection not found");
+
+  const platformAccountId=normalizePlatformAccountId(
+    schedule.platform_account_id||
+    conn.account_id||
+    conn.metadata?.selectedPlatformAccountId||
+    conn.metadata?.lastOwnedPlatformAccountId
+  );
+  if(!platformAccountId)throw new Error("Auto refresh missing TikTok advertiser id");
+
+  if(schedule.active===false){
+    return {ok:true,platform:"tiktok",skipped:true,reason:"schedule_inactive",schedule_id:schedule.id,platform_account_id:platformAccountId};
+  }
+
+  const ownership=await getOwnership("tiktok",platformAccountId);
+  if(!ownership||ownership.owner_user_id!==schedule.user_id||!activeOwnershipStatuses().includes(ownership.status)){
+    return {ok:true,platform:"tiktok",skipped:true,reason:"ownership_not_active",schedule_id:schedule.id,platform_account_id:platformAccountId,ownership_status:ownership?.status||null};
+  }
+
+  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"tiktok",platformAccountId,conn,ownership);
+  const policy=resolveAutoRefreshPolicy({date:runDate,platformTimeZone,platform:"tiktok"});
+  const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
+
+  if(!policy.isAutomationHour){
+    return {
+      ok:true,
+      platform:"tiktok",
+      skipped:true,
+      reason:"not_platform_automation_hour",
+      schedule_id:schedule.id,
+      platform_account_id:platformAccountId,
+      platform_account_timezone:platformTimeZone,
+      platform_business_hour:policy.platform_business_hour,
+      platform_account_time:policy.platform_account_time,
+      server_time_utc:policy.server_time_utc,
+      istanbul_time:policy.istanbul_time,
+      automation_hours:policy.automation_hours
+    };
+  }
+
+  job=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{
+    trigger:"automation",
+    datePreset:policy.datePreset,
+    snapshotDate,
+    captureReason:policy.captureReason,
+    snapshotClass:policy.snapshotClass,
+    scheduleId:schedule.id,
+    platformHour:policy.hour,
+    platformBusinessHour:policy.platform_business_hour,
+    dataMaturityWindowHours:policy.data_maturity_window_hours,
+    server_time_utc:policy.server_time_utc,
+    istanbul_time:policy.istanbul_time,
+    platform_account_time:policy.platform_account_time,
+    platform_account_timezone:policy.platform_account_timezone,
+    platform_business_date:policy.platform_business_date,
+    timeEngineVersion:TIME_ENGINE_VERSION
+  });
+
+  await setRefreshJobStatus(job.id,"running");
+
+  try{
+    const writeResult=await writeTikTokSnapshotImmutable({
+      user,
+      conn,
+      advertiserId:platformAccountId,
+      datePreset:policy.datePreset,
+      snapshotDate,
+      sourceJobId:job.id,
+      captureReason:policy.captureReason,
+      snapshotClass:policy.snapshotClass
+    });
+
+    await setRefreshJobStatus(job.id,"completed",{
+      snapshot_id:writeResult.snapshot?.id||null,
+      metadata:{
+        ...(job.metadata||{}),
+        row_counts:writeResult.row_counts||null,
+        spread_result:writeResult.spread_result||null,
+        performance_spread_result:writeResult.performance_spread_result||null
+      }
+    });
+
+    const nextRunAt=await bumpSnapshotScheduleNextRun(schedule);
+
+    return {
+      ok:true,
+      platform:"tiktok",
+      job_id:job.id,
+      snapshot_id:writeResult.snapshot?.id||null,
+      snapshot_version:writeResult.snapshot?.snapshot_version||null,
+      snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,
+      date_preset:policy.datePreset,
+      capture_reason:policy.captureReason,
+      platform_account_id:platformAccountId,
+      platform_account_timezone:platformTimeZone,
+      platform_account_time:policy.platform_account_time,
+      server_time_utc:policy.server_time_utc,
+      istanbul_time:policy.istanbul_time,
+      row_counts:writeResult.row_counts||null,
+      spread_result:writeResult.spread_result||null,
+      performance_spread_result:writeResult.performance_spread_result||null,
+      next_run_at:nextRunAt
+    };
+  }catch(e){
+    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    throw e;
+  }
+}
+
 app.get("/api/cron/auto-refresh",async(req,res)=>{
   const startedAt=new Date().toISOString();
+  const now=new Date();
   try{
     const {data:schedules,error}=await supabaseAdmin
       .from("snapshot_schedules")
       .select("*")
       .eq("active",true)
-      .in("platform",["meta","google"]);
+      .in("platform",["meta","google","tiktok"]);
 
     if(error)throw error;
 
     const results=[];
     for(const schedule of schedules||[]){
+      const platform=String(schedule.platform||"").toLowerCase();
+      if(!scheduleIsDueForAutomation(schedule,now)){
+        results.push({ok:true,platform,skipped:true,reason:"not_due_yet",schedule_id:schedule.id,next_run_at:schedule.next_run_at});
+        continue;
+      }
       try{
-        if(schedule.platform==="google")results.push(await runGoogleAutoRefreshForSchedule(schedule));
-        else results.push(await runMetaAutoRefreshForSchedule(schedule));
+        if(platform==="google")results.push(await runGoogleAutoRefreshForSchedule(schedule));
+        else if(platform==="tiktok")results.push(await runTikTokAutoRefreshForSchedule(schedule));
+        else if(platform==="meta")results.push(await runMetaAutoRefreshForSchedule(schedule));
+        else results.push({ok:true,platform,skipped:true,reason:"unsupported_platform",schedule_id:schedule.id});
       }catch(e){
-        results.push({ok:false,platform:schedule.platform,schedule_id:schedule.id,error:e.message});
+        results.push({ok:false,platform,schedule_id:schedule.id,error:e.message});
       }
     }
 
-    res.json({ok:true,started_at:startedAt,count:results.length,results});
+    const runnable=results.filter(r=>!r.skipped);
+    const completed=results.filter(r=>r.ok&&!r.skipped);
+    const failed=results.filter(r=>!r.ok);
+
+    res.json({
+      ok:failed.length===0,
+      started_at:startedAt,
+      count:results.length,
+      runnable_count:runnable.length,
+      completed_count:completed.length,
+      failed_count:failed.length,
+      results
+    });
   }catch(e){
     res.status(500).json({ok:false,error:e.message,started_at:startedAt});
   }

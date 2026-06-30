@@ -411,6 +411,16 @@ function applyFxToSnapshotPayload(snapshot,fx){
 }
 
 const AUTOMATION_PLATFORM_HOURS=[0,4,8,12,16,20];
+function nextAutomationSlotUtc(date=new Date()){
+  const slots=[...AUTOMATION_PLATFORM_HOURS].map(Number).filter(h=>Number.isInteger(h)&&h>=0&&h<=23).sort((a,b)=>a-b);
+  const base=new Date(date);
+  for(const hour of slots){
+    const candidate=new Date(Date.UTC(base.getUTCFullYear(),base.getUTCMonth(),base.getUTCDate(),hour,0,0,0));
+    if(candidate.getTime()>base.getTime())return candidate.toISOString();
+  }
+  const first=slots.length?slots[0]:0;
+  return new Date(Date.UTC(base.getUTCFullYear(),base.getUTCMonth(),base.getUTCDate()+1,first,0,0,0)).toISOString();
+}
 const DEFAULT_PLATFORM_TIMEZONE="UTC";
 const DEFAULT_DATA_MATURITY_WINDOW_HOURS={meta:3,google:3,tiktok:3,klaviyo:3,pinterest:3};
 
@@ -1958,7 +1968,7 @@ async function runMetaAutoRefreshForSchedule(schedule){
       .from("snapshot_schedules")
       .update({
         last_run_at:new Date().toISOString(),
-        next_run_at:new Date(Date.now()+Number(schedule.interval_minutes||240)*60000).toISOString(),
+        next_run_at:nextAutomationSlotUtc(),
         updated_at:new Date().toISOString()
       })
       .eq("id",schedule.id);
@@ -2864,7 +2874,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
       .from("snapshot_schedules")
       .update({
         last_run_at:new Date().toISOString(),
-        next_run_at:new Date(Date.now()+Number(schedule.interval_minutes||240)*60000).toISOString(),
+        next_run_at:nextAutomationSlotUtc(),
         updated_at:new Date().toISOString()
       })
       .eq("id",schedule.id);
@@ -3735,7 +3745,7 @@ async function runTikTokAutoRefreshForSchedule(schedule){
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
   const job=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{trigger:"automation",datePreset:policy.datePreset,snapshotDate,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass,scheduleId:schedule.id});
   await setRefreshJobStatus(job.id,"running");
-  try{const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});await supabaseAdmin.from("snapshot_schedules").update({next_run_at:new Date(Date.now()+Number(schedule.interval_minutes||240)*60000).toISOString(),updated_at:new Date().toISOString()}).eq("id",schedule.id);return {ok:true,platform:"tiktok",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts}}catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
+  try{const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);return {ok:true,platform:"tiktok",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts}}catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
 }
 
 async function runKlaviyoAutoRefreshForSchedule(schedule){
@@ -3749,7 +3759,7 @@ async function runKlaviyoAutoRefreshForSchedule(schedule){
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
   const job=await createRefreshJob(schedule.user_id,"klaviyo",platformAccountId,{trigger:"automation",datePreset:policy.datePreset,snapshotDate,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass,scheduleId:schedule.id});
   await setRefreshJobStatus(job.id,"running");
-  try{const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});await supabaseAdmin.from("snapshot_schedules").update({next_run_at:new Date(Date.now()+Number(schedule.interval_minutes||240)*60000).toISOString(),updated_at:new Date().toISOString()}).eq("id",schedule.id);return {ok:true,platform:"klaviyo",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts}}catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
+  try{const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);return {ok:true,platform:"klaviyo",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts}}catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
 }
 
 // ===== END TIKTOK READ LAYER =====

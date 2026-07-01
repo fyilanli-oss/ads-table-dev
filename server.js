@@ -216,7 +216,7 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
     stopped_at:null,
     stop_reason:null,
     lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
-    next_run_at:existing?.next_run_at||nextAutomationSlotUtc(new Date(now)),
+    next_run_at:now,
     updated_at:now
   };
 
@@ -1536,13 +1536,11 @@ function resolveSnapshotCapturePeriod(datePreset,snapshotDate,platformTimeZone=D
 function resolveAutoRefreshPolicy({date=new Date(),platformTimeZone=DEFAULT_PLATFORM_TIMEZONE,platform="meta"}={}){
   const sync=resolveAdminTimeSync(date,platformTimeZone);
   const platformParts=timePartsInZone(date,platformTimeZone);
-  const utcHour=date.getUTCHours();
-  const utcMinute=date.getUTCMinutes();
-  const hour=utcHour;
-  const isAutomationHour=AUTOMATION_PLATFORM_HOURS.includes(utcHour);
+  const hour=sync.platform_business_hour;
+  const isAutomationHour=AUTOMATION_PLATFORM_HOURS.includes(hour);
   const maturityHours=dataMaturityWindowHours(platform);
-  const isDayCloseHour=utcHour===maturityHours;
-  const isRecoveryHour=utcHour===4;
+  const isDayCloseHour=hour===maturityHours;
+  const isRecoveryHour=hour===4;
 
   let datePreset="today";
   let captureReason="automation_today";
@@ -1561,7 +1559,7 @@ function resolveAutoRefreshPolicy({date=new Date(),platformTimeZone=DEFAULT_PLAT
   return {
     ...sync,
     hour,
-    minute:utcMinute,
+    minute:platformParts.minute,
     isAutomationHour,
     automation_hours:AUTOMATION_PLATFORM_HOURS,
     datePreset,
@@ -2661,18 +2659,12 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
     .maybeSingle();
   if(error)throw error;
   let performance_spread_result=null;
-  let spread_result=null;
   try{
     performance_spread_result=await spreadSnapshotToPerformanceDataset(data);
   }catch(performanceSpreadError){
     performance_spread_result={ok:false,error:performanceSpreadError.message};
   }
-  try{
-    spread_result=await spreadSnapshotToJasTables(data);
-  }catch(jasSpreadError){
-    spread_result={ok:false,error:jasSpreadError.message};
-  }
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
 }
 
 async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
@@ -2876,7 +2868,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
       snapshotClass:policy.snapshotClass
     });
 
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null}});
 
     await supabaseAdmin
       .from("snapshot_schedules")
@@ -2917,7 +2909,7 @@ async function handleGoogleSnapshotWrite(req,res){
     stage="google_api";
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
     res.json({
       ok:true,
       platform:"Google",
@@ -2935,8 +2927,8 @@ async function handleGoogleSnapshotWrite(req,res){
       purchase_journey:writeResult.snapshot?.purchase_journey||{},
       click_journey:writeResult.snapshot?.click_journey||{},
       performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{},
-      spread_result:writeResult.spread_result||null,
-      jas_spread:writeResult.spread_result?.ok?"called_by_google_snapshot_write_v2":"failed_or_unavailable"
+      spread_result:null,
+      jas_spread:"not_called_by_google_snapshot_write_v1"
     });
   }catch(e){
     if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
@@ -3579,7 +3571,7 @@ function tiktokSnapshotRow(row,level,platformAccountId,synthetic=false){
     purchases:conversions,
     purchase_value:revenue,
     abandoned:null,
-    source_confidence:synthetic?"tiktok_empty_report_fallback":"tiktok_report_api",
+    source_confidence:synthetic?"sandbox_empty_report_fallback":"tiktok_report_api",
     raw:{...((row&&typeof row.raw==="object")?row.raw:row),synthetic,zero_null_policy:"0 is measured zero; null is unknown/unavailable/not computable"}
   };
 }
@@ -3604,10 +3596,28 @@ async function fetchTikTokSnapshotRows(conn,platformAccountId,datePreset){
     result.counts[levelInfo.level]=rows.length;
     result.rows.push(...rows);
   }
-  if(!result.rows.length){
-    const fallback=tiktokSnapshotRow({campaign_id:platformAccountId,name:`TikTok Advertiser ${platformAccountId}`,raw:{fallback_reason:useSandbox?"sandbox_empty_report":"no_report_rows_for_period",token_source:result.tokenSource}},"campaign",platformAccountId,true);
-    result.rows.push(fallback);
-    result.counts.campaign=1;
+  const shouldCreateFallbackRows=useSandbox||!result.rows.length;
+  if(shouldCreateFallbackRows){
+    const fallbackBase={raw:{fallback_reason:useSandbox?"sandbox_empty_report":"empty_report_level_fallback",token_source:result.tokenSource}};
+    const fallbackRows=[
+      {
+        level:"campaign",
+        row:{...fallbackBase,campaign_id:platformAccountId,name:`TikTok Campaign ${platformAccountId}`,campaign_name:`TikTok Campaign ${platformAccountId}`,campaign_status:"empty_period_fallback"}
+      },
+      {
+        level:"adgroup",
+        row:{...fallbackBase,campaign_id:platformAccountId,adgroup_id:`${platformAccountId}_adgroup_fallback`,adgroup_name:`TikTok AdGroup ${platformAccountId}`,adgroup_status:"empty_period_fallback"}
+      },
+      {
+        level:"ad",
+        row:{...fallbackBase,campaign_id:platformAccountId,adgroup_id:`${platformAccountId}_adgroup_fallback`,ad_id:`${platformAccountId}_ad_fallback`,ad_name:`TikTok Ad ${platformAccountId}`,ad_status:"empty_period_fallback"}
+      }
+    ];
+    for(const fallback of fallbackRows){
+      if(Number(result.counts[fallback.level]||0)>0)continue;
+      result.rows.push(tiktokSnapshotRow(fallback.row,fallback.level,platformAccountId,true));
+      result.counts[fallback.level]=1;
+    }
   }
   return result;
 }

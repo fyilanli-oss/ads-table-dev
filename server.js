@@ -216,7 +216,7 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
     stopped_at:null,
     stop_reason:null,
     lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
-    next_run_at:existing?.next_run_at||nextAutomationSlotUtc(new Date(now)),
+    next_run_at:existing?.next_run_at||nextAutomationSlotUtc(new Date()),
     updated_at:now
   };
 
@@ -1136,6 +1136,11 @@ async function spreadSnapshotToJasTables(snapshot){
 }
 
 
+function shouldSpreadSnapshotToPerformanceDataset(snapshotOrClass){
+  const cls=typeof snapshotOrClass==="string"?snapshotOrClass:String(snapshotOrClass?.snapshot_class||"");
+  return cls.toLowerCase()!=="recovery";
+}
+
 // ===== PERFORMANCE SPREAD ENGINE v1 =====
 const PERFORMANCE_SPREAD_ENGINE_VERSION="v1";
 function perfHasValue(value){return value!==null&&value!==undefined&&value!==""}
@@ -1537,40 +1542,28 @@ function resolveAutoRefreshPolicy({date=new Date(),platformTimeZone=DEFAULT_PLAT
   const sync=resolveAdminTimeSync(date,platformTimeZone);
   const platformParts=timePartsInZone(date,platformTimeZone);
   const utcHour=date.getUTCHours();
-  const utcMinute=date.getUTCMinutes();
-  const hour=utcHour;
   const isAutomationHour=AUTOMATION_PLATFORM_HOURS.includes(utcHour);
   const maturityHours=dataMaturityWindowHours(platform);
-  const isDayCloseHour=utcHour===maturityHours;
   const isRecoveryHour=utcHour===4;
-
-  let datePreset="today";
-  let captureReason="automation_today";
-  let snapshotClass="primary";
-
-  if(isDayCloseHour){
-    datePreset="day_close";
-    captureReason="day_close";
-    snapshotClass="primary";
-  }else if(isRecoveryHour){
-    datePreset="last_7d";
-    captureReason="automation_recovery";
-    snapshotClass="recovery";
-  }
 
   return {
     ...sync,
-    hour,
-    minute:utcMinute,
+    hour:utcHour,
+    utc_hour:utcHour,
+    minute:date.getUTCMinutes(),
+    platform_minute:platformParts.minute,
     isAutomationHour,
     automation_hours:AUTOMATION_PLATFORM_HOURS,
-    datePreset,
-    captureReason,
-    snapshotClass,
+    datePreset:"today",
+    captureReason:"automation_today",
+    snapshotClass:"primary",
+    shouldRunRecoverySnapshot:isRecoveryHour,
+    recoveryDatePreset:"last_7d",
+    recoveryCaptureReason:"automation_recovery",
+    recoverySnapshotClass:"recovery",
     data_maturity_window_hours:maturityHours
   };
 }
-
 
 async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="today",snapshotDate,limit="100",sourceJobId=null,captureReason="manual_refresh",platformTimeZone=null,snapshotClass=null,adminTimeSync=null}){
   const platformAccountId=normalizePlatformAccountId(adAccountId);
@@ -1670,10 +1663,14 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
   }
 
   let performance_spread_result=null;
-  try{
-    performance_spread_result=await spreadSnapshotToPerformanceDataset(data);
-  }catch(performanceSpreadError){
-    performance_spread_result={ok:false,error:performanceSpreadError.message};
+  if(shouldSpreadSnapshotToPerformanceDataset(data)){
+    try{
+      performance_spread_result=await spreadSnapshotToPerformanceDataset(data);
+    }catch(performanceSpreadError){
+      performance_spread_result={ok:false,error:performanceSpreadError.message};
+    }
+  }else{
+    performance_spread_result={ok:true,skipped:true,reason:"recovery_snapshot_not_written_to_dataset",snapshot_id:data.id};
   }
 
   return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,spread_result,performance_spread_result};
@@ -1965,6 +1962,42 @@ async function runMetaAutoRefreshForSchedule(schedule){
     });
 
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
+
+    let recovery_result=null;
+    if(policy.shouldRunRecoverySnapshot){
+      const recoveryJob=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
+        trigger:"automation",
+        datePreset:policy.recoveryDatePreset,
+        snapshotDate,
+        limit,
+        captureReason:policy.recoveryCaptureReason,
+        snapshotClass:policy.recoverySnapshotClass,
+        scheduleId:schedule.id,
+        pairedPrimaryJobId:job.id,
+        timeEngineVersion:TIME_ENGINE_VERSION
+      });
+      await setRefreshJobStatus(recoveryJob.id,"running");
+      try{
+        const recoveryWrite=await writeMetaSnapshotImmutable({
+          user,
+          conn,
+          adAccountId:platformAccountId,
+          datePreset:policy.recoveryDatePreset,
+          snapshotDate,
+          limit,
+          sourceJobId:recoveryJob.id,
+          captureReason:policy.recoveryCaptureReason,
+          platformTimeZone,
+          adminTimeSync:policy,
+          snapshotClass:policy.recoverySnapshotClass
+        });
+        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
+        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
+      }catch(recoveryError){
+        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
+        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
+      }
+    }
 
     await supabaseAdmin
       .from("snapshot_schedules")
@@ -2661,18 +2694,16 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
     .maybeSingle();
   if(error)throw error;
   let performance_spread_result=null;
-  let spread_result=null;
-  try{
-    performance_spread_result=await spreadSnapshotToPerformanceDataset(data);
-  }catch(performanceSpreadError){
-    performance_spread_result={ok:false,error:performanceSpreadError.message};
+  if(shouldSpreadSnapshotToPerformanceDataset(data)){
+    try{
+      performance_spread_result=await spreadSnapshotToPerformanceDataset(data);
+    }catch(performanceSpreadError){
+      performance_spread_result={ok:false,error:performanceSpreadError.message};
+    }
+  }else{
+    performance_spread_result={ok:true,skipped:true,reason:"recovery_snapshot_not_written_to_dataset",snapshot_id:data.id};
   }
-  try{
-    spread_result=await spreadSnapshotToJasTables(data);
-  }catch(jasSpreadError){
-    spread_result={ok:false,error:jasSpreadError.message};
-  }
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
 }
 
 async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
@@ -2733,7 +2764,7 @@ async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustome
     throw err;
   }
 
-  if(!ownership||ownership.owner_user_id!==user.id){
+  if(!ownership||ownership.owner_user_id!==user.id||!activeOwnershipStatuses().includes(ownership.status)){
     try{
       ownership=await ensurePlatformOwnership(user.id,"google",account);
     }catch(e){
@@ -2814,7 +2845,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
   }
 
   let ownership=await getOwnership("google",platformAccountId);
-  if(!ownership||ownership.owner_user_id!==schedule.user_id){
+  if(!ownership||ownership.owner_user_id!==schedule.user_id||!activeOwnershipStatuses().includes(ownership.status)){
     const lifecycle=await ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustomerId,{accountName:conn.account_name||`Google customer ${platformAccountId}`,source:"google_auto_refresh"});
     ownership=lifecycle.ownership;
   }
@@ -2876,7 +2907,41 @@ async function runGoogleAutoRefreshForSchedule(schedule){
       snapshotClass:policy.snapshotClass
     });
 
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null}});
+
+    let recovery_result=null;
+    if(policy.shouldRunRecoverySnapshot){
+      const recoveryJob=await createRefreshJob(schedule.user_id,"google",platformAccountId,{
+        trigger:"automation",
+        dateRange:policy.recoveryDatePreset,
+        datePreset:policy.recoveryDatePreset,
+        snapshotDate,
+        captureReason:policy.recoveryCaptureReason,
+        snapshotClass:policy.recoverySnapshotClass,
+        scheduleId:schedule.id,
+        loginCustomerId,
+        pairedPrimaryJobId:job.id,
+        timeEngineVersion:TIME_ENGINE_VERSION
+      });
+      await setRefreshJobStatus(recoveryJob.id,"running");
+      try{
+        const recoveryWrite=await writeGoogleSnapshotImmutable({
+          user,
+          customerId:platformAccountId,
+          loginCustomerId,
+          dateRange:policy.recoveryDatePreset,
+          snapshotDate,
+          sourceJobId:recoveryJob.id,
+          captureReason:policy.recoveryCaptureReason,
+          snapshotClass:policy.recoverySnapshotClass
+        });
+        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null,metadata:{row_counts:recoveryWrite.row_counts||null,performance_spread_result:recoveryWrite.performance_spread_result||null}});
+        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
+      }catch(recoveryError){
+        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
+        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
+      }
+    }
 
     await supabaseAdmin
       .from("snapshot_schedules")
@@ -2917,7 +2982,7 @@ async function handleGoogleSnapshotWrite(req,res){
     stage="google_api";
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,spread_result:writeResult.spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
     res.json({
       ok:true,
       platform:"Google",
@@ -2935,8 +3000,8 @@ async function handleGoogleSnapshotWrite(req,res){
       purchase_journey:writeResult.snapshot?.purchase_journey||{},
       click_journey:writeResult.snapshot?.click_journey||{},
       performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{},
-      spread_result:writeResult.spread_result||null,
-      jas_spread:writeResult.spread_result?.ok?"called_by_google_snapshot_write_v2":"failed_or_unavailable"
+      spread_result:null,
+      jas_spread:"not_called_by_google_snapshot_write_v1"
     });
   }catch(e){
     if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
@@ -3579,7 +3644,7 @@ function tiktokSnapshotRow(row,level,platformAccountId,synthetic=false){
     purchases:conversions,
     purchase_value:revenue,
     abandoned:null,
-    source_confidence:synthetic?"tiktok_empty_report_fallback":"tiktok_report_api",
+    source_confidence:synthetic?"sandbox_empty_report_fallback":"tiktok_report_api",
     raw:{...((row&&typeof row.raw==="object")?row.raw:row),synthetic,zero_null_policy:"0 is measured zero; null is unknown/unavailable/not computable"}
   };
 }
@@ -3604,10 +3669,28 @@ async function fetchTikTokSnapshotRows(conn,platformAccountId,datePreset){
     result.counts[levelInfo.level]=rows.length;
     result.rows.push(...rows);
   }
-  if(!result.rows.length){
-    const fallback=tiktokSnapshotRow({campaign_id:platformAccountId,name:`TikTok Advertiser ${platformAccountId}`,raw:{fallback_reason:useSandbox?"sandbox_empty_report":"no_report_rows_for_period",token_source:result.tokenSource}},"campaign",platformAccountId,true);
-    result.rows.push(fallback);
-    result.counts.campaign=1;
+  const shouldCreateFallbackRows=useSandbox||levels.some(level=>Number(result.counts[level]||0)===0);
+  if(shouldCreateFallbackRows){
+    const fallbackBase={raw:{fallback_reason:useSandbox?"sandbox_empty_report":"empty_report_level_fallback",token_source:result.tokenSource}};
+    const fallbackRows=[
+      {
+        level:"campaign",
+        row:{...fallbackBase,campaign_id:platformAccountId,name:`TikTok Campaign ${platformAccountId}`,campaign_name:`TikTok Campaign ${platformAccountId}`,campaign_status:"empty_period_fallback"}
+      },
+      {
+        level:"adgroup",
+        row:{...fallbackBase,campaign_id:platformAccountId,adgroup_id:`${platformAccountId}_adgroup_fallback`,adgroup_name:`TikTok AdGroup ${platformAccountId}`,adgroup_status:"empty_period_fallback"}
+      },
+      {
+        level:"ad",
+        row:{...fallbackBase,campaign_id:platformAccountId,adgroup_id:`${platformAccountId}_adgroup_fallback`,ad_id:`${platformAccountId}_ad_fallback`,ad_name:`TikTok Ad ${platformAccountId}`,ad_status:"empty_period_fallback"}
+      }
+    ];
+    for(const fallback of fallbackRows){
+      if(Number(result.counts[fallback.level]||0)>0)continue;
+      result.rows.push(tiktokSnapshotRow(fallback.row,fallback.level,platformAccountId,true));
+      result.counts[fallback.level]=1;
+    }
   }
   return result;
 }
@@ -3640,7 +3723,11 @@ async function insertSnapshotAndSpread({user,platform,platformAccountId,platform
   if(error)throw error;
   let spread_result=null,performance_spread_result=null;
   try{spread_result=await spreadSnapshotToJasTables(data)}catch(e){spread_result={ok:false,error:e.message}}
-  try{performance_spread_result=await spreadSnapshotToPerformanceDataset(data)}catch(e){performance_spread_result={ok:false,error:e.message}}
+  if(shouldSpreadSnapshotToPerformanceDataset(data)){
+    try{performance_spread_result=await spreadSnapshotToPerformanceDataset(data)}catch(e){performance_spread_result={ok:false,error:e.message}}
+  }else{
+    performance_spread_result={ok:true,skipped:true,reason:"recovery_snapshot_not_written_to_dataset",snapshot_id:data.id};
+  }
   return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,spread_result,performance_spread_result};
 }
 
@@ -3753,7 +3840,25 @@ async function runTikTokAutoRefreshForSchedule(schedule){
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
   const job=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{trigger:"automation",datePreset:policy.datePreset,snapshotDate,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass,scheduleId:schedule.id});
   await setRefreshJobStatus(job.id,"running");
-  try{const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);return {ok:true,platform:"tiktok",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts}}catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
+  try{
+    const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
+    let recovery_result=null;
+    if(policy.shouldRunRecoverySnapshot){
+      const recoveryJob=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{trigger:"automation",datePreset:policy.recoveryDatePreset,snapshotDate,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass,scheduleId:schedule.id,pairedPrimaryJobId:job.id});
+      await setRefreshJobStatus(recoveryJob.id,"running");
+      try{
+        const recoveryWrite=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.recoveryDatePreset,snapshotDate,sourceJobId:recoveryJob.id,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass});
+        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
+        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
+      }catch(recoveryError){
+        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
+        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
+      }
+    }
+    await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
+    return {ok:true,platform:"tiktok",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts,recovery_result};
+  }catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
 }
 
 async function runKlaviyoAutoRefreshForSchedule(schedule){
@@ -3767,7 +3872,25 @@ async function runKlaviyoAutoRefreshForSchedule(schedule){
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
   const job=await createRefreshJob(schedule.user_id,"klaviyo",platformAccountId,{trigger:"automation",datePreset:policy.datePreset,snapshotDate,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass,scheduleId:schedule.id});
   await setRefreshJobStatus(job.id,"running");
-  try{const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);return {ok:true,platform:"klaviyo",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts}}catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
+  try{
+    const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
+    let recovery_result=null;
+    if(policy.shouldRunRecoverySnapshot){
+      const recoveryJob=await createRefreshJob(schedule.user_id,"klaviyo",platformAccountId,{trigger:"automation",datePreset:policy.recoveryDatePreset,snapshotDate,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass,scheduleId:schedule.id,pairedPrimaryJobId:job.id});
+      await setRefreshJobStatus(recoveryJob.id,"running");
+      try{
+        const recoveryWrite=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.recoveryDatePreset,snapshotDate,sourceJobId:recoveryJob.id,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass});
+        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
+        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
+      }catch(recoveryError){
+        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
+        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
+      }
+    }
+    await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
+    return {ok:true,platform:"klaviyo",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts,recovery_result};
+  }catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
 }
 
 // ===== END TIKTOK READ LAYER =====

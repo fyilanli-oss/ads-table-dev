@@ -410,6 +410,163 @@ function applyFxToSnapshotPayload(snapshot,fx){
   return converted;
 }
 
+
+
+// ===== FX RATES DAILY ENGINE v1 =====
+// Design rule: FX is fetched globally on UTC time, but applied by snapshot_date/business_date.
+// Snapshot/Dataset values are not rewritten; Dashboard and Ask AI can convert at read time.
+const FX_RATES_ENGINE_VERSION="v1";
+const FX_RATES_PROVIDER="frankfurter_v1";
+const FX_RATES_PROVIDER_BASE=process.env.FX_RATES_PROVIDER_BASE||"https://api.frankfurter.app";
+const FX_SUPPORTED_CURRENCIES=(process.env.FX_SUPPORTED_CURRENCIES||"USD,EUR,TRY,GBP,JPY,CNY,AUD,CAD,CHF,SEK,NOK,DKK,PLN").split(",").map(normalizeCurrency).filter(Boolean);
+
+function fxDateOnly(value=new Date()){
+  const d=value instanceof Date?value:new Date(value);
+  if(Number.isNaN(d.getTime()))return new Date().toISOString().slice(0,10);
+  return d.toISOString().slice(0,10);
+}
+
+function fxUniqueCurrencies(list){
+  return [...new Set((list||[]).map(normalizeCurrency).filter(Boolean))].sort();
+}
+
+function fxRateFromEurBase(eurRates,sourceCurrency,quoteCurrency){
+  const source=normalizeCurrency(sourceCurrency);
+  const quote=normalizeCurrency(quoteCurrency);
+  if(!source||!quote)return null;
+  if(source===quote)return 1;
+  const eurToSource=source==="EUR"?1:Number(eurRates[source]);
+  const eurToQuote=quote==="EUR"?1:Number(eurRates[quote]);
+  if(!Number.isFinite(eurToSource)||eurToSource<=0||!Number.isFinite(eurToQuote)||eurToQuote<=0)return null;
+  return eurToQuote/eurToSource;
+}
+
+async function fetchFrankfurterEurRates(rateDate,currencies=FX_SUPPORTED_CURRENCIES){
+  const targetCurrencies=fxUniqueCurrencies(currencies).filter(c=>c!=="EUR");
+  const endpoint=rateDate?`/${encodeURIComponent(rateDate)}`:"/latest";
+  const url=new URL(`${FX_RATES_PROVIDER_BASE}${endpoint}`);
+  if(targetCurrencies.length)url.searchParams.set("to",targetCurrencies.join(","));
+  const response=await fetch(url);
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.message||data.error||`FX provider failed ${response.status}`);
+  return {
+    provider:FX_RATES_PROVIDER,
+    engine_version:FX_RATES_ENGINE_VERSION,
+    rate_date:fxDateOnly(data.date||rateDate||new Date()),
+    base_currency:"EUR",
+    rates:data.rates||{},
+    raw:data
+  };
+}
+
+async function upsertFxRatesDaily({rateDate=null,currencies=FX_SUPPORTED_CURRENCIES}={}){
+  if(!supabaseAdmin)throw new Error("Supabase not configured");
+  const providerData=await fetchFrankfurterEurRates(rateDate,currencies);
+  const allCurrencies=fxUniqueCurrencies(["EUR",...currencies]);
+  const fetchedAt=new Date().toISOString();
+  const rows=[];
+  for(const baseCurrency of allCurrencies){
+    for(const quoteCurrency of allCurrencies){
+      const rate=fxRateFromEurBase(providerData.rates,baseCurrency,quoteCurrency);
+      if(rate===null)continue;
+      rows.push({
+        rate_date:providerData.rate_date,
+        base_currency:baseCurrency,
+        quote_currency:quoteCurrency,
+        rate,
+        provider:FX_RATES_PROVIDER,
+        fetched_at:fetchedAt,
+        engine_version:FX_RATES_ENGINE_VERSION,
+        raw:{
+          source:"eur_cross_rate",
+          provider_base_currency:"EUR",
+          provider_rate_date:providerData.rate_date,
+          provider_raw:providerData.raw
+        },
+        updated_at:fetchedAt
+      });
+    }
+  }
+  if(!rows.length)throw new Error("FX provider returned no usable rates");
+  const {data,error}=await supabaseAdmin
+    .from("fx_rates_daily")
+    .upsert(rows,{onConflict:"rate_date,base_currency,quote_currency,provider"})
+    .select("rate_date,base_currency,quote_currency,rate,provider,fetched_at,engine_version");
+  if(error)throw error;
+  return {ok:true,provider:FX_RATES_PROVIDER,engine_version:FX_RATES_ENGINE_VERSION,rate_date:providerData.rate_date,rows:(data||[]).length,currencies:allCurrencies};
+}
+
+async function getFxRateDaily({rateDate,baseCurrency,quoteCurrency,provider=FX_RATES_PROVIDER}){
+  const base=normalizeCurrency(baseCurrency);
+  const quote=normalizeCurrency(quoteCurrency);
+  if(!base||!quote)throw new Error("baseCurrency and quoteCurrency are required");
+  if(base===quote){
+    return {ok:true,rate_date:fxDateOnly(rateDate||new Date()),base_currency:base,quote_currency:quote,rate:1,provider,engine_version:FX_RATES_ENGINE_VERSION,source:"same_currency"};
+  }
+  const targetDate=fxDateOnly(rateDate||new Date());
+  const {data,error}=await supabaseAdmin
+    .from("fx_rates_daily")
+    .select("rate_date,base_currency,quote_currency,rate,provider,fetched_at,engine_version")
+    .eq("provider",provider)
+    .eq("base_currency",base)
+    .eq("quote_currency",quote)
+    .lte("rate_date",targetDate)
+    .order("rate_date",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(error)throw error;
+  if(!data){
+    const err=new Error(`FX rate not found for ${base}->${quote} on or before ${targetDate}`);
+    err.status=404;
+    throw err;
+  }
+  return {ok:true,...data,requested_rate_date:targetDate,source:data.rate_date===targetDate?"exact_date":"last_available_rate"};
+}
+
+app.get("/api/cron/fx-rates",async(req,res)=>{
+  const startedAt=new Date().toISOString();
+  try{
+    const rateDate=String(req.query.date||"").trim()||fxDateOnly(new Date());
+    const currencies=String(req.query.currencies||"").trim()?String(req.query.currencies).split(","):FX_SUPPORTED_CURRENCIES;
+    const result=await upsertFxRatesDaily({rateDate,currencies});
+    res.json({ok:true,started_at:startedAt,...result});
+  }catch(e){
+    res.status(e.status||500).json({ok:false,error:e.message,started_at:startedAt,stage:"fx_rates_cron"});
+  }
+});
+
+app.post("/api/fx/refresh",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const rateDate=String(req.body?.date||req.query.date||"").trim()||fxDateOnly(new Date());
+    const currencies=String(req.body?.currencies||req.query.currencies||"").trim()?String(req.body?.currencies||req.query.currencies).split(","):FX_SUPPORTED_CURRENCIES;
+    res.json(await upsertFxRatesDaily({rateDate,currencies}));
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"fx_refresh"})}
+});
+
+app.get("/api/fx/rate",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const rateDate=req.query.date||req.query.snapshot_date||fxDateOnly(new Date());
+    const baseCurrency=req.query.base||req.query.base_currency||req.query.source_currency;
+    const quoteCurrency=req.query.quote||req.query.quote_currency||req.query.target_currency;
+    res.json(await getFxRateDaily({rateDate,baseCurrency,quoteCurrency}));
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"fx_rate_lookup"})}
+});
+
+app.get("/api/fx/convert",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const amount=Number(req.query.amount||0);
+    const rateDate=req.query.date||req.query.snapshot_date||fxDateOnly(new Date());
+    const baseCurrency=req.query.base||req.query.base_currency||req.query.source_currency;
+    const quoteCurrency=req.query.quote||req.query.quote_currency||req.query.target_currency;
+    const fx=await getFxRateDaily({rateDate,baseCurrency,quoteCurrency});
+    res.json({...fx,amount,converted_amount:Number.isFinite(amount)?amount*Number(fx.rate):null});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"fx_convert"})}
+});
+// ===== END FX RATES DAILY ENGINE v1 =====
+
 const AUTOMATION_PLATFORM_HOURS=[0,4,8,12,16,20];
 function nextAutomationSlotUtc(date=new Date()){
   const slots=[...AUTOMATION_PLATFORM_HOURS].map(Number).filter(h=>Number.isInteger(h)&&h>=0&&h<=23).sort((a,b)=>a-b);

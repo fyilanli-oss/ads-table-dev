@@ -2175,6 +2175,15 @@ async function runMetaAutoRefreshForSchedule(schedule){
 app.get("/api/cron/auto-refresh",async(req,res)=>{
   const startedAt=new Date().toISOString();
   try{
+    let fx_result=null;
+    const fxNow=new Date();
+    if(fxNow.getUTCHours()===5){
+      try{
+        fx_result=await upsertFxRatesDaily({rateDate:fxDateOnly(fxNow)});
+      }catch(fxError){
+        fx_result={ok:false,error:fxError.message,stage:"fx_rates_auto_refresh_05utc"};
+      }
+    }
     const nowIso=new Date().toISOString();
     const {data:schedules,error}=await supabaseAdmin
       .from("snapshot_schedules")
@@ -2198,7 +2207,7 @@ app.get("/api/cron/auto-refresh",async(req,res)=>{
       }
     }
 
-    res.json({ok:true,started_at:startedAt,count:results.length,results});
+    res.json({ok:true,started_at:startedAt,fx_result,count:results.length,results});
   }catch(e){
     res.status(500).json({ok:false,error:e.message,started_at:startedAt});
   }

@@ -1405,7 +1405,7 @@ async function readSnapshotForSpread({userId,snapshotId,platform="meta",platform
   return data;
 }
 
-app.post("/api/jas/spread",async(req,res)=>{
+app.post("/api/jas_removed/spread",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
     const snapshot=await readSnapshotForSpread({userId:user.id,snapshotId:req.body?.snapshot_id||req.query.snapshot_id||null,platform:String(req.body?.platform||req.query.platform||"meta"),platformAccountId:req.body?.platform_account_id||req.query.platform_account_id||null});
@@ -1413,7 +1413,7 @@ app.post("/api/jas/spread",async(req,res)=>{
   }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"jas_spread"})}
 });
 
-app.get("/api/jas/status",async(req,res)=>{
+app.get("/api/jas_removed/status",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
     const platform=String(req.query.platform||"meta"), platformAccountId=req.query.platform_account_id||null;
@@ -1814,7 +1814,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
 
   let spread_result=null;
   try{
-    spread_result=await spreadSnapshotToJasTables(data);
+    /* JAS removed */ spread_result={ok:false,disabled:true};
   }catch(spreadError){
     spread_result={ok:false,error:spreadError.message};
   }

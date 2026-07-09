@@ -72,6 +72,25 @@ function phase1ReportableAccountType(platform){return PHASE1_REPORTABLE_ACCOUNT_
 function normalizePlatformAccountId(value){return String(value||"").trim()}
 function activeOwnershipStatuses(){return ["connected","active"]}
 
+const PASSIVE_LEGACY_PLATFORMS={
+  pinterest:{
+    status:"passive_legacy",
+    label:"Pinterest",
+    message:"Pinterest is currently Passive / Legacy. New Pinterest connections are disabled; existing data remains available."
+  }
+};
+function passiveLegacyPlatform(platform){return PASSIVE_LEGACY_PLATFORMS[String(platform||"").toLowerCase()]||null}
+function passiveLegacyPlatformStatus(platform){const cfg=passiveLegacyPlatform(platform);return cfg?{platform:String(platform||"").toLowerCase(),status:cfg.status,label:cfg.label,message:cfg.message}:null}
+function assertPlatformNotPassiveLegacy(platform){
+  const cfg=passiveLegacyPlatform(platform);
+  if(!cfg)return;
+  const err=new Error(cfg.message);
+  err.status=410;
+  err.code="PLATFORM_PASSIVE_LEGACY";
+  err.platform=String(platform||"").toLowerCase();
+  err.platform_status=cfg.status;
+  throw err;
+}
 
 const DISCONNECT_LIFECYCLE_VERSION="v1";
 const BACKFILL_DAYS_ON_RECONNECT=30;
@@ -780,6 +799,7 @@ function accountSelectionLimitMessage(platform,selectedCount,limit){
 
 async function validateSelectedAccounts(userId,platform,selectedAccounts=[]){
   const cleanPlatform=String(platform||"").toLowerCase().trim();
+  assertPlatformNotPassiveLegacy(cleanPlatform);
   const limit=PHASE1_PLATFORM_LIMITS[cleanPlatform]||3;
   const accounts=(Array.isArray(selectedAccounts)?selectedAccounts:[])
     .map(account=>({...(account||{}),platform_account_id:normalizePlatformAccountId(account?.platform_account_id||account?.id||account?.customerId||account?.account_id||account?.advertiser_id)}))
@@ -1050,8 +1070,16 @@ req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&accoun
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
-app.get("/auth/pinterest",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.PINTEREST_CLIENT_ID||!process.env.PINTEREST_REDIRECT_URI)throw new Error("Missing Pinterest env");const state=Math.random().toString(36).slice(2);req.session.pinterestOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.PINTEREST_CLIENT_ID,redirect_uri:process.env.PINTEREST_REDIRECT_URI,scope:"ads:read",state});res.redirect(`https://www.pinterest.com/oauth/?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/pinterest/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?pinterest_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?pinterest_error=missing_code");if(!state||state!==req.session.pinterestOAuthState)return res.redirect("/dashboard?pinterest_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?pinterest_error=missing_user_id");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.PINTEREST_REDIRECT_URI});const r=await fetch(`${PINTEREST_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${pinterestBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.message||data.error_description||data.error||"Pinterest token exchange failed");await saveConnection(userId,"pinterest",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||null,expiresIn:data.expires_in||null}});req.session.pinterestOAuthState=null;res.redirect("/dashboard?pinterest_connected=1")}catch(e){res.redirect(`/dashboard?pinterest_error=${encodeURIComponent(e.message)}`)}});
+app.get("/auth/pinterest",async(req,res)=>{
+  const status=passiveLegacyPlatformStatus("pinterest");
+  res.redirect(`/dashboard?pinterest_legacy=1&platform_status=${encodeURIComponent(status.status)}&message=${encodeURIComponent(status.message)}`);
+});
+app.get("/auth/pinterest/callback",async(req,res)=>{
+  req.session.pinterestOAuthState=null;
+  req.session.oauthUserId=null;
+  const status=passiveLegacyPlatformStatus("pinterest");
+  res.redirect(`/dashboard?pinterest_legacy=1&platform_status=${encodeURIComponent(status.status)}&message=${encodeURIComponent(status.message)}`);
+});
 
 function base64Url(input){return Buffer.from(input).toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 function klaviyoBasic(){return Buffer.from(`${process.env.KLAVIYO_CLIENT_ID}:${process.env.KLAVIYO_CLIENT_SECRET}`).toString("base64")}
@@ -2585,7 +2613,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest")}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -3307,7 +3335,7 @@ app.get("/api/accounts/selection-status",async(req,res)=>{
     for(const p of platforms){
       const limit=PHASE1_PLATFORM_LIMITS[p]||3;
       const activeCount=await countActiveOwnerships(user.id,p);
-      rows.push({platform:p,limit,active_count:activeCount,remaining:Math.max(limit-activeCount,0),message:activeCount>=limit?accountSelectionLimitMessage(p,limit,limit):null});
+      rows.push({platform:p,limit,active_count:activeCount,remaining:Math.max(limit-activeCount,0),platform_status:passiveLegacyPlatformStatus(p),message:passiveLegacyPlatform(p)?passiveLegacyPlatform(p).message:(activeCount>=limit?accountSelectionLimitMessage(p,limit,limit):null)});
     }
     res.json({ok:true,platforms:rows});
   }catch(e){res.status(e.status||500).json({ok:false,error:e.message})}

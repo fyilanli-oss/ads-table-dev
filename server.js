@@ -631,6 +631,7 @@ function resolveAdminTimeSync(date=new Date(),platformTimeZone=DEFAULT_PLATFORM_
   const platform=timePartsInZone(date,platformTimeZone);
   return {
     server_time_utc:serverTimeUtc,
+    platform_business_at:serverTimeUtc,
     istanbul_time:istanbul.text,
     platform_account_time:platform.text,
     platform_account_timezone:platform.timeZone,
@@ -1273,12 +1274,9 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
     date_end:perfDate(snapshot.snapshot_period_end),
     date_range:perfText(snapshot.date_preset),
     snapshot_date:perfDate(snapshot.snapshot_date),
-    platform_business_date:perfDate(snapshot.platform_business_date||snapshot.snapshot_date),
+    platform_business_at:snapshot.platform_business_at||snapshot.server_time_utc||snapshot.snapshot_created_at||null,
     platform_account_timezone:perfText(snapshot.platform_account_timezone),
-    platform_business_hour:perfNullableNumber(snapshot.platform_business_hour),
     server_time_utc:snapshot.server_time_utc||null,
-    istanbul_time:perfText(snapshot.istanbul_time),
-    platform_account_time:perfText(snapshot.platform_account_time),
     time_engine_version:perfText(snapshot.time_engine_version||TIME_ENGINE_VERSION),
     spend:perfNullableNumber(row.spend),
     impressions:perfNullableNumber(row.impressions),
@@ -1678,6 +1676,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     snapshot_class:resolvedSnapshotClass,
     platform_account_timezone:resolvedTimeZone,
     platform_business_date:timeSync.platform_business_date,
+    platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,
     platform_business_hour:timeSync.platform_business_hour,
     data_maturity_window_hours:dataMaturityWindowHours("meta"),
     server_time_utc:timeSync.server_time_utc,
@@ -1702,7 +1701,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
 
@@ -2320,7 +2319,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
       .eq("user_id",user.id)
       .neq("snapshot_class","recovery");
 
@@ -2720,6 +2719,7 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
     snapshot_class:snapshotClass,
     platform_account_timezone:platformTimeZone,
     platform_business_date:timeSync.platform_business_date,
+    platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,
     platform_business_hour:timeSync.platform_business_hour,
     data_maturity_window_hours:dataMaturityWindowHours("google"),
     server_time_utc:timeSync.server_time_utc,
@@ -2743,7 +2743,7 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
   let performance_spread_result=null;
@@ -3769,8 +3769,8 @@ async function insertSnapshotAndSpread({user,platform,platformAccountId,platform
   if(existingVersionResult.error)throw existingVersionResult.error;
   const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
   const now=new Date().toISOString();
-  const row={user_id:user.id,platform,platform_account_id:platformAccountId,platform_base_currency:platformBaseCurrency,snapshot_version:snapshotVersion,source_job_id:sourceJobId,date_preset:datePreset,snapshot_period_start:period.start,snapshot_period_end:period.end,snapshot_scope:period.scope||datePreset,capture_reason:captureReason,snapshot_class:snapshotClass,platform_account_timezone:platformTimeZone,platform_business_date:timeSync.platform_business_date,platform_business_hour:timeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours(platform),server_time_utc:timeSync.server_time_utc,istanbul_time:timeSync.istanbul_time,platform_account_time:timeSync.platform_account_time,time_engine_version:TIME_ENGINE_VERSION,fx_rate:1,fx_provider:FX_PROVIDER,fx_rate_timestamp:new Date().toISOString(),fx_source_currency:snapshot.account_currency,fx_target_currency:snapshot.account_currency,fx_engine_version:FX_ENGINE_VERSION,snapshot_date:snapshot.snapshot_date,snapshot_created_at:now,account_currency:snapshot.account_currency,kpis:snapshot.kpis,purchase_journey:snapshot.purchase_journey,click_journey:snapshot.click_journey,performance_summary:snapshot.performance_summary};
-  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
+  const row={user_id:user.id,platform,platform_account_id:platformAccountId,platform_base_currency:platformBaseCurrency,snapshot_version:snapshotVersion,source_job_id:sourceJobId,date_preset:datePreset,snapshot_period_start:period.start,snapshot_period_end:period.end,snapshot_scope:period.scope||datePreset,capture_reason:captureReason,snapshot_class:snapshotClass,platform_account_timezone:platformTimeZone,platform_business_date:timeSync.platform_business_date,platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,platform_business_hour:timeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours(platform),server_time_utc:timeSync.server_time_utc,istanbul_time:timeSync.istanbul_time,platform_account_time:timeSync.platform_account_time,time_engine_version:TIME_ENGINE_VERSION,fx_rate:1,fx_provider:FX_PROVIDER,fx_rate_timestamp:new Date().toISOString(),fx_source_currency:snapshot.account_currency,fx_target_currency:snapshot.account_currency,fx_engine_version:FX_ENGINE_VERSION,snapshot_date:snapshot.snapshot_date,snapshot_created_at:now,account_currency:snapshot.account_currency,kpis:snapshot.kpis,purchase_journey:snapshot.purchase_journey,click_journey:snapshot.click_journey,performance_summary:snapshot.performance_summary};
+  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
   if(error)throw error;
   let performance_spread_result=null;
   if(shouldSpreadSnapshotToPerformanceDataset(data)){

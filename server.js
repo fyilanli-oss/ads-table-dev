@@ -276,39 +276,43 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
 async function requestLifecycleBackfill({userId,platform,platformAccountId,reason}){
   const now=new Date().toISOString();
   const normalized=normalizePlatformAccountId(platformAccountId);
+  const cleanPlatform=String(platform||"").toLowerCase().trim();
+  const cleanReason=String(reason||"account_backfill_30d").trim();
   if(!normalized)throw new Error("Backfill platform account id is required");
+  if(!cleanPlatform)throw new Error("Backfill platform is required");
 
-  const since=new Date(Date.now()-24*60*60*1000).toISOString();
   const {data:existing,error:existingError}=await supabaseAdmin
     .from("snapshot_jobs")
-    .select("id,status,created_at,job_type,capture_reason")
+    .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
     .eq("user_id",userId)
-    .eq("platform",platform)
+    .eq("platform",cleanPlatform)
     .eq("platform_account_id",normalized)
     .eq("job_type","backfill_30d")
-    .eq("capture_reason",reason)
-    .gte("created_at",since)
+    .eq("capture_reason",cleanReason)
+    .in("status",["queued","running","completed"])
     .order("created_at",{ascending:false})
     .limit(1)
     .maybeSingle();
   if(existingError)throw existingError;
-  if(existing)return {created:false,job:existing,reason:"existing_recent_backfill"};
+  if(existing)return {created:false,job:existing,reason:"existing_backfill_30d"};
 
   const {data,error}=await supabaseAdmin
     .from("snapshot_jobs")
     .insert({
       user_id:userId,
-      platform,
+      platform:cleanPlatform,
       platform_account_id:normalized,
       status:"queued",
       job_type:"backfill_30d",
-      capture_reason:reason,
+      capture_reason:cleanReason,
       lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
       metadata:{
-        trigger:reason,
+        trigger:cleanReason,
         days:BACKFILL_DAYS_ON_RECONNECT,
         datePreset:"last_30d",
-        captureReason:reason,
+        captureReason:cleanReason,
+        snapshotClass:"backfill",
+        queuedBackfillVersion:"v1",
         lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION
       },
       created_at:now,
@@ -322,7 +326,7 @@ async function requestLifecycleBackfill({userId,platform,platformAccountId,reaso
     .from("platform_account_ownerships")
     .update({last_backfill_requested_at:now,updated_at:now,lifecycle_version:DISCONNECT_LIFECYCLE_VERSION})
     .eq("owner_user_id",userId)
-    .eq("platform",platform)
+    .eq("platform",cleanPlatform)
     .eq("platform_account_id",normalized);
 
   return {created:true,job:data};
@@ -824,8 +828,9 @@ async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccoun
     const ownership=await ensurePlatformOwnership(userId,validation.platform,row);
     await supabaseAdmin.from("platform_ad_accounts").upsert(row,{onConflict:"user_id,platform,platform_account_id"});
     const schedule=await ensureSnapshotSchedule(userId,validation.platform,row.platform_account_id,{accountSelectionGuardVersion:"v1",selectedByUserAt:now,account_type:phase1ReportableAccountType(validation.platform)});
-    await saveConnection(userId,validation.platform,{accountId:row.platform_account_id,accountName:row.account_name,metadata:{lastOwnedPlatformAccountId:row.platform_account_id,selectedPlatformAccountId:row.platform_account_id,baseCurrency:row.currency,accountSelectionGuardVersion:"v1",selectedByUserAt:now}});
-    results.push({platform:validation.platform,platform_account_id:row.platform_account_id,account_name:row.account_name,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null});
+    const backfill=await requestLifecycleBackfill({userId,platform:validation.platform,platformAccountId:row.platform_account_id,reason:"account_initial_connect"});
+    await saveConnection(userId,validation.platform,{accountId:row.platform_account_id,accountName:row.account_name,metadata:{lastOwnedPlatformAccountId:row.platform_account_id,selectedPlatformAccountId:row.platform_account_id,baseCurrency:row.currency,accountSelectionGuardVersion:"v1",selectedByUserAt:now,lastBackfill30dJobId:backfill?.job?.id||null,lastBackfill30dCreated:backfill?.created||false}});
+    results.push({platform:validation.platform,platform_account_id:row.platform_account_id,account_name:row.account_name,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null,backfill_30d:backfill});
   }
   return {ok:true,platform:validation.platform,limit:validation.limit,selected_count:results.length,accounts:results,message:`Selected ${results.length} account(s).`};
 }
@@ -2041,6 +2046,77 @@ app.get("/api/refresh/status",async(req,res)=>{
   }
 });
 
+async function runQueuedBackfillJob(job){
+  if(!job||job.job_type!=="backfill_30d")return {ok:true,skipped:true,reason:"not_backfill_job",job_id:job?.id||null};
+  const platform=String(job.platform||"").toLowerCase();
+  const platformAccountId=normalizePlatformAccountId(job.platform_account_id);
+  const datePreset=String(job.metadata?.datePreset||job.metadata?.date_preset||"last_30d");
+  const captureReason=String(job.capture_reason||job.metadata?.captureReason||"account_backfill_30d");
+  const snapshotClass=String(job.metadata?.snapshotClass||"backfill");
+  if(!platformAccountId)throw new Error("Queued backfill missing platform_account_id");
+
+  const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",job.user_id).maybeSingle();
+  if(userError)throw userError;
+  if(!user)throw new Error("Queued backfill user not found");
+
+  const ownership=await getOwnership(platform,platformAccountId);
+  if(!ownership||ownership.owner_user_id!==job.user_id||!activeOwnershipStatuses().includes(ownership.status)){
+    return {ok:true,skipped:true,reason:"ownership_not_active",job_id:job.id,platform,platform_account_id:platformAccountId,ownership_status:ownership?.status||null};
+  }
+
+  const {data:conn,error:connError}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",job.user_id).eq("platform",platform).eq("connected",true).maybeSingle();
+  if(connError)throw connError;
+  if(!conn)throw new Error(`Queued backfill ${platform} connection not found`);
+
+  await setRefreshJobStatus(job.id,"running");
+  try{
+    let writeResult=null;
+    if(platform==="meta"){
+      const platformTimeZone=await getPlatformAccountTimezone(job.user_id,"meta",platformAccountId,conn,ownership);
+      writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate:null,limit:String(job.metadata?.limit||"100"),sourceJobId:job.id,captureReason,platformTimeZone,snapshotClass});
+    }else if(platform==="google"){
+      const resolved=await resolveGoogleRefreshAccount(user,platformAccountId,job.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
+      writeResult=await writeGoogleSnapshotImmutable({user,customerId:normalizeCustomerId(resolved.customerId||platformAccountId),loginCustomerId:normalizeCustomerId(resolved.loginCustomerId||job.metadata?.loginCustomerId||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||""),dateRange:datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
+    }else if(platform==="tiktok"){
+      writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
+    }else if(platform==="klaviyo"){
+      writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
+    }else{
+      return {ok:true,skipped:true,reason:"unsupported_backfill_platform",job_id:job.id,platform};
+    }
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult?.snapshot?.id||null,metadata:{...(job.metadata||{}),processedBackfillAt:new Date().toISOString(),performance_spread_result:writeResult?.performance_spread_result||null,row_counts:writeResult?.row_counts||null}});
+    return {ok:true,job_id:job.id,platform,platform_account_id:platformAccountId,snapshot_id:writeResult?.snapshot?.id||null,date_preset:datePreset,snapshot_class:snapshotClass};
+  }catch(e){
+    await setRefreshJobStatus(job.id,"failed",{error_message:e.message,metadata:{...(job.metadata||{}),failedBackfillAt:new Date().toISOString()}}).catch(()=>null);
+    throw e;
+  }
+}
+
+async function processQueuedBackfills({limit=10}={}){
+  const {data:jobs,error}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .select("*")
+    .eq("status","queued")
+    .eq("job_type","backfill_30d")
+    .order("created_at",{ascending:true})
+    .limit(Number(limit)||10);
+  if(error)throw error;
+  const results=[];
+  for(const job of jobs||[]){
+    try{results.push(await runQueuedBackfillJob(job));}
+    catch(e){results.push({ok:false,job_id:job.id,platform:job.platform,platform_account_id:job.platform_account_id,error:e.message});}
+  }
+  return {ok:true,count:results.length,results};
+}
+
+app.post("/api/backfill/process",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
+    res.json(await processQueuedBackfills({limit:Number(req.body?.limit||req.query.limit||10)}));
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"queued_backfill_process"})}
+});
+
 async function runMetaAutoRefreshForSchedule(schedule){
   let job=null;
   const runDate=new Date();
@@ -2198,6 +2274,7 @@ app.get("/api/cron/auto-refresh",async(req,res)=>{
         fx_result={ok:false,error:fxError.message,stage:"fx_rates_auto_refresh_05utc"};
       }
     }
+    const queued_backfill_result=await processQueuedBackfills({limit:Number(req.query.backfill_limit||10)}).catch(e=>({ok:false,error:e.message,stage:"queued_backfill_cron"}));
     const nowIso=new Date().toISOString();
     const {data:schedules,error}=await supabaseAdmin
       .from("snapshot_schedules")
@@ -2221,7 +2298,7 @@ app.get("/api/cron/auto-refresh",async(req,res)=>{
       }
     }
 
-    res.json({ok:true,started_at:startedAt,fx_result,count:results.length,results});
+    res.json({ok:true,started_at:startedAt,fx_result,queued_backfill_result,count:results.length,results});
   }catch(e){
     res.status(500).json({ok:false,error:e.message,started_at:startedAt});
   }

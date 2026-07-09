@@ -329,7 +329,7 @@ async function reactivatePlatformLifecycle(userId,platform,platformAccountId,rea
 
 
 const TIME_ENGINE_VERSION="v1.2";
-const FX_ENGINE_VERSION="v1";
+const FX_ENGINE_VERSION="v1.1";
 const FX_PROVIDER="snapshot_static_v1";
 const DEFAULT_REPORTING_CURRENCY="TRY";
 
@@ -338,23 +338,49 @@ function normalizeCurrency(value){
   return /^[A-Z]{3}$/.test(s)?s:null;
 }
 
-function resolveFxRate(sourceCurrency,targetCurrency){
-  const source=normalizeCurrency(sourceCurrency)||normalizeCurrency(targetCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const target=normalizeCurrency(targetCurrency)||source;
+async function resolveFxRate(sourceCurrency,targetCurrency,options={}){
+  const source=normalizeCurrency(sourceCurrency);
+  const target=normalizeCurrency(targetCurrency)||source||DEFAULT_REPORTING_CURRENCY;
+  const requestedRateDate=options.rateDate||options.snapshotDate||options.businessDate||new Date();
+
+  if(!source){
+    const fallback=target||DEFAULT_REPORTING_CURRENCY;
+    return {
+      fx_rate:1,
+      fx_rate_date:fxDateOnly(requestedRateDate),
+      fx_provider:FX_PROVIDER,
+      fx_rate_timestamp:new Date().toISOString(),
+      fx_source_currency:fallback,
+      fx_target_currency:fallback,
+      fx_engine_version:FX_ENGINE_VERSION,
+      fx_source:"missing_source_currency_fallback"
+    };
+  }
+
   if(source===target){
     return {
       fx_rate:1,
+      fx_rate_date:fxDateOnly(requestedRateDate),
       fx_provider:FX_PROVIDER,
       fx_rate_timestamp:new Date().toISOString(),
       fx_source_currency:source,
       fx_target_currency:target,
-      fx_engine_version:FX_ENGINE_VERSION
+      fx_engine_version:FX_ENGINE_VERSION,
+      fx_source:"same_currency"
     };
   }
-  const err=new Error(`FX rate missing for ${source}->${target}`);
-  err.status=422;
-  err.stage="fx";
-  throw err;
+
+  const daily=await getFxRateDaily({rateDate:requestedRateDate,baseCurrency:source,quoteCurrency:target});
+  return {
+    fx_rate:Number(daily.rate),
+    fx_rate_date:daily.rate_date,
+    fx_provider:daily.provider||FX_RATES_PROVIDER,
+    fx_rate_timestamp:daily.fetched_at||new Date().toISOString(),
+    fx_source_currency:daily.base_currency||source,
+    fx_target_currency:daily.quote_currency||target,
+    fx_engine_version:FX_ENGINE_VERSION,
+    fx_source:daily.source||"fx_rates_daily"
+  };
 }
 
 function convertMoney(value,fxRate){
@@ -397,6 +423,7 @@ function applyFxToSnapshotPayload(snapshot,fx){
       if(row.raw&&typeof row.raw==="object"){
         row.raw.fx_applied={
           fx_rate:fx.fx_rate,
+          fx_rate_date:fx.fx_rate_date||null,
           fx_provider:fx.fx_provider,
           fx_rate_timestamp:fx.fx_rate_timestamp,
           fx_source_currency:fx.fx_source_currency,
@@ -707,6 +734,70 @@ async function countActiveOwnerships(userId,platform){
   if(error)throw error;
   return count||0;
 }
+
+function accountSelectionLimitMessage(platform,selectedCount,limit){
+  const label=String(platform||"platform").replace(/^./,c=>c.toUpperCase());
+  if(selectedCount>limit){
+    return `You selected ${selectedCount} accounts. AdsTable supports up to ${limit} accounts per platform. Select up to ${limit} accounts to continue.`;
+  }
+  return `You can connect up to ${limit} accounts per platform. You already have ${limit} connected ${label} accounts. Disconnect an existing account to connect a new one.`;
+}
+
+async function validateSelectedAccounts(userId,platform,selectedAccounts=[]){
+  const cleanPlatform=String(platform||"").toLowerCase().trim();
+  const limit=PHASE1_PLATFORM_LIMITS[cleanPlatform]||3;
+  const accounts=(Array.isArray(selectedAccounts)?selectedAccounts:[])
+    .map(account=>({...(account||{}),platform_account_id:normalizePlatformAccountId(account?.platform_account_id||account?.id||account?.customerId||account?.account_id||account?.advertiser_id)}))
+    .filter(account=>account.platform_account_id);
+  const unique=[];
+  const seen=new Set();
+  for(const account of accounts){
+    if(seen.has(account.platform_account_id))continue;
+    seen.add(account.platform_account_id);
+    unique.push(account);
+  }
+  if(!cleanPlatform){const err=new Error("platform is required");err.status=400;throw err;}
+  if(!unique.length){const err=new Error("Select at least 1 account to continue.");err.status=400;throw err;}
+  if(unique.length>limit){const err=new Error(accountSelectionLimitMessage(cleanPlatform,unique.length,limit));err.status=403;err.code="ACCOUNT_SELECTION_LIMIT";err.limit=limit;err.selectedCount=unique.length;throw err;}
+  const activeCount=await countActiveOwnerships(userId,cleanPlatform);
+  const existingIds=[];
+  for(const account of unique){
+    const existing=await getOwnership(cleanPlatform,account.platform_account_id);
+    if(existing&&existing.owner_user_id===userId&&activeOwnershipStatuses().includes(existing.status))existingIds.push(account.platform_account_id);
+  }
+  const newCount=unique.length-existingIds.length;
+  if(activeCount+newCount>limit){
+    const err=new Error(accountSelectionLimitMessage(cleanPlatform,activeCount+newCount,limit));
+    err.status=403;err.code="ACCOUNT_SELECTION_LIMIT";err.limit=limit;err.activeCount=activeCount;err.selectedCount=unique.length;throw err;
+  }
+  return {platform:cleanPlatform,limit,activeCount,selectedAccounts:unique};
+}
+
+async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccounts=[]){
+  const validation=await validateSelectedAccounts(userId,platform,selectedAccounts);
+  const now=new Date().toISOString();
+  const results=[];
+  for(const account of validation.selectedAccounts){
+    const row={
+      user_id:userId,
+      platform:validation.platform,
+      platform_business_id:account.business_id||account.platform_business_id||null,
+      platform_account_id:account.platform_account_id,
+      account_name:account.name||account.descriptiveName||account.account_name||account.advertiser_name||`Account ${account.platform_account_id}`,
+      currency:account.currency||account.currency_code||null,
+      timezone:account.timezone_name||account.timezone||DEFAULT_PLATFORM_TIMEZONE,
+      status:String(account.account_status||account.status||"active"),
+      metadata:{...account,selectedByUserAt:now,accountSelectionGuardVersion:"v1"},
+      updated_at:now
+    };
+    const ownership=await ensurePlatformOwnership(userId,validation.platform,row);
+    await supabaseAdmin.from("platform_ad_accounts").upsert(row,{onConflict:"user_id,platform,platform_account_id"});
+    const schedule=await ensureSnapshotSchedule(userId,validation.platform,row.platform_account_id,{accountSelectionGuardVersion:"v1",selectedByUserAt:now,account_type:phase1ReportableAccountType(validation.platform)});
+    await saveConnection(userId,validation.platform,{accountId:row.platform_account_id,accountName:row.account_name,metadata:{lastOwnedPlatformAccountId:row.platform_account_id,selectedPlatformAccountId:row.platform_account_id,baseCurrency:row.currency,accountSelectionGuardVersion:"v1",selectedByUserAt:now}});
+    results.push({platform:validation.platform,platform_account_id:row.platform_account_id,account_name:row.account_name,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null});
+  }
+  return {ok:true,platform:validation.platform,limit:validation.limit,selected_count:results.length,accounts:results,message:`Selected ${results.length} account(s).`};
+}
 async function ensurePlatformOwnership(userId,platform,account){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
   const platformAccountId=normalizePlatformAccountId(account.platform_account_id||account.id||account.customerId||account.account_id);
@@ -910,34 +1001,18 @@ app.get("/auth/meta",async(req,res)=>{try{const accessCheck=await requireConnect
 app.get("/auth/meta/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");if(!state||state!==req.session.metaOAuthState)return res.redirect("/dashboard?meta_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?meta_error=missing_user_id");const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{expiresIn:data.expires_in||null}});
 
 const metaConnAfterReconnect=await getConnection(userId,"meta");
-let reconnectLifecycleAccountId=null;
 if(metaConnAfterReconnect){
-  const reconnectAccountId=normalizePlatformAccountId(
-    metaConnAfterReconnect.account_id||
-    metaConnAfterReconnect.metadata?.lastOwnedPlatformAccountId||
-    metaConnAfterReconnect.metadata?.selectedPlatformAccountId
-  );
-
-  if(reconnectAccountId){
-    reconnectLifecycleAccountId=reconnectAccountId;
-    await resolveMetaRefreshAccount({id:userId},metaConnAfterReconnect,reconnectAccountId);
-  }else{
+  try{
     const accountsData=await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},data.access_token);
-    const first=(accountsData.data||[])[0];
-    if(first){
-      reconnectLifecycleAccountId=normalizePlatformAccountId(first.id);
-      await upsertAdAccount(userId,"meta",first);
-      await resolveMetaRefreshAccount({id:userId},metaConnAfterReconnect,reconnectLifecycleAccountId);
-    }
+    for(const account of accountsData.data||[])await upsertAdAccount(userId,"meta",account);
+    await saveConnection(userId,"meta",{metadata:{accountSelectionRequired:true,availableAccountCount:(accountsData.data||[]).length,accountSelectionGuardVersion:"v1"}});
+  }catch(discoveryError){
+    await saveConnection(userId,"meta",{metadata:{accountSelectionRequired:true,accountDiscoveryError:discoveryError.message,accountSelectionGuardVersion:"v1"}});
   }
 }
-if(reconnectLifecycleAccountId){
-  await reactivatePlatformLifecycle(userId,"meta",reconnectLifecycleAccountId,"account_reconnect");
-}
-
-req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
+req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
+app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.PINTEREST_CLIENT_ID||!process.env.PINTEREST_REDIRECT_URI)throw new Error("Missing Pinterest env");const state=Math.random().toString(36).slice(2);req.session.pinterestOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.PINTEREST_CLIENT_ID,redirect_uri:process.env.PINTEREST_REDIRECT_URI,scope:"ads:read",state});res.redirect(`https://www.pinterest.com/oauth/?${p}`)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/pinterest/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?pinterest_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?pinterest_error=missing_code");if(!state||state!==req.session.pinterestOAuthState)return res.redirect("/dashboard?pinterest_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?pinterest_error=missing_user_id");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.PINTEREST_REDIRECT_URI});const r=await fetch(`${PINTEREST_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${pinterestBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.message||data.error_description||data.error||"Pinterest token exchange failed");await saveConnection(userId,"pinterest",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||null,expiresIn:data.expires_in||null}});req.session.pinterestOAuthState=null;res.redirect("/dashboard?pinterest_connected=1")}catch(e){res.redirect(`/dashboard?pinterest_error=${encodeURIComponent(e.message)}`)}});
@@ -1088,7 +1163,10 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
   }
 }
 app.get("/auth/klaviyo",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const state=Math.random().toString(36).slice(2);const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());req.session.klaviyoOAuthState=state;req.session.klaviyoCodeVerifier=codeVerifier;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});res.redirect(`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null}});const klaviyoConn=await getConnection(userId,"klaviyo");await bootstrapKlaviyoLifecycle(userId,klaviyoConn,"oauth_callback");req.session.klaviyoOAuthState=null;req.session.klaviyoCodeVerifier=null;res.redirect("/dashboard?klaviyo_connected=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
+app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null}});const klaviyoConn=await getConnection(userId,"klaviyo");
+const klaviyoAccount=await resolveKlaviyoAccountIdentity(klaviyoConn);
+await saveConnection(userId,"klaviyo",{accountId:klaviyoAccount.platform_account_id,accountName:klaviyoAccount.account_name,metadata:{selectedPlatformAccountId:null,lastDiscoveredPlatformAccountId:klaviyoAccount.platform_account_id,accountSelectionRequired:true,accountSelectionGuardVersion:"v1",rawAccount:klaviyoAccount.raw_account}});
+req.session.klaviyoOAuthState=null;req.session.klaviyoCodeVerifier=null;res.redirect("/dashboard?klaviyo_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
 app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");res.json({connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),setupRequired:Boolean(conn?.metadata?.requiresSetup),estimatedMonthlySpend:conn?.metadata?.estimatedMonthlySpend||null,spendCurrency:conn?.metadata?.spendCurrency||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/klaviyo/campaigns",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const channel=String(req.query.channel||"email");const filter=`equals(messages.channel,\'${channel}\'),greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const data=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);res.json(data)}catch(e){res.status(500).json({error:e.message})}});
@@ -1289,6 +1367,12 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
     roas:perfNullableNumber(row.roas),
     conversions:perfNullableNumber(row.conversions??row.purchase??row.purchases),
     conversion_value:conversionValue!==null?conversionValue:revenue,
+    fx_rate:perfNullableNumber(snapshot.fx_rate),
+    fx_rate_date:perfDate(snapshot.fx_rate_date),
+    fx_provider:perfText(snapshot.fx_provider),
+    fx_source_currency:perfText(snapshot.fx_source_currency),
+    fx_target_currency:perfText(snapshot.fx_target_currency),
+    fx_engine_version:perfText(snapshot.fx_engine_version),
     raw:{
       ...((row&&typeof row.raw==="object")?row.raw:{}),
       performance_dataset_source_row:row,
@@ -1528,16 +1612,10 @@ async function resolveMetaRefreshAccount(user,conn,requestedAccountId){
     return {platformAccountId:storedId,account};
   }
 
-  const accountsData=await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},conn.access_token);
-  const accounts=accountsData.data||[];
-  if(!accounts.length){
-    const err=new Error("No Meta ad account found for connected user");
-    err.status=404;
-    throw err;
-  }
-  const first=accounts[0];
-  await upsertAdAccount(user.id,"meta",first);
-  return {platformAccountId:normalizePlatformAccountId(first.id),account:first};
+  const err=new Error("Meta account selection is required before refresh. Select up to 3 ad accounts to continue.");
+  err.status=409;
+  err.code="ACCOUNT_SELECTION_REQUIRED";
+  throw err;
 }
 
 
@@ -1635,7 +1713,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     adRows.find(r=>r.currency)?.currency||
     null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
+  const fx=await resolveFxRate(platformBaseCurrency,accountCurrency,{rateDate:effectiveSnapshotDate});
 
   const rawSnapshot=e2aBuildMetaSnapshot({
     snapshotDate:effectiveSnapshotDate,
@@ -1686,6 +1764,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     fx_rate:fx.fx_rate,
     fx_provider:fx.fx_provider,
     fx_rate_timestamp:fx.fx_rate_timestamp,
+    fx_rate_date:fx.fx_rate_date||null,
     fx_source_currency:fx.fx_source_currency,
     fx_target_currency:fx.fx_target_currency,
     fx_engine_version:fx.fx_engine_version,
@@ -1701,7 +1780,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_rate_date,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
 
@@ -2319,7 +2398,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_rate_date,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
       .eq("user_id",user.id)
       .neq("snapshot_class","recovery");
 
@@ -2398,10 +2477,8 @@ async function upsertAdAccount(userId,platform,account){
     updated_at:new Date().toISOString()
   };
   if(!row.platform_account_id)return null;
-  const ownership=await ensurePlatformOwnership(userId,platform,row);
   await supabaseAdmin.from("platform_ad_accounts").upsert(row,{onConflict:"user_id,platform,platform_account_id"});
-  await saveConnection(userId,platform,{accountId:row.platform_account_id,accountName:row.account_name,metadata:{lastOwnedPlatformAccountId:row.platform_account_id,baseCurrency:row.currency}});
-  return ownership;
+  return row;
 }
 async function metaGraph(pathname,params,token){const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}${pathname}`);Object.entries(params||{}).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=="")url.searchParams.set(k,v)});url.searchParams.set("access_token",token);const r=await fetch(url);const data=await r.json();if(!r.ok)throw new Error(data.error?.message||JSON.stringify(data));return data}
 app.get("/api/meta/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"meta");if(!result)return;const{user,conn}=result;const data=await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},conn.access_token);const accounts=data.data||[];res.json({platform:"meta",accounts})}catch(e){res.status(500).json({error:e.message})}});
@@ -2688,7 +2765,7 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   const allRows=[...campaignResult.rows,...adgroupResult.rows,...adResult.rows];
   const platformBaseCurrency=(allRows.find(r=>r.currency)?.currency)||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
+  const fx=await resolveFxRate(platformBaseCurrency,accountCurrency,{rateDate:effectiveSnapshotDate});
   const rawSnapshot=buildGoogleSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,campaignRows:campaignResult.rows,adgroupRows:adgroupResult.rows,adRows:adResult.rows});
   const snapshot=applyFxToSnapshotPayload(rawSnapshot,fx);
   const existingVersionResult=await supabaseAdmin
@@ -2729,6 +2806,7 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
     fx_rate:fx.fx_rate,
     fx_provider:fx.fx_provider,
     fx_rate_timestamp:fx.fx_rate_timestamp,
+    fx_rate_date:fx.fx_rate_date||null,
     fx_source_currency:fx.fx_source_currency,
     fx_target_currency:fx.fx_target_currency,
     fx_engine_version:fx.fx_engine_version,
@@ -2743,7 +2821,7 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_rate_date,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
   let performance_spread_result=null;
@@ -2818,10 +2896,9 @@ async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustome
   }
 
   if(!ownership||ownership.owner_user_id!==user.id||!activeOwnershipStatuses().includes(ownership.status)){
-    // Google follows the same SMB account-limit rule as every other platform.
-    // No silent reuse/fallback is allowed: if the user already has 3 active Google
-    // Ads Customer Accounts, the fourth account must fail clearly instead of
-    // rewriting an existing ownership row.
+    // No silent reuse/fallback is allowed. If the user has reached the Google account
+    // limit, ensurePlatformOwnership must reject the new account instead of mutating an
+    // existing ownership row.
     ownership=await ensurePlatformOwnership(user.id,"google",account);
   }
 
@@ -3084,6 +3161,31 @@ app.get("/api/pinterest/insights",async(req,res)=>{try{const result=await requir
 
 app.get("/api/pinterest/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{user,conn}=result;const data=await pinterestFetch(conn,"/ad_accounts");const accounts=data.items||[];res.json(data)}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/accounts",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_ad_accounts").select("*").eq("user_id",user.id).order("platform",{ascending:true});if(error)throw error;res.json({accounts:data||[]})}catch(e){res.status(500).json({error:e.message})}});
+
+app.post("/api/accounts/select",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const platform=String(req.body?.platform||req.query.platform||"").toLowerCase();
+    const selectedAccounts=req.body?.accounts||req.body?.selectedAccounts||[];
+    const result=await selectPlatformAccountsForLifecycle(user.id,platform,selectedAccounts);
+    res.json(result);
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,code:e.code||null,limit:e.limit||null,activeCount:e.activeCount||null,selectedCount:e.selectedCount||null})}
+});
+
+app.get("/api/accounts/selection-status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const platform=String(req.query.platform||"").toLowerCase();
+    const platforms=platform?[platform]:Object.keys(PHASE1_PLATFORM_LIMITS);
+    const rows=[];
+    for(const p of platforms){
+      const limit=PHASE1_PLATFORM_LIMITS[p]||3;
+      const activeCount=await countActiveOwnerships(user.id,p);
+      rows.push({platform:p,limit,active_count:activeCount,remaining:Math.max(limit-activeCount,0),message:activeCount>=limit?accountSelectionLimitMessage(p,limit,limit):null});
+    }
+    res.json({ok:true,platforms:rows});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message})}
+});
 
 
 // ===== D.2A.1 META CONNECT / DISCONNECT =====
@@ -3503,7 +3605,7 @@ app.get("/auth/tiktok/callback",async(req,res)=>{
       metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null}
     });
     req.session.tiktokOAuthState=null;
-    res.redirect("/dashboard?tiktok_connected=1");
+    res.redirect("/dashboard?tiktok_connected=1&account_selection_required=1");
   }catch(e){res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`)}
 });
 
@@ -3728,12 +3830,17 @@ function buildSnapshotPayloadFromPerformanceRows({platform,snapshotDate,accountC
 }
 
 async function insertSnapshotAndSpread({user,platform,platformAccountId,platformBaseCurrency,snapshot,datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync}){
-  const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform",platform).eq("platform_account_id",platformAccountId).eq("snapshot_date",snapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();
+  const targetCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||normalizeCurrency(snapshot.account_currency)||DEFAULT_REPORTING_CURRENCY;
+  const sourceCurrency=normalizeCurrency(platformBaseCurrency)||normalizeCurrency(snapshot.account_currency)||targetCurrency;
+  const fx=await resolveFxRate(sourceCurrency,targetCurrency,{rateDate:snapshot.snapshot_date});
+  const convertedSnapshot=applyFxToSnapshotPayload(snapshot,fx);
+
+  const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform",platform).eq("platform_account_id",platformAccountId).eq("snapshot_date",convertedSnapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();
   if(existingVersionResult.error)throw existingVersionResult.error;
   const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
   const now=new Date().toISOString();
-  const row={user_id:user.id,platform,platform_account_id:platformAccountId,platform_base_currency:platformBaseCurrency,snapshot_version:snapshotVersion,source_job_id:sourceJobId,date_preset:datePreset,snapshot_period_start:period.start,snapshot_period_end:period.end,snapshot_scope:period.scope||datePreset,capture_reason:captureReason,snapshot_class:snapshotClass,platform_account_timezone:platformTimeZone,platform_business_date:timeSync.platform_business_date,platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,platform_business_hour:timeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours(platform),server_time_utc:timeSync.server_time_utc,istanbul_time:timeSync.istanbul_time,platform_account_time:timeSync.platform_account_time,time_engine_version:TIME_ENGINE_VERSION,fx_rate:1,fx_provider:FX_PROVIDER,fx_rate_timestamp:new Date().toISOString(),fx_source_currency:snapshot.account_currency,fx_target_currency:snapshot.account_currency,fx_engine_version:FX_ENGINE_VERSION,snapshot_date:snapshot.snapshot_date,snapshot_created_at:now,account_currency:snapshot.account_currency,kpis:snapshot.kpis,purchase_journey:snapshot.purchase_journey,click_journey:snapshot.click_journey,performance_summary:snapshot.performance_summary};
-  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
+  const row={user_id:user.id,platform,platform_account_id:platformAccountId,platform_base_currency:sourceCurrency,snapshot_version:snapshotVersion,source_job_id:sourceJobId,date_preset:datePreset,snapshot_period_start:period.start,snapshot_period_end:period.end,snapshot_scope:period.scope||datePreset,capture_reason:captureReason,snapshot_class:snapshotClass,platform_account_timezone:platformTimeZone,platform_business_date:timeSync.platform_business_date,platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,platform_business_hour:timeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours(platform),server_time_utc:timeSync.server_time_utc,istanbul_time:timeSync.istanbul_time,platform_account_time:timeSync.platform_account_time,time_engine_version:TIME_ENGINE_VERSION,fx_rate:fx.fx_rate,fx_provider:fx.fx_provider,fx_rate_timestamp:fx.fx_rate_timestamp,fx_rate_date:fx.fx_rate_date||null,fx_source_currency:fx.fx_source_currency,fx_target_currency:fx.fx_target_currency,fx_engine_version:fx.fx_engine_version,snapshot_date:convertedSnapshot.snapshot_date,snapshot_created_at:now,account_currency:convertedSnapshot.account_currency,kpis:convertedSnapshot.kpis,purchase_journey:convertedSnapshot.purchase_journey,click_journey:convertedSnapshot.click_journey,performance_summary:convertedSnapshot.performance_summary};
+  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_rate_date,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
   if(error)throw error;
   let performance_spread_result=null;
   if(shouldSpreadSnapshotToPerformanceDataset(data)){
@@ -3741,9 +3848,8 @@ async function insertSnapshotAndSpread({user,platform,platformAccountId,platform
   }else{
     performance_spread_result={ok:true,skipped:true,reason:"recovery_snapshot_not_written_to_dataset",snapshot_id:data.id};
   }
-  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result};
+  return {mode:"insert",snapshot:data,row_counts:convertedSnapshot.performance_summary.counts,performance_spread_result};
 }
-
 async function writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
   const normalized=normalizePlatformAccountId(platformAccountId||conn?.account_id||conn?.metadata?.selectedPlatformAccountId);
   if(!normalized)throw new Error("Missing TikTok advertiser id");
@@ -3755,7 +3861,7 @@ async function writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePre
   const fetched=await fetchTikTokSnapshotRows(conn,normalized,period.datePreset);
   const platformBaseCurrency=fetched.rows.find(r=>r.currency)?.currency||conn?.metadata?.baseCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"tiktok",snapshotDate:effectiveSnapshotDate,accountCurrency,rows:fetched.rows.map(r=>({...r,currency:r.currency||accountCurrency})),counts:fetched.counts,sourceConfidence:"snapshot_layer_tiktok_v2",truthContract:tiktokTruthContract()});
+  const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"tiktok",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:fetched.rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:fetched.counts,sourceConfidence:"snapshot_layer_tiktok_v2",truthContract:tiktokTruthContract()});
   snapshot.performance_summary.raw_report=fetched.raw;
   snapshot.performance_summary.token_source=fetched.tokenSource;
   return insertSnapshotAndSpread({user,platform:"tiktok",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
@@ -3817,7 +3923,7 @@ async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePr
   }
   const platformBaseCurrency=rows.find(r=>r.currency)?.currency||conn.metadata?.spendCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"klaviyo",snapshotDate:effectiveSnapshotDate,accountCurrency,rows:rows.map(r=>({...r,currency:r.currency||accountCurrency})),counts:{campaign:rows.length,adgroup:0,ad:0},sourceConfidence:"snapshot_layer_klaviyo_v1"});
+  const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"klaviyo",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:{campaign:rows.length,adgroup:0,ad:0},sourceConfidence:"snapshot_layer_klaviyo_v1"});
   return insertSnapshotAndSpread({user,platform:"klaviyo",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
 }
 

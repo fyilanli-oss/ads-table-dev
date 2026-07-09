@@ -404,7 +404,6 @@ function applyFxToSnapshotPayload(snapshot,fx){
     converted.kpis.revenue=convertMoney(converted.kpis.revenue,fxRate);
     converted.kpis.sales=convertMoney(converted.kpis.sales,fxRate);
     converted.kpis.cpc=converted.kpis.clicks>0?converted.kpis.spend/converted.kpis.clicks:null;
-    converted.kpis.roas=converted.kpis.spend>0?converted.kpis.revenue/converted.kpis.spend:null;
   }
 
   if(converted.click_journey){
@@ -419,7 +418,6 @@ function applyFxToSnapshotPayload(snapshot,fx){
       row.sales=convertMoney(row.sales,fxRate);
       row.revenue=convertMoney(row.revenue,fxRate);
       row.cpc=Number(row.clicks||0)>0?row.spend/Number(row.clicks||0):null;
-      row.roas=Number(row.spend||0)>0?Number(row.revenue||0)/Number(row.spend||0):null;
       if(row.raw&&typeof row.raw==="object"){
         row.raw.fx_applied={
           fx_rate:fx.fx_rate,
@@ -1298,7 +1296,7 @@ function shouldSpreadSnapshotToPerformanceDataset(snapshotOrClass){
 }
 
 // ===== PERFORMANCE SPREAD ENGINE v1 =====
-const PERFORMANCE_SPREAD_ENGINE_VERSION="v1";
+const PERFORMANCE_SPREAD_ENGINE_VERSION="v1.1";
 function perfHasValue(value){return value!==null&&value!==undefined&&value!==""}
 function perfNullableNumber(value){if(!perfHasValue(value))return null;const n=Number(value);return Number.isFinite(n)?n:null}
 function perfText(value){const s=String(value??"").trim();return s?s:null}
@@ -1334,13 +1332,24 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
   if(!level)return null;
   const idInPlatform=perfEntityId(row,level);
   if(!idInPlatform)return null;
+
+  const platform=perfNormalizePlatform(snapshot.platform||row.platform);
+  const spend=perfNullableNumber(row.spend);
   const revenue=perfNullableNumber(row.revenue);
   const sales=perfNullableNumber(row.sales);
   const conversionValue=perfNullableNumber(row.conversion_value??row.purchase_value);
+  const adClicks=perfNullableNumber(row.ad_clicks??row.clicks??(platform==="klaviyo"?row.link_clicks:null));
+  const addToCart=perfNullableNumber(row.add_to_cart);
+  const checkout=perfNullableNumber(row.checkout);
+  const purchase=perfNullableNumber(row.purchase??row.purchases??row.purchase_count??row.conversions);
+  const abandoned=checkout!==null&&purchase!==null?Math.max(checkout-purchase,0):perfNullableNumber(row.abandoned);
+  const profit=sales!==null&&spend!==null?sales-spend:(revenue!==null&&spend!==null?revenue-spend:null);
+  const cps=spend!==null&&purchase!==null&&purchase>0?spend/purchase:null;
+
   return {
     snapshot_id:snapshot.id,
     user_id:snapshot.user_id,
-    platform:perfNormalizePlatform(snapshot.platform||row.platform),
+    platform,
     platform_account_id:perfText(snapshot.platform_account_id),
     level,
     id_in_platform:idInPlatform,
@@ -1356,17 +1365,23 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
     platform_account_timezone:perfText(snapshot.platform_account_timezone),
     server_time_utc:snapshot.server_time_utc||null,
     time_engine_version:perfText(snapshot.time_engine_version||TIME_ENGINE_VERSION),
-    spend:perfNullableNumber(row.spend),
+    spend,
     impressions:perfNullableNumber(row.impressions),
-    reach:perfNullableNumber(row.reach),
-    clicks:perfNullableNumber(row.clicks),
+    clicks:adClicks,
+    ad_clicks:adClicks,
     ctr:perfCtrRatio(row.ctr),
     cpc:perfNullableNumber(row.cpc),
     sales,
     revenue,
     roas:perfNullableNumber(row.roas),
-    conversions:perfNullableNumber(row.conversions??row.purchase??row.purchases),
+    conversions:purchase,
     conversion_value:conversionValue!==null?conversionValue:revenue,
+    add_to_cart:addToCart,
+    checkout,
+    purchase,
+    abandoned,
+    profit,
+    cps,
     fx_rate:perfNullableNumber(snapshot.fx_rate),
     fx_rate_date:perfDate(snapshot.fx_rate_date),
     fx_provider:perfText(snapshot.fx_provider),
@@ -1378,7 +1393,8 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
       performance_dataset_source_row:row,
       performance_spread_engine_version:PERFORMANCE_SPREAD_ENGINE_VERSION,
       ctr_storage_standard:"ratio",
-      zero_null_policy:"0 is measured zero; null is unknown/unavailable/not computable"
+      zero_null_policy:"0 is measured zero; null is unknown/unavailable/not computable",
+      kpi_normalization_policy:"reach/link_click/landing_page_view excluded from dataset; klaviyo link_click normalized into ad_clicks"
     }
   };
 }

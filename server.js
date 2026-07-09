@@ -328,7 +328,7 @@ async function reactivatePlatformLifecycle(userId,platform,platformAccountId,rea
 
 
 
-const TIME_ENGINE_VERSION="v1";
+const TIME_ENGINE_VERSION="v1.1";
 const FX_ENGINE_VERSION="v1";
 const FX_PROVIDER="snapshot_static_v1";
 const DEFAULT_REPORTING_CURRENCY="TRY";
@@ -636,6 +636,18 @@ function resolveAdminTimeSync(date=new Date(),platformTimeZone=DEFAULT_PLATFORM_
     platform_account_timezone:platform.timeZone,
     platform_business_date:platform.date,
     platform_business_hour:platform.hour
+  };
+}
+
+function resolveTimeEngineContext({date=new Date(),platformTimeZone=DEFAULT_PLATFORM_TIMEZONE,requestedSnapshotDate=null}={}){
+  const timeSync=resolveAdminTimeSync(date,platformTimeZone);
+  const requested=String(requestedSnapshotDate||"").trim();
+  const snapshotDate=requested?requested.slice(0,10):timeSync.platform_business_date;
+  return {
+    ...timeSync,
+    snapshot_date:snapshotDate,
+    snapshot_date_source:requested?"request_override":"platform_business_date",
+    time_engine_version:TIME_ENGINE_VERSION
   };
 }
 
@@ -1613,8 +1625,8 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
   const platformAccountId=normalizePlatformAccountId(adAccountId);
   const ownership=await requireActiveOwnership(user.id,"meta",platformAccountId);
   const resolvedTimeZone=normalizeTimeZone(platformTimeZone||await getPlatformAccountTimezone(user.id,"meta",platformAccountId,conn,ownership));
-  const timeSync=adminTimeSync||resolveAdminTimeSync(new Date(),resolvedTimeZone);
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,resolvedTimeZone);
+  const timeSync=adminTimeSync||resolveTimeEngineContext({date:new Date(),platformTimeZone:resolvedTimeZone,requestedSnapshotDate:snapshotDate});
+  const effectiveSnapshotDate=timeSync.snapshot_date;
   const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,resolvedTimeZone,new Date());
   const normalizedDatePreset=period.datePreset;
   const resolvedSnapshotClass=snapshotClass||period.snapshotClass||"primary";
@@ -1729,9 +1741,9 @@ async function handleMetaSnapshotWrite(req,res){
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Meta ad account id",stage});
 
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"meta",platformAccountId,conn,null);
-    const adminTimeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
+    const adminTimeSync=resolveTimeEngineContext({date:new Date(),platformTimeZone,requestedSnapshotDate:req.body?.snapshot_date||req.query.snapshot_date});
     const datePreset="today";
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
+    const snapshotDate=adminTimeSync.snapshot_date;
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
@@ -2671,8 +2683,8 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   const platformAccountId=normalizeCustomerId(customerId);
   if(!platformAccountId)throw new Error("Missing Google customerId");
   const platformTimeZone=await getPlatformAccountTimezone(user.id,"google",platformAccountId,null,null);
-  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
+  const timeSync=resolveTimeEngineContext({date:new Date(),platformTimeZone,requestedSnapshotDate:snapshotDate});
+  const effectiveSnapshotDate=timeSync.snapshot_date;
   const period=googleDateRangeWindow(dateRange,effectiveSnapshotDate);
   const [campaignResult,adgroupResult,adResult]=await Promise.all([
     googleFetchInsightsForLevel({user,customerId:platformAccountId,loginCustomerId,dateRange,level:"campaign"}),
@@ -3018,12 +3030,14 @@ async function handleGoogleSnapshotWrite(req,res){
     const resolvedGoogleAccount=await resolveGoogleRefreshAccount(user,requestedCustomerId,requestedLoginCustomerId);
     const platformAccountId=normalizeCustomerId(resolvedGoogleAccount.customerId);
     const loginCustomerId=normalizeCustomerId(requestedLoginCustomerId||resolvedGoogleAccount.loginCustomerId||"");
+    const platformTimeZone=await getPlatformAccountTimezone(user.id,"google",platformAccountId,null,null);
+    const timeEngineContext=resolveTimeEngineContext({date:new Date(),platformTimeZone,requestedSnapshotDate:req.body?.snapshot_date||req.query.snapshot_date});
     const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
+    const snapshotDate=timeEngineContext.snapshot_date;
     stage="lifecycle";
     await ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustomerId,{accountName:`Google customer ${platformAccountId}`,source:"manual_google_refresh"});
     stage="job";
-    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId});
+    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",...timeEngineContext,timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId});
     await setRefreshJobStatus(job.id,"running");
     stage="google_api";
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
@@ -3779,9 +3793,9 @@ async function writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePre
   if(!normalized)throw new Error("Missing TikTok advertiser id");
   await requireActiveOwnership(user.id,"tiktok",normalized);
   const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",normalized,conn,null);
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
+  const timeSync=resolveTimeEngineContext({date:new Date(),platformTimeZone,requestedSnapshotDate:snapshotDate});
+  const effectiveSnapshotDate=timeSync.snapshot_date;
   const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,platformTimeZone,new Date());
-  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
   const fetched=await fetchTikTokSnapshotRows(conn,normalized,period.datePreset);
   const platformBaseCurrency=fetched.rows.find(r=>r.currency)?.currency||conn?.metadata?.baseCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
@@ -3801,9 +3815,10 @@ async function handleTikTokSnapshotWrite(req,res){
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing TikTok advertiser id",stage});
     const datePreset=String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today");
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,null);
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
+    const timeEngineContext=resolveTimeEngineContext({date:new Date(),platformTimeZone,requestedSnapshotDate:req.body?.snapshot_date||req.query.snapshot_date});
+    const snapshotDate=timeEngineContext.snapshot_date;
     stage="job";
-    job=await createRefreshJob(user.id,"tiktok",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
+    job=await createRefreshJob(user.id,"tiktok",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",...timeEngineContext,timeEngineVersion:TIME_ENGINE_VERSION});
     await setRefreshJobStatus(job.id,"running");
     stage="snapshot";
     const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
@@ -3817,9 +3832,9 @@ async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePr
   if(!normalized)throw new Error("Missing Klaviyo account id");
   await requireActiveOwnership(user.id,"klaviyo",normalized);
   const platformTimeZone=await getPlatformAccountTimezone(user.id,"klaviyo",normalized,conn,null);
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
+  const timeSync=resolveTimeEngineContext({date:new Date(),platformTimeZone,requestedSnapshotDate:snapshotDate});
+  const effectiveSnapshotDate=timeSync.snapshot_date;
   const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,platformTimeZone,new Date());
-  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
   const w=klaviyoDateWindow(period.datePreset);
   let campaigns=[];
   try{
@@ -3861,9 +3876,10 @@ async function handleKlaviyoSnapshotWrite(req,res){
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Klaviyo account id",stage});
     const datePreset=String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today");
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"klaviyo",platformAccountId,conn,null);
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
+    const timeEngineContext=resolveTimeEngineContext({date:new Date(),platformTimeZone,requestedSnapshotDate:req.body?.snapshot_date||req.query.snapshot_date});
+    const snapshotDate=timeEngineContext.snapshot_date;
     stage="job";
-    job=await createRefreshJob(user.id,"klaviyo",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
+    job=await createRefreshJob(user.id,"klaviyo",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",...timeEngineContext,timeEngineVersion:TIME_ENGINE_VERSION});
     await setRefreshJobStatus(job.id,"running");
     stage="snapshot";
     const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});

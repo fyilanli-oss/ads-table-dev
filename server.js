@@ -19,6 +19,7 @@ const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOM
 const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
+const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
 app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>sendFile(res,"tiktok-test.html"));
@@ -126,7 +127,39 @@ async function revokePlatformToken(platform,conn){
       return result;
     }
 
-    if(platform==="klaviyo"||platform==="tiktok"){
+    if(platform==="tiktok"){
+      result.attempted=true;
+      result.provider="tiktok";
+
+      const accessToken=conn.access_token;
+      if(!accessToken){
+        throw new Error("TikTok revoke requires active access token before disconnect");
+      }
+      if(!tiktokClientId()||!tiktokClientSecret()){
+        throw new Error("TikTok revoke requires TIKTOK_CLIENT_ID and TIKTOK_CLIENT_SECRET");
+      }
+
+      const r=await fetch(TIKTOK_REVOKE_ENDPOINT,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          app_id:tiktokClientId(),
+          secret:tiktokClientSecret(),
+          access_token:accessToken
+        })
+      });
+      const data=await r.json().catch(()=>({status:r.status}));
+      result.response=data;
+
+      if(!r.ok || (data.code!==undefined&&data.code!==0)){
+        throw new Error(data.message||data.error?.message||`TikTok revoke failed ${r.status}`);
+      }
+
+      result.ok=true;
+      return result;
+    }
+
+    if(platform==="klaviyo"){
       result.attempted=true;
       result.provider=platform;
       result.ok=true;

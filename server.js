@@ -329,7 +329,7 @@ async function reactivatePlatformLifecycle(userId,platform,platformAccountId,rea
 
 
 const TIME_ENGINE_VERSION="v1.2";
-const FX_ENGINE_VERSION="v1.1";
+const FX_ENGINE_VERSION="v1";
 const FX_PROVIDER="snapshot_static_v1";
 const DEFAULT_REPORTING_CURRENCY="TRY";
 
@@ -338,49 +338,23 @@ function normalizeCurrency(value){
   return /^[A-Z]{3}$/.test(s)?s:null;
 }
 
-async function resolveFxRate(sourceCurrency,targetCurrency,options={}){
-  const source=normalizeCurrency(sourceCurrency);
-  const target=normalizeCurrency(targetCurrency)||source||DEFAULT_REPORTING_CURRENCY;
-  const requestedRateDate=options.rateDate||options.snapshotDate||options.businessDate||new Date();
-
-  if(!source){
-    const fallback=target||DEFAULT_REPORTING_CURRENCY;
-    return {
-      fx_rate:1,
-      fx_rate_date:fxDateOnly(requestedRateDate),
-      fx_provider:FX_PROVIDER,
-      fx_rate_timestamp:new Date().toISOString(),
-      fx_source_currency:fallback,
-      fx_target_currency:fallback,
-      fx_engine_version:FX_ENGINE_VERSION,
-      fx_source:"missing_source_currency_fallback"
-    };
-  }
-
+function resolveFxRate(sourceCurrency,targetCurrency){
+  const source=normalizeCurrency(sourceCurrency)||normalizeCurrency(targetCurrency)||DEFAULT_REPORTING_CURRENCY;
+  const target=normalizeCurrency(targetCurrency)||source;
   if(source===target){
     return {
       fx_rate:1,
-      fx_rate_date:fxDateOnly(requestedRateDate),
       fx_provider:FX_PROVIDER,
       fx_rate_timestamp:new Date().toISOString(),
       fx_source_currency:source,
       fx_target_currency:target,
-      fx_engine_version:FX_ENGINE_VERSION,
-      fx_source:"same_currency"
+      fx_engine_version:FX_ENGINE_VERSION
     };
   }
-
-  const daily=await getFxRateDaily({rateDate:requestedRateDate,baseCurrency:source,quoteCurrency:target});
-  return {
-    fx_rate:Number(daily.rate),
-    fx_rate_date:daily.rate_date,
-    fx_provider:daily.provider||FX_RATES_PROVIDER,
-    fx_rate_timestamp:daily.fetched_at||new Date().toISOString(),
-    fx_source_currency:daily.base_currency||source,
-    fx_target_currency:daily.quote_currency||target,
-    fx_engine_version:FX_ENGINE_VERSION,
-    fx_source:daily.source||"fx_rates_daily"
-  };
+  const err=new Error(`FX rate missing for ${source}->${target}`);
+  err.status=422;
+  err.stage="fx";
+  throw err;
 }
 
 function convertMoney(value,fxRate){
@@ -423,7 +397,6 @@ function applyFxToSnapshotPayload(snapshot,fx){
       if(row.raw&&typeof row.raw==="object"){
         row.raw.fx_applied={
           fx_rate:fx.fx_rate,
-          fx_rate_date:fx.fx_rate_date||null,
           fx_provider:fx.fx_provider,
           fx_rate_timestamp:fx.fx_rate_timestamp,
           fx_source_currency:fx.fx_source_currency,
@@ -1316,12 +1289,6 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
     roas:perfNullableNumber(row.roas),
     conversions:perfNullableNumber(row.conversions??row.purchase??row.purchases),
     conversion_value:conversionValue!==null?conversionValue:revenue,
-    fx_rate:perfNullableNumber(snapshot.fx_rate),
-    fx_rate_date:perfDate(snapshot.fx_rate_date),
-    fx_provider:perfText(snapshot.fx_provider),
-    fx_source_currency:perfText(snapshot.fx_source_currency),
-    fx_target_currency:perfText(snapshot.fx_target_currency),
-    fx_engine_version:perfText(snapshot.fx_engine_version),
     raw:{
       ...((row&&typeof row.raw==="object")?row.raw:{}),
       performance_dataset_source_row:row,
@@ -1668,7 +1635,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     adRows.find(r=>r.currency)?.currency||
     null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const fx=await resolveFxRate(platformBaseCurrency,accountCurrency,{rateDate:effectiveSnapshotDate});
+  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
 
   const rawSnapshot=e2aBuildMetaSnapshot({
     snapshotDate:effectiveSnapshotDate,
@@ -1719,7 +1686,6 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
     fx_rate:fx.fx_rate,
     fx_provider:fx.fx_provider,
     fx_rate_timestamp:fx.fx_rate_timestamp,
-    fx_rate_date:fx.fx_rate_date||null,
     fx_source_currency:fx.fx_source_currency,
     fx_target_currency:fx.fx_target_currency,
     fx_engine_version:fx.fx_engine_version,
@@ -1735,7 +1701,7 @@ async function writeMetaSnapshotImmutable({user,conn,adAccountId,datePreset="tod
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_rate_date,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
 
@@ -2353,7 +2319,7 @@ app.get("/api/snapshots/meta/latest",async(req,res)=>{
 
     let snapshotQuery=supabaseAdmin
       .from("dashboard_snapshots")
-      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_rate_date,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+      .select("id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
       .eq("user_id",user.id)
       .neq("snapshot_class","recovery");
 
@@ -2722,7 +2688,7 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   const allRows=[...campaignResult.rows,...adgroupResult.rows,...adResult.rows];
   const platformBaseCurrency=(allRows.find(r=>r.currency)?.currency)||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const fx=await resolveFxRate(platformBaseCurrency,accountCurrency,{rateDate:effectiveSnapshotDate});
+  const fx=resolveFxRate(platformBaseCurrency,accountCurrency);
   const rawSnapshot=buildGoogleSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,campaignRows:campaignResult.rows,adgroupRows:adgroupResult.rows,adRows:adResult.rows});
   const snapshot=applyFxToSnapshotPayload(rawSnapshot,fx);
   const existingVersionResult=await supabaseAdmin
@@ -2763,7 +2729,6 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
     fx_rate:fx.fx_rate,
     fx_provider:fx.fx_provider,
     fx_rate_timestamp:fx.fx_rate_timestamp,
-    fx_rate_date:fx.fx_rate_date||null,
     fx_source_currency:fx.fx_source_currency,
     fx_target_currency:fx.fx_target_currency,
     fx_engine_version:fx.fx_engine_version,
@@ -2778,7 +2743,7 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   const {data,error}=await supabaseAdmin
     .from("dashboard_snapshots")
     .insert(row)
-    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_rate_date,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
+    .select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary")
     .maybeSingle();
   if(error)throw error;
   let performance_spread_result=null;
@@ -2853,48 +2818,11 @@ async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustome
   }
 
   if(!ownership||ownership.owner_user_id!==user.id||!activeOwnershipStatuses().includes(ownership.status)){
-    try{
-      ownership=await ensurePlatformOwnership(user.id,"google",account);
-    }catch(e){
-      // Google Snapshot uses a fixed tested account pair. Older reconnect flows may have
-      // created stale Google ownership rows, causing the generic ownership guard to hit
-      // the per-platform limit before the configured snapshot account can be registered.
-      // In that case, reuse the user's most recent active Google ownership row instead
-      // of creating a fourth reportable account. This keeps the ownership lifecycle
-      // aligned with the schedule/account-resolution source and preserves the global limit.
-      if(!String(e.message||"").includes("Connected reportable platform account limit reached for google"))throw e;
-
-      const {data:existingRows,error:existingError}=await supabaseAdmin
-        .from("platform_account_ownerships")
-        .select("*")
-        .eq("owner_user_id",user.id)
-        .eq("platform","google")
-        .in("status",activeOwnershipStatuses())
-        .order("updated_at",{ascending:false})
-        .limit(1);
-      if(existingError)throw existingError;
-      const reusable=(existingRows||[])[0];
-      if(!reusable)throw e;
-
-      const now=new Date().toISOString();
-      const {data:updated,error:updateError}=await supabaseAdmin
-        .from("platform_account_ownerships")
-        .update({
-          platform_account_id:normalized,
-          platform_account_name:account.account_name||account.name||reusable.platform_account_name||null,
-          account_type:phase1ReportableAccountType("google"),
-          base_currency:account.currency||account.currency_code||reusable.base_currency||null,
-          status:"active",
-          lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
-          updated_at:now,
-          metadata:{...(reusable.metadata||{}),...account,reusedOwnershipId:reusable.id,reusedForGoogleSnapshotAccount:true,loginCustomerId:loginCustomerId||null}
-        })
-        .eq("id",reusable.id)
-        .select("*")
-        .maybeSingle();
-      if(updateError)throw updateError;
-      ownership=updated;
-    }
+    // Google follows the same SMB account-limit rule as every other platform.
+    // No silent reuse/fallback is allowed: if the user already has 3 active Google
+    // Ads Customer Accounts, the fourth account must fail clearly instead of
+    // rewriting an existing ownership row.
+    ownership=await ensurePlatformOwnership(user.id,"google",account);
   }
 
   const schedule=await ensureSnapshotSchedule(user.id,"google",normalized,{loginCustomerId:loginCustomerId||null,source:"google_snapshot_lifecycle",accountResolutionSource:"google_snapshot_config",timeEngineVersion:TIME_ENGINE_VERSION});
@@ -3800,17 +3728,12 @@ function buildSnapshotPayloadFromPerformanceRows({platform,snapshotDate,accountC
 }
 
 async function insertSnapshotAndSpread({user,platform,platformAccountId,platformBaseCurrency,snapshot,datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync}){
-  const targetCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||normalizeCurrency(snapshot.account_currency)||DEFAULT_REPORTING_CURRENCY;
-  const sourceCurrency=normalizeCurrency(platformBaseCurrency)||normalizeCurrency(snapshot.account_currency)||targetCurrency;
-  const fx=await resolveFxRate(sourceCurrency,targetCurrency,{rateDate:snapshot.snapshot_date});
-  const convertedSnapshot=applyFxToSnapshotPayload(snapshot,fx);
-
-  const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform",platform).eq("platform_account_id",platformAccountId).eq("snapshot_date",convertedSnapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();
+  const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform",platform).eq("platform_account_id",platformAccountId).eq("snapshot_date",snapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();
   if(existingVersionResult.error)throw existingVersionResult.error;
   const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
   const now=new Date().toISOString();
-  const row={user_id:user.id,platform,platform_account_id:platformAccountId,platform_base_currency:sourceCurrency,snapshot_version:snapshotVersion,source_job_id:sourceJobId,date_preset:datePreset,snapshot_period_start:period.start,snapshot_period_end:period.end,snapshot_scope:period.scope||datePreset,capture_reason:captureReason,snapshot_class:snapshotClass,platform_account_timezone:platformTimeZone,platform_business_date:timeSync.platform_business_date,platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,platform_business_hour:timeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours(platform),server_time_utc:timeSync.server_time_utc,istanbul_time:timeSync.istanbul_time,platform_account_time:timeSync.platform_account_time,time_engine_version:TIME_ENGINE_VERSION,fx_rate:fx.fx_rate,fx_provider:fx.fx_provider,fx_rate_timestamp:fx.fx_rate_timestamp,fx_rate_date:fx.fx_rate_date||null,fx_source_currency:fx.fx_source_currency,fx_target_currency:fx.fx_target_currency,fx_engine_version:fx.fx_engine_version,snapshot_date:convertedSnapshot.snapshot_date,snapshot_created_at:now,account_currency:convertedSnapshot.account_currency,kpis:convertedSnapshot.kpis,purchase_journey:convertedSnapshot.purchase_journey,click_journey:convertedSnapshot.click_journey,performance_summary:convertedSnapshot.performance_summary};
-  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_rate_date,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
+  const row={user_id:user.id,platform,platform_account_id:platformAccountId,platform_base_currency:platformBaseCurrency,snapshot_version:snapshotVersion,source_job_id:sourceJobId,date_preset:datePreset,snapshot_period_start:period.start,snapshot_period_end:period.end,snapshot_scope:period.scope||datePreset,capture_reason:captureReason,snapshot_class:snapshotClass,platform_account_timezone:platformTimeZone,platform_business_date:timeSync.platform_business_date,platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,platform_business_hour:timeSync.platform_business_hour,data_maturity_window_hours:dataMaturityWindowHours(platform),server_time_utc:timeSync.server_time_utc,istanbul_time:timeSync.istanbul_time,platform_account_time:timeSync.platform_account_time,time_engine_version:TIME_ENGINE_VERSION,fx_rate:1,fx_provider:FX_PROVIDER,fx_rate_timestamp:new Date().toISOString(),fx_source_currency:snapshot.account_currency,fx_target_currency:snapshot.account_currency,fx_engine_version:FX_ENGINE_VERSION,snapshot_date:snapshot.snapshot_date,snapshot_created_at:now,account_currency:snapshot.account_currency,kpis:snapshot.kpis,purchase_journey:snapshot.purchase_journey,click_journey:snapshot.click_journey,performance_summary:snapshot.performance_summary};
+  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,platform_base_currency,snapshot_version,source_job_id,date_preset,snapshot_period_start,snapshot_period_end,snapshot_scope,capture_reason,snapshot_class,platform_account_timezone,platform_business_date,platform_business_at,platform_business_hour,data_maturity_window_hours,server_time_utc,istanbul_time,platform_account_time,time_engine_version,fx_rate,fx_provider,fx_rate_timestamp,fx_source_currency,fx_target_currency,fx_engine_version,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
   if(error)throw error;
   let performance_spread_result=null;
   if(shouldSpreadSnapshotToPerformanceDataset(data)){
@@ -3818,8 +3741,9 @@ async function insertSnapshotAndSpread({user,platform,platformAccountId,platform
   }else{
     performance_spread_result={ok:true,skipped:true,reason:"recovery_snapshot_not_written_to_dataset",snapshot_id:data.id};
   }
-  return {mode:"insert",snapshot:data,row_counts:convertedSnapshot.performance_summary.counts,performance_spread_result};
+  return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result};
 }
+
 async function writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
   const normalized=normalizePlatformAccountId(platformAccountId||conn?.account_id||conn?.metadata?.selectedPlatformAccountId);
   if(!normalized)throw new Error("Missing TikTok advertiser id");
@@ -3831,7 +3755,7 @@ async function writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePre
   const fetched=await fetchTikTokSnapshotRows(conn,normalized,period.datePreset);
   const platformBaseCurrency=fetched.rows.find(r=>r.currency)?.currency||conn?.metadata?.baseCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"tiktok",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:fetched.rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:fetched.counts,sourceConfidence:"snapshot_layer_tiktok_v2",truthContract:tiktokTruthContract()});
+  const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"tiktok",snapshotDate:effectiveSnapshotDate,accountCurrency,rows:fetched.rows.map(r=>({...r,currency:r.currency||accountCurrency})),counts:fetched.counts,sourceConfidence:"snapshot_layer_tiktok_v2",truthContract:tiktokTruthContract()});
   snapshot.performance_summary.raw_report=fetched.raw;
   snapshot.performance_summary.token_source=fetched.tokenSource;
   return insertSnapshotAndSpread({user,platform:"tiktok",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
@@ -3893,7 +3817,7 @@ async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePr
   }
   const platformBaseCurrency=rows.find(r=>r.currency)?.currency||conn.metadata?.spendCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
-  const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"klaviyo",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:{campaign:rows.length,adgroup:0,ad:0},sourceConfidence:"snapshot_layer_klaviyo_v1"});
+  const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"klaviyo",snapshotDate:effectiveSnapshotDate,accountCurrency,rows:rows.map(r=>({...r,currency:r.currency||accountCurrency})),counts:{campaign:rows.length,adgroup:0,ad:0},sourceConfidence:"snapshot_layer_klaviyo_v1"});
   return insertSnapshotAndSpread({user,platform:"klaviyo",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
 }
 

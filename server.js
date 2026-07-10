@@ -22,7 +22,7 @@ const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
-app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>sendFile(res,"tiktok-test.html")); app.get("/organic-test",(_,res)=>sendFile(res,"organic-test.html"));
+app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>sendFile(res,"tiktok-test.html"));
 app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));
 async function getUserFromRequest(req){const a=req.headers.authorization||"";const t=a.startsWith("Bearer ")?a.slice(7):null;if(!t||!supabaseAdmin)return null;const {data,error}=await supabaseAdmin.auth.getUser(t);if(error||!data?.user?.id)return null;return data.user}
 async function requireUser(req,res){const u=await getUserFromRequest(req);if(!u){res.status(401).json({error:"Not authenticated"});return null}return u}
@@ -1227,6 +1227,341 @@ app.get("/api/platform/organic/ga4/properties",async(req,res)=>{try{const user=a
 app.get("/api/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
 app.get("/api/platform/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
 // ===== END ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
+
+function pickOrganicGa4Property(input){
+  const propertyId=normalizePlatformAccountId(input?.property_id||input?.propertyId||input?.platform_account_id||input?.id||String(input?.property_resource_name||input?.property||"").replace(/^properties\//,""));
+  if(!propertyId)return null;
+  return {
+    platform_account_id:propertyId,
+    property_id:propertyId,
+    property_resource_name:input?.property_resource_name||input?.property||`properties/${propertyId}`,
+    property_name:input?.property_name||input?.displayName||input?.display_name||input?.name||`GA4 Property ${propertyId}`,
+    account_id:input?.account_id||null,
+    account_name:input?.account_name||null,
+    raw:input
+  };
+}
+function pickOrganicSearchConsoleSite(input){
+  const siteUrl=String(input?.site_url||input?.siteUrl||input?.platform_account_id||input?.id||"").trim();
+  if(!siteUrl)return null;
+  return {
+    platform_account_id:siteUrl,
+    site_url:siteUrl,
+    permission_level:input?.permission_level||input?.permissionLevel||null,
+    raw:input
+  };
+}
+async function bindOrganicPropertyAndSite(userId,body={}){
+  const now=new Date().toISOString();
+  const conn=await getConnection(userId,"organic");
+  if(!conn)throw Object.assign(new Error("Organic OAuth connection is required before property binding"),{status:404});
+
+  const requestedProperty=pickOrganicGa4Property(body.ga4_property||body.ga4Property||body.property||body);
+  const requestedSite=pickOrganicSearchConsoleSite(body.search_console_site||body.searchConsoleSite||body.site||body);
+  if(!requestedProperty)throw Object.assign(new Error("GA4 property selection is required"),{status:400});
+  if(!requestedSite)throw Object.assign(new Error("Search Console site selection is required"),{status:400});
+
+  const availableProperties=(await listOrganicGa4Properties(userId)).properties||[];
+  const verifiedProperty=availableProperties.find(p=>p.property_id===requestedProperty.property_id||p.platform_account_id===requestedProperty.platform_account_id);
+  if(!verifiedProperty)throw Object.assign(new Error("Selected GA4 property is not available for this Organic connection"),{status:403});
+
+  const availableSites=(await listOrganicSearchConsoleSites(userId)).sites||[];
+  const verifiedSite=availableSites.find(s=>s.site_url===requestedSite.site_url);
+  if(!verifiedSite)throw Object.assign(new Error("Selected Search Console site is not available for this Organic connection"),{status:403});
+
+  const organicAccount={
+    platform_account_id:verifiedProperty.property_id,
+    account_name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
+    name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
+    property_id:verifiedProperty.property_id,
+    property_resource_name:verifiedProperty.property_resource_name,
+    site_url:verifiedSite.site_url,
+    currency:null,
+    metadata:{
+      source:"organic_property_site_binding",
+      organicBindingVersion:"v1",
+      selectedAt:now,
+      ga4_property:verifiedProperty,
+      search_console_site:verifiedSite
+    }
+  };
+
+  const ownership=await ensurePlatformOwnership(userId,"organic",organicAccount);
+
+  await supabaseAdmin.from("platform_ad_accounts").upsert({
+    user_id:userId,
+    platform:"organic",
+    platform_business_id:verifiedProperty.account_id||null,
+    platform_account_id:verifiedProperty.property_id,
+    account_name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
+    currency:null,
+    timezone:DEFAULT_PLATFORM_TIMEZONE,
+    status:"active",
+    metadata:{
+      organicBindingVersion:"v1",
+      selectedAt:now,
+      ga4_property:verifiedProperty,
+      search_console_site:verifiedSite
+    },
+    updated_at:now
+  },{onConflict:"user_id,platform,platform_account_id"});
+
+  await saveConnection(userId,"organic",{
+    accountId:verifiedProperty.property_id,
+    accountName:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
+    metadata:{
+      ...(conn.metadata||{}),
+      setupStage:"configured",
+      configured:true,
+      configuredAt:now,
+      organicBindingVersion:"v1",
+      selectedPlatformAccountId:verifiedProperty.property_id,
+      lastOwnedPlatformAccountId:verifiedProperty.property_id,
+      ga4PropertySelectionRequired:false,
+      searchConsoleSiteSelectionRequired:false,
+      selectedGa4Property:verifiedProperty,
+      selectedSearchConsoleSite:verifiedSite
+    }
+  });
+
+  return {
+    ok:true,
+    platform:"organic",
+    setupStage:"configured",
+    configured:true,
+    platform_account_id:verifiedProperty.property_id,
+    ga4_property:verifiedProperty,
+    search_console_site:verifiedSite,
+    ownership_id:ownership?.id||null
+  };
+}
+app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicPropertyAndSite(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_property_site_binding"})}});
+app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicPropertyAndSite(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_property_site_binding"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured),setupStage:conn?.metadata?.setupStage||null,ga4_property:conn?.metadata?.selectedGa4Property||null,search_console_site:conn?.metadata?.selectedSearchConsoleSite||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured),setupStage:conn?.metadata?.setupStage||null,ga4_property:conn?.metadata?.selectedGa4Property||null,search_console_site:conn?.metadata?.selectedSearchConsoleSite||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+
+
+
+// ===== ORGANIC SNAPSHOT v1 =====
+function organicMetricValue(row,metricName){
+  const headers=row?.metricHeaders||[];
+  const values=row?.rows?.[0]?.metricValues||[];
+  const index=headers.findIndex(h=>h?.name===metricName);
+  if(index<0)return 0;
+  const n=Number(values[index]?.value||0);
+  return Number.isFinite(n)?n:0;
+}
+
+function organicIsoDate(value){
+  return fxDateOnly(value||new Date());
+}
+
+async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
+  const cleanPropertyId=normalizePlatformAccountId(propertyId);
+  if(!cleanPropertyId)throw Object.assign(new Error("Organic GA4 property id is required"),{status:400});
+  const token=await getFreshOrganicAccessToken(userId);
+  const url=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(cleanPropertyId)}:runReport`;
+  const body={
+    dateRanges:[{startDate,endDate}],
+    metrics:[
+      {name:"sessions"},
+      {name:"addToCarts"},
+      {name:"checkouts"},
+      {name:"purchases"},
+      {name:"purchaseRevenue"}
+    ]
+  };
+  const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data=await r.json().catch(()=>({status:r.status}));
+  if(!r.ok)throw new Error(data.error?.message||data.message||`Organic GA4 Data API failed ${r.status}`);
+  return {
+    sessions:organicMetricValue(data,"sessions"),
+    add_to_cart:organicMetricValue(data,"addToCarts"),
+    checkout:organicMetricValue(data,"checkouts"),
+    purchase:organicMetricValue(data,"purchases"),
+    revenue:organicMetricValue(data,"purchaseRevenue"),
+    raw:data
+  };
+}
+
+async function fetchOrganicSearchConsoleMetrics(userId,siteUrl,startDate,endDate){
+  const cleanSiteUrl=String(siteUrl||"").trim();
+  if(!cleanSiteUrl)throw Object.assign(new Error("Organic Search Console site url is required"),{status:400});
+  const token=await getFreshOrganicAccessToken(userId);
+  const url=`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(cleanSiteUrl)}/searchAnalytics/query`;
+  const body={startDate,endDate,rowLimit:1};
+  const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data=await r.json().catch(()=>({status:r.status}));
+  if(!r.ok)throw new Error(data.error?.message||data.message||`Organic Search Console API failed ${r.status}`);
+  const row=Array.isArray(data.rows)?(data.rows[0]||{}):{};
+  const clicks=Number(row.clicks||0);
+  const impressions=Number(row.impressions||0);
+  const ctr=row.ctr===undefined||row.ctr===null?null:Number(row.ctr)*100;
+  const averagePosition=row.position===undefined||row.position===null?null:Number(row.position);
+  return {
+    clicks:Number.isFinite(clicks)?clicks:0,
+    impressions:Number.isFinite(impressions)?impressions:0,
+    ctr:Number.isFinite(ctr)?ctr:null,
+    average_position:Number.isFinite(averagePosition)?averagePosition:null,
+    raw:data
+  };
+}
+
+function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,property,site}){
+  const sessions=Number(ga4.sessions||0);
+  const addToCart=Number(ga4.add_to_cart||0);
+  const checkout=Number(ga4.checkout||0);
+  const purchase=Number(ga4.purchase||0);
+  const revenue=Number(ga4.revenue||0);
+  const clicks=Number(gsc.clicks||0);
+  const impressions=Number(gsc.impressions||0);
+  const ctr=gsc.ctr!==null&&gsc.ctr!==undefined?Number(gsc.ctr):(impressions>0?clicks/impressions*100:null);
+  const abandoned=checkout>0?Math.max(checkout-purchase,0):0;
+  return {
+    platform:"organic",
+    snapshot_date:snapshotDate,
+    account_currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
+    kpis:{
+      spend:0,
+      sales:revenue,
+      revenue,
+      impressions,
+      clicks,
+      sessions,
+      ctr,
+      cpc:null,
+      roas:null
+    },
+    purchase_journey:{
+      add_to_cart:addToCart,
+      checkout,
+      abandoned,
+      purchase,
+      purchases:purchase,
+      purchase_value:revenue
+    },
+    click_journey:{
+      ad_clicks:clicks,
+      link_clicks:0,
+      landing_page_views:0,
+      sessions,
+      traffic_score:null,
+      real_cpc:null
+    },
+    performance_summary:{
+      rows:[{
+        platform:"Organic",
+        level:"platform",
+        campaign_id:"organic",
+        campaign_name:"Organic",
+        campaign_status:"active",
+        currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
+        impressions,
+        clicks,
+        ad_clicks:clicks,
+        sessions,
+        ctr,
+        cpc:null,
+        spend:0,
+        sales:revenue,
+        revenue,
+        roas:null,
+        add_to_cart:addToCart,
+        checkout,
+        purchase,
+        purchases:purchase,
+        purchase_count:purchase,
+        abandoned,
+        conversion_value:revenue,
+        conversions:purchase,
+        raw:{
+          source:"organic_snapshot_v1",
+          ga4_property:property,
+          search_console_site:site,
+          gsc_average_position:gsc.average_position
+        }
+      }],
+      counts:{platform:1},
+      source_confidence:"organic_snapshot_v1",
+      null_policy:"Organic Snapshot v1 uses GA4 for sessions/events/revenue and Search Console for impressions/clicks/ctr. Dataset spread is intentionally disabled in this patch.",
+      raw_report:{ga4:ga4.raw,gsc:gsc.raw}
+    }
+  };
+}
+
+async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null,captureReason="manual_refresh",snapshotClass="primary"}){
+  const conn=await getConnection(user.id,"organic");
+  if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
+  if(!conn.metadata?.configured)throw Object.assign(new Error("Organic property and site binding is required before snapshot"),{status:400});
+  const property=conn.metadata.selectedGa4Property||{};
+  const site=conn.metadata.selectedSearchConsoleSite||{};
+  const platformAccountId=normalizePlatformAccountId(conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
+  if(!platformAccountId)throw Object.assign(new Error("Organic GA4 property id is missing"),{status:400});
+  await requireActiveOwnership(user.id,"organic",platformAccountId);
+  const platformTimeZone=DEFAULT_PLATFORM_TIMEZONE;
+  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
+  const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,platformTimeZone,new Date());
+  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
+  const startDate=organicIsoDate(period.start);
+  const endDate=organicIsoDate(period.end);
+  const [ga4,gsc]=await Promise.all([
+    fetchOrganicGa4Metrics(user.id,platformAccountId,startDate,endDate),
+    fetchOrganicSearchConsoleMetrics(user.id,site.site_url,startDate,endDate)
+  ]);
+  const accountCurrency=await getUserAccountCurrency(user.id);
+  const snapshot=buildOrganicSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency,ga4,gsc,property,site});
+  const fx=await resolveFxRate(accountCurrency,accountCurrency,{rateDate:snapshot.snapshot_date});
+  const convertedSnapshot=applyFxToSnapshotPayload(snapshot,fx);
+  const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform","organic").eq("platform_account_id",platformAccountId).eq("snapshot_date",convertedSnapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();
+  if(existingVersionResult.error)throw existingVersionResult.error;
+  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
+  const now=new Date().toISOString();
+  const row={
+    user_id:user.id,
+    platform:"organic",
+    platform_account_id:platformAccountId,
+    platform_base_currency:accountCurrency,
+    snapshot_version:snapshotVersion,
+    source_job_id:null,
+    date_preset:period.datePreset,
+    snapshot_period_start:period.start,
+    snapshot_period_end:period.end,
+    snapshot_scope:period.scope||period.datePreset,
+    capture_reason:captureReason,
+    snapshot_class:snapshotClass,
+    platform_account_timezone:platformTimeZone,
+    platform_business_date:timeSync.platform_business_date,
+    platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,
+    platform_business_hour:timeSync.platform_business_hour,
+    data_maturity_window_hours:dataMaturityWindowHours("organic"),
+    server_time_utc:timeSync.server_time_utc,
+    istanbul_time:timeSync.istanbul_time,
+    platform_account_time:timeSync.platform_account_time,
+    time_engine_version:TIME_ENGINE_VERSION,
+    fx_rate:fx.fx_rate,
+    fx_provider:fx.fx_provider,
+    fx_rate_timestamp:fx.fx_rate_timestamp,
+    fx_rate_date:fx.fx_rate_date||null,
+    fx_source_currency:fx.fx_source_currency,
+    fx_target_currency:fx.fx_target_currency,
+    fx_engine_version:fx.fx_engine_version,
+    snapshot_date:convertedSnapshot.snapshot_date,
+    snapshot_created_at:now,
+    account_currency:convertedSnapshot.account_currency,
+    kpis:convertedSnapshot.kpis,
+    purchase_journey:convertedSnapshot.purchase_journey,
+    click_journey:convertedSnapshot.click_journey,
+    performance_summary:convertedSnapshot.performance_summary
+  };
+  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,snapshot_version,date_preset,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
+  if(error)throw error;
+  return {ok:true,platform:"organic",mode:"snapshot_insert_only",dataset_spread:false,snapshot:data,row_counts:convertedSnapshot.performance_summary.counts};
+}
+
+app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
+app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
+// ===== END ORGANIC SNAPSHOT v1 =====
+
 
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",async(req,res)=>{

@@ -1146,6 +1146,88 @@ app.get("/auth/organic/callback",async(req,res)=>{
   }
 });
 
+
+// ===== ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
+const GA4_ADMIN_API_BASE=process.env.GA4_ADMIN_API_BASE||"https://analyticsadmin.googleapis.com/v1beta";
+const SEARCH_CONSOLE_API_BASE=process.env.SEARCH_CONSOLE_API_BASE||"https://www.googleapis.com/webmasters/v3";
+function organicGoogleOAuthClientForRefresh(){
+  if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)throw new Error("Missing Google OAuth env");
+  return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.ORGANIC_GOOGLE_REDIRECT_URI||process.env.GOOGLE_REDIRECT_URI||"");
+}
+async function getFreshOrganicAccessToken(userId){
+  const conn=await getConnection(userId,"organic");
+  if(!conn)throw new Error("Organic not connected");
+  const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;
+  if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;
+  if(!conn.refresh_token){
+    if(conn.access_token)return conn.access_token;
+    throw new Error("Organic Google refresh token missing. Please reconnect Organic.");
+  }
+  const client=organicGoogleOAuthClientForRefresh();
+  client.setCredentials({refresh_token:conn.refresh_token});
+  const {credentials}=await client.refreshAccessToken();
+  const token=credentials.access_token;
+  const expiry=credentials.expiry_date||(Date.now()+3600*1000);
+  await saveConnection(userId,"organic",{
+    accessToken:token,
+    refreshToken:conn.refresh_token,
+    tokenExpiresAt:new Date(expiry).toISOString(),
+    accountId:conn.account_id||null,
+    accountName:conn.account_name||"Organic",
+    metadata:{...(conn.metadata||{}),organicDiscoveryRefreshAt:new Date().toISOString(),expiryDate:expiry,organicDiscoveryVersion:"v1-restore"}
+  });
+  return token;
+}
+async function organicGoogleFetch(userId,url){
+  const token=await getFreshOrganicAccessToken(userId);
+  const r=await fetch(url,{headers:{Authorization:`Bearer ${token}`,Accept:"application/json"}});
+  const data=await r.json().catch(()=>({status:r.status}));
+  if(!r.ok)throw new Error(data.error?.message||data.message||`Organic Google API failed ${r.status}`);
+  return data;
+}
+function normalizeGa4PropertySummary(accountSummary,propertySummary){
+  const propertyName=propertySummary?.property||"";
+  const propertyId=String(propertyName).replace(/^properties\//,"");
+  return {
+    platform_account_id:propertyId,
+    property_id:propertyId,
+    property_resource_name:propertyName||null,
+    property_name:propertySummary?.displayName||propertySummary?.display_name||propertyName||null,
+    account_id:String(accountSummary?.account||"").replace(/^accounts\//,"")||null,
+    account_resource_name:accountSummary?.account||null,
+    account_name:accountSummary?.displayName||accountSummary?.display_name||null,
+    raw:{accountSummary,propertySummary}
+  };
+}
+function normalizeSearchConsoleSite(site){
+  const siteUrl=String(site?.siteUrl||site?.site_url||"").trim();
+  return {
+    platform_account_id:siteUrl,
+    site_url:siteUrl,
+    permission_level:site?.permissionLevel||site?.permission_level||null,
+    raw:site
+  };
+}
+async function listOrganicGa4Properties(userId){
+  const data=await organicGoogleFetch(userId,`${GA4_ADMIN_API_BASE}/accountSummaries?pageSize=200`);
+  const accounts=Array.isArray(data.accountSummaries)?data.accountSummaries:[];
+  const properties=[];
+  for(const account of accounts){
+    for(const prop of account.propertySummaries||[])properties.push(normalizeGa4PropertySummary(account,prop));
+  }
+  return {ok:true,platform:"organic",source:"ga4_admin_api",properties,rawCount:properties.length,nextPageToken:data.nextPageToken||null};
+}
+async function listOrganicSearchConsoleSites(userId){
+  const data=await organicGoogleFetch(userId,`${SEARCH_CONSOLE_API_BASE}/sites`);
+  const sites=(Array.isArray(data.siteEntry)?data.siteEntry:[]).map(normalizeSearchConsoleSite).filter(s=>s.site_url);
+  return {ok:true,platform:"organic",source:"search_console_api",sites,rawCount:sites.length};
+}
+app.get("/api/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
+app.get("/api/platform/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
+app.get("/api/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
+app.get("/api/platform/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
+// ===== END ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
+
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",async(req,res)=>{
   const status=passiveLegacyPlatformStatus("pinterest");

@@ -1506,7 +1506,7 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,prope
       }],
       counts:{platform:1},
       source_confidence:"organic_snapshot_v1",
-      null_policy:"Organic Snapshot v1 uses GA4 for sessions/events/revenue and Search Console for impressions/clicks/ctr. Dataset spread is intentionally disabled in this patch.",
+      null_policy:"Organic Snapshot v1 uses GA4 filtered by AdsTable Organic Channel Filter v1 and Search Console for impressions/clicks/ctr. Dataset spread is enabled in Organic Dataset Spread v1.",
       raw_report:{ga4:{...ga4.raw,adstable_channel_filter_v1:ORGANIC_GA4_CHANNEL_GROUPS_V1},gsc:gsc.raw}
     }
   };
@@ -1578,7 +1578,20 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
   };
   const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,snapshot_version,date_preset,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
   if(error)throw error;
-  return {ok:true,platform:"organic",mode:"snapshot_insert_only",dataset_spread:false,snapshot:data,row_counts:convertedSnapshot.performance_summary.counts};
+
+  const snapshotForSpread={...row,...data};
+  let performance_spread_result=null;
+  if(snapshotClass!=="recovery"){
+    try{
+      performance_spread_result=await spreadSnapshotToPerformanceDataset(snapshotForSpread);
+    }catch(performanceSpreadError){
+      performance_spread_result={ok:false,error:performanceSpreadError.message,snapshot_id:data.id};
+    }
+  }else{
+    performance_spread_result={ok:true,skipped:true,reason:"recovery_snapshot_not_written_to_dataset",snapshot_id:data.id};
+  }
+
+  return {ok:true,platform:"organic",mode:"snapshot_insert_and_dataset_spread",dataset_spread:true,snapshot:data,row_counts:convertedSnapshot.performance_summary.counts,performance_spread_result};
 }
 
 app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});

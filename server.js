@@ -1344,6 +1344,26 @@ app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await re
 
 
 // ===== ORGANIC SNAPSHOT v1 =====
+const ORGANIC_GA4_CHANNEL_GROUPS_V1=[
+  "Organic Search",
+  "Organic Social",
+  "Organic Video",
+  "Organic Shopping",
+  "Direct"
+];
+
+function organicGa4ChannelFilterV1(){
+  return {
+    filter:{
+      fieldName:"sessionDefaultChannelGroup",
+      inListFilter:{
+        values:ORGANIC_GA4_CHANNEL_GROUPS_V1,
+        caseSensitive:true
+      }
+    }
+  };
+}
+
 function organicMetricValue(row,metricName){
   const headers=row?.metricHeaders||[];
   const values=row?.rows?.[0]?.metricValues||[];
@@ -1364,6 +1384,7 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
   const url=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(cleanPropertyId)}:runReport`;
   const body={
     dateRanges:[{startDate,endDate}],
+    dimensionFilter:organicGa4ChannelFilterV1(),
     metrics:[
       {name:"sessions"},
       {name:"addToCarts"},
@@ -1381,6 +1402,7 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
     checkout:organicMetricValue(data,"checkouts"),
     purchase:organicMetricValue(data,"ecommercePurchases"),
     revenue:organicMetricValue(data,"purchaseRevenue"),
+    channel_groups:ORGANIC_GA4_CHANNEL_GROUPS_V1,
     raw:data
   };
 }
@@ -1485,7 +1507,7 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,prope
       counts:{platform:1},
       source_confidence:"organic_snapshot_v1",
       null_policy:"Organic Snapshot v1 uses GA4 for sessions/events/revenue and Search Console for impressions/clicks/ctr. Dataset spread is intentionally disabled in this patch.",
-      raw_report:{ga4:ga4.raw,gsc:gsc.raw}
+      raw_report:{ga4:{...ga4.raw,adstable_channel_filter_v1:ORGANIC_GA4_CHANNEL_GROUPS_V1},gsc:gsc.raw}
     }
   };
 }

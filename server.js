@@ -14,6 +14,7 @@ const PINTEREST_API_BASE="https://api.pinterest.com/v5";
 const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
+const GA4_DATA_API_BASE=process.env.GA4_DATA_API_BASE||"https://analyticsdata.googleapis.com/v1beta";
 const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||process.env.GOOGLE_TEST_CUSTOMER_ID||"5580593360";
 const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||process.env.GOOGLE_TEST_LOGIN_CUSTOMER_ID||"5383556660";
 const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";

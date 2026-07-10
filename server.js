@@ -1075,6 +1075,103 @@ app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConne
 app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
 app.get("/auth/organic",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.organicGoogleOAuthState=state;req.session.oauthUserId=userId;const url=organicGoogleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:ORGANIC_GOOGLE_SCOPES,include_granted_scopes:true});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/organic/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?organic_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?organic_error=missing_code");if(!state||state!==req.session.organicGoogleOAuthState)return res.redirect("/dashboard?organic_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?organic_error=missing_user_id");const client=organicGoogleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"organic",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),requestedScopes:ORGANIC_GOOGLE_SCOPES,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null,organicOAuthVersion:"v1",setupStage:"oauth_connected",propertySelectionRequired:true,searchConsoleSelectionRequired:true,connectedAt:new Date().toISOString()}});req.session.organicGoogleOAuthState=null;res.redirect("/dashboard?organic_connected=1&organic_property_selection_required=1")}catch(e){res.redirect(`/dashboard?organic_error=${encodeURIComponent(e.message)}`)}});
+
+async function getFreshOrganicAccessToken(userId){
+  const conn=await getConnection(userId,"organic");
+  if(!conn)throw new Error("Organic not connected");
+  const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;
+  if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;
+  if(!conn.refresh_token){
+    if(conn.access_token)return conn.access_token;
+    throw new Error("Organic refresh token missing. Please reconnect Organic.");
+  }
+  const client=organicGoogleOAuthClient();
+  client.setCredentials({refresh_token:conn.refresh_token});
+  const {credentials}=await client.refreshAccessToken();
+  const token=credentials.access_token;
+  const expiry=credentials.expiry_date||(Date.now()+3600*1000);
+  await saveConnection(userId,"organic",{
+    accessToken:token,
+    refreshToken:conn.refresh_token,
+    tokenExpiresAt:new Date(expiry).toISOString(),
+    metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry,organicOAuthVersion:"v1"}
+  });
+  return token;
+}
+
+async function organicGoogleJson(userId,url){
+  const token=await getFreshOrganicAccessToken(userId);
+  const r=await fetch(url,{headers:{Authorization:`Bearer ${token}`,Accept:"application/json"}});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.error?.message||data.message||`Organic Google API failed ${r.status}`);
+  return data;
+}
+
+function normalizeGa4PropertySummary(accountSummary,propertySummary){
+  const propertyName=String(propertySummary?.property||"");
+  const propertyId=propertyName.replace(/^properties\//,"");
+  return {
+    platform:"organic",
+    source:"ga4",
+    property_id:propertyId,
+    platform_account_id:propertyId,
+    property_name:propertyName,
+    display_name:propertySummary?.displayName||`GA4 Property ${propertyId}`,
+    account_id:String(accountSummary?.account||"").replace(/^accounts\//,""),
+    account_name:accountSummary?.displayName||null,
+    property_type:propertySummary?.propertyType||null,
+    parent:propertySummary?.parent||null,
+    raw:{accountSummary,propertySummary}
+  };
+}
+
+async function listOrganicGa4Properties(userId){
+  const properties=[];
+  let pageToken="";
+  do{
+    const url=new URL("https://analyticsadmin.googleapis.com/v1beta/accountSummaries");
+    url.searchParams.set("pageSize","200");
+    if(pageToken)url.searchParams.set("pageToken",pageToken);
+    const data=await organicGoogleJson(userId,url);
+    for(const accountSummary of data.accountSummaries||[]){
+      for(const propertySummary of accountSummary.propertySummaries||[]){
+        const item=normalizeGa4PropertySummary(accountSummary,propertySummary);
+        if(item.property_id)properties.push(item);
+      }
+    }
+    pageToken=data.nextPageToken||"";
+  }while(pageToken);
+  const conn=await getConnection(userId,"organic").catch(()=>null);
+  if(conn){
+    await saveConnection(userId,"organic",{
+      metadata:{
+        ...(conn.metadata||{}),
+        setupStage:"ga4_property_discovered",
+        propertySelectionRequired:true,
+        availableGa4PropertyCount:properties.length,
+        lastGa4PropertyDiscoveryAt:new Date().toISOString(),
+        organicGa4DiscoveryVersion:"v1"
+      }
+    });
+  }
+  return properties;
+}
+
+app.get("/api/organic/ga4/properties",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const properties=await listOrganicGa4Properties(user.id);
+    res.json({ok:true,platform:"organic",source:"ga4",property_selection_required:true,count:properties.length,properties});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}
+});
+
+app.get("/api/platform/organic/ga4/properties",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const properties=await listOrganicGa4Properties(user.id);
+    res.json({ok:true,platform:"organic",source:"ga4",property_selection_required:true,count:properties.length,properties});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}
+});
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",async(req,res)=>{
   const status=passiveLegacyPlatformStatus("pinterest");
@@ -3424,7 +3521,7 @@ app.get("/api/platform/organic/status",async(req,res)=>{
       search_console_connected:Boolean(conn&&conn.access_token),
       property_selection_required:Boolean(conn?.metadata?.propertySelectionRequired),
       search_console_selection_required:Boolean(conn?.metadata?.searchConsoleSelectionRequired),
-      message:conn?"Organic OAuth connected. Property and Search Console selection are pending.":"Organic Google OAuth is ready. Connect Organic to continue."
+      message:conn?"Organic OAuth connected. GA4 property discovery is available; property selection is pending.":"Organic Google OAuth is ready. Connect Organic to continue."
     });
   }catch(e){
     res.status(500).json({error:e.message});

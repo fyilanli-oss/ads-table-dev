@@ -20,6 +20,10 @@ const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
+const ORGANIC_GOOGLE_REDIRECT_URI=process.env.ORGANIC_GOOGLE_REDIRECT_URI||process.env.GOOGLE_ORGANIC_REDIRECT_URI||process.env.GOOGLE_REDIRECT_URI;
+const ORGANIC_GOOGLE_SCOPES=(process.env.ORGANIC_GOOGLE_SCOPES||"https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly").split(/\s+/).filter(Boolean);
+const GA4_ADMIN_API_BASE="https://analyticsadmin.googleapis.com/v1beta";
+const SEARCH_CONSOLE_API_BASE="https://www.googleapis.com/webmasters/v3";
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
 app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>sendFile(res,"tiktok-test.html"));
@@ -135,9 +139,9 @@ async function revokePlatformToken(platform,conn){
       return result;
     }
 
-    if((platform==="google"||platform==="organic")&&(conn.refresh_token||conn.access_token)){
+    if(platform==="google"&&(conn.refresh_token||conn.access_token)){
       result.attempted=true;
-      result.provider=platform==="organic"?"google_organic":"google";
+      result.provider="google";
       const url=new URL("https://oauth2.googleapis.com/revoke");
       url.searchParams.set("token",conn.refresh_token||conn.access_token);
       const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"}});
@@ -1053,9 +1057,6 @@ async function setRefreshJobStatus(jobId,status,extra={}){
 }
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
-const ORGANIC_GOOGLE_SCOPES=["https://www.googleapis.com/auth/analytics.readonly","https://www.googleapis.com/auth/webmasters.readonly"];
-function organicGoogleRedirectUri(){return process.env.ORGANIC_GOOGLE_REDIRECT_URI||process.env.GOOGLE_ORGANIC_REDIRECT_URI||process.env.GOOGLE_REDIRECT_URI}
-function organicGoogleOAuthClient(){const redirectUri=organicGoogleRedirectUri();if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!redirectUri)throw new Error("Missing Organic Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,redirectUri)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
 app.get("/auth/meta",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.META_APP_ID||!process.env.META_REDIRECT_URI)throw new Error("Missing Meta env");const state=Math.random().toString(36).slice(2);req.session.metaOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({client_id:process.env.META_APP_ID,redirect_uri:process.env.META_REDIRECT_URI,state,response_type:"code",scope:"ads_read"});res.redirect(`https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${p}`)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/meta/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");if(!state||state!==req.session.metaOAuthState)return res.redirect("/dashboard?meta_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?meta_error=missing_user_id");const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),metadata:{expiresIn:data.expires_in||null}});
@@ -1073,9 +1074,12 @@ if(metaConnAfterReconnect){
 req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
-app.get("/auth/organic",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.organicGoogleOAuthState=state;req.session.oauthUserId=userId;const url=organicGoogleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:ORGANIC_GOOGLE_SCOPES,include_granted_scopes:true});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/organic/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?organic_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?organic_error=missing_code");if(!state||state!==req.session.organicGoogleOAuthState)return res.redirect("/dashboard?organic_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?organic_error=missing_user_id");const client=organicGoogleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"organic",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),requestedScopes:ORGANIC_GOOGLE_SCOPES,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null,organicOAuthVersion:"v1",setupStage:"oauth_connected",propertySelectionRequired:true,searchConsoleSelectionRequired:true,connectedAt:new Date().toISOString()}});req.session.organicGoogleOAuthState=null;res.redirect("/dashboard?organic_connected=1&organic_property_selection_required=1")}catch(e){res.redirect(`/dashboard?organic_error=${encodeURIComponent(e.message)}`)}});
 
+// ===== ORGANIC GOOGLE OAUTH + DISCOVERY v1 =====
+function organicGoogleOAuthClient(){
+  if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!ORGANIC_GOOGLE_REDIRECT_URI)throw new Error("Missing Organic Google OAuth env");
+  return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,ORGANIC_GOOGLE_REDIRECT_URI);
+}
 async function getFreshOrganicAccessToken(userId){
   const conn=await getConnection(userId,"organic");
   if(!conn)throw new Error("Organic not connected");
@@ -1083,95 +1087,110 @@ async function getFreshOrganicAccessToken(userId){
   if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;
   if(!conn.refresh_token){
     if(conn.access_token)return conn.access_token;
-    throw new Error("Organic refresh token missing. Please reconnect Organic.");
+    throw new Error("Organic Google refresh token missing. Please reconnect Organic.");
   }
   const client=organicGoogleOAuthClient();
   client.setCredentials({refresh_token:conn.refresh_token});
   const {credentials}=await client.refreshAccessToken();
   const token=credentials.access_token;
   const expiry=credentials.expiry_date||(Date.now()+3600*1000);
-  await saveConnection(userId,"organic",{
-    accessToken:token,
-    refreshToken:conn.refresh_token,
-    tokenExpiresAt:new Date(expiry).toISOString(),
-    metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry,organicOAuthVersion:"v1"}
-  });
+  await saveConnection(userId,"organic",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry,organicOAuthVersion:"v1"}});
   return token;
 }
-
-async function organicGoogleJson(userId,url){
+async function organicGoogleFetch(userId,url){
   const token=await getFreshOrganicAccessToken(userId);
   const r=await fetch(url,{headers:{Authorization:`Bearer ${token}`,Accept:"application/json"}});
-  const data=await r.json().catch(()=>({}));
+  const data=await r.json().catch(()=>({status:r.status}));
   if(!r.ok)throw new Error(data.error?.message||data.message||`Organic Google API failed ${r.status}`);
   return data;
 }
-
 function normalizeGa4PropertySummary(accountSummary,propertySummary){
-  const propertyName=String(propertySummary?.property||"");
-  const propertyId=propertyName.replace(/^properties\//,"");
+  const propertyName=propertySummary?.property||"";
+  const propertyId=String(propertyName).replace(/^properties\//,"");
   return {
-    platform:"organic",
-    source:"ga4",
-    property_id:propertyId,
     platform_account_id:propertyId,
-    property_name:propertyName,
-    display_name:propertySummary?.displayName||`GA4 Property ${propertyId}`,
-    account_id:String(accountSummary?.account||"").replace(/^accounts\//,""),
-    account_name:accountSummary?.displayName||null,
-    property_type:propertySummary?.propertyType||null,
-    parent:propertySummary?.parent||null,
+    property_id:propertyId,
+    property_resource_name:propertyName||null,
+    property_name:propertySummary?.displayName||propertySummary?.display_name||propertyName||null,
+    account_id:String(accountSummary?.account||"").replace(/^accounts\//,"")||null,
+    account_resource_name:accountSummary?.account||null,
+    account_name:accountSummary?.displayName||accountSummary?.display_name||null,
     raw:{accountSummary,propertySummary}
   };
 }
-
-async function listOrganicGa4Properties(userId){
-  const properties=[];
-  let pageToken="";
-  do{
-    const url=new URL("https://analyticsadmin.googleapis.com/v1beta/accountSummaries");
-    url.searchParams.set("pageSize","200");
-    if(pageToken)url.searchParams.set("pageToken",pageToken);
-    const data=await organicGoogleJson(userId,url);
-    for(const accountSummary of data.accountSummaries||[]){
-      for(const propertySummary of accountSummary.propertySummaries||[]){
-        const item=normalizeGa4PropertySummary(accountSummary,propertySummary);
-        if(item.property_id)properties.push(item);
-      }
-    }
-    pageToken=data.nextPageToken||"";
-  }while(pageToken);
-  const conn=await getConnection(userId,"organic").catch(()=>null);
-  if(conn){
+function normalizeSearchConsoleSite(site){
+  const siteUrl=String(site?.siteUrl||site?.site_url||"").trim();
+  return {
+    platform_account_id:siteUrl,
+    site_url:siteUrl,
+    permission_level:site?.permissionLevel||site?.permission_level||null,
+    raw:site
+  };
+}
+app.get("/auth/organic",async(req,res)=>{
+  try{
+    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
+    const userId=accessCheck.userId;
+    const state=Math.random().toString(36).slice(2);
+    req.session.organicOAuthState=state;
+    req.session.oauthUserId=userId;
+    const url=organicGoogleOAuthClient().generateAuthUrl({
+      access_type:"offline",
+      prompt:"consent",
+      include_granted_scopes:true,
+      state,
+      scope:ORGANIC_GOOGLE_SCOPES
+    });
+    res.redirect(url);
+  }catch(e){res.status(500).send(e.message)}
+});
+app.get("/auth/organic/callback",async(req,res)=>{
+  try{
+    const{code,state,error}=req.query;
+    if(error)return res.redirect(`/dashboard?organic_error=${encodeURIComponent(error)}`);
+    if(!code)return res.redirect("/dashboard?organic_error=missing_code");
+    if(!state||state!==req.session.organicOAuthState)return res.redirect("/dashboard?organic_error=invalid_state");
+    const userId=req.session.oauthUserId;
+    if(!userId)return res.redirect("/dashboard?organic_error=missing_user_id");
+    const client=organicGoogleOAuthClient();
+    const{tokens}=await client.getToken(code);
     await saveConnection(userId,"organic",{
+      accessToken:tokens.access_token,
+      refreshToken:tokens.refresh_token||null,
+      tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,
       metadata:{
-        ...(conn.metadata||{}),
-        setupStage:"ga4_property_discovered",
-        propertySelectionRequired:true,
-        availableGa4PropertyCount:properties.length,
-        lastGa4PropertyDiscoveryAt:new Date().toISOString(),
-        organicGa4DiscoveryVersion:"v1"
+        scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),
+        expiryDate:tokens.expiry_date||null,
+        tokenType:tokens.token_type||null,
+        setupStage:"oauth_connected",
+        organicOAuthVersion:"v1",
+        ga4PropertySelectionRequired:true,
+        searchConsoleSiteSelectionRequired:true
       }
     });
+    req.session.organicOAuthState=null;
+    res.redirect("/dashboard?organic_connected=1&organic_setup=property_selection_required");
+  }catch(e){res.redirect(`/dashboard?organic_error=${encodeURIComponent(e.message)}`)}
+});
+async function listOrganicGa4Properties(userId){
+  const data=await organicGoogleFetch(userId,`${GA4_ADMIN_API_BASE}/accountSummaries?pageSize=200`);
+  const accounts=Array.isArray(data.accountSummaries)?data.accountSummaries:[];
+  const properties=[];
+  for(const account of accounts){
+    for(const prop of account.propertySummaries||[])properties.push(normalizeGa4PropertySummary(account,prop));
   }
-  return properties;
+  return {ok:true,platform:"organic",source:"ga4_admin_api",properties,rawCount:properties.length,nextPageToken:data.nextPageToken||null};
 }
-
-app.get("/api/organic/ga4/properties",async(req,res)=>{
-  try{
-    const user=await requireUser(req,res);if(!user)return;
-    const properties=await listOrganicGa4Properties(user.id);
-    res.json({ok:true,platform:"organic",source:"ga4",property_selection_required:true,count:properties.length,properties});
-  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}
-});
-
-app.get("/api/platform/organic/ga4/properties",async(req,res)=>{
-  try{
-    const user=await requireUser(req,res);if(!user)return;
-    const properties=await listOrganicGa4Properties(user.id);
-    res.json({ok:true,platform:"organic",source:"ga4",property_selection_required:true,count:properties.length,properties});
-  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}
-});
+async function listOrganicSearchConsoleSites(userId){
+  const data=await organicGoogleFetch(userId,`${SEARCH_CONSOLE_API_BASE}/sites`);
+  const sites=(Array.isArray(data.siteEntry)?data.siteEntry:[]).map(normalizeSearchConsoleSite).filter(s=>s.site_url);
+  return {ok:true,platform:"organic",source:"search_console_api",sites,rawCount:sites.length};
+}
+app.get("/api/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
+app.get("/api/platform/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
+app.get("/api/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
+app.get("/api/platform/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
+// ===== END ORGANIC GOOGLE OAUTH + DISCOVERY v1 =====
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",async(req,res)=>{
   const status=passiveLegacyPlatformStatus("pinterest");
@@ -2716,7 +2735,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"oauth_ready",label:"Organic",message:"Organic Google OAuth is available. Property and Search Console selection will be added in the next patch."}}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:organic.connected?"oauth_connected":"skeleton",label:"Organic",message:organic.connected?"Organic OAuth connected. GA4 Property and Search Console Site discovery are available.":"Organic platform skeleton is available. Connect Organic to continue."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -3516,12 +3535,13 @@ app.get("/api/platform/organic/status",async(req,res)=>{
       connected:Boolean(conn),
       account_limit:PHASE1_PLATFORM_LIMITS.organic,
       active_ownership_count:ownershipCount,
-      setup_stage:conn?.metadata?.setupStage||"oauth_ready",
-      ga4_connected:Boolean(conn&&conn.access_token),
-      search_console_connected:Boolean(conn&&conn.access_token),
-      property_selection_required:Boolean(conn?.metadata?.propertySelectionRequired),
-      search_console_selection_required:Boolean(conn?.metadata?.searchConsoleSelectionRequired),
-      message:conn?"Organic OAuth connected. GA4 property discovery is available; property selection is pending.":"Organic Google OAuth is ready. Connect Organic to continue."
+      setup_stage:conn?.metadata?.setupStage||"skeleton",
+      oauth_connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),
+      ga4_property_selection_required:Boolean(conn?.metadata?.ga4PropertySelectionRequired),
+      search_console_site_selection_required:Boolean(conn?.metadata?.searchConsoleSiteSelectionRequired),
+      ga4_connected:false,
+      search_console_connected:false,
+      message:conn?"Organic OAuth connected. GA4 Property and Search Console Site discovery are available.":"Organic platform skeleton is ready. Connect Organic to discover GA4 Properties and Search Console Sites."
     });
   }catch(e){
     res.status(500).json({error:e.message});

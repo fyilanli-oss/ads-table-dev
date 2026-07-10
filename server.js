@@ -1368,7 +1368,7 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
       {name:"sessions"},
       {name:"addToCarts"},
       {name:"checkouts"},
-      {name:"purchases"},
+      {name:"ecommercePurchases"},
       {name:"purchaseRevenue"}
     ]
   };
@@ -1379,7 +1379,7 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
     sessions:organicMetricValue(data,"sessions"),
     add_to_cart:organicMetricValue(data,"addToCarts"),
     checkout:organicMetricValue(data,"checkouts"),
-    purchase:organicMetricValue(data,"purchases"),
+    purchase:organicMetricValue(data,"ecommercePurchases"),
     revenue:organicMetricValue(data,"purchaseRevenue"),
     raw:data
   };

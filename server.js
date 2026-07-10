@@ -1190,6 +1190,119 @@ app.get("/api/organic/ga4/properties",async(req,res)=>{try{const user=await requ
 app.get("/api/platform/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
 app.get("/api/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
 app.get("/api/platform/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
+
+function pickOrganicGa4Property(input){
+  const propertyId=normalizePlatformAccountId(input?.property_id||input?.propertyId||input?.platform_account_id||input?.id||String(input?.property_resource_name||input?.property||"").replace(/^properties\//,""));
+  if(!propertyId)return null;
+  return {
+    platform_account_id:propertyId,
+    property_id:propertyId,
+    property_resource_name:input?.property_resource_name||input?.property||`properties/${propertyId}`,
+    property_name:input?.property_name||input?.displayName||input?.display_name||input?.name||`GA4 Property ${propertyId}`,
+    account_id:input?.account_id||null,
+    account_name:input?.account_name||null,
+    raw:input
+  };
+}
+function pickOrganicSearchConsoleSite(input){
+  const siteUrl=String(input?.site_url||input?.siteUrl||input?.platform_account_id||input?.id||"").trim();
+  if(!siteUrl)return null;
+  return {
+    platform_account_id:siteUrl,
+    site_url:siteUrl,
+    permission_level:input?.permission_level||input?.permissionLevel||null,
+    raw:input
+  };
+}
+async function bindOrganicPropertyAndSite(userId,body={}){
+  const now=new Date().toISOString();
+  const conn=await getConnection(userId,"organic");
+  if(!conn)throw Object.assign(new Error("Organic OAuth connection is required before property binding"),{status:404});
+
+  const requestedProperty=pickOrganicGa4Property(body.ga4_property||body.ga4Property||body.property||body);
+  const requestedSite=pickOrganicSearchConsoleSite(body.search_console_site||body.searchConsoleSite||body.site||body);
+  if(!requestedProperty)throw Object.assign(new Error("GA4 property selection is required"),{status:400});
+  if(!requestedSite)throw Object.assign(new Error("Search Console site selection is required"),{status:400});
+
+  const availableProperties=(await listOrganicGa4Properties(userId)).properties||[];
+  const verifiedProperty=availableProperties.find(p=>p.property_id===requestedProperty.property_id||p.platform_account_id===requestedProperty.platform_account_id);
+  if(!verifiedProperty)throw Object.assign(new Error("Selected GA4 property is not available for this Organic connection"),{status:403});
+
+  const availableSites=(await listOrganicSearchConsoleSites(userId)).sites||[];
+  const verifiedSite=availableSites.find(s=>s.site_url===requestedSite.site_url);
+  if(!verifiedSite)throw Object.assign(new Error("Selected Search Console site is not available for this Organic connection"),{status:403});
+
+  const organicAccount={
+    platform_account_id:verifiedProperty.property_id,
+    account_name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
+    name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
+    property_id:verifiedProperty.property_id,
+    property_resource_name:verifiedProperty.property_resource_name,
+    site_url:verifiedSite.site_url,
+    currency:null,
+    metadata:{
+      source:"organic_property_site_binding",
+      organicBindingVersion:"v1",
+      selectedAt:now,
+      ga4_property:verifiedProperty,
+      search_console_site:verifiedSite
+    }
+  };
+
+  const ownership=await ensurePlatformOwnership(userId,"organic",organicAccount);
+
+  await supabaseAdmin.from("platform_ad_accounts").upsert({
+    user_id:userId,
+    platform:"organic",
+    platform_business_id:verifiedProperty.account_id||null,
+    platform_account_id:verifiedProperty.property_id,
+    account_name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
+    currency:null,
+    timezone:DEFAULT_PLATFORM_TIMEZONE,
+    status:"active",
+    metadata:{
+      organicBindingVersion:"v1",
+      selectedAt:now,
+      ga4_property:verifiedProperty,
+      search_console_site:verifiedSite
+    },
+    updated_at:now
+  },{onConflict:"user_id,platform,platform_account_id"});
+
+  await saveConnection(userId,"organic",{
+    accountId:verifiedProperty.property_id,
+    accountName:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
+    metadata:{
+      ...(conn.metadata||{}),
+      setupStage:"configured",
+      configured:true,
+      configuredAt:now,
+      organicBindingVersion:"v1",
+      selectedPlatformAccountId:verifiedProperty.property_id,
+      lastOwnedPlatformAccountId:verifiedProperty.property_id,
+      ga4PropertySelectionRequired:false,
+      searchConsoleSiteSelectionRequired:false,
+      selectedGa4Property:verifiedProperty,
+      selectedSearchConsoleSite:verifiedSite
+    }
+  });
+
+  return {
+    ok:true,
+    platform:"organic",
+    setupStage:"configured",
+    configured:true,
+    platform_account_id:verifiedProperty.property_id,
+    ga4_property:verifiedProperty,
+    search_console_site:verifiedSite,
+    ownership_id:ownership?.id||null
+  };
+}
+app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicPropertyAndSite(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_property_site_binding"})}});
+app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicPropertyAndSite(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_property_site_binding"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured),setupStage:conn?.metadata?.setupStage||null,ga4_property:conn?.metadata?.selectedGa4Property||null,search_console_site:conn?.metadata?.selectedSearchConsoleSite||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured),setupStage:conn?.metadata?.setupStage||null,ga4_property:conn?.metadata?.selectedGa4Property||null,search_console_site:conn?.metadata?.selectedSearchConsoleSite||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+
 // ===== END ORGANIC GOOGLE OAUTH + DISCOVERY v1 =====
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",async(req,res)=>{

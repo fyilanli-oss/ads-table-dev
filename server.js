@@ -1897,27 +1897,31 @@ function perfHasValue(value){return value!==null&&value!==undefined&&value!==""}
 function perfNullableNumber(value){if(!perfHasValue(value))return null;const n=Number(value);return Number.isFinite(n)?n:null}
 function perfText(value){const s=String(value??"").trim();return s?s:null}
 function perfDate(value){return value?String(value).slice(0,10):null}
-function perfNormalizeLevel(level){const l=String(level||"").toLowerCase();if(l==="adset")return "adgroup";if(["campaign","adgroup","ad"].includes(l))return l;return null}
+function perfNormalizeLevel(level){const l=String(level||"").toLowerCase();if(l==="adset")return "adgroup";if(["platform","campaign","adgroup","ad"].includes(l))return l;return null}
 function perfCtrRatio(value){const n=perfNullableNumber(value);if(n===null)return null;return Math.abs(n)>1?n/100:n}
 function perfEntityId(row,level){
+  if(level==="platform")return perfText(row.id_in_platform||row.campaign_id||row.platform_account_id||row.platform||row.id||"platform");
   if(level==="campaign")return perfText(row.id_in_platform||row.campaign_id||row.id);
   if(level==="adgroup")return perfText(row.id_in_platform||row.adgroup_id||row.adset_id||row.id);
   if(level==="ad")return perfText(row.id_in_platform||row.ad_id||row.id);
   return perfText(row.id_in_platform||row.id||row.campaign_id||row.adgroup_id||row.adset_id||row.ad_id);
 }
 function perfParentId(row,level){
+  if(level==="platform")return null;
   if(level==="campaign")return null;
   if(level==="adgroup")return perfText(row.parent_id||row.campaign_id);
   if(level==="ad")return perfText(row.parent_id||row.adgroup_id||row.adset_id||row.campaign_id);
   return perfText(row.parent_id);
 }
 function perfEntityName(row,level){
+  if(level==="platform")return perfText(row.name||row.campaign_name||row.platform||"Organic");
   if(level==="campaign")return perfText(row.name||row.campaign_name);
   if(level==="adgroup")return perfText(row.name||row.adgroup_name||row.adset_name);
   if(level==="ad")return perfText(row.name||row.ad_name);
   return perfText(row.name);
 }
 function perfEntityStatus(row,level){
+  if(level==="platform")return perfText(row.status||row.campaign_status||"active");
   if(level==="campaign")return perfText(row.status||row.campaign_status);
   if(level==="adgroup")return perfText(row.status||row.adgroup_status||row.adset_status);
   if(level==="ad")return perfText(row.status||row.ad_status);

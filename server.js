@@ -61,12 +61,13 @@ async function connectionStatus(userId,platform){const r=await getConnection(use
 async function requireConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked){res.status(403).json({error:"Account access blocked",status:access.status});return null}const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn}}
 
 // ===== PHASE 1 CONSTITUTION PACK HELPERS =====
-const PHASE1_PLATFORM_LIMITS={meta:3,google:3,klaviyo:3,tiktok:3};
+const PHASE1_PLATFORM_LIMITS={meta:3,google:3,klaviyo:3,tiktok:3,organic:1};
 const PHASE1_REPORTABLE_ACCOUNT_TYPES={
   meta:"meta_ads_account",
   google:"google_ads_customer_account",
   tiktok:"tiktok_advertiser_account",
-  klaviyo:"klaviyo_account"
+  klaviyo:"klaviyo_account",
+  organic:"organic_property"
 };
 function phase1ReportableAccountType(platform){return PHASE1_REPORTABLE_ACCOUNT_TYPES[platform]||`${platform}_platform_account`}
 function normalizePlatformAccountId(value){return String(value||"").trim()}
@@ -660,7 +661,7 @@ function nextAutomationSlotUtc(date=new Date()){
   return new Date(Date.UTC(base.getUTCFullYear(),base.getUTCMonth(),base.getUTCDate()+1,first,0,0,0)).toISOString();
 }
 const DEFAULT_PLATFORM_TIMEZONE="UTC";
-const DEFAULT_DATA_MATURITY_WINDOW_HOURS={meta:3,google:3,tiktok:3,klaviyo:3,pinterest:3};
+const DEFAULT_DATA_MATURITY_WINDOW_HOURS={meta:3,google:3,tiktok:3,klaviyo:3,organic:3,pinterest:3};
 
 function validTimeZone(tz){
   try{
@@ -802,7 +803,7 @@ async function validateSelectedAccounts(userId,platform,selectedAccounts=[]){
   assertPlatformNotPassiveLegacy(cleanPlatform);
   const limit=PHASE1_PLATFORM_LIMITS[cleanPlatform]||3;
   const accounts=(Array.isArray(selectedAccounts)?selectedAccounts:[])
-    .map(account=>({...(account||{}),platform_account_id:normalizePlatformAccountId(account?.platform_account_id||account?.id||account?.customerId||account?.account_id||account?.advertiser_id)}))
+    .map(account=>({...(account||{}),platform_account_id:normalizePlatformAccountId(account?.platform_account_id||account?.property_id||account?.site_url||account?.id||account?.customerId||account?.account_id||account?.advertiser_id)}))
     .filter(account=>account.platform_account_id);
   const unique=[];
   const seen=new Set();
@@ -856,7 +857,7 @@ async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccoun
 }
 async function ensurePlatformOwnership(userId,platform,account){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
-  const platformAccountId=normalizePlatformAccountId(account.platform_account_id||account.id||account.customerId||account.account_id);
+  const platformAccountId=normalizePlatformAccountId(account.platform_account_id||account.property_id||account.site_url||account.id||account.customerId||account.account_id);
   if(!platformAccountId)throw new Error("Platform account id is required for ownership");
   const existing=await getOwnership(platform,platformAccountId);
   const now=new Date().toISOString();
@@ -2613,9 +2614,9 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest")}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"skeleton",label:"Organic",message:"Organic platform skeleton is available. GA4 and Search Console OAuth will be added in the next patch."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
-app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
+app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
   if(!supabaseAdmin||!userId)return null;
   const row={
@@ -3397,6 +3398,43 @@ app.post("/api/platform/google/disconnect",async(req,res)=>{
 });
 // ===== END D.2A.2 GOOGLE CONNECT / DISCONNECT =====
 
+
+// ===== D.2A.3 ORGANIC CONNECT / DISCONNECT SKELETON =====
+app.get("/api/platform/organic/status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const conn=await getConnection(user.id,"organic");
+    const ownershipCount=await countActiveOwnerships(user.id,"organic");
+    res.json({
+      platform:"organic",
+      label:"Organic",
+      state: conn ? "CONNECTED" : "NOT_CONNECTED",
+      connected:Boolean(conn),
+      account_limit:PHASE1_PLATFORM_LIMITS.organic,
+      active_ownership_count:ownershipCount,
+      setup_stage:conn?.metadata?.setupStage||"skeleton",
+      ga4_connected:false,
+      search_console_connected:false,
+      message:"Organic platform skeleton is ready. GA4 and Search Console OAuth will be added in the next patch."
+    });
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
+
+app.post("/api/platform/organic/disconnect",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+    const result=await disconnectPlatformLifecycle(user.id,"organic");
+    res.json({state:"NOT_CONNECTED",...result});
+  }catch(e){
+    res.status(e.status||500).json({error:e.message});
+  }
+});
+// ===== END D.2A.3 ORGANIC CONNECT / DISCONNECT SKELETON =====
 
 // ===== D.2B.1 KLAVIYO CONNECT / DISCONNECT + ESTIMATED MONTHLY SPEND =====
 app.get("/api/platform/klaviyo/status",async(req,res)=>{

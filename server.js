@@ -20,11 +20,6 @@ const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
-const ORGANIC_GOOGLE_REDIRECT_URI=process.env.ORGANIC_GOOGLE_REDIRECT_URI||process.env.GOOGLE_ORGANIC_REDIRECT_URI||process.env.GOOGLE_REDIRECT_URI;
-const ORGANIC_GOOGLE_SCOPES=(process.env.ORGANIC_GOOGLE_SCOPES||"https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly").split(/\s+/).filter(Boolean);
-const GA4_ADMIN_API_BASE="https://analyticsadmin.googleapis.com/v1beta";
-const GA4_DATA_API_BASE="https://analyticsdata.googleapis.com/v1beta";
-const SEARCH_CONSOLE_API_BASE="https://www.googleapis.com/webmasters/v3";
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
 app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>sendFile(res,"tiktok-test.html"));
@@ -1076,57 +1071,16 @@ req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&accoun
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
 
-// ===== ORGANIC GOOGLE OAUTH + DISCOVERY v1 =====
-function organicGoogleOAuthClient(){
-  if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!ORGANIC_GOOGLE_REDIRECT_URI)throw new Error("Missing Organic Google OAuth env");
-  return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,ORGANIC_GOOGLE_REDIRECT_URI);
+const ORGANIC_GOOGLE_SCOPES=[
+  "https://www.googleapis.com/auth/analytics.readonly",
+  "https://www.googleapis.com/auth/webmasters.readonly"
+];
+function organicGoogleRedirectUri(req){
+  return process.env.ORGANIC_GOOGLE_REDIRECT_URI||`${req.protocol}://${req.get("host")}/auth/organic/callback`;
 }
-async function getFreshOrganicAccessToken(userId){
-  const conn=await getConnection(userId,"organic");
-  if(!conn)throw new Error("Organic not connected");
-  const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;
-  if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;
-  if(!conn.refresh_token){
-    if(conn.access_token)return conn.access_token;
-    throw new Error("Organic Google refresh token missing. Please reconnect Organic.");
-  }
-  const client=organicGoogleOAuthClient();
-  client.setCredentials({refresh_token:conn.refresh_token});
-  const {credentials}=await client.refreshAccessToken();
-  const token=credentials.access_token;
-  const expiry=credentials.expiry_date||(Date.now()+3600*1000);
-  await saveConnection(userId,"organic",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry,organicOAuthVersion:"v1"}});
-  return token;
-}
-async function organicGoogleFetch(userId,url){
-  const token=await getFreshOrganicAccessToken(userId);
-  const r=await fetch(url,{headers:{Authorization:`Bearer ${token}`,Accept:"application/json"}});
-  const data=await r.json().catch(()=>({status:r.status}));
-  if(!r.ok)throw new Error(data.error?.message||data.message||`Organic Google API failed ${r.status}`);
-  return data;
-}
-function normalizeGa4PropertySummary(accountSummary,propertySummary){
-  const propertyName=propertySummary?.property||"";
-  const propertyId=String(propertyName).replace(/^properties\//,"");
-  return {
-    platform_account_id:propertyId,
-    property_id:propertyId,
-    property_resource_name:propertyName||null,
-    property_name:propertySummary?.displayName||propertySummary?.display_name||propertyName||null,
-    account_id:String(accountSummary?.account||"").replace(/^accounts\//,"")||null,
-    account_resource_name:accountSummary?.account||null,
-    account_name:accountSummary?.displayName||accountSummary?.display_name||null,
-    raw:{accountSummary,propertySummary}
-  };
-}
-function normalizeSearchConsoleSite(site){
-  const siteUrl=String(site?.siteUrl||site?.site_url||"").trim();
-  return {
-    platform_account_id:siteUrl,
-    site_url:siteUrl,
-    permission_level:site?.permissionLevel||site?.permission_level||null,
-    raw:site
-  };
+function organicGoogleOAuthClient(req){
+  if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)throw new Error("Missing Google OAuth env");
+  return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,organicGoogleRedirectUri(req));
 }
 app.get("/auth/organic",async(req,res)=>{
   try{
@@ -1135,7 +1089,8 @@ app.get("/auth/organic",async(req,res)=>{
     const state=Math.random().toString(36).slice(2);
     req.session.organicOAuthState=state;
     req.session.oauthUserId=userId;
-    const url=organicGoogleOAuthClient().generateAuthUrl({
+    req.session.organicOAuthStartedAt=new Date().toISOString();
+    const url=organicGoogleOAuthClient(req).generateAuthUrl({
       access_type:"offline",
       prompt:"consent",
       include_granted_scopes:true,
@@ -1146,387 +1101,51 @@ app.get("/auth/organic",async(req,res)=>{
   }catch(e){res.status(500).send(e.message)}
 });
 app.get("/auth/organic/callback",async(req,res)=>{
+  const callbackAt=new Date().toISOString();
   try{
-    const{code,state,error}=req.query;
-    if(error)return res.redirect(`/dashboard?organic_error=${encodeURIComponent(error)}`);
+    const{code,state,error,error_description}=req.query;
+    if(error)return res.redirect(`/dashboard?organic_error=${encodeURIComponent(error_description||error)}`);
     if(!code)return res.redirect("/dashboard?organic_error=missing_code");
     if(!state||state!==req.session.organicOAuthState)return res.redirect("/dashboard?organic_error=invalid_state");
     const userId=req.session.oauthUserId;
     if(!userId)return res.redirect("/dashboard?organic_error=missing_user_id");
-    const client=organicGoogleOAuthClient();
+    const client=organicGoogleOAuthClient(req);
     const{tokens}=await client.getToken(code);
+    if(!tokens.access_token&&!tokens.refresh_token)throw new Error("Organic token exchange returned no token");
+    const existing=await getConnection(userId,"organic").catch(()=>null);
     await saveConnection(userId,"organic",{
-      accessToken:tokens.access_token,
-      refreshToken:tokens.refresh_token||null,
-      tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,
+      accessToken:tokens.access_token||existing?.access_token||null,
+      refreshToken:tokens.refresh_token||existing?.refresh_token||null,
+      tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
+      accountId:existing?.account_id||null,
+      accountName:existing?.account_name||"Organic",
       metadata:{
+        organicOAuthVersion:"v1.1-callback-fix",
+        organicOAuthConnectedAt:callbackAt,
+        organicOAuthStartedAt:req.session.organicOAuthStartedAt||null,
+        organicRedirectUri:organicGoogleRedirectUri(req),
         scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),
-        expiryDate:tokens.expiry_date||null,
         tokenType:tokens.token_type||null,
-        setupStage:"oauth_connected",
-        organicOAuthVersion:"v1",
-        ga4PropertySelectionRequired:true,
-        searchConsoleSiteSelectionRequired:true
+        expiryDate:tokens.expiry_date||null,
+        accountSelectionRequired:true,
+        organicConfigured:false,
+        organicCallbackSaved:true
       }
     });
     req.session.organicOAuthState=null;
-    res.redirect("/dashboard?organic_connected=1&organic_setup=property_selection_required");
-  }catch(e){res.redirect(`/dashboard?organic_error=${encodeURIComponent(e.message)}`)}
-});
-async function listOrganicGa4Properties(userId){
-  const data=await organicGoogleFetch(userId,`${GA4_ADMIN_API_BASE}/accountSummaries?pageSize=200`);
-  const accounts=Array.isArray(data.accountSummaries)?data.accountSummaries:[];
-  const properties=[];
-  for(const account of accounts){
-    for(const prop of account.propertySummaries||[])properties.push(normalizeGa4PropertySummary(account,prop));
+    req.session.organicOAuthStartedAt=null;
+    res.redirect("/dashboard?organic_connected=1&account_selection_required=1");
+  }catch(e){
+    try{
+      const userId=req.session.oauthUserId;
+      if(userId){
+        await saveConnection(userId,"organic",{metadata:{organicOAuthVersion:"v1.1-callback-fix",organicCallbackError:e.message,organicCallbackErrorAt:callbackAt}});
+      }
+    }catch{}
+    res.redirect(`/dashboard?organic_error=${encodeURIComponent(e.message)}`);
   }
-  return {ok:true,platform:"organic",source:"ga4_admin_api",properties,rawCount:properties.length,nextPageToken:data.nextPageToken||null};
-}
-async function listOrganicSearchConsoleSites(userId){
-  const data=await organicGoogleFetch(userId,`${SEARCH_CONSOLE_API_BASE}/sites`);
-  const sites=(Array.isArray(data.siteEntry)?data.siteEntry:[]).map(normalizeSearchConsoleSite).filter(s=>s.site_url);
-  return {ok:true,platform:"organic",source:"search_console_api",sites,rawCount:sites.length};
-}
-app.get("/api/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
-app.get("/api/platform/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
-app.get("/api/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
-app.get("/api/platform/organic/search-console/sites",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicSearchConsoleSites(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_search_console_site_discovery"})}});
+});
 
-function pickOrganicGa4Property(input){
-  const propertyId=normalizePlatformAccountId(input?.property_id||input?.propertyId||input?.platform_account_id||input?.id||String(input?.property_resource_name||input?.property||"").replace(/^properties\//,""));
-  if(!propertyId)return null;
-  return {
-    platform_account_id:propertyId,
-    property_id:propertyId,
-    property_resource_name:input?.property_resource_name||input?.property||`properties/${propertyId}`,
-    property_name:input?.property_name||input?.displayName||input?.display_name||input?.name||`GA4 Property ${propertyId}`,
-    account_id:input?.account_id||null,
-    account_name:input?.account_name||null,
-    raw:input
-  };
-}
-function pickOrganicSearchConsoleSite(input){
-  const siteUrl=String(input?.site_url||input?.siteUrl||input?.platform_account_id||input?.id||"").trim();
-  if(!siteUrl)return null;
-  return {
-    platform_account_id:siteUrl,
-    site_url:siteUrl,
-    permission_level:input?.permission_level||input?.permissionLevel||null,
-    raw:input
-  };
-}
-async function bindOrganicPropertyAndSite(userId,body={}){
-  const now=new Date().toISOString();
-  const conn=await getConnection(userId,"organic");
-  if(!conn)throw Object.assign(new Error("Organic OAuth connection is required before property binding"),{status:404});
-
-  const requestedProperty=pickOrganicGa4Property(body.ga4_property||body.ga4Property||body.property||body);
-  const requestedSite=pickOrganicSearchConsoleSite(body.search_console_site||body.searchConsoleSite||body.site||body);
-  if(!requestedProperty)throw Object.assign(new Error("GA4 property selection is required"),{status:400});
-  if(!requestedSite)throw Object.assign(new Error("Search Console site selection is required"),{status:400});
-
-  const availableProperties=(await listOrganicGa4Properties(userId)).properties||[];
-  const verifiedProperty=availableProperties.find(p=>p.property_id===requestedProperty.property_id||p.platform_account_id===requestedProperty.platform_account_id);
-  if(!verifiedProperty)throw Object.assign(new Error("Selected GA4 property is not available for this Organic connection"),{status:403});
-
-  const availableSites=(await listOrganicSearchConsoleSites(userId)).sites||[];
-  const verifiedSite=availableSites.find(s=>s.site_url===requestedSite.site_url);
-  if(!verifiedSite)throw Object.assign(new Error("Selected Search Console site is not available for this Organic connection"),{status:403});
-
-  const organicAccount={
-    platform_account_id:verifiedProperty.property_id,
-    account_name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
-    name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
-    property_id:verifiedProperty.property_id,
-    property_resource_name:verifiedProperty.property_resource_name,
-    site_url:verifiedSite.site_url,
-    currency:null,
-    metadata:{
-      source:"organic_property_site_binding",
-      organicBindingVersion:"v1",
-      selectedAt:now,
-      ga4_property:verifiedProperty,
-      search_console_site:verifiedSite
-    }
-  };
-
-  const ownership=await ensurePlatformOwnership(userId,"organic",organicAccount);
-
-  await supabaseAdmin.from("platform_ad_accounts").upsert({
-    user_id:userId,
-    platform:"organic",
-    platform_business_id:verifiedProperty.account_id||null,
-    platform_account_id:verifiedProperty.property_id,
-    account_name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
-    currency:null,
-    timezone:DEFAULT_PLATFORM_TIMEZONE,
-    status:"active",
-    metadata:{
-      organicBindingVersion:"v1",
-      selectedAt:now,
-      ga4_property:verifiedProperty,
-      search_console_site:verifiedSite
-    },
-    updated_at:now
-  },{onConflict:"user_id,platform,platform_account_id"});
-
-  await saveConnection(userId,"organic",{
-    accountId:verifiedProperty.property_id,
-    accountName:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
-    metadata:{
-      ...(conn.metadata||{}),
-      setupStage:"configured",
-      configured:true,
-      configuredAt:now,
-      organicBindingVersion:"v1",
-      selectedPlatformAccountId:verifiedProperty.property_id,
-      lastOwnedPlatformAccountId:verifiedProperty.property_id,
-      ga4PropertySelectionRequired:false,
-      searchConsoleSiteSelectionRequired:false,
-      selectedGa4Property:verifiedProperty,
-      selectedSearchConsoleSite:verifiedSite
-    }
-  });
-
-  return {
-    ok:true,
-    platform:"organic",
-    setupStage:"configured",
-    configured:true,
-    platform_account_id:verifiedProperty.property_id,
-    ga4_property:verifiedProperty,
-    search_console_site:verifiedSite,
-    ownership_id:ownership?.id||null
-  };
-}
-app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicPropertyAndSite(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_property_site_binding"})}});
-app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicPropertyAndSite(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_property_site_binding"})}});
-app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured),setupStage:conn?.metadata?.setupStage||null,ga4_property:conn?.metadata?.selectedGa4Property||null,search_console_site:conn?.metadata?.selectedSearchConsoleSite||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured),setupStage:conn?.metadata?.setupStage||null,ga4_property:conn?.metadata?.selectedGa4Property||null,search_console_site:conn?.metadata?.selectedSearchConsoleSite||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-
-
-
-// ===== ORGANIC SNAPSHOT v1 =====
-function organicMetricValue(row,metricName){
-  const headers=row?.metricHeaders||[];
-  const values=row?.rows?.[0]?.metricValues||[];
-  const index=headers.findIndex(h=>h?.name===metricName);
-  if(index<0)return 0;
-  const n=Number(values[index]?.value||0);
-  return Number.isFinite(n)?n:0;
-}
-
-function organicIsoDate(value){
-  return fxDateOnly(value||new Date());
-}
-
-async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
-  const cleanPropertyId=normalizePlatformAccountId(propertyId);
-  if(!cleanPropertyId)throw Object.assign(new Error("Organic GA4 property id is required"),{status:400});
-  const token=await getFreshOrganicAccessToken(userId);
-  const url=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(cleanPropertyId)}:runReport`;
-  const body={
-    dateRanges:[{startDate,endDate}],
-    metrics:[
-      {name:"sessions"},
-      {name:"addToCarts"},
-      {name:"checkouts"},
-      {name:"purchases"},
-      {name:"purchaseRevenue"}
-    ]
-  };
-  const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify(body)});
-  const data=await r.json().catch(()=>({status:r.status}));
-  if(!r.ok)throw new Error(data.error?.message||data.message||`Organic GA4 Data API failed ${r.status}`);
-  return {
-    sessions:organicMetricValue(data,"sessions"),
-    add_to_cart:organicMetricValue(data,"addToCarts"),
-    checkout:organicMetricValue(data,"checkouts"),
-    purchase:organicMetricValue(data,"purchases"),
-    revenue:organicMetricValue(data,"purchaseRevenue"),
-    raw:data
-  };
-}
-
-async function fetchOrganicSearchConsoleMetrics(userId,siteUrl,startDate,endDate){
-  const cleanSiteUrl=String(siteUrl||"").trim();
-  if(!cleanSiteUrl)throw Object.assign(new Error("Organic Search Console site url is required"),{status:400});
-  const token=await getFreshOrganicAccessToken(userId);
-  const url=`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(cleanSiteUrl)}/searchAnalytics/query`;
-  const body={startDate,endDate,rowLimit:1};
-  const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify(body)});
-  const data=await r.json().catch(()=>({status:r.status}));
-  if(!r.ok)throw new Error(data.error?.message||data.message||`Organic Search Console API failed ${r.status}`);
-  const row=Array.isArray(data.rows)?(data.rows[0]||{}):{};
-  const clicks=Number(row.clicks||0);
-  const impressions=Number(row.impressions||0);
-  const ctr=row.ctr===undefined||row.ctr===null?null:Number(row.ctr)*100;
-  const averagePosition=row.position===undefined||row.position===null?null:Number(row.position);
-  return {
-    clicks:Number.isFinite(clicks)?clicks:0,
-    impressions:Number.isFinite(impressions)?impressions:0,
-    ctr:Number.isFinite(ctr)?ctr:null,
-    average_position:Number.isFinite(averagePosition)?averagePosition:null,
-    raw:data
-  };
-}
-
-function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,property,site}){
-  const sessions=Number(ga4.sessions||0);
-  const addToCart=Number(ga4.add_to_cart||0);
-  const checkout=Number(ga4.checkout||0);
-  const purchase=Number(ga4.purchase||0);
-  const revenue=Number(ga4.revenue||0);
-  const clicks=Number(gsc.clicks||0);
-  const impressions=Number(gsc.impressions||0);
-  const ctr=gsc.ctr!==null&&gsc.ctr!==undefined?Number(gsc.ctr):(impressions>0?clicks/impressions*100:null);
-  const abandoned=checkout>0?Math.max(checkout-purchase,0):0;
-  return {
-    platform:"organic",
-    snapshot_date:snapshotDate,
-    account_currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
-    kpis:{
-      spend:0,
-      sales:revenue,
-      revenue,
-      impressions,
-      clicks,
-      sessions,
-      ctr,
-      cpc:null,
-      roas:null
-    },
-    purchase_journey:{
-      add_to_cart:addToCart,
-      checkout,
-      abandoned,
-      purchase,
-      purchases:purchase,
-      purchase_value:revenue
-    },
-    click_journey:{
-      ad_clicks:clicks,
-      link_clicks:0,
-      landing_page_views:0,
-      sessions,
-      traffic_score:null,
-      real_cpc:null
-    },
-    performance_summary:{
-      rows:[{
-        platform:"Organic",
-        level:"platform",
-        campaign_id:"organic",
-        campaign_name:"Organic",
-        campaign_status:"active",
-        currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
-        impressions,
-        clicks,
-        ad_clicks:clicks,
-        sessions,
-        ctr,
-        cpc:null,
-        spend:0,
-        sales:revenue,
-        revenue,
-        roas:null,
-        add_to_cart:addToCart,
-        checkout,
-        purchase,
-        purchases:purchase,
-        purchase_count:purchase,
-        abandoned,
-        conversion_value:revenue,
-        conversions:purchase,
-        raw:{
-          source:"organic_snapshot_v1",
-          ga4_property:property,
-          search_console_site:site,
-          gsc_average_position:gsc.average_position
-        }
-      }],
-      counts:{platform:1},
-      source_confidence:"organic_snapshot_v1",
-      null_policy:"Organic Snapshot v1 uses GA4 for sessions/events/revenue and Search Console for impressions/clicks/ctr. Dataset spread is intentionally disabled in this patch.",
-      raw_report:{ga4:ga4.raw,gsc:gsc.raw}
-    }
-  };
-}
-
-async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null,captureReason="manual_refresh",snapshotClass="primary"}){
-  const conn=await getConnection(user.id,"organic");
-  if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
-  if(!conn.metadata?.configured)throw Object.assign(new Error("Organic property and site binding is required before snapshot"),{status:400});
-  const property=conn.metadata.selectedGa4Property||{};
-  const site=conn.metadata.selectedSearchConsoleSite||{};
-  const platformAccountId=normalizePlatformAccountId(conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
-  if(!platformAccountId)throw Object.assign(new Error("Organic GA4 property id is missing"),{status:400});
-  await requireActiveOwnership(user.id,"organic",platformAccountId);
-  const platformTimeZone=DEFAULT_PLATFORM_TIMEZONE;
-  const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
-  const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,platformTimeZone,new Date());
-  const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
-  const startDate=organicIsoDate(period.start);
-  const endDate=organicIsoDate(period.end);
-  const [ga4,gsc]=await Promise.all([
-    fetchOrganicGa4Metrics(user.id,platformAccountId,startDate,endDate),
-    fetchOrganicSearchConsoleMetrics(user.id,site.site_url,startDate,endDate)
-  ]);
-  const accountCurrency=await getUserAccountCurrency(user.id);
-  const snapshot=buildOrganicSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency,ga4,gsc,property,site});
-  const fx=await resolveFxRate(accountCurrency,accountCurrency,{rateDate:snapshot.snapshot_date});
-  const convertedSnapshot=applyFxToSnapshotPayload(snapshot,fx);
-  const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform","organic").eq("platform_account_id",platformAccountId).eq("snapshot_date",convertedSnapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();
-  if(existingVersionResult.error)throw existingVersionResult.error;
-  const snapshotVersion=Number(existingVersionResult.data?.snapshot_version||0)+1;
-  const now=new Date().toISOString();
-  const row={
-    user_id:user.id,
-    platform:"organic",
-    platform_account_id:platformAccountId,
-    platform_base_currency:accountCurrency,
-    snapshot_version:snapshotVersion,
-    source_job_id:null,
-    date_preset:period.datePreset,
-    snapshot_period_start:period.start,
-    snapshot_period_end:period.end,
-    snapshot_scope:period.scope||period.datePreset,
-    capture_reason:captureReason,
-    snapshot_class:snapshotClass,
-    platform_account_timezone:platformTimeZone,
-    platform_business_date:timeSync.platform_business_date,
-    platform_business_at:timeSync.platform_business_at||timeSync.server_time_utc,
-    platform_business_hour:timeSync.platform_business_hour,
-    data_maturity_window_hours:dataMaturityWindowHours("organic"),
-    server_time_utc:timeSync.server_time_utc,
-    istanbul_time:timeSync.istanbul_time,
-    platform_account_time:timeSync.platform_account_time,
-    time_engine_version:TIME_ENGINE_VERSION,
-    fx_rate:fx.fx_rate,
-    fx_provider:fx.fx_provider,
-    fx_rate_timestamp:fx.fx_rate_timestamp,
-    fx_rate_date:fx.fx_rate_date||null,
-    fx_source_currency:fx.fx_source_currency,
-    fx_target_currency:fx.fx_target_currency,
-    fx_engine_version:fx.fx_engine_version,
-    snapshot_date:convertedSnapshot.snapshot_date,
-    snapshot_created_at:now,
-    account_currency:convertedSnapshot.account_currency,
-    kpis:convertedSnapshot.kpis,
-    purchase_journey:convertedSnapshot.purchase_journey,
-    click_journey:convertedSnapshot.click_journey,
-    performance_summary:convertedSnapshot.performance_summary
-  };
-  const {data,error}=await supabaseAdmin.from("dashboard_snapshots").insert(row).select("id,user_id,platform,platform_account_id,snapshot_version,date_preset,snapshot_date,snapshot_created_at,account_currency,kpis,purchase_journey,click_journey,performance_summary").maybeSingle();
-  if(error)throw error;
-  return {ok:true,platform:"organic",mode:"snapshot_insert_only",dataset_spread:false,snapshot:data,row_counts:convertedSnapshot.performance_summary.counts};
-}
-
-app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
-app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
-// ===== END ORGANIC SNAPSHOT v1 =====
-
-// ===== END ORGANIC GOOGLE OAUTH + DISCOVERY v1 =====
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
 app.get("/auth/pinterest",async(req,res)=>{
   const status=passiveLegacyPlatformStatus("pinterest");
@@ -3071,7 +2690,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:organic.connected?"oauth_connected":"skeleton",label:"Organic",message:organic.connected?"Organic OAuth connected. GA4 Property and Search Console Site discovery are available.":"Organic platform skeleton is available. Connect Organic to continue."}}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"skeleton",label:"Organic",message:"Organic platform skeleton is available. GA4 and Search Console OAuth will be added in the next patch."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -3872,12 +3491,9 @@ app.get("/api/platform/organic/status",async(req,res)=>{
       account_limit:PHASE1_PLATFORM_LIMITS.organic,
       active_ownership_count:ownershipCount,
       setup_stage:conn?.metadata?.setupStage||"skeleton",
-      oauth_connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),
-      ga4_property_selection_required:Boolean(conn?.metadata?.ga4PropertySelectionRequired),
-      search_console_site_selection_required:Boolean(conn?.metadata?.searchConsoleSiteSelectionRequired),
       ga4_connected:false,
       search_console_connected:false,
-      message:conn?"Organic OAuth connected. GA4 Property and Search Console Site discovery are available.":"Organic platform skeleton is ready. Connect Organic to discover GA4 Properties and Search Console Sites."
+      message:"Organic platform skeleton is ready. GA4 and Search Console OAuth will be added in the next patch."
     });
   }catch(e){
     res.status(500).json({error:e.message});

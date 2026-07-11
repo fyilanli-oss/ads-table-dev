@@ -136,7 +136,7 @@ async function revokePlatformToken(platform,conn){
       return result;
     }
 
-    if(platform==="google"&&(conn.refresh_token||conn.access_token)){
+    if((platform==="google"||platform==="organic")&&(conn.refresh_token||conn.access_token)){
       result.attempted=true;
       result.provider="google";
       const url=new URL("https://oauth2.googleapis.com/revoke");

@@ -1407,38 +1407,12 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
   };
 }
 
-async function fetchOrganicSearchConsoleMetrics(userId,siteUrl,startDate,endDate){
-  const cleanSiteUrl=String(siteUrl||"").trim();
-  if(!cleanSiteUrl)throw Object.assign(new Error("Organic Search Console site url is required"),{status:400});
-  const token=await getFreshOrganicAccessToken(userId);
-  const url=`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(cleanSiteUrl)}/searchAnalytics/query`;
-  const body={startDate,endDate,rowLimit:1};
-  const r=await fetch(url,{method:"POST",headers:{Authorization:`Bearer ${token}`,Accept:"application/json","Content-Type":"application/json"},body:JSON.stringify(body)});
-  const data=await r.json().catch(()=>({status:r.status}));
-  if(!r.ok)throw new Error(data.error?.message||data.message||`Organic Search Console API failed ${r.status}`);
-  const row=Array.isArray(data.rows)?(data.rows[0]||{}):{};
-  const clicks=Number(row.clicks||0);
-  const impressions=Number(row.impressions||0);
-  const ctr=row.ctr===undefined||row.ctr===null?null:Number(row.ctr)*100;
-  const averagePosition=row.position===undefined||row.position===null?null:Number(row.position);
-  return {
-    clicks:Number.isFinite(clicks)?clicks:0,
-    impressions:Number.isFinite(impressions)?impressions:0,
-    ctr:Number.isFinite(ctr)?ctr:null,
-    average_position:Number.isFinite(averagePosition)?averagePosition:null,
-    raw:data
-  };
-}
-
-function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,property,site}){
+function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,property}){
   const sessions=Number(ga4.sessions||0);
   const addToCart=Number(ga4.add_to_cart||0);
   const checkout=Number(ga4.checkout||0);
   const purchase=Number(ga4.purchase||0);
   const revenue=Number(ga4.revenue||0);
-  const clicks=Number(gsc.clicks||0);
-  const impressions=Number(gsc.impressions||0);
-  const ctr=gsc.ctr!==null&&gsc.ctr!==undefined?Number(gsc.ctr):(impressions>0?clicks/impressions*100:null);
   const abandoned=checkout>0?Math.max(checkout-purchase,0):0;
   return {
     platform:"organic",
@@ -1448,10 +1422,10 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,prope
       spend:0,
       sales:revenue,
       revenue,
-      impressions,
-      clicks,
+      impressions:0,
+      clicks:0,
       sessions,
-      ctr,
+      ctr:null,
       cpc:null,
       roas:null
     },
@@ -1464,7 +1438,7 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,prope
       purchase_value:revenue
     },
     click_journey:{
-      ad_clicks:clicks,
+      ad_clicks:0,
       link_clicks:0,
       landing_page_views:0,
       sessions,
@@ -1479,11 +1453,11 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,prope
         campaign_name:"Organic",
         campaign_status:"active",
         currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
-        impressions,
-        clicks,
-        ad_clicks:clicks,
+        impressions:0,
+        clicks:0,
+        ad_clicks:0,
         sessions,
-        ctr,
+        ctr:null,
         cpc:null,
         spend:0,
         sales:revenue,
@@ -1498,16 +1472,15 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,prope
         conversion_value:revenue,
         conversions:purchase,
         raw:{
-          source:"organic_snapshot_v1",
+          source:"organic_snapshot_ga4_core_v1",
           ga4_property:property,
-          search_console_site:site,
-          gsc_average_position:gsc.average_position
+          channel_groups:ORGANIC_GA4_CHANNEL_GROUPS_V1
         }
       }],
       counts:{platform:1},
-      source_confidence:"organic_snapshot_v1",
-      null_policy:"Organic Snapshot v1 uses GA4 filtered by AdsTable Organic Channel Filter v1 and Search Console for impressions/clicks/ctr. Dataset spread is enabled in Organic Dataset Spread v1.",
-      raw_report:{ga4:{...ga4.raw,adstable_channel_filter_v1:ORGANIC_GA4_CHANNEL_GROUPS_V1},gsc:gsc.raw}
+      source_confidence:"organic_snapshot_ga4_core_v1",
+      null_policy:"Organic Core uses only GA4 filtered by AdsTable Organic Channel Filter v1. Search Console is not required and no Search Console metrics are written.",
+      raw_report:{ga4:{...ga4.raw,adstable_channel_filter_v1:ORGANIC_GA4_CHANNEL_GROUPS_V1}}
     }
   };
 }
@@ -1515,9 +1488,8 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,gsc,prope
 async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null,captureReason="manual_refresh",snapshotClass="primary"}){
   const conn=await getConnection(user.id,"organic");
   if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
-  if(!conn.metadata?.configured)throw Object.assign(new Error("Organic property and site binding is required before snapshot"),{status:400});
+  if(!conn.metadata?.configured)throw Object.assign(new Error("Organic GA4 property binding is required before snapshot"),{status:400});
   const property=conn.metadata.selectedGa4Property||{};
-  const site=conn.metadata.selectedSearchConsoleSite||{};
   const platformAccountId=normalizePlatformAccountId(conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
   if(!platformAccountId)throw Object.assign(new Error("Organic GA4 property id is missing"),{status:400});
   await requireActiveOwnership(user.id,"organic",platformAccountId);
@@ -1527,12 +1499,9 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
   const timeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
   const startDate=organicIsoDate(period.start);
   const endDate=organicIsoDate(period.end);
-  const [ga4,gsc]=await Promise.all([
-    fetchOrganicGa4Metrics(user.id,platformAccountId,startDate,endDate),
-    fetchOrganicSearchConsoleMetrics(user.id,site.site_url,startDate,endDate)
-  ]);
+  const ga4=await fetchOrganicGa4Metrics(user.id,platformAccountId,startDate,endDate);
   const accountCurrency=await getUserAccountCurrency(user.id);
-  const snapshot=buildOrganicSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency,ga4,gsc,property,site});
+  const snapshot=buildOrganicSnapshotPayload({snapshotDate:effectiveSnapshotDate,accountCurrency,ga4,property});
   const fx=await resolveFxRate(accountCurrency,accountCurrency,{rateDate:snapshot.snapshot_date});
   const convertedSnapshot=applyFxToSnapshotPayload(snapshot,fx);
   const existingVersionResult=await supabaseAdmin.from("dashboard_snapshots").select("snapshot_version").eq("user_id",user.id).eq("platform","organic").eq("platform_account_id",platformAccountId).eq("snapshot_date",convertedSnapshot.snapshot_date).order("snapshot_version",{ascending:false}).limit(1).maybeSingle();

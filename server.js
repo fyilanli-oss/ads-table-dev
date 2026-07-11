@@ -1260,6 +1260,12 @@ async function bindOrganicGa4Property(userId,body={}){
   };
 
   const ownership=await ensurePlatformOwnership(userId,"organic",organicAccount);
+  const schedule=await ensureSnapshotSchedule(userId,"organic",verifiedProperty.property_id,{
+    organicAutomationVersion:"v1",
+    organicBindingVersion:"v2-ga4-only",
+    selectedAt:now,
+    account_type:phase1ReportableAccountType("organic")
+  });
 
   await supabaseAdmin.from("platform_ad_accounts").upsert({
     user_id:userId,
@@ -1302,7 +1308,8 @@ async function bindOrganicGa4Property(userId,body={}){
     configured:true,
     platform_account_id:verifiedProperty.property_id,
     ga4_property:verifiedProperty,
-    ownership_id:ownership?.id||null
+    ownership_id:ownership?.id||null,
+    schedule_id:schedule?.id||null
   };
 }
 app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
@@ -2804,12 +2811,13 @@ app.get("/api/cron/auto-refresh",async(req,res)=>{
       }
     }
     const queued_backfill_result=await processQueuedBackfills({limit:Number(req.query.backfill_limit||10)}).catch(e=>({ok:false,error:e.message,stage:"queued_backfill_cron"}));
+    const organic_schedule_result=await ensureConfiguredOrganicSchedules().catch(e=>({ok:false,error:e.message,stage:"organic_schedule_ensure"}));
     const nowIso=new Date().toISOString();
     const {data:schedules,error}=await supabaseAdmin
       .from("snapshot_schedules")
       .select("*")
       .eq("active",true)
-      .in("platform",["meta","google","tiktok","klaviyo"])
+      .in("platform",["meta","google","tiktok","klaviyo","organic"])
       .or(`next_run_at.is.null,next_run_at.lte.${nowIso}`);
 
     if(error)throw error;
@@ -2821,13 +2829,14 @@ app.get("/api/cron/auto-refresh",async(req,res)=>{
         else if(schedule.platform==="google")results.push(await runGoogleAutoRefreshForSchedule(schedule));
         else if(schedule.platform==="tiktok")results.push(await runTikTokAutoRefreshForSchedule(schedule));
         else if(schedule.platform==="klaviyo")results.push(await runKlaviyoAutoRefreshForSchedule(schedule));
+        else if(schedule.platform==="organic")results.push(await runOrganicAutoRefreshForSchedule(schedule));
         else results.push({ok:true,skipped:true,reason:"unsupported_platform",platform:schedule.platform,schedule_id:schedule.id});
       }catch(e){
         results.push({ok:false,platform:schedule.platform,schedule_id:schedule.id,error:e.message});
       }
     }
 
-    res.json({ok:true,started_at:startedAt,fx_result,queued_backfill_result,count:results.length,results});
+    res.json({ok:true,started_at:startedAt,fx_result,queued_backfill_result,organic_schedule_result,count:results.length,results});
   }catch(e){
     res.status(500).json({ok:false,error:e.message,started_at:startedAt});
   }
@@ -4637,6 +4646,157 @@ async function handleKlaviyoSnapshotWrite(req,res){
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
     res.json({ok:true,platform:"Klaviyo",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result});
   }catch(e){if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
+}
+
+
+
+async function ensureConfiguredOrganicSchedules(){
+  const {data:connections,error}=await supabaseAdmin
+    .from("platform_connections")
+    .select("user_id,account_id,metadata")
+    .eq("platform","organic")
+    .eq("connected",true);
+  if(error)throw error;
+
+  const results=[];
+  for(const conn of connections||[]){
+    if(!conn.metadata?.configured)continue;
+    const property=conn.metadata.selectedGa4Property||{};
+    const platformAccountId=normalizePlatformAccountId(conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
+    if(!platformAccountId)continue;
+    const ownership=await getOwnership("organic",platformAccountId);
+    if(!ownership||ownership.owner_user_id!==conn.user_id||!activeOwnershipStatuses().includes(ownership.status))continue;
+    const schedule=await ensureSnapshotSchedule(conn.user_id,"organic",platformAccountId,{
+      organicAutomationVersion:"v1",
+      ensuredBy:"auto_refresh_cron",
+      account_type:phase1ReportableAccountType("organic")
+    });
+    results.push({user_id:conn.user_id,platform_account_id:platformAccountId,schedule_id:schedule?.id||null});
+  }
+  return {ok:true,count:results.length,results};
+}
+
+async function runOrganicAutoRefreshForSchedule(schedule){
+  const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",schedule.user_id).maybeSingle();
+  if(userError)throw userError;
+  if(!user)throw new Error("Auto refresh user not found");
+
+  const conn=await getConnection(schedule.user_id,"organic");
+  if(!conn)throw new Error("Auto refresh Organic connection not found");
+  if(!conn.metadata?.configured)throw new Error("Organic GA4 property binding is required before automation");
+
+  const property=conn.metadata.selectedGa4Property||{};
+  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
+  if(!platformAccountId)throw new Error("Auto refresh missing Organic GA4 property id");
+
+  if(schedule.active===false){
+    return {ok:true,skipped:true,platform:"organic",reason:"schedule_inactive",schedule_id:schedule.id,platform_account_id:platformAccountId};
+  }
+
+  const ownership=await getOwnership("organic",platformAccountId);
+  if(!ownership||ownership.owner_user_id!==schedule.user_id||!activeOwnershipStatuses().includes(ownership.status)){
+    return {ok:true,skipped:true,platform:"organic",reason:"ownership_not_active",schedule_id:schedule.id,platform_account_id:platformAccountId,ownership_status:ownership?.status||null};
+  }
+
+  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"organic",platformAccountId,conn,ownership);
+  const policy=resolveAutoRefreshPolicy({date:new Date(),platformTimeZone,platform:"organic"});
+  if(!policy.isAutomationHour){
+    return {
+      ok:true,
+      skipped:true,
+      platform:"organic",
+      reason:"not_platform_automation_hour",
+      schedule_id:schedule.id,
+      platform_account_id:platformAccountId,
+      platform_account_timezone:platformTimeZone,
+      platform_business_hour:policy.platform_business_hour,
+      platform_account_time:policy.platform_account_time,
+      server_time_utc:policy.server_time_utc,
+      istanbul_time:policy.istanbul_time,
+      automation_hours:policy.automation_hours
+    };
+  }
+
+  const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
+  const job=await createRefreshJob(schedule.user_id,"organic",platformAccountId,{
+    trigger:"automation",
+    datePreset:policy.datePreset,
+    snapshotDate,
+    captureReason:policy.captureReason,
+    snapshotClass:policy.snapshotClass,
+    scheduleId:schedule.id,
+    platformBusinessHour:policy.platform_business_hour,
+    dataMaturityWindowHours:policy.data_maturity_window_hours,
+    server_time_utc:policy.server_time_utc,
+    istanbul_time:policy.istanbul_time,
+    platform_account_time:policy.platform_account_time,
+    platform_account_timezone:policy.platform_account_timezone,
+    platform_business_date:policy.platform_business_date,
+    timeEngineVersion:TIME_ENGINE_VERSION
+  });
+
+  await setRefreshJobStatus(job.id,"running");
+
+  try{
+    const writeResult=await writeOrganicSnapshotV1({
+      user,
+      datePreset:policy.datePreset,
+      snapshotDate,
+      sourceJobId:job.id,
+      captureReason:policy.captureReason,
+      snapshotClass:policy.snapshotClass
+    });
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
+
+    let recovery_result=null;
+    if(policy.shouldRunRecoverySnapshot){
+      const recoveryJob=await createRefreshJob(schedule.user_id,"organic",platformAccountId,{
+        trigger:"automation",
+        datePreset:policy.recoveryDatePreset,
+        snapshotDate,
+        captureReason:policy.recoveryCaptureReason,
+        snapshotClass:policy.recoverySnapshotClass,
+        scheduleId:schedule.id,
+        pairedPrimaryJobId:job.id,
+        timeEngineVersion:TIME_ENGINE_VERSION
+      });
+      await setRefreshJobStatus(recoveryJob.id,"running");
+      try{
+        const recoveryWrite=await writeOrganicSnapshotV1({
+          user,
+          datePreset:policy.recoveryDatePreset,
+          snapshotDate,
+          sourceJobId:recoveryJob.id,
+          captureReason:policy.recoveryCaptureReason,
+          snapshotClass:policy.recoverySnapshotClass
+        });
+        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
+        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
+      }catch(recoveryError){
+        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
+        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
+      }
+    }
+
+    await supabaseAdmin.from("snapshot_schedules").update({
+      last_run_at:new Date().toISOString(),
+      next_run_at:nextAutomationSlotUtc(),
+      updated_at:new Date().toISOString()
+    }).eq("id",schedule.id);
+
+    return {
+      ok:true,
+      platform:"organic",
+      job_id:job.id,
+      snapshot_id:writeResult.snapshot?.id||null,
+      row_counts:writeResult.row_counts,
+      performance_spread_result:writeResult.performance_spread_result||null,
+      recovery_result
+    };
+  }catch(e){
+    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    throw e;
+  }
 }
 
 async function runTikTokAutoRefreshForSchedule(schedule){

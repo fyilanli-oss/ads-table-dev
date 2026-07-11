@@ -143,7 +143,7 @@ async function revokePlatformToken(platform,conn){
       url.searchParams.set("token",conn.refresh_token||conn.access_token);
       const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"}});
       result.response={status:r.status};
-      if(!r.ok&&r.status!==400)throw new Error(`Google revoke failed ${r.status}`);
+      if(!r.ok&&r.status!==400)throw new Error(`${platform} Google revoke failed ${r.status}`);
       result.ok=true;
       return result;
     }
@@ -181,10 +181,18 @@ async function revokePlatformToken(platform,conn){
     }
 
     if(platform==="klaviyo"){
-      result.attempted=true;
-      result.provider=platform;
+      // Klaviyo does not expose a provider token-revocation call in this integration.
+      // Disconnect is completed by destroying the stored OAuth credentials and
+      // closing the local lifecycle below.
+      result.attempted=false;
+      result.provider="internal_token_destruction";
       result.ok=true;
-      result.error="Provider revoke endpoint not configured; internal tokens destroyed";
+      result.error=null;
+      result.response={
+        revocation_mode:"internal_token_destruction",
+        access_token_present:Boolean(conn.access_token),
+        refresh_token_present:Boolean(conn.refresh_token)
+      };
       return result;
     }
 

@@ -1453,7 +1453,7 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,property}
   };
 }
 
-async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null,captureReason="manual_refresh",snapshotClass="primary"}){
+async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
   const conn=await getConnection(user.id,"organic");
   if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
   if(!conn.metadata?.configured)throw Object.assign(new Error("Organic GA4 property binding is required before snapshot"),{status:400});
@@ -1482,7 +1482,7 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
     platform_account_id:platformAccountId,
     platform_base_currency:accountCurrency,
     snapshot_version:snapshotVersion,
-    source_job_id:null,
+    source_job_id:sourceJobId,
     date_preset:period.datePreset,
     snapshot_period_start:period.start,
     snapshot_period_end:period.end,
@@ -1529,6 +1529,30 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
   }
 
   return {ok:true,platform:"organic",mode:"snapshot_insert_and_dataset_spread",dataset_spread:true,snapshot:data,row_counts:convertedSnapshot.performance_summary.counts,performance_spread_result};
+}
+
+async function handleOrganicSnapshotWrite(req,res){
+  let job=null,stage="connection";
+  try{
+    const result=await requireConnection(req,res,"organic");if(!result)return;
+    const {user,conn}=result;
+    if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
+    const property=conn.metadata.selectedGa4Property||{};
+    const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.query.platform_account_id||conn.account_id||property.property_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
+    if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Organic GA4 property id",stage});
+    const datePreset=String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today");
+    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
+    stage="job";
+    job=await createRefreshJob(user.id,"organic",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
+    await setRefreshJobStatus(job.id,"running");
+    stage="snapshot";
+    const writeResult=await writeOrganicSnapshotV1({user,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
+    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
+    res.json({ok:true,platform:"Organic",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result});
+  }catch(e){
+    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null});
+  }
 }
 
 app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
@@ -2485,7 +2509,8 @@ async function handleGlobalRefresh(req,res){
     ["meta",handleMetaSnapshotWrite],
     ["google",handleGoogleSnapshotWrite],
     ["tiktok",typeof handleTikTokSnapshotWrite==="function"?handleTikTokSnapshotWrite:null],
-    ["klaviyo",typeof handleKlaviyoSnapshotWrite==="function"?handleKlaviyoSnapshotWrite:null]
+    ["klaviyo",typeof handleKlaviyoSnapshotWrite==="function"?handleKlaviyoSnapshotWrite:null],
+    ["organic",typeof handleOrganicSnapshotWrite==="function"?handleOrganicSnapshotWrite:null]
   ];
 
   for(const [platform,handler] of platforms){
@@ -2512,7 +2537,8 @@ async function handleGlobalRefresh(req,res){
       meta:results.meta?.data||null,
       google:results.google?.data||null,
       tiktok:results.tiktok?.data||null,
-      klaviyo:results.klaviyo?.data||null
+      klaviyo:results.klaviyo?.data||null,
+      organic:results.organic?.data||null
     }
   });
 }
@@ -2529,6 +2555,10 @@ app.get("/api/refresh/klaviyo",handleKlaviyoSnapshotWrite);
 app.post("/api/refresh/klaviyo",handleKlaviyoSnapshotWrite);
 app.get("/api/snapshots/klaviyo/write",handleKlaviyoSnapshotWrite);
 app.post("/api/snapshots/klaviyo/write",handleKlaviyoSnapshotWrite);
+app.get("/api/refresh/organic",handleOrganicSnapshotWrite);
+app.post("/api/refresh/organic",handleOrganicSnapshotWrite);
+app.get("/api/snapshots/organic/write",handleOrganicSnapshotWrite);
+app.post("/api/snapshots/organic/write",handleOrganicSnapshotWrite);
 
 app.get("/api/refresh/status",async(req,res)=>{
   try{

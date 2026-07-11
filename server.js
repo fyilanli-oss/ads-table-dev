@@ -1242,33 +1242,17 @@ function pickOrganicGa4Property(input){
     raw:input
   };
 }
-function pickOrganicSearchConsoleSite(input){
-  const siteUrl=String(input?.site_url||input?.siteUrl||input?.platform_account_id||input?.id||"").trim();
-  if(!siteUrl)return null;
-  return {
-    platform_account_id:siteUrl,
-    site_url:siteUrl,
-    permission_level:input?.permission_level||input?.permissionLevel||null,
-    raw:input
-  };
-}
-async function bindOrganicPropertyAndSite(userId,body={}){
+async function bindOrganicGa4Property(userId,body={}){
   const now=new Date().toISOString();
   const conn=await getConnection(userId,"organic");
   if(!conn)throw Object.assign(new Error("Organic OAuth connection is required before property binding"),{status:404});
 
   const requestedProperty=pickOrganicGa4Property(body.ga4_property||body.ga4Property||body.property||body);
-  const requestedSite=pickOrganicSearchConsoleSite(body.search_console_site||body.searchConsoleSite||body.site||body);
   if(!requestedProperty)throw Object.assign(new Error("GA4 property selection is required"),{status:400});
-  if(!requestedSite)throw Object.assign(new Error("Search Console site selection is required"),{status:400});
 
   const availableProperties=(await listOrganicGa4Properties(userId)).properties||[];
   const verifiedProperty=availableProperties.find(p=>p.property_id===requestedProperty.property_id||p.platform_account_id===requestedProperty.platform_account_id);
   if(!verifiedProperty)throw Object.assign(new Error("Selected GA4 property is not available for this Organic connection"),{status:403});
-
-  const availableSites=(await listOrganicSearchConsoleSites(userId)).sites||[];
-  const verifiedSite=availableSites.find(s=>s.site_url===requestedSite.site_url);
-  if(!verifiedSite)throw Object.assign(new Error("Selected Search Console site is not available for this Organic connection"),{status:403});
 
   const organicAccount={
     platform_account_id:verifiedProperty.property_id,
@@ -1276,14 +1260,12 @@ async function bindOrganicPropertyAndSite(userId,body={}){
     name:verifiedProperty.property_name||`GA4 Property ${verifiedProperty.property_id}`,
     property_id:verifiedProperty.property_id,
     property_resource_name:verifiedProperty.property_resource_name,
-    site_url:verifiedSite.site_url,
     currency:null,
     metadata:{
-      source:"organic_property_site_binding",
-      organicBindingVersion:"v1",
+      source:"organic_ga4_property_binding",
+      organicBindingVersion:"v2-ga4-only",
       selectedAt:now,
-      ga4_property:verifiedProperty,
-      search_console_site:verifiedSite
+      ga4_property:verifiedProperty
     }
   };
 
@@ -1299,10 +1281,9 @@ async function bindOrganicPropertyAndSite(userId,body={}){
     timezone:DEFAULT_PLATFORM_TIMEZONE,
     status:"active",
     metadata:{
-      organicBindingVersion:"v1",
+      organicBindingVersion:"v2-ga4-only",
       selectedAt:now,
-      ga4_property:verifiedProperty,
-      search_console_site:verifiedSite
+      ga4_property:verifiedProperty
     },
     updated_at:now
   },{onConflict:"user_id,platform,platform_account_id"});
@@ -1315,13 +1296,14 @@ async function bindOrganicPropertyAndSite(userId,body={}){
       setupStage:"configured",
       configured:true,
       configuredAt:now,
-      organicBindingVersion:"v1",
+      organicBindingVersion:"v2-ga4-only",
       selectedPlatformAccountId:verifiedProperty.property_id,
       lastOwnedPlatformAccountId:verifiedProperty.property_id,
       ga4PropertySelectionRequired:false,
       searchConsoleSiteSelectionRequired:false,
       selectedGa4Property:verifiedProperty,
-      selectedSearchConsoleSite:verifiedSite
+      selectedSearchConsoleSite:null,
+      searchConsoleRemovedFromCoreAt:now
     }
   });
 
@@ -1332,15 +1314,13 @@ async function bindOrganicPropertyAndSite(userId,body={}){
     configured:true,
     platform_account_id:verifiedProperty.property_id,
     ga4_property:verifiedProperty,
-    search_console_site:verifiedSite,
     ownership_id:ownership?.id||null
   };
 }
-app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicPropertyAndSite(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_property_site_binding"})}});
-app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicPropertyAndSite(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_property_site_binding"})}});
-app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured),setupStage:conn?.metadata?.setupStage||null,ga4_property:conn?.metadata?.selectedGa4Property||null,search_console_site:conn?.metadata?.selectedSearchConsoleSite||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured),setupStage:conn?.metadata?.setupStage||null,ga4_property:conn?.metadata?.selectedGa4Property||null,search_console_site:conn?.metadata?.selectedSearchConsoleSite||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-
+app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
+app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
 
 
 // ===== ORGANIC SNAPSHOT v1 =====

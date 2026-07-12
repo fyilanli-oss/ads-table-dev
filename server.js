@@ -173,15 +173,7 @@ async function revokePlatformToken(platform,conn){
       result.response=data;
 
       if(!r.ok || (data.code!==undefined&&data.code!==0)){
-        result.ok=false;
-        result.non_blocking=true;
-        result.error=data.message||data.error?.message||`TikTok revoke failed ${r.status}`;
-        result.response={
-          provider_response:data,
-          local_disconnect_continues:true,
-          revocation_mode:"provider_best_effort_then_local_token_destruction"
-        };
-        return result;
+        throw new Error(data.message||data.error?.message||`TikTok revoke failed ${r.status}`);
       }
 
       result.ok=true;
@@ -980,7 +972,7 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
     revoke_results.push(await revokePlatformToken(platform,conn));
   }
 
-  const failedRevoke=revoke_results.find(r=>r.attempted&&r.ok===false&&!r.non_blocking);
+  const failedRevoke=revoke_results.find(r=>r.attempted&&r.ok===false);
   if(failedRevoke){
     const err=new Error(`${platform} revoke failed: ${failedRevoke.error}`);
     err.status=502;
@@ -1401,30 +1393,31 @@ app.get("/auth/organic/callback",async(req,res)=>{
       accessToken:tokens.access_token||existing?.access_token||null,
       refreshToken:tokens.refresh_token||existing?.refresh_token||null,
       tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:existing?.account_id||null,
-      accountName:existing?.account_name||"Organic",
+      accountId:null,
+      accountName:"Organic",
       metadata:{
-        organicOAuthVersion:"v1.1-callback-fix",
+        organicOAuthVersion:"v1.2-property-selection-reset",
         organicOAuthConnectedAt:callbackAt,
         organicOAuthStartedAt:req.session.organicOAuthStartedAt||null,
         organicRedirectUri:organicGoogleRedirectUri(req),
         scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),
         tokenType:tokens.token_type||null,
         expiryDate:tokens.expiry_date||null,
-        accountSelectionRequired:true,
-        organicConfigured:false,
-        configured:false,
-        setupStage:"property_selection_required",
+        selectedGa4Property:null,
         selectedPlatformAccountId:null,
         lastOwnedPlatformAccountId:null,
-        selectedGa4Property:null,
+        configured:false,
+        organicConfigured:false,
+        setupStage:"property_selection_required",
         ga4PropertySelectionRequired:true,
+        accountSelectionRequired:true,
         organicCallbackSaved:true
       }
     });
     req.session.organicOAuthState=null;
     req.session.organicOAuthStartedAt=null;
-    res.redirect("/dashboard?organic_connected=1&account_selection_required=1");
+    req.session.oauthUserId=null;
+    res.redirect("/dashboard?organic_connected=1&property_selection_required=1&account_selection_required=1");
   }catch(e){
     try{
       const userId=req.session.oauthUserId;
@@ -2807,8 +2800,37 @@ async function handleGlobalRefresh(req,res){
     ["klaviyo",typeof handleKlaviyoSnapshotWrite==="function"?handleKlaviyoSnapshotWrite:null],
     ["organic",typeof handleOrganicSnapshotWrite==="function"?handleOrganicSnapshotWrite:null]
   ];
+  const refreshPlatforms=platforms.map(([platform])=>platform);
+  const {data:connectedRows,error:connectedError}=await supabaseAdmin
+    .from("platform_connections")
+    .select("platform")
+    .eq("user_id",refreshUser.id)
+    .eq("connected",true)
+    .in("platform",refreshPlatforms);
+  if(connectedError)return res.status(500).json({ok:false,error:connectedError.message,stage:"global_refresh_connection_check"});
+  const connectedPlatforms=[...new Set((connectedRows||[]).map(row=>String(row.platform||"").toLowerCase()).filter(platform=>refreshPlatforms.includes(platform)))];
+
+  if(connectedPlatforms.length===0){
+    return res.status(200).json({
+      ok:true,
+      refresh_scope:"global",
+      message:"No connected platforms to refresh.",
+      connected_platform_count:0,
+      completed:[],
+      failed:[],
+      refresh_job:null,
+      snapshot_id:null,
+      snapshot_date:null,
+      google_sheets_sync:{attempted:false,ok:true,skipped:true,reason:"no_connected_platforms",spreadsheet_id:null,rows_written:0,error:null},
+      platforms:{meta:null,google:null,tiktok:null,klaviyo:null,organic:null}
+    });
+  }
 
   for(const [platform,handler] of platforms){
+    if(!connectedPlatforms.includes(platform)){
+      results[platform]={ok:true,status:200,data:{ok:true,platform,skipped:true,reason:"not_connected"}};
+      continue;
+    }
     if(!handler){
       results[platform]={ok:false,status:501,data:{ok:false,error:`${platform} refresh handler not implemented`,stage:"refresh_dispatcher"}};
       continue;
@@ -2816,7 +2838,7 @@ async function handleGlobalRefresh(req,res){
     results[platform]=await runRefreshPlatform(platform,handler,req);
   }
 
-  const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
+  const completed=Object.entries(results).filter(([,r])=>r.ok&&!r.data?.skipped).map(([platform])=>platform);
   const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
   const firstCompleted=completed[0]?results[completed[0]]?.data:{};
   const googleSheetsSync=completed.length?await maybeAutoSyncGoogleSheets(refreshUser.id):{attempted:false,ok:true,skipped:true,reason:"no_platform_refresh_completed",spreadsheet_id:null,rows_written:0,error:null};
@@ -3828,14 +3850,6 @@ async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
 async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustomerId="",metadata={}){
   const normalized=normalizeCustomerId(platformAccountId);
   if(!normalized)throw new Error("Google platform account id is required for lifecycle");
-
-  const activeConnection=await getConnection(user.id,"google");
-  if(!activeConnection){
-    const err=new Error("Google not connected. Reconnect Google before refresh.");
-    err.status=404;
-    err.stage="connection";
-    throw err;
-  }
 
   const account={
     id:normalized,

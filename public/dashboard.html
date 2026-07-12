@@ -3953,21 +3953,24 @@ function togglePJ(groupName){
         throw new Error(data.error||"Disconnect failed");
       }
       render(service,false);
+      if(window.closeDashboardServiceModal)window.closeDashboardServiceModal();
     }catch(error){
       render(service,true);
+      button.disabled=false;
+      throw error;
     }
   }
+
+  window.runDashboardServiceLifecycle=function(platform){
+    const service=services.find(function(item){return item.platform===platform;});
+    if(!service)return Promise.reject(new Error("Unsupported dashboard service"));
+    return act(service);
+  };
 
   function boot(){
     services.forEach(function(service){
       const button=document.getElementById(service.buttonId);
-      if(button&&!button.dataset.lifecycleBound){
-        button.dataset.lifecycleBound="true";
-        button.addEventListener("click",function(event){
-          event.preventDefault();
-          act(service);
-        });
-      }
+      if(button)button.dataset.lifecycleBound="true";
       load(service);
     });
   }
@@ -3991,50 +3994,84 @@ function togglePJ(groupName){
 
 <script>
 (function(){
-  let activeDrawerButton = null;
+  "use strict";
 
-  const modal = document.getElementById("connectModal");
-  const modalOverlay = document.getElementById("connectModalOverlay");
-  const modalAction = document.getElementById("connectModalAction");
+  let activeDrawerButton=null;
+  const managedPlatforms=new Set(["tiktok","organic","google_sheets"]);
+  const labels={tiktok:"TikTok Ads",organic:"Analytics",google_sheets:"Sheets"};
+
+  const modal=document.getElementById("connectModal");
+  const modalOverlay=document.getElementById("connectModalOverlay");
+  const modalTitle=document.getElementById("connectModalTitle");
+  const modalDescription=document.getElementById("connectModalDescription");
+  const modalAction=document.getElementById("connectModalAction");
+  const modalCancel=document.getElementById("connectModalCancel");
+
+  function isConnected(btn){
+    const state=String(btn?.dataset?.state||"").toLowerCase();
+    return state==="connected"||state==="disconnect";
+  }
+
+  function closeConnectModal(){
+    if(modal)modal.classList.remove("open");
+    if(modalOverlay)modalOverlay.classList.remove("open");
+    if(modal)delete modal.dataset.platform;
+    activeDrawerButton=null;
+  }
+
+  window.closeDashboardServiceModal=closeConnectModal;
 
   function openConnectModal(btn){
-    activeDrawerButton = btn;
-    const state = btn.getAttribute("data-state") || "connect";
-    modalAction.textContent = state === "connect" ? "Connect" : "Disconnect";
+    const platform=btn.dataset.platform;
+    const connected=isConnected(btn);
+    const label=labels[platform]||platform;
+    activeDrawerButton=btn;
+    modal.dataset.platform=platform;
+    if(modalTitle)modalTitle.textContent=connected?`Disconnect ${label}?`:`Connect ${label}?`;
+    if(modalDescription)modalDescription.textContent=connected
+      ?`This will stop future ${label} syncs. Historical dashboard data will remain available.`
+      :`Continue to authorize ${label} for AdsTable.`;
+    modalAction.textContent=connected?"Disconnect":"Connect";
+    if(modalCancel)modalCancel.style.display="";
     modal.classList.add("open");
     modalOverlay.classList.add("open");
   }
 
-  function closeConnectModal(){
-    modal.classList.remove("open");
-    modalOverlay.classList.remove("open");
-  }
-
   document.querySelectorAll(".drawerConnectBtn").forEach(function(btn){
-    btn.addEventListener("click", function(e){
-      e.preventDefault();
-      e.stopPropagation();
+    if(!managedPlatforms.has(btn.dataset.platform))return;
+    btn.addEventListener("click",function(event){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if(btn.disabled)return;
       openConnectModal(btn);
-    });
+    },true);
   });
 
-  modalAction.addEventListener("click", function(){
-    if(!activeDrawerButton) return;
-
-    const currentState = activeDrawerButton.getAttribute("data-state") || "connect";
-
-    if(currentState === "connect"){
-      activeDrawerButton.setAttribute("data-state", "disconnect");
-      activeDrawerButton.textContent = "Disconnect";
-    }else{
-      activeDrawerButton.setAttribute("data-state", "connect");
-      activeDrawerButton.textContent = "Connect";
+  modalAction.addEventListener("click",async function(event){
+    const platform=activeDrawerButton?.dataset?.platform;
+    if(!managedPlatforms.has(platform))return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    modalAction.disabled=true;
+    try{
+      await window.runDashboardServiceLifecycle(platform);
+    }catch(error){
+      if(modalDescription)modalDescription.textContent=error?.message||"Action failed.";
+    }finally{
+      modalAction.disabled=false;
     }
+  },true);
 
+  if(modalCancel)modalCancel.addEventListener("click",function(event){
+    if(!activeDrawerButton||!managedPlatforms.has(activeDrawerButton.dataset.platform))return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
     closeConnectModal();
-  });
+  },true);
 
-  modalOverlay.addEventListener("click", closeConnectModal);
+  modalOverlay.addEventListener("click",function(){
+    if(activeDrawerButton&&managedPlatforms.has(activeDrawerButton.dataset.platform))closeConnectModal();
+  });
 })();
 </script>
 

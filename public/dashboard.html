@@ -7824,7 +7824,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     const action=byId("connectModalAction");
     if(action&&!action.dataset.d2a1MetaBound){
       action.dataset.d2a1MetaBound="true";
-      action.addEventListener("click",function(e){
+      action.addEventListener("click",async function(e){
         const modal=byId("connectModal");
         if(!modal || modal.dataset.platform !== "meta") return;
         if(modalMode!=="connect"&&modalMode!=="disconnect")return;
@@ -7832,9 +7832,20 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
         e.stopImmediatePropagation();
 
         if(modalMode==="connect"){
-          if(session&&session.user&&session.user.id){
-            window.location.href="/auth/meta?user_id="+encodeURIComponent(session.user.id);
+          const desc=byId("connectModalDescription");
+          action.disabled=true;
+          action.textContent="Loading...";
+
+          const ready=await initSupabase();
+          if(ready&&session&&session.user&&session.user.id){
+            window.location.assign("/auth/meta?user_id="+encodeURIComponent(session.user.id));
+            return;
           }
+
+          if(desc)desc.textContent="Your session could not be loaded. Please sign in again.";
+          action.disabled=false;
+          action.textContent="Connect Meta";
+          if(!session)window.location.href="/login";
         }else{
           disconnectMeta();
         }

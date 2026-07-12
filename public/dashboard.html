@@ -7836,16 +7836,48 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
           action.disabled=true;
           action.textContent="Loading...";
 
-          const ready=await initSupabase();
-          if(ready&&session&&session.user&&session.user.id){
-            window.location.assign("/auth/meta?user_id="+encodeURIComponent(session.user.id));
+          let userId=null;
+
+          /* Mobile-safe fast path: read the already authenticated Supabase session
+             directly from localStorage. This avoids getSession() lock contention
+             when multiple dashboard modules initialize Supabase at the same time. */
+          try{
+            for(let i=0;i<window.localStorage.length;i+=1){
+              const key=window.localStorage.key(i);
+              if(!key || !/^sb-.*-auth-token$/.test(key))continue;
+              const raw=window.localStorage.getItem(key);
+              if(!raw)continue;
+              const stored=JSON.parse(raw);
+              const candidate=(stored&&stored.user&&stored.user.id)
+                ? stored.user.id
+                : (stored&&stored.currentSession&&stored.currentSession.user&&stored.currentSession.user.id)
+                  ? stored.currentSession.user.id
+                  : null;
+              if(candidate){userId=candidate;break;}
+            }
+          }catch(_storageError){}
+
+          if(!userId){
+            try{
+              const ready=await Promise.race([
+                initSupabase(),
+                new Promise(resolve=>setTimeout(()=>resolve(false),4000))
+              ]);
+              if(ready&&session&&session.user&&session.user.id){
+                userId=session.user.id;
+              }
+            }catch(_sessionError){}
+          }
+
+          if(userId){
+            window.location.replace("/auth/meta?user_id="+encodeURIComponent(userId));
             return;
           }
 
           if(desc)desc.textContent="Your session could not be loaded. Please sign in again.";
           action.disabled=false;
           action.textContent="Connect Meta";
-          if(!session)window.location.href="/login";
+          window.location.replace("/login");
         }else{
           disconnectMeta();
         }

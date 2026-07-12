@@ -316,6 +316,23 @@ async function requestLifecycleBackfill({userId,platform,platformAccountId,reaso
   if(!normalized)throw new Error("Backfill platform account id is required");
   if(!cleanPlatform)throw new Error("Backfill platform is required");
 
+  // Patch 14: Meta account selection must reuse any active job protected by
+  // snapshot_jobs_active_guard_unique_idx, regardless of job type or reason.
+  if(cleanPlatform==="meta"){
+    const {data:activeJob,error:activeJobError}=await supabaseAdmin
+      .from("snapshot_jobs")
+      .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
+      .eq("user_id",userId)
+      .eq("platform",cleanPlatform)
+      .eq("platform_account_id",normalized)
+      .in("status",["queued","running"])
+      .order("created_at",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(activeJobError)throw activeJobError;
+    if(activeJob)return {created:false,job:activeJob,reason:"active_job_reused"};
+  }
+
   const {data:existing,error:existingError}=await supabaseAdmin
     .from("snapshot_jobs")
     .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
@@ -355,7 +372,31 @@ async function requestLifecycleBackfill({userId,platform,platformAccountId,reaso
     })
     .select("*")
     .maybeSingle();
-  if(error)throw error;
+
+  if(error){
+    const activeGuardConflict=cleanPlatform==="meta"&&(
+      error.code==="23505"||
+      String(error.message||"").includes("snapshot_jobs_active_guard_unique_idx")
+    );
+    if(!activeGuardConflict)throw error;
+
+    // Race-safe fallback: another request may have queued the active job
+    // between the pre-check and INSERT. Reuse that row instead of failing the
+    // ownership/schedule lifecycle.
+    const {data:activeJob,error:activeJobError}=await supabaseAdmin
+      .from("snapshot_jobs")
+      .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
+      .eq("user_id",userId)
+      .eq("platform",cleanPlatform)
+      .eq("platform_account_id",normalized)
+      .in("status",["queued","running"])
+      .order("created_at",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(activeJobError)throw activeJobError;
+    if(activeJob)return {created:false,job:activeJob,reason:"active_job_reused_after_conflict"};
+    throw error;
+  }
 
   await supabaseAdmin
     .from("platform_account_ownerships")

@@ -7945,13 +7945,19 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       action.addEventListener("click",async function(e){
         const modal=byId("connectModal");
         if(!modal || modal.dataset.platform !== "meta") return;
+
+        if(modalMode==="account_selection"){
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          await submitMetaAccountSelection();
+          return;
+        }
+
         if(modalMode!=="connect"&&modalMode!=="disconnect")return;
         e.preventDefault();
         e.stopImmediatePropagation();
 
-        if(modalMode==="account_selection"){
-          await submitMetaAccountSelection();
-        }else if(modalMode==="connect"){
+        if(modalMode==="connect"){
           const desc=byId("connectModalDescription");
           action.disabled=true;
           action.textContent="Loading...";

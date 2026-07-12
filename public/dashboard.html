@@ -2118,6 +2118,21 @@ table.perf{
   margin-bottom:14px;
 }
 
+.drawerServices{
+  margin-top:28px;
+  padding-top:20px;
+  border-top:1px solid #d9d9d9;
+}
+
+.drawerServiceSection{
+  margin-bottom:8px;
+}
+
+.drawerConnectBtn:disabled{
+  opacity:.58;
+  cursor:default;
+}
+
 .drawerRow{
   display:flex;
   align-items:center;
@@ -3810,35 +3825,38 @@ function togglePJ(groupName){
 
   <div class="drawerRow">
     <span>Meta Ads</span>
-    <button id="metaConnectButton" class="drawerConnectBtn" data-platform="meta" data-state="connect">Connect Meta</button>
+    <button id="metaConnectButton" class="drawerConnectBtn" data-platform="meta" data-state="connect">Connect</button>
   </div>
 
   <div class="drawerRow">
     <span>Google Ads</span>
-    <button id="googleConnectButton" class="drawerConnectBtn" data-platform="google" data-state="connect">Connect Google</button>
-  </div>
-
-  <div class="drawerRow">
-    <span>Klaviyo</span>
-    <button id="klaviyoConnectButton" class="drawerConnectBtn" data-platform="klaviyo" data-state="connect">Connect Klaviyo</button>
-  </div>
-
-  <div class="drawerRow">
-    <span>Pinterest Ads</span>
-    <button class="drawerPendingBtn">Pending</button>
+    <button id="googleConnectButton" class="drawerConnectBtn" data-platform="google" data-state="connect">Connect</button>
   </div>
 
   <div class="drawerRow">
     <span>TikTok Ads</span>
-    <button class="drawerPendingBtn">Pending</button>
+    <button id="tiktokConnectButton" class="drawerConnectBtn" data-platform="tiktok" data-state="loading" disabled>Loading...</button>
   </div>
 
   <div class="drawerRow">
-    <span>Amazon Ads</span>
-    <button class="drawerPendingBtn">Pending</button>
+    <span>Klaviyo</span>
+    <button id="klaviyoConnectButton" class="drawerConnectBtn" data-platform="klaviyo" data-state="connect">Connect</button>
   </div>
 
-  
+  <div class="drawerServices" aria-label="Independent services">
+    <div class="drawerSection drawerServiceSection">SERVICES</div>
+
+    <div class="drawerRow">
+      <span>Analytics</span>
+      <button id="analyticsConnectButton" class="drawerConnectBtn" data-platform="organic" data-state="loading" disabled>Loading...</button>
+    </div>
+
+    <div class="drawerRow">
+      <span>Sheets</span>
+      <button id="sheetsConnectButton" class="drawerConnectBtn" data-platform="google_sheets" data-state="loading" disabled>Loading...</button>
+    </div>
+  </div>
+
 </aside>
 
 
@@ -3864,6 +3882,98 @@ function togglePJ(groupName){
   if(openBtn) openBtn.addEventListener("click", openDrawer);
   if(closeBtn) closeBtn.addEventListener("click", closeDrawer);
   if(overlay) overlay.addEventListener("click", closeDrawer);
+})();
+</script>
+
+<script id="dashboard-platform-list-standardization">
+(function(){
+  "use strict";
+
+  const services=[
+    {buttonId:"tiktokConnectButton",platform:"tiktok",statusUrl:"/api/platform/tiktok/status",disconnectUrl:"/api/platform/tiktok/disconnect",connectUrl:"/auth/tiktok"},
+    {buttonId:"analyticsConnectButton",platform:"organic",statusUrl:"/api/platform/organic/status",disconnectUrl:"/api/platform/organic/disconnect",connectUrl:"/auth/organic"},
+    {buttonId:"sheetsConnectButton",platform:"google_sheets",statusUrl:"/api/google-sheets/status",disconnectUrl:"/api/google-sheets/disconnect",connectUrl:"/auth/google-sheets"}
+  ];
+
+  let client=null;
+  let session=null;
+
+  async function initSession(){
+    if(client&&session)return true;
+    const cfg=await fetch("/api/public-config").then(function(r){return r.json()});
+    client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+    const result=await client.auth.getSession();
+    session=result.data.session;
+    return Boolean(session&&session.user&&session.access_token);
+  }
+
+  async function authHeaders(){
+    if(!await initSession())throw new Error("Not authenticated");
+    return {Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"};
+  }
+
+  function isConnected(data){
+    return data&&(data.state==="CONNECTED"||data.connected===true||data.status==="connected");
+  }
+
+  function render(service,connected){
+    const button=document.getElementById(service.buttonId);
+    if(!button)return;
+    button.disabled=false;
+    button.dataset.state=connected?"connected":"not_connected";
+    button.textContent=connected?"Disconnect":"Connect";
+  }
+
+  async function load(service){
+    const button=document.getElementById(service.buttonId);
+    if(!button)return;
+    try{
+      const response=await fetch(service.statusUrl,{headers:await authHeaders()});
+      const data=await response.json().catch(function(){return {}});
+      render(service,response.ok&&isConnected(data));
+    }catch(error){
+      render(service,false);
+    }
+  }
+
+  async function act(service){
+    const button=document.getElementById(service.buttonId);
+    if(!button||button.disabled)return;
+    if(button.dataset.state!=="connected"){
+      if(!await initSession()){window.location.href="/login";return;}
+      window.location.href=service.connectUrl+"?user_id="+encodeURIComponent(session.user.id);
+      return;
+    }
+
+    button.disabled=true;
+    try{
+      const response=await fetch(service.disconnectUrl,{method:"POST",headers:await authHeaders(),body:"{}"});
+      if(!response.ok){
+        const data=await response.json().catch(function(){return {}});
+        throw new Error(data.error||"Disconnect failed");
+      }
+      render(service,false);
+    }catch(error){
+      render(service,true);
+    }
+  }
+
+  function boot(){
+    services.forEach(function(service){
+      const button=document.getElementById(service.buttonId);
+      if(button&&!button.dataset.lifecycleBound){
+        button.dataset.lifecycleBound="true";
+        button.addEventListener("click",function(event){
+          event.preventDefault();
+          act(service);
+        });
+      }
+      load(service);
+    });
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);
+  else boot();
 })();
 </script>
 

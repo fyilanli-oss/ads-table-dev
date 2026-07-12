@@ -173,7 +173,15 @@ async function revokePlatformToken(platform,conn){
       result.response=data;
 
       if(!r.ok || (data.code!==undefined&&data.code!==0)){
-        throw new Error(data.message||data.error?.message||`TikTok revoke failed ${r.status}`);
+        result.ok=false;
+        result.non_blocking=true;
+        result.error=data.message||data.error?.message||`TikTok revoke failed ${r.status}`;
+        result.response={
+          provider_response:data,
+          local_disconnect_continues:true,
+          revocation_mode:"provider_best_effort_then_local_token_destruction"
+        };
+        return result;
       }
 
       result.ok=true;
@@ -972,7 +980,7 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
     revoke_results.push(await revokePlatformToken(platform,conn));
   }
 
-  const failedRevoke=revoke_results.find(r=>r.attempted&&r.ok===false);
+  const failedRevoke=revoke_results.find(r=>r.attempted&&r.ok===false&&!r.non_blocking);
   if(failedRevoke){
     const err=new Error(`${platform} revoke failed: ${failedRevoke.error}`);
     err.status=502;
@@ -1405,6 +1413,12 @@ app.get("/auth/organic/callback",async(req,res)=>{
         expiryDate:tokens.expiry_date||null,
         accountSelectionRequired:true,
         organicConfigured:false,
+        configured:false,
+        setupStage:"property_selection_required",
+        selectedPlatformAccountId:null,
+        lastOwnedPlatformAccountId:null,
+        selectedGa4Property:null,
+        ga4PropertySelectionRequired:true,
         organicCallbackSaved:true
       }
     });
@@ -3814,6 +3828,14 @@ async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
 async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustomerId="",metadata={}){
   const normalized=normalizeCustomerId(platformAccountId);
   if(!normalized)throw new Error("Google platform account id is required for lifecycle");
+
+  const activeConnection=await getConnection(user.id,"google");
+  if(!activeConnection){
+    const err=new Error("Google not connected. Reconnect Google before refresh.");
+    err.status=404;
+    err.stage="connection";
+    throw err;
+  }
 
   const account={
     id:normalized,

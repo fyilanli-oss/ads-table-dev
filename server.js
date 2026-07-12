@@ -316,6 +316,17 @@ async function requestLifecycleBackfill({userId,platform,platformAccountId,reaso
   if(!normalized)throw new Error("Backfill platform account id is required");
   if(!cleanPlatform)throw new Error("Backfill platform is required");
 
+  // Patch 15: reconnect only restores connection, ownership and schedule.
+  // A 30-day backfill must be started explicitly and must not occupy the
+  // active-job guard during reconnect.
+  if(cleanReason==="account_reconnect"){
+    return {
+      created:false,
+      job:null,
+      reason:"reconnect_backfill_disabled"
+    };
+  }
+
   // Patch 14: Meta account selection must reuse any active job protected by
   // snapshot_jobs_active_guard_unique_idx, regardless of job type or reason.
   if(cleanPlatform==="meta"){

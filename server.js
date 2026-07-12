@@ -35,6 +35,9 @@ async function requireConnectAccessForOAuth(req,res){const userId=req.query.user
 function parseExpiry(s){return s?new Date(Date.now()+Number(s)*1000).toISOString():null}
 async function saveConnection(userId,platform,payload){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
+  if(["meta","google"].includes(String(platform||"").toLowerCase())&&(payload.accountId!==undefined||payload.accountName!==undefined)){
+    console.log("SAVE_CONNECTION_ACCOUNT",{platform:String(platform||"").toLowerCase(),user_id:userId,accountId:payload.accountId,accountName:payload.accountName});
+  }
   const {data:existing,error:existingError}=await supabaseAdmin
     .from("platform_connections")
     .select("account_id,account_name,metadata,access_token,refresh_token,token_expires_at")
@@ -242,6 +245,9 @@ async function failOpenPlatformJobs(userId,platform,reason="Stopped by disconnec
 }
 
 async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata={}){
+  if(["meta","google"].includes(String(platform||"").toLowerCase())){
+    console.log("ENSURE_SNAPSHOT_SCHEDULE",{platform:String(platform||"").toLowerCase(),user_id:userId,platform_account_id:normalizePlatformAccountId(platformAccountId)});
+  }
   const now=new Date().toISOString();
   const normalized=normalizePlatformAccountId(platformAccountId);
   if(!normalized)throw new Error("platform account id is required for schedule");
@@ -839,6 +845,9 @@ async function validateSelectedAccounts(userId,platform,selectedAccounts=[]){
 }
 
 async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccounts=[]){
+  if(["meta","google"].includes(String(platform||"").toLowerCase())){
+    console.log("SELECT_PLATFORM_ACCOUNTS_ENTER",{platform:String(platform||"").toLowerCase(),user_id:userId,selectedAccounts});
+  }
   const validation=await validateSelectedAccounts(userId,platform,selectedAccounts);
   const now=new Date().toISOString();
   const results=[];
@@ -883,6 +892,9 @@ async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccoun
 async function ensurePlatformOwnership(userId,platform,account){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
   const platformAccountId=normalizePlatformAccountId(account.platform_account_id||account.property_id||account.site_url||account.id||account.customerId||account.account_id);
+  if(["meta","google"].includes(String(platform||"").toLowerCase())){
+    console.log("ENSURE_PLATFORM_OWNERSHIP",{platform:String(platform||"").toLowerCase(),user_id:userId,platform_account_id:platformAccountId});
+  }
   if(!platformAccountId)throw new Error("Platform account id is required for ownership");
   const existing=await getOwnership(platform,platformAccountId);
   const now=new Date().toISOString();
@@ -1393,31 +1405,24 @@ app.get("/auth/organic/callback",async(req,res)=>{
       accessToken:tokens.access_token||existing?.access_token||null,
       refreshToken:tokens.refresh_token||existing?.refresh_token||null,
       tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:null,
-      accountName:"Organic",
+      accountId:existing?.account_id||null,
+      accountName:existing?.account_name||"Organic",
       metadata:{
-        organicOAuthVersion:"v1.2-property-selection-reset",
+        organicOAuthVersion:"v1.1-callback-fix",
         organicOAuthConnectedAt:callbackAt,
         organicOAuthStartedAt:req.session.organicOAuthStartedAt||null,
         organicRedirectUri:organicGoogleRedirectUri(req),
         scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),
         tokenType:tokens.token_type||null,
         expiryDate:tokens.expiry_date||null,
-        selectedGa4Property:null,
-        selectedPlatformAccountId:null,
-        lastOwnedPlatformAccountId:null,
-        configured:false,
-        organicConfigured:false,
-        setupStage:"property_selection_required",
-        ga4PropertySelectionRequired:true,
         accountSelectionRequired:true,
+        organicConfigured:false,
         organicCallbackSaved:true
       }
     });
     req.session.organicOAuthState=null;
     req.session.organicOAuthStartedAt=null;
-    req.session.oauthUserId=null;
-    res.redirect("/dashboard?organic_connected=1&property_selection_required=1&account_selection_required=1");
+    res.redirect("/dashboard?organic_connected=1&account_selection_required=1");
   }catch(e){
     try{
       const userId=req.session.oauthUserId;
@@ -2800,37 +2805,8 @@ async function handleGlobalRefresh(req,res){
     ["klaviyo",typeof handleKlaviyoSnapshotWrite==="function"?handleKlaviyoSnapshotWrite:null],
     ["organic",typeof handleOrganicSnapshotWrite==="function"?handleOrganicSnapshotWrite:null]
   ];
-  const refreshPlatforms=platforms.map(([platform])=>platform);
-  const {data:connectedRows,error:connectedError}=await supabaseAdmin
-    .from("platform_connections")
-    .select("platform")
-    .eq("user_id",refreshUser.id)
-    .eq("connected",true)
-    .in("platform",refreshPlatforms);
-  if(connectedError)return res.status(500).json({ok:false,error:connectedError.message,stage:"global_refresh_connection_check"});
-  const connectedPlatforms=[...new Set((connectedRows||[]).map(row=>String(row.platform||"").toLowerCase()).filter(platform=>refreshPlatforms.includes(platform)))];
-
-  if(connectedPlatforms.length===0){
-    return res.status(200).json({
-      ok:true,
-      refresh_scope:"global",
-      message:"No connected platforms to refresh.",
-      connected_platform_count:0,
-      completed:[],
-      failed:[],
-      refresh_job:null,
-      snapshot_id:null,
-      snapshot_date:null,
-      google_sheets_sync:{attempted:false,ok:true,skipped:true,reason:"no_connected_platforms",spreadsheet_id:null,rows_written:0,error:null},
-      platforms:{meta:null,google:null,tiktok:null,klaviyo:null,organic:null}
-    });
-  }
 
   for(const [platform,handler] of platforms){
-    if(!connectedPlatforms.includes(platform)){
-      results[platform]={ok:true,status:200,data:{ok:true,platform,skipped:true,reason:"not_connected"}};
-      continue;
-    }
     if(!handler){
       results[platform]={ok:false,status:501,data:{ok:false,error:`${platform} refresh handler not implemented`,stage:"refresh_dispatcher"}};
       continue;
@@ -2838,7 +2814,7 @@ async function handleGlobalRefresh(req,res){
     results[platform]=await runRefreshPlatform(platform,handler,req);
   }
 
-  const completed=Object.entries(results).filter(([,r])=>r.ok&&!r.data?.skipped).map(([platform])=>platform);
+  const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
   const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
   const firstCompleted=completed[0]?results[completed[0]]?.data:{};
   const googleSheetsSync=completed.length?await maybeAutoSyncGoogleSheets(refreshUser.id):{attempted:false,ok:true,skipped:true,reason:"no_platform_refresh_completed",spreadsheet_id:null,rows_written:0,error:null};

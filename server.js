@@ -136,7 +136,7 @@ async function revokePlatformToken(platform,conn){
       return result;
     }
 
-    if((platform==="google"||platform==="organic")&&(conn.refresh_token||conn.access_token)){
+    if((platform==="google"||platform==="organic"||platform==="google_sheets")&&(conn.refresh_token||conn.access_token)){
       result.attempted=true;
       result.provider="google";
       const url=new URL("https://oauth2.googleapis.com/revoke");
@@ -1096,6 +1096,258 @@ req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&accoun
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,accountId:null,accountName:null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
 
+
+// ===== GOOGLE SHEETS BACKEND INTEGRATION v1 =====
+const GOOGLE_SHEETS_PLATFORM="google_sheets";
+const GOOGLE_SHEETS_DEFAULT_WORKSHEET="Performance Dataset";
+const GOOGLE_SHEETS_SCOPES=[
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive.file"
+];
+const GOOGLE_SHEETS_DATASET_COLUMNS=[
+  "snapshot_id","user_id","platform","platform_account_id","level","id_in_platform","parent_id","name","status","currency",
+  "date_start","date_end","date_range","snapshot_date","platform_business_at","platform_account_timezone","server_time_utc","time_engine_version",
+  "spend","impressions","clicks","ad_clicks","ctr","cpc","sales","revenue","roas","conversions","conversion_value","add_to_cart","checkout","purchase","abandoned","profit","cps",
+  "fx_rate","fx_rate_date","fx_provider","fx_source_currency","fx_target_currency","fx_engine_version","raw","created_at","updated_at"
+];
+function googleSheetsRedirectUri(req){
+  return process.env.GOOGLE_SHEETS_REDIRECT_URI||`${req.protocol}://${req.get("host")}/auth/google-sheets/callback`;
+}
+function googleSheetsOAuthClient(req=null){
+  if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)throw new Error("Missing Google OAuth env");
+  const redirectUri=req?googleSheetsRedirectUri(req):(process.env.GOOGLE_SHEETS_REDIRECT_URI||process.env.GOOGLE_REDIRECT_URI||"");
+  return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,redirectUri);
+}
+function sanitizedGoogleSheetsMetadata(conn){
+  const m=conn?.metadata||{};
+  return {
+    spreadsheet_id:m.spreadsheet_id||null,
+    spreadsheet_name:m.spreadsheet_name||null,
+    worksheet_name:m.worksheet_name||GOOGLE_SHEETS_DEFAULT_WORKSHEET,
+    auto_sync_enabled:m.auto_sync_enabled===true,
+    last_sync_at:m.last_sync_at||null,
+    last_sync_status:m.last_sync_status||null,
+    last_sync_error:m.last_sync_error||null
+  };
+}
+async function getFreshGoogleSheetsClient(userId){
+  const conn=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
+  if(!conn)throw Object.assign(new Error("Google Sheets not connected"),{status:404,code:"GOOGLE_SHEETS_NOT_CONNECTED"});
+  const client=googleSheetsOAuthClient();
+  client.setCredentials({
+    access_token:conn.access_token||undefined,
+    refresh_token:conn.refresh_token||undefined,
+    expiry_date:conn.token_expires_at?new Date(conn.token_expires_at).getTime():undefined
+  });
+  const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;
+  if(!conn.access_token||!exp||exp<=Date.now()+120000){
+    if(!conn.refresh_token)throw Object.assign(new Error("Google Sheets refresh token missing. Please reconnect Google Sheets."),{status:401,code:"GOOGLE_SHEETS_REFRESH_TOKEN_MISSING"});
+    const {credentials}=await client.refreshAccessToken();
+    if(!credentials?.access_token)throw Object.assign(new Error("Google Sheets access token refresh failed"),{status:401,code:"GOOGLE_SHEETS_TOKEN_REFRESH_FAILED"});
+    client.setCredentials({...client.credentials,...credentials,refresh_token:conn.refresh_token});
+    await saveConnection(userId,GOOGLE_SHEETS_PLATFORM,{
+      accessToken:credentials.access_token,
+      refreshToken:conn.refresh_token,
+      tokenExpiresAt:credentials.expiry_date?new Date(credentials.expiry_date).toISOString():new Date(Date.now()+3600000).toISOString(),
+      accountId:conn.account_id||null,
+      accountName:conn.account_name||"Google Sheets",
+      metadata:{googleSheetsTokenRefreshedAt:new Date().toISOString()}
+    });
+  }
+  return {client,conn:await getConnection(userId,GOOGLE_SHEETS_PLATFORM)};
+}
+async function updateGoogleSheetsMetadata(userId,patch={}){
+  const conn=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
+  if(!conn)throw Object.assign(new Error("Google Sheets not connected"),{status:404});
+  await saveConnection(userId,GOOGLE_SHEETS_PLATFORM,{
+    accountId:patch.spreadsheet_id!==undefined?patch.spreadsheet_id:conn.account_id,
+    accountName:patch.spreadsheet_name!==undefined?patch.spreadsheet_name:conn.account_name,
+    metadata:{...patch}
+  });
+  return await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
+}
+function googleSheetsWorksheetRange(title){return `'${String(title||GOOGLE_SHEETS_DEFAULT_WORKSHEET).replace(/'/g,"''")}'`;}
+async function ensureGoogleSheetsWorksheet(sheets,spreadsheetId,worksheetName){
+  const info=await sheets.spreadsheets.get({spreadsheetId,fields:"properties.title,sheets.properties"});
+  const spreadsheetName=info.data?.properties?.title||"Google Sheets";
+  const existing=(info.data?.sheets||[]).find(x=>x.properties?.title===worksheetName);
+  if(!existing){
+    await sheets.spreadsheets.batchUpdate({spreadsheetId,requestBody:{requests:[{addSheet:{properties:{title:worksheetName}}}]}});
+  }
+  return {spreadsheet_name:spreadsheetName,worksheet_name:worksheetName};
+}
+async function fetchGoogleSheetsDatasetRows(userId){
+  const pageSize=1000;
+  const rows=[];
+  for(let from=0;;from+=pageSize){
+    const {data,error}=await supabaseAdmin
+      .from("performance_dataset_rows")
+      .select(GOOGLE_SHEETS_DATASET_COLUMNS.join(","))
+      .eq("user_id",userId)
+      .order("platform",{ascending:true})
+      .order("platform_account_id",{ascending:true})
+      .order("snapshot_date",{ascending:false})
+      .order("level",{ascending:true})
+      .order("id_in_platform",{ascending:true})
+      .range(from,from+pageSize-1);
+    if(error)throw error;
+    rows.push(...(data||[]));
+    if((data||[]).length<pageSize)break;
+  }
+  return rows;
+}
+function googleSheetsCellValue(value){
+  if(value===null||value===undefined)return "";
+  if(typeof value==="object")return JSON.stringify(value);
+  return value;
+}
+async function syncPerformanceDatasetToGoogleSheets(userId,options={}){
+  const startedAt=new Date().toISOString();
+  const {client,conn}=await getFreshGoogleSheetsClient(userId);
+  const metadata=sanitizedGoogleSheetsMetadata(conn);
+  const spreadsheetId=String(options.spreadsheet_id||metadata.spreadsheet_id||"").trim();
+  const worksheetName=String(options.worksheet_name||metadata.worksheet_name||GOOGLE_SHEETS_DEFAULT_WORKSHEET).trim()||GOOGLE_SHEETS_DEFAULT_WORKSHEET;
+  if(!spreadsheetId)throw Object.assign(new Error("Google Sheets spreadsheet is not bound"),{status:400,code:"GOOGLE_SHEETS_NOT_BOUND"});
+  const sheets=google.sheets({version:"v4",auth:client});
+  try{
+    const ensured=await ensureGoogleSheetsWorksheet(sheets,spreadsheetId,worksheetName);
+    const datasetRows=await fetchGoogleSheetsDatasetRows(userId);
+    const values=[GOOGLE_SHEETS_DATASET_COLUMNS,...datasetRows.map(row=>GOOGLE_SHEETS_DATASET_COLUMNS.map(col=>googleSheetsCellValue(row[col])))];
+    const quotedRange=googleSheetsWorksheetRange(worksheetName);
+    await sheets.spreadsheets.values.clear({spreadsheetId,range:quotedRange,requestBody:{}});
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range:`${quotedRange}!A1`,
+      valueInputOption:"RAW",
+      requestBody:{majorDimension:"ROWS",values}
+    });
+    const finishedAt=new Date().toISOString();
+    await updateGoogleSheetsMetadata(userId,{
+      spreadsheet_id:spreadsheetId,
+      spreadsheet_name:ensured.spreadsheet_name,
+      worksheet_name:worksheetName,
+      last_sync_at:finishedAt,
+      last_sync_status:"success",
+      last_sync_error:null
+    });
+    return {attempted:true,ok:true,spreadsheet_id:spreadsheetId,spreadsheet_name:ensured.spreadsheet_name,worksheet_name:worksheetName,rows_written:datasetRows.length,error:null,started_at:startedAt,finished_at:finishedAt};
+  }catch(e){
+    const message=e?.response?.data?.error?.message||e.message||"Google Sheets sync failed";
+    await updateGoogleSheetsMetadata(userId,{last_sync_at:new Date().toISOString(),last_sync_status:"failed",last_sync_error:message}).catch(()=>null);
+    const err=new Error(message);err.status=Number.isInteger(e.status)?e.status:(Number.isInteger(e.code)?e.code:502);err.code=e.code||"GOOGLE_SHEETS_SYNC_FAILED";throw err;
+  }
+}
+async function maybeAutoSyncGoogleSheets(userId){
+  try{
+    const conn=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
+    if(!conn)return {attempted:false,ok:true,skipped:true,reason:"google_sheets_not_connected",spreadsheet_id:null,rows_written:0,error:null};
+    const metadata=sanitizedGoogleSheetsMetadata(conn);
+    if(!metadata.auto_sync_enabled)return {attempted:false,ok:true,skipped:true,reason:"auto_sync_disabled",spreadsheet_id:metadata.spreadsheet_id,rows_written:0,error:null};
+    if(!metadata.spreadsheet_id)return {attempted:false,ok:true,skipped:true,reason:"spreadsheet_not_bound",spreadsheet_id:null,rows_written:0,error:null};
+    return await syncPerformanceDatasetToGoogleSheets(userId);
+  }catch(e){
+    return {attempted:true,ok:false,spreadsheet_id:null,rows_written:0,error:e.message};
+  }
+}
+app.get("/auth/google-sheets",async(req,res)=>{
+  try{
+    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
+    const state=crypto.randomBytes(24).toString("hex");
+    req.session.googleSheetsOAuthState=state;
+    req.session.googleSheetsOAuthUserId=accessCheck.userId;
+    const url=googleSheetsOAuthClient(req).generateAuthUrl({access_type:"offline",prompt:"consent",include_granted_scopes:true,state,scope:GOOGLE_SHEETS_SCOPES});
+    res.redirect(url);
+  }catch(e){res.status(500).send(e.message)}
+});
+app.get("/auth/google-sheets/callback",async(req,res)=>{
+  try{
+    const {code,state,error,error_description}=req.query;
+    if(error)return res.redirect(`/dashboard?google_sheets_error=${encodeURIComponent(error_description||error)}`);
+    if(!code)return res.redirect("/dashboard?google_sheets_error=missing_code");
+    if(!state||state!==req.session.googleSheetsOAuthState)return res.redirect("/dashboard?google_sheets_error=invalid_state");
+    const userId=req.session.googleSheetsOAuthUserId;
+    if(!userId)return res.redirect("/dashboard?google_sheets_error=missing_user_id");
+    const client=googleSheetsOAuthClient(req);
+    const {tokens}=await client.getToken(code);
+    if(!tokens.access_token&&!tokens.refresh_token)throw new Error("Google Sheets token exchange returned no token");
+    const {data:existing}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",GOOGLE_SHEETS_PLATFORM).maybeSingle();
+    await saveConnection(userId,GOOGLE_SHEETS_PLATFORM,{
+      accessToken:tokens.access_token||existing?.access_token||null,
+      refreshToken:tokens.refresh_token||existing?.refresh_token||null,
+      tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
+      accountId:existing?.account_id||null,
+      accountName:existing?.account_name||"Google Sheets",
+      metadata:{
+        googleSheetsOAuthVersion:"v1",
+        scope:tokens.scope||GOOGLE_SHEETS_SCOPES.join(" "),
+        tokenType:tokens.token_type||null,
+        connectedAt:new Date().toISOString(),
+        spreadsheet_id:existing?.metadata?.spreadsheet_id||null,
+        spreadsheet_name:existing?.metadata?.spreadsheet_name||null,
+        worksheet_name:existing?.metadata?.worksheet_name||GOOGLE_SHEETS_DEFAULT_WORKSHEET,
+        auto_sync_enabled:existing?.metadata?.auto_sync_enabled===true,
+        last_sync_at:existing?.metadata?.last_sync_at||null,
+        last_sync_status:existing?.metadata?.last_sync_status||null,
+        last_sync_error:existing?.metadata?.last_sync_error||null
+      }
+    });
+    req.session.googleSheetsOAuthState=null;req.session.googleSheetsOAuthUserId=null;
+    res.redirect("/dashboard?google_sheets_connected=1");
+  }catch(e){res.redirect(`/dashboard?google_sheets_error=${encodeURIComponent(e.message)}`)}
+});
+app.get("/api/google-sheets/status",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const conn=await getConnection(user.id,GOOGLE_SHEETS_PLATFORM);
+    res.json({ok:true,connected:Boolean(conn),platform:GOOGLE_SHEETS_PLATFORM,...sanitizedGoogleSheetsMetadata(conn)});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message})}
+});
+app.post("/api/google-sheets/disconnect",async(req,res)=>{
+  try{const user=await requireUser(req,res);if(!user)return;res.json(await disconnectPlatformLifecycle(user.id,GOOGLE_SHEETS_PLATFORM,{reason:req.body?.reason||"user_disconnect"}))}
+  catch(e){res.status(e.status||500).json({ok:false,error:e.message})}
+});
+app.post("/api/google-sheets/spreadsheets/create",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const {client}=await getFreshGoogleSheetsClient(user.id);
+    const worksheetName=String(req.body?.worksheet_name||GOOGLE_SHEETS_DEFAULT_WORKSHEET).trim()||GOOGLE_SHEETS_DEFAULT_WORKSHEET;
+    const spreadsheetName=String(req.body?.spreadsheet_name||"AdsTable Performance Dataset").trim()||"AdsTable Performance Dataset";
+    const sheets=google.sheets({version:"v4",auth:client});
+    const created=await sheets.spreadsheets.create({requestBody:{properties:{title:spreadsheetName},sheets:[{properties:{title:worksheetName}}]},fields:"spreadsheetId,properties.title,sheets.properties"});
+    const spreadsheetId=created.data.spreadsheetId;
+    await updateGoogleSheetsMetadata(user.id,{spreadsheet_id:spreadsheetId,spreadsheet_name:created.data.properties?.title||spreadsheetName,worksheet_name:worksheetName,auto_sync_enabled:req.body?.auto_sync_enabled!==false,last_sync_at:null,last_sync_status:null,last_sync_error:null});
+    res.json({ok:true,spreadsheet_id:spreadsheetId,spreadsheet_name:created.data.properties?.title||spreadsheetName,worksheet_name:worksheetName,auto_sync_enabled:req.body?.auto_sync_enabled!==false});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e?.response?.data?.error?.message||e.message})}
+});
+app.post("/api/google-sheets/spreadsheets/bind",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const spreadsheetId=String(req.body?.spreadsheet_id||"").trim();
+    if(!spreadsheetId)return res.status(400).json({ok:false,error:"spreadsheet_id is required"});
+    const worksheetName=String(req.body?.worksheet_name||GOOGLE_SHEETS_DEFAULT_WORKSHEET).trim()||GOOGLE_SHEETS_DEFAULT_WORKSHEET;
+    const {client}=await getFreshGoogleSheetsClient(user.id);
+    const sheets=google.sheets({version:"v4",auth:client});
+    const ensured=await ensureGoogleSheetsWorksheet(sheets,spreadsheetId,worksheetName);
+    await updateGoogleSheetsMetadata(user.id,{spreadsheet_id:spreadsheetId,spreadsheet_name:ensured.spreadsheet_name,worksheet_name:worksheetName,auto_sync_enabled:req.body?.auto_sync_enabled!==false,last_sync_error:null});
+    res.json({ok:true,spreadsheet_id:spreadsheetId,spreadsheet_name:ensured.spreadsheet_name,worksheet_name:worksheetName,auto_sync_enabled:req.body?.auto_sync_enabled!==false});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e?.response?.data?.error?.message||e.message})}
+});
+app.post("/api/google-sheets/settings",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const patch={};
+    if(req.body?.auto_sync_enabled!==undefined)patch.auto_sync_enabled=req.body.auto_sync_enabled===true;
+    if(req.body?.worksheet_name!==undefined)patch.worksheet_name=String(req.body.worksheet_name||GOOGLE_SHEETS_DEFAULT_WORKSHEET).trim()||GOOGLE_SHEETS_DEFAULT_WORKSHEET;
+    const conn=await updateGoogleSheetsMetadata(user.id,patch);
+    res.json({ok:true,...sanitizedGoogleSheetsMetadata(conn)});
+  }catch(e){res.status(e.status||500).json({ok:false,error:e.message})}
+});
+app.post("/api/google-sheets/sync",async(req,res)=>{
+  try{const user=await requireUser(req,res);if(!user)return;res.json(await syncPerformanceDatasetToGoogleSheets(user.id,req.body||{}))}
+  catch(e){res.status(e.status||500).json({attempted:true,ok:false,spreadsheet_id:req.body?.spreadsheet_id||null,rows_written:0,error:e.message})}
+});
+// ===== END GOOGLE SHEETS BACKEND INTEGRATION v1 =====
+
 const ORGANIC_GOOGLE_SCOPES=[
   "https://www.googleapis.com/auth/analytics.readonly"
 ];
@@ -1571,7 +1823,8 @@ async function handleOrganicSnapshotWrite(req,res){
     stage="snapshot";
     const writeResult=await writeOrganicSnapshotV1({user,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
-    res.json({ok:true,platform:"Organic",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result});
+    const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
+    res.json({ok:true,platform:"Organic",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
   }catch(e){
     if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
     res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null});
@@ -2430,9 +2683,11 @@ async function handleMetaSnapshotWrite(req,res){
     stage="snapshot";
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
 
+    const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({
       ok:true,
       platform:"Meta",
+      google_sheets_sync:googleSheetsSync,
       refresh_job:{id:job.id,status:"completed"},
       mode:writeResult.mode,
       snapshot_id:writeResult.snapshot?.id||null,
@@ -2528,6 +2783,8 @@ async function runRefreshPlatform(platform,handler,req){
 }
 
 async function handleGlobalRefresh(req,res){
+  const refreshUser=await requireUser(req,res);if(!refreshUser)return;
+  req._skipGoogleSheetsAutoSync=true;
   const results={};
   const platforms=[
     ["meta",handleMetaSnapshotWrite],
@@ -2548,6 +2805,7 @@ async function handleGlobalRefresh(req,res){
   const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
   const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
   const firstCompleted=completed[0]?results[completed[0]]?.data:{};
+  const googleSheetsSync=completed.length?await maybeAutoSyncGoogleSheets(refreshUser.id):{attempted:false,ok:true,skipped:true,reason:"no_platform_refresh_completed",spreadsheet_id:null,rows_written:0,error:null};
 
   res.status(completed.length?200:500).json({
     ok:completed.length>0,
@@ -2557,6 +2815,7 @@ async function handleGlobalRefresh(req,res){
     refresh_job:firstCompleted?.refresh_job||null,
     snapshot_id:firstCompleted?.snapshot_id||null,
     snapshot_date:firstCompleted?.snapshot_date||null,
+    google_sheets_sync:googleSheetsSync,
     platforms:{
       meta:results.meta?.data||null,
       google:results.google?.data||null,
@@ -3140,9 +3399,9 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"skeleton",label:"Organic",message:"Organic platform skeleton is available. GA4 and Search Console OAuth will be added in the next patch."}}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic"),googleSheets=await connectionStatus(user.id,"google_sheets");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,google_sheets:googleSheets.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source,google_sheets:googleSheets.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:googleSheets.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"skeleton",label:"Organic",message:"Organic platform skeleton is available. GA4 and Search Console OAuth will be added in the next patch."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
-app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
+app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic","google_sheets"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
   if(!supabaseAdmin||!userId)return null;
   const row={
@@ -3757,9 +4016,11 @@ async function handleGoogleSnapshotWrite(req,res){
     const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     stage="snapshot";
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
+    const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({
       ok:true,
       platform:"Google",
+      google_sheets_sync:googleSheetsSync,
       refresh_job:{id:job.id,status:"completed"},
       mode:writeResult.mode,
       snapshot_id:writeResult.snapshot?.id||null,
@@ -4599,7 +4860,8 @@ async function handleTikTokSnapshotWrite(req,res){
     stage="snapshot";
     const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
-    res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result});
+    const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
+    res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
   }catch(e){if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
 }
 
@@ -4659,7 +4921,8 @@ async function handleKlaviyoSnapshotWrite(req,res){
     stage="snapshot";
     const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
     await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
-    res.json({ok:true,platform:"Klaviyo",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result});
+    const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
+    res.json({ok:true,platform:"Klaviyo",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
   }catch(e){if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
 }
 

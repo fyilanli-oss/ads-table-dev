@@ -309,114 +309,23 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
 }
 
 async function requestLifecycleBackfill({userId,platform,platformAccountId,reason}){
-  const now=new Date().toISOString();
   const normalized=normalizePlatformAccountId(platformAccountId);
   const cleanPlatform=String(platform||"").toLowerCase().trim();
   const cleanReason=String(reason||"account_backfill_30d").trim();
   if(!normalized)throw new Error("Backfill platform account id is required");
   if(!cleanPlatform)throw new Error("Backfill platform is required");
 
-  // Patch 15: reconnect only restores connection, ownership and schedule.
-  // A 30-day backfill must be started explicitly and must not occupy the
-  // active-job guard during reconnect.
-  if(cleanReason==="account_reconnect"){
-    return {
-      created:false,
-      job:null,
-      reason:"reconnect_backfill_disabled"
-    };
-  }
-
-  // Patch 14: Meta account selection must reuse any active job protected by
-  // snapshot_jobs_active_guard_unique_idx, regardless of job type or reason.
-  if(cleanPlatform==="meta"){
-    const {data:activeJob,error:activeJobError}=await supabaseAdmin
-      .from("snapshot_jobs")
-      .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
-      .eq("user_id",userId)
-      .eq("platform",cleanPlatform)
-      .eq("platform_account_id",normalized)
-      .in("status",["queued","running"])
-      .order("created_at",{ascending:false})
-      .limit(1)
-      .maybeSingle();
-    if(activeJobError)throw activeJobError;
-    if(activeJob)return {created:false,job:activeJob,reason:"active_job_reused"};
-  }
-
-  const {data:existing,error:existingError}=await supabaseAdmin
-    .from("snapshot_jobs")
-    .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
-    .eq("user_id",userId)
-    .eq("platform",cleanPlatform)
-    .eq("platform_account_id",normalized)
-    .eq("job_type","backfill_30d")
-    .eq("capture_reason",cleanReason)
-    .in("status",["queued","running","completed"])
-    .order("created_at",{ascending:false})
-    .limit(1)
-    .maybeSingle();
-  if(existingError)throw existingError;
-  if(existing)return {created:false,job:existing,reason:"existing_backfill_30d"};
-
-  const {data,error}=await supabaseAdmin
-    .from("snapshot_jobs")
-    .insert({
-      user_id:userId,
-      platform:cleanPlatform,
-      platform_account_id:normalized,
-      status:"queued",
-      job_type:"backfill_30d",
-      capture_reason:cleanReason,
-      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
-      metadata:{
-        trigger:cleanReason,
-        days:BACKFILL_DAYS_ON_RECONNECT,
-        datePreset:"last_30d",
-        captureReason:cleanReason,
-        snapshotClass:"backfill",
-        queuedBackfillVersion:"v1",
-        lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION
-      },
-      created_at:now,
-      updated_at:now
-    })
-    .select("*")
-    .maybeSingle();
-
-  if(error){
-    const activeGuardConflict=cleanPlatform==="meta"&&(
-      error.code==="23505"||
-      String(error.message||"").includes("snapshot_jobs_active_guard_unique_idx")
-    );
-    if(!activeGuardConflict)throw error;
-
-    // Race-safe fallback: another request may have queued the active job
-    // between the pre-check and INSERT. Reuse that row instead of failing the
-    // ownership/schedule lifecycle.
-    const {data:activeJob,error:activeJobError}=await supabaseAdmin
-      .from("snapshot_jobs")
-      .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
-      .eq("user_id",userId)
-      .eq("platform",cleanPlatform)
-      .eq("platform_account_id",normalized)
-      .in("status",["queued","running"])
-      .order("created_at",{ascending:false})
-      .limit(1)
-      .maybeSingle();
-    if(activeJobError)throw activeJobError;
-    if(activeJob)return {created:false,job:activeJob,reason:"active_job_reused_after_conflict"};
-    throw error;
-  }
-
-  await supabaseAdmin
-    .from("platform_account_ownerships")
-    .update({last_backfill_requested_at:now,updated_at:now,lifecycle_version:DISCONNECT_LIFECYCLE_VERSION})
-    .eq("owner_user_id",userId)
-    .eq("platform",cleanPlatform)
-    .eq("platform_account_id",normalized);
-
-  return {created:true,job:data};
+  // Patch 16: lifecycle connect/reconnect must never create an active
+  // backfill_30d job. Backfill is allowed only through a separate explicit,
+  // controlled operation outside this lifecycle helper.
+  return {
+    created:false,
+    job:null,
+    reason:"automatic_lifecycle_backfill_disabled",
+    platform:cleanPlatform,
+    platform_account_id:normalized,
+    capture_reason:cleanReason
+  };
 }
 
 async function reactivatePlatformLifecycle(userId,platform,platformAccountId,reason="account_reactivation"){

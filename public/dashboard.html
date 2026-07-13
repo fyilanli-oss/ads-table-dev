@@ -8990,13 +8990,14 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
         const result=await submitSelection();
         cleanReconnectUrl();
 
+        action.disabled=false;
+        action.textContent="Continue";
+
         if(result&&result.empty){
           const overlay=byId("connectModalOverlay");
           modal.classList.remove("open");
           if(overlay)overlay.classList.remove("open");
           delete modal.dataset.platform;
-          action.disabled=false;
-          action.textContent="Continue";
           return;
         }
 

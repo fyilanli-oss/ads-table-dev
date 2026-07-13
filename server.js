@@ -926,22 +926,47 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
     throw err;
   }
 
-  const {data:connData,error:connError}=await supabaseAdmin
-    .from("platform_connections")
-    .update({
-      connected:false,
-      access_token:null,
-      refresh_token:null,
-      token_expires_at:null,
-      disconnected_at:now,
-      disconnect_reason:reason,
-      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
-      updated_at:now
-    })
-    .eq("user_id",userId)
-    .eq("platform",platform)
-    .select("platform,account_id,account_name,connected,disconnected_at,disconnect_reason,lifecycle_version");
-  if(connError)throw connError;
+  const connData=[];
+  for(const conn of connections||[]){
+    const metadata={...(conn.metadata||{})};
+    metadata.selectedPlatformAccountId=null;
+    metadata.selectedPlatformAccountIds=[];
+    metadata.selectedPlatformAccounts=[];
+    metadata.lastOwnedPlatformAccountId=null;
+    metadata.accountSelectionRequired=true;
+    metadata.reconnectSelectionRequired=true;
+    metadata.disconnectedSelectionClearedAt=now;
+
+    if(platform===GOOGLE_SHEETS_PLATFORM){
+      metadata.spreadsheet_id=null;
+      metadata.spreadsheet_name=null;
+      metadata.last_sync_at=null;
+      metadata.last_sync_status=null;
+      metadata.last_sync_error=null;
+    }
+
+    const {data:updatedConnection,error:connError}=await supabaseAdmin
+      .from("platform_connections")
+      .update({
+        connected:false,
+        access_token:null,
+        refresh_token:null,
+        token_expires_at:null,
+        account_id:null,
+        account_name:null,
+        metadata,
+        disconnected_at:now,
+        disconnect_reason:reason,
+        lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+        updated_at:now
+      })
+      .eq("user_id",userId)
+      .eq("platform",platform)
+      .select("platform,account_id,account_name,connected,metadata,disconnected_at,disconnect_reason,lifecycle_version")
+      .maybeSingle();
+    if(connError)throw connError;
+    if(updatedConnection)connData.push(updatedConnection);
+  }
 
   const {data:ownershipData,error:ownershipError}=await supabaseAdmin
     .from("platform_account_ownerships")
@@ -1026,7 +1051,7 @@ async function setRefreshJobStatus(jobId,status,extra={}){
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
 app.get("/auth/meta",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.META_APP_ID||!process.env.META_REDIRECT_URI)throw new Error("Missing Meta env");const state=Math.random().toString(36).slice(2);req.session.metaOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({client_id:process.env.META_APP_ID,redirect_uri:process.env.META_REDIRECT_URI,state,response_type:"code",scope:"ads_read"});res.redirect(`https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/meta/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");if(!state||state!==req.session.metaOAuthState)return res.redirect("/dashboard?meta_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?meta_error=missing_user_id");const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});
+app.get("/auth/meta/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");if(!state||state!==req.session.metaOAuthState)return res.redirect("/dashboard?meta_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?meta_error=missing_user_id");const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});
 
 const metaConnAfterReconnect=await getConnection(userId,"meta");
 if(metaConnAfterReconnect){
@@ -1040,7 +1065,7 @@ if(metaConnAfterReconnect){
 }
 req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,accountId:null,accountName:null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
+app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,accountId:null,accountName:null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
 
 
 // ===== GOOGLE SHEETS BACKEND INTEGRATION v1 =====
@@ -1221,24 +1246,30 @@ app.get("/auth/google-sheets/callback",async(req,res)=>{
       accessToken:tokens.access_token||existing?.access_token||null,
       refreshToken:tokens.refresh_token||existing?.refresh_token||null,
       tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:existing?.account_id||null,
-      accountName:existing?.account_name||"Google Sheets",
+      accountId:null,
+      accountName:null,
       metadata:{
         googleSheetsOAuthVersion:"v1",
         scope:tokens.scope||GOOGLE_SHEETS_SCOPES.join(" "),
         tokenType:tokens.token_type||null,
         connectedAt:new Date().toISOString(),
-        spreadsheet_id:existing?.metadata?.spreadsheet_id||null,
-        spreadsheet_name:existing?.metadata?.spreadsheet_name||null,
-        worksheet_name:existing?.metadata?.worksheet_name||GOOGLE_SHEETS_DEFAULT_WORKSHEET,
-        auto_sync_enabled:existing?.metadata?.auto_sync_enabled===true,
-        last_sync_at:existing?.metadata?.last_sync_at||null,
-        last_sync_status:existing?.metadata?.last_sync_status||null,
-        last_sync_error:existing?.metadata?.last_sync_error||null
+        selectedPlatformAccountId:null,
+        selectedPlatformAccountIds:[],
+        selectedPlatformAccounts:[],
+        lastOwnedPlatformAccountId:null,
+        accountSelectionRequired:true,
+        reconnectSelectionRequired:true,
+        spreadsheet_id:null,
+        spreadsheet_name:null,
+        worksheet_name:GOOGLE_SHEETS_DEFAULT_WORKSHEET,
+        auto_sync_enabled:false,
+        last_sync_at:null,
+        last_sync_status:null,
+        last_sync_error:null
       }
     });
     req.session.googleSheetsOAuthState=null;req.session.googleSheetsOAuthUserId=null;
-    res.redirect("/dashboard?google_sheets_connected=1");
+    res.redirect("/dashboard?google_sheets_connected=1&account_selection_required=1");
   }catch(e){res.redirect(`/dashboard?google_sheets_error=${encodeURIComponent(e.message)}`)}
 });
 app.get("/api/google-sheets/status",async(req,res)=>{
@@ -1339,8 +1370,8 @@ app.get("/auth/organic/callback",async(req,res)=>{
       accessToken:tokens.access_token||existing?.access_token||null,
       refreshToken:tokens.refresh_token||existing?.refresh_token||null,
       tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:existing?.account_id||null,
-      accountName:existing?.account_name||"Organic",
+      accountId:null,
+      accountName:null,
       metadata:{
         organicOAuthVersion:"v1.1-callback-fix",
         organicOAuthConnectedAt:callbackAt,
@@ -1349,7 +1380,12 @@ app.get("/auth/organic/callback",async(req,res)=>{
         scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),
         tokenType:tokens.token_type||null,
         expiryDate:tokens.expiry_date||null,
+        selectedPlatformAccountId:null,
+        selectedPlatformAccountIds:[],
+        selectedPlatformAccounts:[],
+        lastOwnedPlatformAccountId:null,
         accountSelectionRequired:true,
+        reconnectSelectionRequired:true,
         organicConfigured:false,
         organicCallbackSaved:true
       }
@@ -1940,7 +1976,7 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
   }
 }
 app.get("/auth/klaviyo",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const state=Math.random().toString(36).slice(2);const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());req.session.klaviyoOAuthState=state;req.session.klaviyoCodeVerifier=codeVerifier;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});res.redirect(`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});const klaviyoConn=await getConnection(userId,"klaviyo");
+app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});const klaviyoConn=await getConnection(userId,"klaviyo");
 const klaviyoAccount=await resolveKlaviyoAccountIdentity(klaviyoConn);
 await saveConnection(userId,"klaviyo",{accountId:null,accountName:null,metadata:{selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastDiscoveredPlatformAccountId:klaviyoAccount.platform_account_id,availableAccounts:[{platform_account_id:klaviyoAccount.platform_account_id,account_name:klaviyoAccount.account_name,currency:klaviyoAccount.currency||null}],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection",rawAccount:klaviyoAccount.raw_account}});
 req.session.klaviyoOAuthState=null;req.session.klaviyoCodeVerifier=null;res.redirect("/dashboard?klaviyo_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
@@ -4646,7 +4682,7 @@ app.get("/auth/tiktok/callback",async(req,res)=>{
       tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
       accountId:null,
       accountName:null,
-      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}
+      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}
     });
     req.session.tiktokOAuthState=null;
     res.redirect("/dashboard?tiktok_connected=1&account_selection_required=1");

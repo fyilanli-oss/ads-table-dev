@@ -2720,19 +2720,103 @@ async function getDefaultConnectionAccountId(userId,platform){
   return {conn,platformAccountId:fallbackId};
 }
 
-async function runRefreshPlatform(platform,handler,req){
+async function getActiveRefreshOwnerships(userId,platform){
+  const {data,error}=await supabaseAdmin
+    .from("platform_account_ownerships")
+    .select("platform_account_id,platform_account_name,metadata")
+    .eq("owner_user_id",userId)
+    .eq("platform",platform)
+    .in("status",activeOwnershipStatuses())
+    .order("updated_at",{ascending:true});
+  if(error)throw error;
+  return (data||[]).filter(row=>normalizePlatformAccountId(row.platform_account_id));
+}
+
+function refreshRequestOverrides(platform,ownership){
+  const platformAccountId=normalizePlatformAccountId(ownership.platform_account_id);
+  const metadata=ownership.metadata||{};
+
+  if(platform==="meta"){
+    return {
+      body:{adAccountId:platformAccountId,ad_account_id:platformAccountId},
+      query:{adAccountId:platformAccountId,ad_account_id:platformAccountId}
+    };
+  }
+
+  if(platform==="google"){
+    const loginCustomerId=normalizePlatformAccountId(
+      metadata.loginCustomerId||
+      metadata.login_customer_id||
+      metadata.manager_customer_id||
+      ""
+    );
+    return {
+      body:{
+        customerId:platformAccountId,
+        customer_id:platformAccountId,
+        loginCustomerId,
+        login_customer_id:loginCustomerId
+      },
+      query:{
+        customerId:platformAccountId,
+        customer_id:platformAccountId,
+        loginCustomerId,
+        login_customer_id:loginCustomerId
+      }
+    };
+  }
+
+  if(platform==="tiktok"){
+    return {
+      body:{advertiser_id:platformAccountId,advertiserId:platformAccountId,platform_account_id:platformAccountId},
+      query:{advertiser_id:platformAccountId,advertiserId:platformAccountId,platform_account_id:platformAccountId}
+    };
+  }
+
+  return {
+    body:{platform_account_id:platformAccountId},
+    query:{platform_account_id:platformAccountId}
+  };
+}
+
+async function runRefreshPlatform(platform,handler,req,user,ownership){
+  const platformAccountId=normalizePlatformAccountId(ownership.platform_account_id);
   try{
-    return await invokeRefreshHandler(handler,req);
+    const overrides=refreshRequestOverrides(platform,ownership);
+    const accountReq=makeSyntheticReqForUser(user,req,overrides);
+    accountReq._skipGoogleSheetsAutoSync=true;
+    const result=await invokeRefreshHandler(handler,accountReq);
+    return {
+      ...result,
+      platform,
+      platform_account_id:platformAccountId,
+      data:{
+        ...(result.data||{}),
+        platform_account_id:result.data?.platform_account_id||platformAccountId
+      }
+    };
   }catch(e){
-    return {ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||`${platform}_refresh`}};
+    return {
+      ok:false,
+      status:e.status||500,
+      platform,
+      platform_account_id:platformAccountId,
+      data:{
+        ok:false,
+        platform,
+        platform_account_id:platformAccountId,
+        error:e.message,
+        stage:e.stage||`${platform}_refresh`
+      }
+    };
   }
 }
 
 async function handleGlobalRefresh(req,res){
   const refreshUser=await requireUser(req,res);if(!refreshUser)return;
   req._skipGoogleSheetsAutoSync=true;
-  const results={};
-  const platforms=[
+
+  const platformHandlers=[
     ["meta",handleMetaSnapshotWrite],
     ["google",handleGoogleSnapshotWrite],
     ["tiktok",typeof handleTikTokSnapshotWrite==="function"?handleTikTokSnapshotWrite:null],
@@ -2740,35 +2824,69 @@ async function handleGlobalRefresh(req,res){
     ["organic",typeof handleOrganicSnapshotWrite==="function"?handleOrganicSnapshotWrite:null]
   ];
 
-  for(const [platform,handler] of platforms){
+  const accountResults=[];
+  const platforms={};
+
+  for(const [platform,handler] of platformHandlers){
     if(!handler){
-      results[platform]={ok:false,status:501,data:{ok:false,error:`${platform} refresh handler not implemented`,stage:"refresh_dispatcher"}};
+      platforms[platform]={
+        ok:false,
+        status:501,
+        accounts:[],
+        error:`${platform} refresh handler not implemented`,
+        stage:"refresh_dispatcher"
+      };
       continue;
     }
-    results[platform]=await runRefreshPlatform(platform,handler,req);
+
+    const ownerships=await getActiveRefreshOwnerships(refreshUser.id,platform);
+    const results=[];
+
+    for(const ownership of ownerships){
+      results.push(await runRefreshPlatform(platform,handler,req,refreshUser,ownership));
+    }
+
+    accountResults.push(...results);
+
+    const successful=results.filter(result=>result.ok);
+    const failed=results.filter(result=>!result.ok);
+    platforms[platform]={
+      ok:results.length>0&&failed.length===0,
+      status:results.length===0?204:(failed.length===0?200:(successful.length>0?207:500)),
+      active_account_count:ownerships.length,
+      refreshed_account_count:results.length,
+      completed_account_count:successful.length,
+      failed_account_count:failed.length,
+      accounts:results.map(result=>result.data)
+    };
   }
 
-  const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
-  const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
-  const firstCompleted=completed[0]?results[completed[0]]?.data:{};
-  const googleSheetsSync=completed.length?await maybeAutoSyncGoogleSheets(refreshUser.id):{attempted:false,ok:true,skipped:true,reason:"no_platform_refresh_completed",spreadsheet_id:null,rows_written:0,error:null};
+  const completedResults=accountResults.filter(result=>result.ok);
+  const failedResults=accountResults.filter(result=>!result.ok);
+  const firstCompleted=completedResults[0]?.data||{};
+  const googleSheetsSync=completedResults.length
+    ?await maybeAutoSyncGoogleSheets(refreshUser.id)
+    :{attempted:false,ok:true,skipped:true,reason:"no_platform_refresh_completed",spreadsheet_id:null,rows_written:0,error:null};
 
-  res.status(completed.length?200:500).json({
-    ok:completed.length>0,
-    refresh_scope:"global",
+  const completed=[...new Set(completedResults.map(result=>result.platform))];
+  const failed=failedResults.map(result=>({
+    platform:result.platform,
+    platform_account_id:result.platform_account_id,
+    status:result.status,
+    error:result.data?.error||"Refresh failed",
+    stage:result.data?.stage||null
+  }));
+
+  res.status(completedResults.length?200:500).json({
+    ok:completedResults.length>0,
+    refresh_scope:"global_multi_account",
     completed,
     failed,
     refresh_job:firstCompleted?.refresh_job||null,
     snapshot_id:firstCompleted?.snapshot_id||null,
     snapshot_date:firstCompleted?.snapshot_date||null,
     google_sheets_sync:googleSheetsSync,
-    platforms:{
-      meta:results.meta?.data||null,
-      google:results.google?.data||null,
-      tiktok:results.tiktok?.data||null,
-      klaviyo:results.klaviyo?.data||null,
-      organic:results.organic?.data||null
-    }
+    platforms
   });
 }
 

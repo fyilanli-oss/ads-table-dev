@@ -8087,7 +8087,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     }
   }
 
-  function openModal(mode){
+  function openModal(mode,accounts){
     modalMode=mode;
     const modal=byId("connectModal");
     const overlay=byId("connectModalOverlay");
@@ -8103,11 +8103,47 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       if(title)title.textContent="Google Not Connected";
       if(desc)desc.textContent="Connect your Google Ads account to start tracking performance.";
       action.textContent="Connect Google";
+      action.disabled=false;
+      if(cancel)cancel.style.display="none";
+    }else if(mode==="account_selection"){
+      if(title)title.textContent="Select Google Ads Account";
+      if(desc){
+        desc.textContent="";
+        const list=document.createElement("div");
+        list.id="googleAccountSelectionList";
+        list.style.display="grid";
+        list.style.gap="10px";
+        (accounts||[]).forEach(function(account,index){
+          const label=document.createElement("label");
+          label.style.display="flex";
+          label.style.alignItems="center";
+          label.style.gap="10px";
+          label.style.cursor="pointer";
+
+          const input=document.createElement("input");
+          input.type="checkbox";
+          input.name="googleAccountSelection";
+          input.checked=index===0;
+          input.dataset.accountIndex=String(index);
+
+          const text=document.createElement("span");
+          text.textContent=account.account_name||account.name||account.descriptiveName||account.platform_account_id||account.customerId||"Google Ads account";
+
+          label.appendChild(input);
+          label.appendChild(text);
+          list.appendChild(label);
+        });
+        desc.appendChild(list);
+      }
+      modal._googleAccounts=Array.isArray(accounts)?accounts:[];
+      action.textContent="Continue";
+      action.disabled=false;
       if(cancel)cancel.style.display="none";
     }else{
       if(title)title.textContent="Disconnect Google?";
       if(desc)desc.textContent="This will stop future Google syncs. Your historical dashboard data will remain available.";
       action.textContent="Disconnect";
+      action.disabled=false;
       if(cancel)cancel.style.display="";
     }
 
@@ -8150,6 +8186,94 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     }
   }
 
+
+  async function handleGoogleAccountSelectionRedirect(){
+    const params=new URLSearchParams(window.location.search);
+    if(params.get("google_connected")!=="1"||params.get("account_selection_required")!=="1")return;
+    if(!await initSupabase())return;
+
+    const modal=byId("connectModal");
+    const desc=byId("connectModalDescription");
+    try{
+      const res=await fetch("/api/google/customers",{headers:await authHeader()});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok)throw new Error(data.error||"Google Ads accounts could not be loaded.");
+      const accounts=(Array.isArray(data.customers)?data.customers:[]).map(function(account){
+        const id=String(account.customerId||account.platform_account_id||account.id||"").trim();
+        return {
+          ...account,
+          platform_account_id:id,
+          account_name:account.account_name||account.name||account.descriptiveName||("Google Ads "+id)
+        };
+      }).filter(function(account){return Boolean(account.platform_account_id);});
+      if(!accounts.length)throw new Error("No Google Ads account was found.");
+      openModal("account_selection",accounts);
+    }catch(error){
+      openModal("account_selection",[]);
+      if(desc)desc.textContent=error.message||"Google Ads accounts could not be loaded.";
+      const action=byId("connectModalAction");
+      if(action)action.disabled=true;
+      if(modal)modal._googleAccounts=[];
+    }
+  }
+
+  async function submitGoogleAccountSelection(){
+    const modal=byId("connectModal");
+    const action=byId("connectModalAction");
+    const desc=byId("connectModalDescription");
+    const accounts=modal&&Array.isArray(modal._googleAccounts)?modal._googleAccounts:[];
+    const selected=[];
+    document.querySelectorAll('input[name="googleAccountSelection"]:checked').forEach(function(input){
+      const account=accounts[Number(input.dataset.accountIndex)];
+      if(account)selected.push(account);
+    });
+
+    if(!selected.length){
+      if(desc){
+        const existing=desc.querySelector("[data-google-selection-error]");
+        if(existing)existing.remove();
+        const error=document.createElement("div");
+        error.dataset.googleSelectionError="true";
+        error.textContent="Select at least 1 account to continue.";
+        error.style.marginTop="10px";
+        desc.appendChild(error);
+      }
+      return;
+    }
+
+    action.disabled=true;
+    action.textContent="Saving...";
+    try{
+      const res=await fetch("/api/accounts/select",{
+        method:"POST",
+        headers:{...(await authHeader()),"Content-Type":"application/json"},
+        body:JSON.stringify({platform:"google",accounts:selected})
+      });
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||data.ok===false)throw new Error(data.error||"Google Ads account selection failed.");
+
+      const url=new URL(window.location.href);
+      url.searchParams.delete("google_connected");
+      url.searchParams.delete("account_selection_required");
+      window.history.replaceState({},"",url.pathname+url.search+url.hash);
+
+      closeModal();
+      await loadGoogleStatus();
+    }catch(error){
+      if(desc){
+        const existing=desc.querySelector("[data-google-selection-error]");
+        if(existing)existing.remove();
+        const errorBox=document.createElement("div");
+        errorBox.dataset.googleSelectionError="true";
+        errorBox.textContent=error.message||"Google Ads account selection failed.";
+        errorBox.style.marginTop="10px";
+        desc.appendChild(errorBox);
+      }
+      action.disabled=false;
+      action.textContent="Continue";
+    }
+  }
+
   function bind(){
     const btn=byId("googleConnectButton") || document.querySelector('.drawerConnectBtn[data-platform="google"]');
     if(btn&&!btn.dataset.d2a2Bound){
@@ -8164,19 +8288,28 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     const action=byId("connectModalAction");
     if(action&&!action.dataset.d2a2GoogleBound){
       action.dataset.d2a2GoogleBound="true";
-      action.addEventListener("click",function(e){
+      action.addEventListener("click",async function(e){
         const modal=byId("connectModal");
         if(!modal || modal.dataset.platform !== "google") return;
+
+        if(modalMode==="account_selection"){
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          await submitGoogleAccountSelection();
+          return;
+        }
+
         if(modalMode!=="connect"&&modalMode!=="disconnect")return;
         e.preventDefault();
         e.stopImmediatePropagation();
 
         if(modalMode==="connect"){
+          if(!await initSupabase())return;
           if(session&&session.user&&session.user.id){
             window.location.href="/auth/google?user_id="+encodeURIComponent(session.user.id);
           }
         }else{
-          disconnectGoogle();
+          await disconnectGoogle();
         }
       },true);
     }
@@ -8197,6 +8330,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   function boot(){
     bind();
     loadGoogleStatus();
+    handleGoogleAccountSelectionRedirect();
   }
 
   if(document.readyState==="loading"){

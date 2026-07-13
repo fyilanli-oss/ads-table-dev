@@ -8909,7 +8909,9 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       const row=availableAccounts[Number(input.dataset.accountIndex)];
       if(row)selected.push(row);
     });
-    if(!selected.length)throw new Error("Select at least 1 account to continue.");
+    if(!selected.length){
+      return {empty:true};
+    }
 
     if(activePlatform==="google_sheets"){
       const response=await fetch("/api/google-sheets/spreadsheets/create",{
@@ -8944,12 +8946,21 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     const action=byId("connectModalAction");
     try{
       const accounts=await discover(platform);
-      if(!accounts.length)throw new Error("No accessible "+LABELS[platform]+" account was found.");
       openSelection(platform,accounts);
+      if(!accounts.length){
+        if(desc)desc.textContent="No accessible account was found.";
+        if(action){
+          action.disabled=false;
+          action.textContent="Continue";
+        }
+      }
     }catch(error){
       openSelection(platform,[]);
       if(desc)desc.textContent=error.message||"Account selection could not be loaded.";
-      if(action)action.disabled=true;
+      if(action){
+        action.disabled=false;
+        action.textContent="Continue";
+      }
     }
   }
 
@@ -8964,8 +8975,19 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       action.textContent="Saving...";
       const desc=byId("connectModalDescription");
       try{
-        await submitSelection();
+        const result=await submitSelection();
         cleanReconnectUrl();
+
+        if(result&&result.empty){
+          const overlay=byId("connectModalOverlay");
+          modal.classList.remove("open");
+          if(overlay)overlay.classList.remove("open");
+          delete modal.dataset.platform;
+          action.disabled=false;
+          action.textContent="Continue";
+          return;
+        }
+
         window.location.reload();
       }catch(error){
         if(desc){

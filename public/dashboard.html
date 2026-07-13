@@ -8939,7 +8939,11 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     if(!response.ok||data.ok===false)throw new Error(data.error||((LABELS[activePlatform]||activePlatform)+" account selection failed."));
 
     if(activePlatform==="klaviyo"){
-      sessionStorage.setItem("klaviyo_spend_after_account_selection","1");
+      if(typeof openEstimatedMonthlySpendModal==="function"){
+        openEstimatedMonthlySpendModal();
+      }else if(typeof openSpendModal==="function"){
+        openSpendModal();
+      }
     }
 
     return {empty:false,selected:true};
@@ -8996,6 +9000,9 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
           return;
         }
 
+        if(activePlatform==="klaviyo"){
+          return;
+        }
         window.location.reload();
       }catch(error){
         if(desc){

@@ -8728,6 +8728,268 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   }, true);
 })();
 </script>
+
+<!-- PATCH 17E-FIX: GLOBAL RECONNECT ACCOUNT SELECTION -->
+<script id="patch17e-global-reconnect-account-selection">
+(function(){
+  "use strict";
+
+  const CONNECTED_PARAMS={
+    meta:"meta_connected",
+    google:"google_connected",
+    tiktok:"tiktok_connected",
+    klaviyo:"klaviyo_connected",
+    organic:"organic_connected",
+    google_sheets:"google_sheets_connected"
+  };
+
+  const LABELS={
+    meta:"Meta",
+    google:"Google Ads",
+    tiktok:"TikTok",
+    klaviyo:"Klaviyo",
+    organic:"Google Analytics",
+    google_sheets:"Google Sheets"
+  };
+
+  let client=null;
+  let session=null;
+  let activePlatform=null;
+  let availableAccounts=[];
+
+  function byId(id){return document.getElementById(id);}
+
+  async function initSession(){
+    if(client&&session)return true;
+    const cfg=await fetch("/api/public-config").then(function(r){return r.json();});
+    client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+    const result=await client.auth.getSession();
+    session=result.data.session;
+    return Boolean(session&&session.access_token);
+  }
+
+  async function headers(){
+    if(!await initSession())throw new Error("Not authenticated");
+    return {
+      "Authorization":"Bearer "+session.access_token,
+      "Content-Type":"application/json",
+      "Accept":"application/json"
+    };
+  }
+
+  function reconnectPlatformFromUrl(){
+    const params=new URLSearchParams(window.location.search);
+    if(params.get("account_selection_required")!=="1")return null;
+    return Object.keys(CONNECTED_PARAMS).find(function(platform){
+      return params.get(CONNECTED_PARAMS[platform])==="1";
+    })||null;
+  }
+
+  function normalizeAccounts(platform,payload){
+    let rows=[];
+    if(platform==="meta")rows=payload.accounts||payload.data||[];
+    if(platform==="google")rows=payload.customers||payload.accounts||[];
+    if(platform==="tiktok")rows=payload.advertisers||payload.accounts||[];
+    if(platform==="klaviyo")rows=payload.accounts||[];
+    if(platform==="organic")rows=payload.properties||payload.accounts||[];
+
+    return (Array.isArray(rows)?rows:[]).map(function(row){
+      if(platform==="google"){
+        return {
+          ...row,
+          platform:"google",
+          platform_account_id:String(row.platform_account_id||row.customerId||row.customer_id||row.id||""),
+          account_name:row.account_name||row.descriptiveName||("Google Ads "+String(row.customerId||row.customer_id||row.id||""))
+        };
+      }
+      if(platform==="tiktok"){
+        return {
+          ...row,
+          platform:"tiktok",
+          platform_account_id:String(row.platform_account_id||row.advertiser_id||row.advertiserId||row.id||""),
+          account_name:row.account_name||row.advertiser_name||row.name||("TikTok "+String(row.advertiser_id||row.id||""))
+        };
+      }
+      if(platform==="organic"){
+        return {
+          ...row,
+          platform:"organic",
+          platform_account_id:String(row.platform_account_id||row.property_id||row.property||row.name||row.id||""),
+          account_name:row.account_name||row.display_name||row.displayName||row.name||"Google Analytics property"
+        };
+      }
+      return {
+        ...row,
+        platform:platform,
+        platform_account_id:String(row.platform_account_id||row.account_id||row.id||""),
+        account_name:row.account_name||row.name||row.descriptiveName||row.platform_account_id||row.account_id||"Account"
+      };
+    }).filter(function(row){return row.platform_account_id;});
+  }
+
+  async function discover(platform){
+    const urls={
+      meta:"/api/meta/adaccounts",
+      google:"/api/google/customers",
+      tiktok:"/api/tiktok/advertisers",
+      klaviyo:"/api/klaviyo/accounts",
+      organic:"/api/organic/ga4/properties"
+    };
+    if(platform==="google_sheets"){
+      return [{
+        platform:"google_sheets",
+        platform_account_id:"create_new_spreadsheet",
+        account_name:"Create a new AdsTable spreadsheet"
+      }];
+    }
+    const response=await fetch(urls[platform],{headers:await headers()});
+    const data=await response.json().catch(function(){return {};});
+    if(!response.ok)throw new Error(data.error||((LABELS[platform]||platform)+" accounts could not be loaded."));
+    return normalizeAccounts(platform,data);
+  }
+
+  function openSelection(platform,accounts){
+    activePlatform=platform;
+    availableAccounts=accounts;
+    const modal=byId("connectModal");
+    const overlay=byId("connectModalOverlay");
+    const title=byId("connectModalTitle");
+    const desc=byId("connectModalDescription");
+    const action=byId("connectModalAction");
+    const cancel=byId("connectModalCancel");
+    if(!modal||!overlay||!desc||!action)return;
+
+    modal.dataset.platform="global_account_selection";
+    if(title)title.textContent="Select "+LABELS[platform]+" Account";
+    desc.textContent="";
+
+    const list=document.createElement("div");
+    list.style.display="grid";
+    list.style.gap="10px";
+
+    accounts.forEach(function(account,index){
+      const label=document.createElement("label");
+      label.style.display="flex";
+      label.style.alignItems="center";
+      label.style.gap="10px";
+      label.style.cursor="pointer";
+
+      const input=document.createElement("input");
+      input.type=platform==="organic"||platform==="klaviyo"||platform==="google_sheets"?"radio":"checkbox";
+      input.name="globalReconnectAccountSelection";
+      input.dataset.accountIndex=String(index);
+      input.checked=index===0;
+
+      const text=document.createElement("span");
+      text.textContent=account.account_name||account.platform_account_id;
+
+      label.appendChild(input);
+      label.appendChild(text);
+      list.appendChild(label);
+    });
+
+    desc.appendChild(list);
+    action.textContent="Continue";
+    action.disabled=false;
+    if(cancel)cancel.style.display="none";
+    modal.classList.add("open");
+    overlay.classList.add("open");
+  }
+
+  function cleanReconnectUrl(){
+    const url=new URL(window.location.href);
+    url.searchParams.delete("account_selection_required");
+    Object.values(CONNECTED_PARAMS).forEach(function(key){url.searchParams.delete(key);});
+    window.history.replaceState({},"",url.pathname+url.search+url.hash);
+  }
+
+  async function submitSelection(){
+    const selected=[];
+    document.querySelectorAll('input[name="globalReconnectAccountSelection"]:checked').forEach(function(input){
+      const row=availableAccounts[Number(input.dataset.accountIndex)];
+      if(row)selected.push(row);
+    });
+    if(!selected.length)throw new Error("Select at least 1 account to continue.");
+
+    if(activePlatform==="google_sheets"){
+      const response=await fetch("/api/google-sheets/spreadsheets/create",{
+        method:"POST",
+        headers:await headers(),
+        body:JSON.stringify({
+          spreadsheet_name:"AdsTable Performance Dataset",
+          worksheet_name:"Performance Dataset",
+          auto_sync_enabled:true
+        })
+      });
+      const data=await response.json().catch(function(){return {};});
+      if(!response.ok||data.ok===false)throw new Error(data.error||"Google Sheets selection failed.");
+      return;
+    }
+
+    const response=await fetch("/api/accounts/select",{
+      method:"POST",
+      headers:await headers(),
+      body:JSON.stringify({platform:activePlatform,accounts:selected})
+    });
+    const data=await response.json().catch(function(){return {};});
+    if(!response.ok||data.ok===false)throw new Error(data.error||((LABELS[activePlatform]||activePlatform)+" account selection failed."));
+  }
+
+  async function boot(){
+    const platform=reconnectPlatformFromUrl();
+    if(!platform)return;
+    window.__globalReconnectSelectionHandler=true;
+    const modal=byId("connectModal");
+    const desc=byId("connectModalDescription");
+    const action=byId("connectModalAction");
+    try{
+      const accounts=await discover(platform);
+      if(!accounts.length)throw new Error("No accessible "+LABELS[platform]+" account was found.");
+      openSelection(platform,accounts);
+    }catch(error){
+      openSelection(platform,[]);
+      if(desc)desc.textContent=error.message||"Account selection could not be loaded.";
+      if(action)action.disabled=true;
+    }
+  }
+
+  const action=byId("connectModalAction");
+  if(action){
+    action.addEventListener("click",async function(event){
+      const modal=byId("connectModal");
+      if(!modal||modal.dataset.platform!=="global_account_selection")return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      action.disabled=true;
+      action.textContent="Saving...";
+      const desc=byId("connectModalDescription");
+      try{
+        await submitSelection();
+        cleanReconnectUrl();
+        window.location.reload();
+      }catch(error){
+        if(desc){
+          let box=desc.querySelector("[data-global-reconnect-error]");
+          if(!box){
+            box=document.createElement("div");
+            box.dataset.globalReconnectError="true";
+            box.style.marginTop="10px";
+            desc.appendChild(box);
+          }
+          box.textContent=error.message||"Account selection failed.";
+        }
+        action.disabled=false;
+        action.textContent="Continue";
+      }
+    },true);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);
+  else boot();
+})();
+</script>
+<!-- END PATCH 17E-FIX -->
+
 </body>
 </html>
 <!-- =========================================================

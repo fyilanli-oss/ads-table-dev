@@ -8333,8 +8333,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   }
 
   function shouldPromptForKlaviyoSpend(){
-    const params=new URLSearchParams(window.location.search);
-    return params.get("klaviyo_connected")==="1";
+    return sessionStorage.getItem("klaviyo_spend_after_account_selection")==="1";
   }
 
   async function loadKlaviyoStatus(){
@@ -8349,7 +8348,10 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       // Do not open Estimated Monthly Spend modal on generic dashboard load.
       // The modal is opened only after a Klaviyo connect-success signal or explicit Klaviyo check.
       if(shouldPromptForKlaviyoSpend() && data.state==="CONNECTED" && !data.estimated_monthly_spend){
+        sessionStorage.removeItem("klaviyo_spend_after_account_selection");
         openSpendModal();
+      }else if(shouldPromptForKlaviyoSpend()){
+        sessionStorage.removeItem("klaviyo_spend_after_account_selection");
       }
     }catch(e){
       setKlaviyoButton("NOT_CONNECTED");
@@ -8935,6 +8937,12 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     });
     const data=await response.json().catch(function(){return {};});
     if(!response.ok||data.ok===false)throw new Error(data.error||((LABELS[activePlatform]||activePlatform)+" account selection failed."));
+
+    if(activePlatform==="klaviyo"){
+      sessionStorage.setItem("klaviyo_spend_after_account_selection","1");
+    }
+
+    return {empty:false,selected:true};
   }
 
   async function boot(){

@@ -170,7 +170,19 @@ async function revokePlatformToken(platform,conn){
         })
       });
       const data=await r.json().catch(()=>({status:r.status}));
-      result.response=data;
+      result.response={status:r.status,body:data};
+
+      if(r.status===404){
+        result.ok=false;
+        result.tolerated=true;
+        result.error=data.message||data.error?.message||"TikTok revoke endpoint returned 404";
+        console.warn("[TikTok Disconnect] Provider revoke returned 404; continuing local lifecycle cleanup.",{
+          status:r.status,
+          endpoint:TIKTOK_REVOKE_ENDPOINT,
+          error:result.error
+        });
+        return result;
+      }
 
       if(!r.ok || (data.code!==undefined&&data.code!==0)){
         throw new Error(data.message||data.error?.message||`TikTok revoke failed ${r.status}`);
@@ -919,11 +931,19 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
   }
 
   const failedRevoke=revoke_results.find(r=>r.attempted&&r.ok===false);
-  if(failedRevoke){
+  if(failedRevoke&&platform!=="tiktok"){
     const err=new Error(`${platform} revoke failed: ${failedRevoke.error}`);
     err.status=502;
     err.revoke_results=revoke_results;
     throw err;
+  }
+
+  if(failedRevoke&&platform==="tiktok"){
+    failedRevoke.tolerated=true;
+    console.warn("[TikTok Disconnect] Provider revoke failed; local lifecycle cleanup will continue.",{
+      error:failedRevoke.error,
+      response:failedRevoke.response||null
+    });
   }
 
   const connData=[];

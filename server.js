@@ -35,9 +35,6 @@ async function requireConnectAccessForOAuth(req,res){const userId=req.query.user
 function parseExpiry(s){return s?new Date(Date.now()+Number(s)*1000).toISOString():null}
 async function saveConnection(userId,platform,payload){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
-  if(["meta","google"].includes(String(platform||"").toLowerCase())&&(payload.accountId!==undefined||payload.accountName!==undefined)){
-    console.log("SAVE_CONNECTION_ACCOUNT",{platform:String(platform||"").toLowerCase(),user_id:userId,accountId:payload.accountId,accountName:payload.accountName});
-  }
   const {data:existing,error:existingError}=await supabaseAdmin
     .from("platform_connections")
     .select("account_id,account_name,metadata,access_token,refresh_token,token_expires_at")
@@ -245,9 +242,6 @@ async function failOpenPlatformJobs(userId,platform,reason="Stopped by disconnec
 }
 
 async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata={}){
-  if(["meta","google"].includes(String(platform||"").toLowerCase())){
-    console.log("ENSURE_SNAPSHOT_SCHEDULE",{platform:String(platform||"").toLowerCase(),user_id:userId,platform_account_id:normalizePlatformAccountId(platformAccountId)});
-  }
   const now=new Date().toISOString();
   const normalized=normalizePlatformAccountId(platformAccountId);
   if(!normalized)throw new Error("platform account id is required for schedule");
@@ -260,19 +254,6 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
     .eq("platform_account_id",normalized)
     .maybeSingle();
   if(existingError)throw existingError;
-
-  if(!existing){
-    const fallback=await supabaseAdmin
-      .from("snapshot_schedules")
-      .select("*")
-      .eq("user_id",userId)
-      .eq("platform",platform)
-      .order("updated_at",{ascending:false})
-      .limit(1)
-      .maybeSingle();
-    if(fallback.error)throw fallback.error;
-    existing=fallback.data||null;
-  }
 
   const patch={
     user_id:userId,
@@ -309,23 +290,62 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
 }
 
 async function requestLifecycleBackfill({userId,platform,platformAccountId,reason}){
+  const now=new Date().toISOString();
   const normalized=normalizePlatformAccountId(platformAccountId);
   const cleanPlatform=String(platform||"").toLowerCase().trim();
   const cleanReason=String(reason||"account_backfill_30d").trim();
   if(!normalized)throw new Error("Backfill platform account id is required");
   if(!cleanPlatform)throw new Error("Backfill platform is required");
 
-  // Patch 16: lifecycle connect/reconnect must never create an active
-  // backfill_30d job. Backfill is allowed only through a separate explicit,
-  // controlled operation outside this lifecycle helper.
-  return {
-    created:false,
-    job:null,
-    reason:"automatic_lifecycle_backfill_disabled",
-    platform:cleanPlatform,
-    platform_account_id:normalized,
-    capture_reason:cleanReason
-  };
+  const {data:existing,error:existingError}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
+    .eq("user_id",userId)
+    .eq("platform",cleanPlatform)
+    .eq("platform_account_id",normalized)
+    .eq("job_type","backfill_30d")
+    .eq("capture_reason",cleanReason)
+    .in("status",["queued","running","completed"])
+    .order("created_at",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(existingError)throw existingError;
+  if(existing)return {created:false,job:existing,reason:"existing_backfill_30d"};
+
+  const {data,error}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .insert({
+      user_id:userId,
+      platform:cleanPlatform,
+      platform_account_id:normalized,
+      status:"queued",
+      job_type:"backfill_30d",
+      capture_reason:cleanReason,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      metadata:{
+        trigger:cleanReason,
+        days:BACKFILL_DAYS_ON_RECONNECT,
+        datePreset:"last_30d",
+        captureReason:cleanReason,
+        snapshotClass:"backfill",
+        queuedBackfillVersion:"v1",
+        lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION
+      },
+      created_at:now,
+      updated_at:now
+    })
+    .select("*")
+    .maybeSingle();
+  if(error)throw error;
+
+  await supabaseAdmin
+    .from("platform_account_ownerships")
+    .update({last_backfill_requested_at:now,updated_at:now,lifecycle_version:DISCONNECT_LIFECYCLE_VERSION})
+    .eq("owner_user_id",userId)
+    .eq("platform",cleanPlatform)
+    .eq("platform_account_id",normalized);
+
+  return {created:true,job:data};
 }
 
 async function reactivatePlatformLifecycle(userId,platform,platformAccountId,reason="account_reactivation"){
@@ -806,9 +826,6 @@ async function validateSelectedAccounts(userId,platform,selectedAccounts=[]){
 }
 
 async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccounts=[]){
-  if(["meta","google"].includes(String(platform||"").toLowerCase())){
-    console.log("SELECT_PLATFORM_ACCOUNTS_ENTER",{platform:String(platform||"").toLowerCase(),user_id:userId,selectedAccounts});
-  }
   const validation=await validateSelectedAccounts(userId,platform,selectedAccounts);
   const now=new Date().toISOString();
   const results=[];
@@ -853,9 +870,6 @@ async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccoun
 async function ensurePlatformOwnership(userId,platform,account){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
   const platformAccountId=normalizePlatformAccountId(account.platform_account_id||account.property_id||account.site_url||account.id||account.customerId||account.account_id);
-  if(["meta","google"].includes(String(platform||"").toLowerCase())){
-    console.log("ENSURE_PLATFORM_OWNERSHIP",{platform:String(platform||"").toLowerCase(),user_id:userId,platform_account_id:platformAccountId});
-  }
   if(!platformAccountId)throw new Error("Platform account id is required for ownership");
   const existing=await getOwnership(platform,platformAccountId);
   const now=new Date().toISOString();

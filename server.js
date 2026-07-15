@@ -1731,13 +1731,13 @@ app.get("/api/audit/organic/ga4-source-medium",async(req,res)=>{
       }],
       dimensions:[
         {name:"sessionSource"},
-        {name:"sessionMedium"},
-        {name:"sessionCampaignName"}
+        {name:"sessionMedium"}
       ],
       metrics:[
+        {name:"sessions"},
         {name:"addToCarts"},
-        {name:"beginCheckouts"},
-        {name:"purchases"},
+        {name:"checkouts"},
+        {name:"ecommercePurchases"},
         {name:"purchaseRevenue"}
       ]
     };

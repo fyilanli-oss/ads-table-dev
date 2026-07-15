@@ -90,6 +90,23 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;color:#d7e5ff;
     </div>
   </div>
 
+  <!-- ===== TEMPORARY GA4 SOURCE / MEDIUM AUDIT TOOL ===== -->
+  <div class="card" id="ga4SourceMediumAuditCard">
+    <h2>3. GA4 Source / Medium Audit</h2>
+    <p class="small">
+      Read-only test. Uses the current authenticated Organic connection and prints
+      the raw GA4 Data API response without mapping, filtering, snapshot or dataset writes.
+    </p>
+    <div class="row">
+      <button class="btn warn" id="ga4AuditBtn" onclick="runGa4SourceMediumAudit()">
+        Run GA4 Source / Medium Audit
+      </button>
+    </div>
+    <div id="ga4AuditStatus" class="status info">Audit not run yet.</div>
+    <pre id="ga4AuditOutput">{}</pre>
+  </div>
+  <!-- ===== END TEMPORARY GA4 SOURCE / MEDIUM AUDIT TOOL ===== -->
+
   <div class="card">
     <h2>Output</h2>
     <pre id="output">{}</pre>
@@ -232,6 +249,66 @@ async function runOrganicSnapshot(){
     return data;
   }catch(e){setStatus(e.message,"err")}
 }
+async function runGa4SourceMediumAudit(){
+  const button=document.getElementById("ga4AuditBtn");
+  const auditStatus=document.getElementById("ga4AuditStatus");
+  const auditOutput=document.getElementById("ga4AuditOutput");
+
+  try{
+    if(!session?.access_token)throw new Error("Authenticated session is missing.");
+
+    button.disabled=true;
+    button.textContent="Running Audit...";
+    auditStatus.textContent="Calling GA4 Data API with the active Organic connection...";
+    auditStatus.className="status info";
+
+    const response=await fetch("/api/audit/organic/ga4-source-medium",{
+      method:"GET",
+      headers:authHeaders()
+    });
+
+    const rawText=await response.text();
+    let data;
+    try{
+      data=rawText?JSON.parse(rawText):{};
+    }catch{
+      data={raw_text:rawText};
+    }
+
+    const result={
+      request:"GET /api/audit/organic/ga4-source-medium",
+      status:response.status,
+      response:data
+    };
+
+    lastJson=result;
+    auditOutput.textContent=JSON.stringify(result,null,2);
+    document.getElementById("output").textContent=JSON.stringify(result,null,2);
+
+    if(!response.ok){
+      throw new Error(
+        data?.error?.message||
+        data?.error||
+        data?.message||
+        ("GA4 audit failed: "+response.status)
+      );
+    }
+
+    auditStatus.textContent=
+      "GA4 audit completed. Property: "+
+      (data.property_id||"unknown")+
+      " | Rows: "+
+      (data.rowCount??data.rows?.length??0);
+    auditStatus.className="status ok";
+  }catch(e){
+    auditStatus.textContent=e.message||"GA4 audit failed.";
+    auditStatus.className="status err";
+  }finally{
+    button.disabled=false;
+    button.textContent="Run GA4 Source / Medium Audit";
+  }
+}
+
 async function copyJson(){
   try{
     await navigator.clipboard.writeText(JSON.stringify(lastJson,null,2));

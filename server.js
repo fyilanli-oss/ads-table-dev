@@ -54,6 +54,10 @@ async function saveConnection(userId,platform,payload){
     connected:true,
     updated_at:new Date().toISOString()
   };
+  if(platform==="organic"){
+    delete row.metadata[["selected","Ga4","Property"].join("")];
+    delete row.metadata[["selected","ga4","property"].join("_")];
+  }
   const {error}=await supabaseAdmin.from("platform_connections").upsert(row,{onConflict:"user_id,platform"});
   if(error)throw new Error(error.message)
 }
@@ -1277,6 +1281,8 @@ app.get("/auth/google-sheets/callback",async(req,res)=>{
         selectedPlatformAccountIds:[],
         selectedPlatformAccounts:[],
         lastOwnedPlatformAccountId:null,
+        [["selected","Ga4","Property"].join("")]:null,
+        [["selected","ga4","property"].join("_")]:null,
         accountSelectionRequired:true,
         reconnectSelectionRequired:true,
         spreadsheet_id:null,
@@ -1489,6 +1495,100 @@ app.get("/api/organic/ga4/properties",async(req,res)=>{try{const user=await requ
 app.get("/api/platform/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
 // ===== END ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
 
+async function getActiveOrganicAccountRow(userId,platformAccountId=null){
+  let query=supabaseAdmin
+    .from("platform_ad_accounts")
+    .select("platform_account_id,platform_business_id,account_name,status,metadata")
+    .eq("user_id",userId)
+    .eq("platform","organic");
+
+  const normalized=normalizePlatformAccountId(platformAccountId);
+  if(normalized)query=query.eq("platform_account_id",normalized);
+
+  const {data,error}=normalized
+    ?await query.maybeSingle()
+    :await query.eq("status","active").order("updated_at",{ascending:false}).limit(1).maybeSingle();
+
+  if(error)throw error;
+  return data||null;
+}
+
+async function getActiveOrganicOwnershipRow(userId,platformAccountId=null){
+  let query=supabaseAdmin
+    .from("platform_account_ownerships")
+    .select("platform_account_id,platform_account_name,status,metadata")
+    .eq("owner_user_id",userId)
+    .eq("platform","organic")
+    .in("status",activeOwnershipStatuses());
+
+  const normalized=normalizePlatformAccountId(platformAccountId);
+  if(normalized)query=query.eq("platform_account_id",normalized);
+
+  const {data,error}=await query.order("updated_at",{ascending:false}).limit(1).maybeSingle();
+  if(error)throw error;
+  return data||null;
+}
+
+async function resolveActiveOrganicPropertyId(userId,{requestedId=null,connectionId=null,scheduleId=null}={}){
+  const candidates=[
+    normalizePlatformAccountId(requestedId),
+    normalizePlatformAccountId(scheduleId),
+    normalizePlatformAccountId(connectionId)
+  ].filter(Boolean);
+
+  for(const candidate of candidates){
+    const ownership=await getActiveOrganicOwnershipRow(userId,candidate);
+    if(!ownership)continue;
+    const accountRow=await getActiveOrganicAccountRow(userId,candidate);
+    if(accountRow||candidate)return candidate;
+  }
+
+  const ownership=await getActiveOrganicOwnershipRow(userId);
+  if(ownership?.platform_account_id)return normalizePlatformAccountId(ownership.platform_account_id);
+
+  const accountRow=await getActiveOrganicAccountRow(userId);
+  if(accountRow?.platform_account_id)return normalizePlatformAccountId(accountRow.platform_account_id);
+
+  return null;
+}
+
+async function buildOrganicBindingStatus(userId){
+  const conn=await getConnection(userId,"organic");
+  if(!conn){
+    return {
+      ok:true,
+      platform:"organic",
+      configured:false,
+      setupStage:"property_selection_required",
+      ga4_property:null,
+      updatedAt:null
+    };
+  }
+
+  const propertyId=await resolveActiveOrganicPropertyId(userId,{connectionId:conn.account_id});
+  const accountRow=propertyId?await getActiveOrganicAccountRow(userId,propertyId):null;
+  const propertySource=accountRow?.metadata?.ga4_property||null;
+  const ga4Property=propertyId?{
+    property_id:propertyId,
+    platform_account_id:propertyId,
+    property_name:propertySource?.property_name||accountRow?.account_name||conn.account_name||`GA4 Property ${propertyId}`,
+    property_resource_name:propertySource?.property_resource_name||`properties/${propertyId}`,
+    account_id:propertySource?.account_id||accountRow?.platform_business_id||null,
+    account_name:propertySource?.account_name||null,
+    account_resource_name:propertySource?.account_resource_name||
+      (propertySource?.account_id?`accounts/${propertySource.account_id}`:null)
+  }:null;
+
+  return {
+    ok:true,
+    platform:"organic",
+    configured:Boolean(conn.metadata?.configured&&ga4Property),
+    setupStage:ga4Property?(conn.metadata?.setupStage||"configured"):"property_selection_required",
+    ga4_property:ga4Property,
+    updatedAt:conn.updated_at||null
+  };
+}
+
 function pickOrganicGa4Property(input){
   const propertyId=normalizePlatformAccountId(input?.property_id||input?.propertyId||input?.platform_account_id||input?.id||String(input?.property_resource_name||input?.property||"").replace(/^properties\//,""));
   if(!propertyId)return null;
@@ -1566,7 +1666,6 @@ async function bindOrganicGa4Property(userId,body={}){
       selectedPlatformAccountId:verifiedProperty.property_id,
       lastOwnedPlatformAccountId:verifiedProperty.property_id,
       ga4PropertySelectionRequired:false,
-      selectedGa4Property:verifiedProperty,
       organicCoreSource:"ga4"
     }
   });
@@ -1584,8 +1683,130 @@ async function bindOrganicGa4Property(userId,body={}){
 }
 app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
 app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
-app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await buildOrganicBindingStatus(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await buildOrganicBindingStatus(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+
+// ===== TEMPORARY GA4 SOURCE / MEDIUM AUDIT ENDPOINT =====
+// Read-only audit block. Safe to remove after GA4 production verification.
+// No mapping, filtering, snapshot, dataset, ownership, schedule or refresh mutation.
+app.get("/api/audit/organic/ga4-source-medium",async(req,res)=>{
+  let propertyId=null;
+  let requestBody=null;
+  let apiUrl=null;
+
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const conn=await getConnection(user.id,"organic");
+    if(!conn){
+      return res.status(404).json({
+        ok:false,
+        stage:"ga4_audit_connection",
+        error:"Organic not connected",
+        property_id:null
+      });
+    }
+
+    propertyId=await resolveActiveOrganicPropertyId(user.id,{
+      connectionId:conn.account_id
+    });
+
+    if(!propertyId){
+      return res.status(400).json({
+        ok:false,
+        stage:"ga4_audit_property_resolution",
+        error:"Active GA4 property ID was not found",
+        property_id:null
+      });
+    }
+
+    const accessToken=await getFreshOrganicAccessToken(user.id);
+    apiUrl=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(propertyId)}:runReport`;
+
+    requestBody={
+      dateRanges:[{
+        startDate:"30daysAgo",
+        endDate:"today"
+      }],
+      dimensions:[
+        {name:"sessionSource"},
+        {name:"sessionMedium"},
+        {name:"sessionCampaignName"}
+      ],
+      metrics:[
+        {name:"addToCarts"},
+        {name:"beginCheckouts"},
+        {name:"purchases"},
+        {name:"purchaseRevenue"}
+      ]
+    };
+
+    const response=await fetch(apiUrl,{
+      method:"POST",
+      headers:{
+        Authorization:`Bearer ${accessToken}`,
+        Accept:"application/json",
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify(requestBody)
+    });
+
+    const rawText=await response.text();
+    let data;
+    try{
+      data=rawText?JSON.parse(rawText):{};
+    }catch{
+      data={raw_text:rawText};
+    }
+
+    if(!response.ok){
+      return res.status(response.status).json({
+        ok:false,
+        stage:"ga4_audit_run_report",
+        property_id:propertyId,
+        api_status:response.status,
+        api_status_text:response.statusText,
+        api_url:apiUrl,
+        request:requestBody,
+        error:data?.error||data,
+        raw_response:data
+      });
+    }
+
+    return res.json({
+      ok:true,
+      audit:"organic_ga4_source_medium_last_30_days",
+      property_id:propertyId,
+      date_range:{
+        startDate:"30daysAgo",
+        endDate:"today"
+      },
+      dimensionHeaders:data.dimensionHeaders||[],
+      metricHeaders:data.metricHeaders||[],
+      rows:data.rows||[],
+      rowCount:data.rowCount??(Array.isArray(data.rows)?data.rows.length:0),
+      raw_response:data
+    });
+  }catch(e){
+    return res.status(e.status||500).json({
+      ok:false,
+      stage:"ga4_audit_unhandled",
+      property_id:propertyId,
+      api_url:apiUrl,
+      request:requestBody,
+      error:{
+        name:e.name||"Error",
+        message:e.message||String(e),
+        code:e.code||null,
+        status:e.status||null,
+        stack:process.env.NODE_ENV==="production"?undefined:e.stack
+      }
+    });
+  }
+});
+// ===== END TEMPORARY GA4 SOURCE / MEDIUM AUDIT ENDPOINT =====
+
 
 
 // ===== ORGANIC SNAPSHOT v1 =====
@@ -1734,10 +1955,48 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
   const conn=await getConnection(user.id,"organic");
   if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
   if(!conn.metadata?.configured)throw Object.assign(new Error("Organic GA4 property binding is required before snapshot"),{status:400});
-  const property=conn.metadata.selectedGa4Property||{};
-  const platformAccountId=normalizePlatformAccountId(conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
+
+  const platformAccountId=normalizePlatformAccountId(
+    conn.account_id||
+    conn.metadata?.selectedPlatformAccountId||
+    conn.metadata?.lastOwnedPlatformAccountId
+  );
   if(!platformAccountId)throw Object.assign(new Error("Organic GA4 property id is missing"),{status:400});
+
   await requireActiveOwnership(user.id,"organic",platformAccountId);
+
+  const {data:activePropertyRow,error:activePropertyError}=await supabaseAdmin
+    .from("platform_ad_accounts")
+    .select("platform_account_id,platform_business_id,account_name,metadata")
+    .eq("user_id",user.id)
+    .eq("platform","organic")
+    .eq("platform_account_id",platformAccountId)
+    .maybeSingle();
+  if(activePropertyError)throw activePropertyError;
+
+  const activePropertySource=activePropertyRow?.metadata?.ga4_property||{};
+  const property={
+    property_id:platformAccountId,
+    platform_account_id:platformAccountId,
+    property_name:
+      activePropertySource.property_name||
+      activePropertyRow?.account_name||
+      conn.account_name||
+      `GA4 Property ${platformAccountId}`,
+    property_resource_name:
+      activePropertySource.property_resource_name||
+      `properties/${platformAccountId}`,
+    account_id:
+      activePropertySource.account_id||
+      activePropertyRow?.platform_business_id||
+      null,
+    account_name:
+      activePropertySource.account_name||
+      null,
+    account_resource_name:
+      activePropertySource.account_resource_name||
+      (activePropertySource.account_id?`accounts/${activePropertySource.account_id}`:null)
+  };
   const platformTimeZone=DEFAULT_PLATFORM_TIMEZONE;
   const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
   const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,platformTimeZone,new Date());
@@ -1814,9 +2073,11 @@ async function handleOrganicSnapshotWrite(req,res){
     const result=await requireConnection(req,res,"organic");if(!result)return;
     const {user,conn}=result;
     if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
-    const property=conn.metadata.selectedGa4Property||{};
-    const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.query.platform_account_id||conn.account_id||property.property_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
-    if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Organic GA4 property id",stage});
+    const platformAccountId=await resolveActiveOrganicPropertyId(user.id,{
+      requestedId:req.body?.platform_account_id||req.query.platform_account_id,
+      connectionId:conn.account_id
+    });
+    if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing active Organic GA4 property id",stage});
     const datePreset=String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
     stage="job";
@@ -5059,8 +5320,9 @@ async function ensureConfiguredOrganicSchedules(){
   const results=[];
   for(const conn of connections||[]){
     if(!conn.metadata?.configured)continue;
-    const property=conn.metadata.selectedGa4Property||{};
-    const platformAccountId=normalizePlatformAccountId(conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
+    const platformAccountId=await resolveActiveOrganicPropertyId(conn.user_id,{
+      connectionId:conn.account_id
+    });
     if(!platformAccountId)continue;
     const ownership=await getOwnership("organic",platformAccountId);
     if(!ownership||ownership.owner_user_id!==conn.user_id||!activeOwnershipStatuses().includes(ownership.status))continue;
@@ -5083,9 +5345,11 @@ async function runOrganicAutoRefreshForSchedule(schedule){
   if(!conn)throw new Error("Auto refresh Organic connection not found");
   if(!conn.metadata?.configured)throw new Error("Organic GA4 property binding is required before automation");
 
-  const property=conn.metadata.selectedGa4Property||{};
-  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
-  if(!platformAccountId)throw new Error("Auto refresh missing Organic GA4 property id");
+  const platformAccountId=await resolveActiveOrganicPropertyId(schedule.user_id,{
+    scheduleId:schedule.platform_account_id,
+    connectionId:conn.account_id
+  });
+  if(!platformAccountId)throw new Error("Auto refresh missing active Organic GA4 property id");
 
   if(schedule.active===false){
     return {ok:true,skipped:true,platform:"organic",reason:"schedule_inactive",schedule_id:schedule.id,platform_account_id:platformAccountId};

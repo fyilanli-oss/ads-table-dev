@@ -1830,17 +1830,149 @@ function organicGa4ChannelFilterV1(){
   };
 }
 
-function organicMetricValue(row,metricName){
-  const headers=row?.metricHeaders||[];
-  const values=row?.rows?.[0]?.metricValues||[];
-  const index=headers.findIndex(h=>h?.name===metricName);
-  if(index<0)return 0;
-  const n=Number(values[index]?.value||0);
+function organicIsoDate(value){
+  return fxDateOnly(value||new Date());
+}
+
+const ORGANIC_SOURCE_MEDIUM_GROUPS_V2=[
+  "Direct",
+  "Meta Organic",
+  "Google Organic",
+  "TikTok Organic",
+  "Klaviyo Organic",
+  "Others"
+];
+
+function organicGa4Value(value){
+  const n=Number(value||0);
   return Number.isFinite(n)?n:0;
 }
 
-function organicIsoDate(value){
-  return fxDateOnly(value||new Date());
+function organicGa4HeaderIndex(headers,name){
+  return (headers||[]).findIndex(header=>header?.name===name);
+}
+
+function organicNormalizeSourceMedium(value){
+  return String(value??"")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//,"")
+    .replace(/^www\./,"")
+    .replace(/\/+$/,"");
+}
+
+function organicSourceMatchesDomainAllowlist(source,exactValues,rootDomains){
+  if(exactValues.includes(source))return true;
+  return rootDomains.some(domain=>source.endsWith(`.${domain}`));
+}
+
+function organicMediumIsPaidV2(medium){
+  const normalized=organicNormalizeSourceMedium(medium).replace(/\s+/g,"_");
+  const explicitPaidMediums=new Set([
+    "cpc","ppc","paid","paid_social","paid-social","paidsearch","paid_search",
+    "retargeting","display","banner","expandable","interstitial","cpm"
+  ]);
+  if(explicitPaidMediums.has(normalized))return true;
+  if(/.*cp.*/.test(normalized))return true;
+  if(/^paid.*/.test(normalized))return true;
+  return false;
+}
+
+function classifyOrganicSourceMediumV2(source,medium){
+  const normalizedSource=organicNormalizeSourceMedium(source);
+  const normalizedMedium=organicNormalizeSourceMedium(medium);
+
+  if(organicMediumIsPaidV2(normalizedMedium))return null;
+
+  if(normalizedSource==="(direct)"&&
+     (normalizedMedium==="(none)"||normalizedMedium==="(not set)"))return "Direct";
+
+  if(normalizedSource==="google"&&normalizedMedium==="organic")return "Google Organic";
+
+  const metaExactSources=[
+    "apps.facebook.com","business.facebook.com","facebook","facebook.com","fb","fb.me",
+    "free.facebook.com","l.facebook.com","lm.facebook.com","m.facebook.com",
+    "mobile.facebook.com","touch.facebook.com","web.facebook.com",
+    "instagram","instagram.com","ig","l.instagram.com",
+    "messenger","messenger.com","l.messenger.com"
+  ];
+  if(organicSourceMatchesDomainAllowlist(
+    normalizedSource,
+    metaExactSources,
+    ["facebook.com","instagram.com","messenger.com"]
+  ))return "Meta Organic";
+
+  if(organicSourceMatchesDomainAllowlist(
+    normalizedSource,
+    ["tiktok","tiktok.com"],
+    ["tiktok.com"]
+  ))return "TikTok Organic";
+
+  if(
+    organicSourceMatchesDomainAllowlist(
+      normalizedSource,
+      ["klaviyo","klaviyo.com"],
+      ["klaviyo.com"]
+    )||
+    normalizedSource.includes("klaviyo")
+  )return "Klaviyo Organic";
+
+  return "Others";
+}
+
+function aggregateOrganicSourceMediumRowsV2(report){
+  const dimensionHeaders=report?.dimensionHeaders||[];
+  const metricHeaders=report?.metricHeaders||[];
+  const sourceIndex=organicGa4HeaderIndex(dimensionHeaders,"sessionSource");
+  const mediumIndex=organicGa4HeaderIndex(dimensionHeaders,"sessionMedium");
+  const metricIndexes={
+    sessions:organicGa4HeaderIndex(metricHeaders,"sessions"),
+    addToCarts:organicGa4HeaderIndex(metricHeaders,"addToCarts"),
+    checkouts:organicGa4HeaderIndex(metricHeaders,"checkouts"),
+    ecommercePurchases:organicGa4HeaderIndex(metricHeaders,"ecommercePurchases"),
+    purchaseRevenue:organicGa4HeaderIndex(metricHeaders,"purchaseRevenue")
+  };
+
+  const groups=Object.fromEntries(
+    ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(classification=>[
+      classification,
+      {
+        classification,
+        sessions:0,
+        addToCarts:0,
+        checkouts:0,
+        ecommercePurchases:0,
+        purchaseRevenue:0,
+        ga4_source_medium_rows:[]
+      }
+    ])
+  );
+
+  for(const row of report?.rows||[]){
+    const source=row?.dimensionValues?.[sourceIndex]?.value??"";
+    const medium=row?.dimensionValues?.[mediumIndex]?.value??"";
+    const classification=classifyOrganicSourceMediumV2(source,medium);
+    if(!classification)continue;
+    const rawEvidence={
+      sessionSource:source,
+      sessionMedium:medium,
+      sessions:metricIndexes.sessions>=0?organicGa4Value(row?.metricValues?.[metricIndexes.sessions]?.value):0,
+      addToCarts:metricIndexes.addToCarts>=0?organicGa4Value(row?.metricValues?.[metricIndexes.addToCarts]?.value):0,
+      checkouts:metricIndexes.checkouts>=0?organicGa4Value(row?.metricValues?.[metricIndexes.checkouts]?.value):0,
+      ecommercePurchases:metricIndexes.ecommercePurchases>=0?organicGa4Value(row?.metricValues?.[metricIndexes.ecommercePurchases]?.value):0,
+      purchaseRevenue:metricIndexes.purchaseRevenue>=0?organicGa4Value(row?.metricValues?.[metricIndexes.purchaseRevenue]?.value):0
+    };
+
+    const group=groups[classification];
+    group.sessions+=rawEvidence.sessions;
+    group.addToCarts+=rawEvidence.addToCarts;
+    group.checkouts+=rawEvidence.checkouts;
+    group.ecommercePurchases+=rawEvidence.ecommercePurchases;
+    group.purchaseRevenue+=rawEvidence.purchaseRevenue;
+    group.ga4_source_medium_rows.push(rawEvidence);
+  }
+
+  return ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(name=>groups[name]);
 }
 
 async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
@@ -1850,7 +1982,10 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
   const url=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(cleanPropertyId)}:runReport`;
   const body={
     dateRanges:[{startDate,endDate}],
-    dimensionFilter:organicGa4ChannelFilterV1(),
+    dimensions:[
+      {name:"sessionSource"},
+      {name:"sessionMedium"}
+    ],
     metrics:[
       {name:"sessions"},
       {name:"addToCarts"},
@@ -1863,90 +1998,115 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
   const data=await r.json().catch(()=>({status:r.status}));
   if(!r.ok)throw new Error(data.error?.message||data.message||`Organic GA4 Data API failed ${r.status}`);
   return {
-    sessions:organicMetricValue(data,"sessions"),
-    add_to_cart:organicMetricValue(data,"addToCarts"),
-    checkout:organicMetricValue(data,"checkouts"),
-    purchase:organicMetricValue(data,"ecommercePurchases"),
-    revenue:organicMetricValue(data,"purchaseRevenue"),
-    channel_groups:ORGANIC_GA4_CHANNEL_GROUPS_V1,
+    groups:aggregateOrganicSourceMediumRowsV2(data),
     raw:data
   };
 }
 
 function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,property}){
-  const sessions=Number(ga4.sessions||0);
-  const addToCart=Number(ga4.add_to_cart||0);
-  const checkout=Number(ga4.checkout||0);
-  const purchase=Number(ga4.purchase||0);
-  const revenue=Number(ga4.revenue||0);
-  const abandoned=checkout>0?Math.max(checkout-purchase,0):0;
-  return {
-    platform:"organic",
-    snapshot_date:snapshotDate,
-    account_currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
-    kpis:{
+  const currency=accountCurrency||DEFAULT_REPORTING_CURRENCY;
+  const groups=Array.isArray(ga4?.groups)?ga4.groups:[];
+  const totals=groups.reduce((result,group)=>{
+    result.sessions+=organicGa4Value(group.sessions);
+    result.addToCarts+=organicGa4Value(group.addToCarts);
+    result.checkouts+=organicGa4Value(group.checkouts);
+    result.ecommercePurchases+=organicGa4Value(group.ecommercePurchases);
+    result.purchaseRevenue+=organicGa4Value(group.purchaseRevenue);
+    return result;
+  },{sessions:0,addToCarts:0,checkouts:0,ecommercePurchases:0,purchaseRevenue:0});
+
+  const performanceRows=ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(classification=>{
+    const group=groups.find(item=>item.classification===classification)||{
+      classification,
+      sessions:0,
+      addToCarts:0,
+      checkouts:0,
+      ecommercePurchases:0,
+      purchaseRevenue:0,
+      ga4_source_medium_rows:[]
+    };
+    const checkout=organicGa4Value(group.checkouts);
+    const purchase=organicGa4Value(group.ecommercePurchases);
+    const revenue=organicGa4Value(group.purchaseRevenue);
+    const abandoned=Math.max(checkout-purchase,0);
+    const entityId=classification.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
+
+    return {
+      platform:classification,
+      level:"platform",
+      id_in_platform:entityId,
+      campaign_id:entityId,
+      campaign_name:classification,
+      campaign_status:"active",
+      status:"active",
+      currency,
+      impressions:0,
+      clicks:0,
+      ad_clicks:0,
+      sessions:organicGa4Value(group.sessions),
+      ctr:null,
+      cpc:null,
       spend:0,
       sales:revenue,
       revenue,
+      roas:null,
+      cps:null,
+      add_to_cart:organicGa4Value(group.addToCarts),
+      checkout,
+      purchase,
+      purchases:purchase,
+      purchase_count:purchase,
+      abandoned,
+      conversion_value:revenue,
+      conversions:purchase,
+      raw:{
+        source:"organic_snapshot_ga4_source_medium_v2",
+        ga4_source_medium_rows:group.ga4_source_medium_rows||[],
+        classification,
+        property_id:property.property_id,
+        ga4_property:property
+      }
+    };
+  });
+
+  const totalAbandoned=Math.max(totals.checkouts-totals.ecommercePurchases,0);
+  return {
+    platform:"organic",
+    snapshot_date:snapshotDate,
+    account_currency:currency,
+    kpis:{
+      spend:0,
+      sales:totals.purchaseRevenue,
+      revenue:totals.purchaseRevenue,
       impressions:0,
       clicks:0,
-      sessions,
+      sessions:totals.sessions,
       ctr:null,
       cpc:null,
       roas:null
     },
     purchase_journey:{
-      add_to_cart:addToCart,
-      checkout,
-      abandoned,
-      purchase,
-      purchases:purchase,
-      purchase_value:revenue
+      add_to_cart:totals.addToCarts,
+      checkout:totals.checkouts,
+      abandoned:totalAbandoned,
+      purchase:totals.ecommercePurchases,
+      purchases:totals.ecommercePurchases,
+      purchase_value:totals.purchaseRevenue
     },
     click_journey:{
       ad_clicks:0,
       link_clicks:0,
       landing_page_views:0,
-      sessions,
+      sessions:totals.sessions,
       traffic_score:null,
       real_cpc:null
     },
     performance_summary:{
-      rows:[{
-        platform:"Organic",
-        level:"platform",
-        campaign_id:"organic",
-        campaign_name:"Organic",
-        campaign_status:"active",
-        currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
-        impressions:0,
-        clicks:0,
-        ad_clicks:0,
-        sessions,
-        ctr:null,
-        cpc:null,
-        spend:0,
-        sales:revenue,
-        revenue,
-        roas:null,
-        add_to_cart:addToCart,
-        checkout,
-        purchase,
-        purchases:purchase,
-        purchase_count:purchase,
-        abandoned,
-        conversion_value:revenue,
-        conversions:purchase,
-        raw:{
-          source:"organic_snapshot_ga4_core_v1",
-          ga4_property:property,
-          channel_groups:ORGANIC_GA4_CHANNEL_GROUPS_V1
-        }
-      }],
-      counts:{platform:1},
-      source_confidence:"organic_snapshot_ga4_core_v1",
-      null_policy:"Organic Core uses only GA4 filtered by AdsTable Organic Channel Filter v1. Search Console is not required and no Search Console metrics are written.",
-      raw_report:{ga4:{...ga4.raw,adstable_channel_filter_v1:ORGANIC_GA4_CHANNEL_GROUPS_V1}}
+      rows:performanceRows,
+      counts:{platform:performanceRows.length},
+      source_confidence:"organic_snapshot_ga4_source_medium_v2",
+      null_policy:"GA4 source/medium rows are classified into six fixed platform groups. Zero-value groups are preserved. Organic spend metrics remain unavailable and are stored as null where non-computable.",
+      raw_report:{ga4:ga4.raw}
     }
   };
 }
@@ -2385,7 +2545,12 @@ app.get("/api/lifecycle/status",async(req,res)=>{
 
 
 // ===== DATASET SPREAD POLICY v1 =====
-function perfNormalizePlatform(platform){const p=String(platform||"meta").toLowerCase();return p==="tik_tok"?"tiktok":p}
+function perfNormalizePlatform(platform){
+  const raw=String(platform||"meta").trim();
+  if(ORGANIC_SOURCE_MEDIUM_GROUPS_V2.includes(raw))return raw;
+  const p=raw.toLowerCase();
+  return p==="tik_tok"?"tiktok":p;
+}
 
 function shouldSpreadSnapshotToPerformanceDataset(snapshotOrClass){
   const cls=typeof snapshotOrClass==="string"?snapshotOrClass:String(snapshotOrClass?.snapshot_class||"");
@@ -2434,7 +2599,7 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
   const idInPlatform=perfEntityId(row,level);
   if(!idInPlatform)return null;
 
-  const platform=perfNormalizePlatform(snapshot.platform||row.platform);
+  const platform=perfNormalizePlatform(snapshot.platform==="organic"&&row?.platform?row.platform:(snapshot.platform||row.platform));
   const spend=perfNullableNumber(row.spend);
   const revenue=perfNullableNumber(row.revenue);
   const sales=perfNullableNumber(row.sales);

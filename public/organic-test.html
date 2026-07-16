@@ -48,26 +48,15 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;color:#d7e5ff;
       <button class="btn" id="oauthBtn" onclick="startOrganicOAuth()">Connect / Reconnect Organic OAuth</button>
       <button class="btn secondary" onclick="loadStatus()">Status</button>
       <button class="btn secondary" onclick="copyJson()">Copy JSON</button>
+      <button class="btn warn" id="ga4PaidAuditBtn" onclick="runGa4PaidAudit()">GA4 Paid Audit</button>
     </div>
     <div id="status" class="status info">Loading session...</div>
   </div>
 
-  <!-- ===== ACTIVE PROPERTY / AVAILABLE PROPERTIES SEPARATION ===== -->
-  <div class="card" id="activePropertyCard">
-    <h2>1. Active Property</h2>
-    <p class="small">Production'da aktif kullanılan GA4 property. Kaynak: Organic binding status.</p>
-    <div class="grid">
-      <div><label>Property ID</label><div id="activePropertyId" class="status info">Loading...</div></div>
-      <div><label>Property Name</label><div id="activePropertyName" class="status info">Loading...</div></div>
-      <div><label>Account Name</label><div id="activeAccountName" class="status info">Loading...</div></div>
-      <div><label>Status</label><div id="activePropertyState" class="status info">Loading...</div></div>
-    </div>
-  </div>
-
   <div class="grid">
     <div class="card">
-      <h2>2. Available Properties</h2>
-      <p class="small">GA4 Admin API erişilebilen property adaylarını listeler. Bu kayıtlar aktif kabul edilmez.</p>
+      <h2>1. Discovery</h2>
+      <p class="small">Önce OAuth tamamlanmış olmalı. Sonra GA4 Property ve Search Console Site listeleri çekilir.</p>
       <div class="row">
         <button class="btn" onclick="loadGa4Properties()">Load GA4 Properties</button>
         <button class="btn" onclick="loadSearchConsoleSites()">Load Search Console Sites</button>
@@ -81,10 +70,10 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;color:#d7e5ff;
     </div>
 
     <div class="card">
-      <h2>3. Property Selection</h2>
-      <p class="small">Yeni seçim yalnızca kullanıcı Save / Select işlemini çalıştırdığında aktif hale gelir.</p>
+      <h2>2. Binding</h2>
+      <p class="small">Seçilen GA4 Property + Search Console Site Organic connection metadata’sına kaydedilir.</p>
       <div class="row">
-        <button class="btn" onclick="bindOrganic()">Save / Select Property + Site</button>
+        <button class="btn" onclick="bindOrganic()">Bind Selected Property + Site</button>
         <button class="btn secondary" onclick="loadBinding()">Load Binding</button>
       </div>
 
@@ -102,23 +91,6 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;color:#d7e5ff;
     </div>
   </div>
 
-  <!-- ===== TEMPORARY GA4 SOURCE / MEDIUM AUDIT TOOL ===== -->
-  <div class="card" id="ga4SourceMediumAuditCard">
-    <h2>3. GA4 Source / Medium Audit</h2>
-    <p class="small">
-      Read-only test. Uses the current authenticated Organic connection and prints
-      the raw GA4 Data API response without mapping, filtering, snapshot or dataset writes.
-    </p>
-    <div class="row">
-      <button class="btn warn" id="ga4AuditBtn" onclick="runGa4SourceMediumAudit()">
-        Run GA4 Source / Medium Audit
-      </button>
-    </div>
-    <div id="ga4AuditStatus" class="status info">Audit not run yet.</div>
-    <pre id="ga4AuditOutput">{}</pre>
-  </div>
-  <!-- ===== END TEMPORARY GA4 SOURCE / MEDIUM AUDIT TOOL ===== -->
-
   <div class="card">
     <h2>Output</h2>
     <pre id="output">{}</pre>
@@ -126,7 +98,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0b1020;color:#d7e5ff;
 </div>
 
 <script>
-let supabaseClient=null,session=null,lastJson={},activeGa4Property=null;
+let supabaseClient=null,session=null,lastJson={};
 
 function setStatus(t,type){
   const s=document.getElementById("status");
@@ -137,37 +109,6 @@ function printJson(d){
   lastJson=d;
   document.getElementById("output").textContent=JSON.stringify(d,null,2);
 }
-
-function renderActiveProperty(binding){
-  const property=binding?.ga4_property||null;
-  activeGa4Property=property;
-  const fields={
-    activePropertyId:property?.property_id||"No active property",
-    activePropertyName:property?.property_name||"—",
-    activeAccountName:property?.account_name||"—",
-    activePropertyState:property?"Active":"Not configured"
-  };
-  for(const [id,value] of Object.entries(fields)){
-    const el=document.getElementById(id);
-    el.textContent=value;
-    el.className="status "+(property?"ok":"info");
-  }
-}
-function resetAvailablePropertySelection(){
-  const el=document.getElementById("ga4Property");
-  if(!el)return;
-  const activeId=activeGa4Property?.property_id||"";
-  const matching=[...el.options].find(opt=>opt.value===activeId);
-  if(matching)el.value=activeId;
-  else el.selectedIndex=0;
-}
-async function loadActiveProperty(){
-  const data=await apiFallback(["/api/organic/binding","/api/platform/organic/binding"]);
-  renderActiveProperty(data);
-  resetAvailablePropertySelection();
-  return data;
-}
-
 async function init(){
   try{
     const cfg=await fetch("/api/public-config").then(r=>r.json());
@@ -183,7 +124,6 @@ async function init(){
       return;
     }
     setStatus("Logged in. Organic test ready.","ok");
-    await loadActiveProperty();
     await loadStatus();
   }catch(e){setStatus(e.message,"err")}
 }
@@ -240,26 +180,8 @@ async function loadGa4Properties(){
     setStatus("Loading GA4 properties...","info");
     const data=await apiFallback(["/api/organic/ga4/properties","/api/platform/organic/ga4/properties"]);
     const props=data.properties||data.items||[];
-    const el=document.getElementById("ga4Property");
-    el.innerHTML="";
-    const placeholder=document.createElement("option");
-    placeholder.value="";
-    placeholder.textContent=activeGa4Property
-      ?("Active Property — "+(activeGa4Property.property_name||activeGa4Property.property_id)+" — "+activeGa4Property.property_id)
-      :"Select an available GA4 property";
-    placeholder.dataset.raw=activeGa4Property?JSON.stringify(activeGa4Property):"";
-    el.appendChild(placeholder);
-    for(const property of props){
-      const opt=document.createElement("option");
-      opt.value=property.property_id||"";
-      opt.textContent=(property.display_name||property.name||property.property_name||property.property_id)+" — "+(property.property_id||"");
-      opt.dataset.raw=JSON.stringify(property);
-      el.appendChild(opt);
-    }
-    const activeOption=[...el.options].find(opt=>opt.value===activeGa4Property?.property_id);
-    if(activeOption)el.value=activeGa4Property.property_id;
-    else el.selectedIndex=0;
-    setStatus("Available GA4 properties loaded: "+props.length,"ok");
+    fillSelect("ga4Property",props,"property_id",p=>(p.display_name||p.name||p.property_id)+" — "+(p.property_id||""),"No GA4 properties found");
+    setStatus("GA4 properties loaded: "+props.length,"ok");
   }catch(e){setStatus(e.message,"err")}
 }
 async function loadSearchConsoleSites(){
@@ -280,8 +202,7 @@ async function bindOrganic(){
   try{
     const ga4PropertyId=document.getElementById("ga4Property").value;
     const searchConsoleSiteUrl=document.getElementById("gscSite").value;
-    if(!ga4PropertyId)throw new Error("Select an Available Property first.");
-    if(activeGa4Property?.property_id===ga4PropertyId)throw new Error("This is already the Active Property.");
+    if(!ga4PropertyId)throw new Error("Select GA4 Property first.");
     if(!searchConsoleSiteUrl)throw new Error("Select Search Console Site first.");
     const body={
       ga4PropertyId,
@@ -291,8 +212,7 @@ async function bindOrganic(){
     };
     setStatus("Binding Organic property + site...","info");
     const data=await apiFallback(["/api/organic/bind","/api/platform/organic/bind"],{method:"POST",body:JSON.stringify(body)});
-    await loadActiveProperty();
-    setStatus("Active Property updated.","ok");
+    setStatus("Organic binding saved.","ok");
     return data;
   }catch(e){setStatus(e.message,"err")}
 }
@@ -300,9 +220,7 @@ async function loadBinding(){
   try{
     setStatus("Loading Organic binding...","info");
     const data=await apiFallback(["/api/organic/binding","/api/platform/organic/binding"]);
-    renderActiveProperty(data);
-    resetAvailablePropertySelection();
-    setStatus("Active Property loaded.","ok");
+    setStatus("Organic binding loaded.","ok");
     return data;
   }catch(e){setStatus(e.message,"err")}
 }
@@ -315,63 +233,36 @@ async function runOrganicSnapshot(){
     return data;
   }catch(e){setStatus(e.message,"err")}
 }
-async function runGa4SourceMediumAudit(){
-  const button=document.getElementById("ga4AuditBtn");
-  const auditStatus=document.getElementById("ga4AuditStatus");
-  const auditOutput=document.getElementById("ga4AuditOutput");
-
+async function runGa4PaidAudit(){
+  const button=document.getElementById("ga4PaidAuditBtn");
   try{
     if(!session?.access_token)throw new Error("Authenticated session is missing.");
-
     button.disabled=true;
-    button.textContent="Running Audit...";
-    auditStatus.textContent="Calling GA4 Data API with the active Organic connection...";
-    auditStatus.className="status info";
+    button.textContent="Running Paid Audit...";
+    setStatus("Running GA4 Paid Audit...","info");
 
-    const response=await fetch("/api/audit/organic/ga4-source-medium",{
+    const res=await fetch("/api/audit/ga4-paid-source-medium",{
       method:"GET",
       headers:authHeaders()
     });
 
-    const rawText=await response.text();
+    const rawText=await res.text();
     let data;
-    try{
-      data=rawText?JSON.parse(rawText):{};
-    }catch{
-      data={raw_text:rawText};
+    try{data=rawText?JSON.parse(rawText):{}}catch{data=rawText}
+
+    lastJson=data;
+    document.getElementById("output").textContent=typeof data==="string"?data:JSON.stringify(data,null,2);
+
+    if(!res.ok){
+      setStatus("GA4 Paid Audit returned HTTP "+res.status+". Raw response is shown below.","err");
+      return;
     }
-
-    const result={
-      request:"GET /api/audit/organic/ga4-source-medium",
-      status:response.status,
-      response:data
-    };
-
-    lastJson=result;
-    auditOutput.textContent=JSON.stringify(result,null,2);
-    document.getElementById("output").textContent=JSON.stringify(result,null,2);
-
-    if(!response.ok){
-      throw new Error(
-        data?.error?.message||
-        data?.error||
-        data?.message||
-        ("GA4 audit failed: "+response.status)
-      );
-    }
-
-    auditStatus.textContent=
-      "GA4 audit completed. Property: "+
-      (data.property_id||"unknown")+
-      " | Rows: "+
-      (data.rowCount??data.rows?.length??0);
-    auditStatus.className="status ok";
+    setStatus("GA4 Paid Audit completed. Raw GA4 response shown below.","ok");
   }catch(e){
-    auditStatus.textContent=e.message||"GA4 audit failed.";
-    auditStatus.className="status err";
+    setStatus(e.message||"GA4 Paid Audit failed.","err");
   }finally{
     button.disabled=false;
-    button.textContent="Run GA4 Source / Medium Audit";
+    button.textContent="GA4 Paid Audit";
   }
 }
 

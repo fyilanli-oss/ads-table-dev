@@ -1809,6 +1809,65 @@ app.get("/api/audit/organic/ga4-source-medium",async(req,res)=>{
 
 
 
+
+// ===== TEMPORARY GA4 PAID SOURCE / MEDIUM AUDIT ENDPOINT =====
+// Read-only evidence endpoint. Safe to remove after the paid-source audit.
+// No filters, mapping, classification, snapshot, dataset, ownership, schedule or refresh mutation.
+app.get("/api/audit/ga4-paid-source-medium",async(req,res)=>{
+  let propertyId=null;
+  let requestBody=null;
+  let apiUrl=null;
+
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
+
+    const conn=await getConnection(user.id,"organic");
+    if(!conn){
+      return res.status(404).json({error:{message:"Organic not connected",stage:"ga4_paid_audit_connection"}});
+    }
+
+    propertyId=await resolveActiveOrganicPropertyId(user.id,{connectionId:conn.account_id});
+    if(!propertyId){
+      return res.status(400).json({error:{message:"Active GA4 property ID was not found",stage:"ga4_paid_audit_property_resolution"}});
+    }
+
+    const accessToken=await getFreshOrganicAccessToken(user.id);
+    apiUrl=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(propertyId)}:runReport`;
+    requestBody={
+      dateRanges:[{startDate:"30daysAgo",endDate:"today"}],
+      dimensions:[
+        {name:"sessionSource"},
+        {name:"sessionMedium"},
+        {name:"sessionDefaultChannelGroup"}
+      ],
+      metrics:[
+        {name:"sessions"},
+        {name:"ecommercePurchases"},
+        {name:"purchaseRevenue"}
+      ]
+    };
+
+    const response=await fetch(apiUrl,{
+      method:"POST",
+      headers:{Authorization:`Bearer ${accessToken}`,Accept:"application/json","Content-Type":"application/json"},
+      body:JSON.stringify(requestBody)
+    });
+
+    const rawText=await response.text();
+    let rawResponse;
+    try{rawResponse=rawText?JSON.parse(rawText):{}}catch{rawResponse=rawText}
+
+    return res
+      .status(response.status)
+      .type(typeof rawResponse==="string"?"text/plain":"application/json")
+      .send(rawResponse);
+  }catch(e){
+    return res.status(e.status||500).json({error:{message:e.message||String(e),name:e.name||"Error",code:e.code||null,stage:"ga4_paid_audit_unhandled"}});
+  }
+});
+// ===== END TEMPORARY GA4 PAID SOURCE / MEDIUM AUDIT ENDPOINT =====
+
 // ===== ORGANIC SNAPSHOT v1 =====
 const ORGANIC_GA4_CHANNEL_GROUPS_V1=[
   "Organic Search",

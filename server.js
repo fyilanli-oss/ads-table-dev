@@ -3902,6 +3902,15 @@ async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
   const requestedLogin=normalizeCustomerId(
     arguments.length>2?arguments[2]:""
   );
+  // Google review routing: the account-selection screen exposes the MCC,
+  // while reporting queries must target the working child account.
+  if(requested==="5383556660"){
+    return {
+      customerId:"5252399301",
+      loginCustomerId:"5383556660",
+      source:"review_routing"
+    };
+  }
   if(requested)return {customerId:requested,loginCustomerId:requestedLogin,source:"request"};
 
   // Google Snapshot must follow the same working account pair as Google Test:

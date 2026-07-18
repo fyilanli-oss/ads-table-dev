@@ -54,10 +54,6 @@ async function saveConnection(userId,platform,payload){
     connected:true,
     updated_at:new Date().toISOString()
   };
-  if(platform==="organic"){
-    delete row.metadata[["selected","Ga4","Property"].join("")];
-    delete row.metadata[["selected","ga4","property"].join("_")];
-  }
   const {error}=await supabaseAdmin.from("platform_connections").upsert(row,{onConflict:"user_id,platform"});
   if(error)throw new Error(error.message)
 }
@@ -1281,8 +1277,6 @@ app.get("/auth/google-sheets/callback",async(req,res)=>{
         selectedPlatformAccountIds:[],
         selectedPlatformAccounts:[],
         lastOwnedPlatformAccountId:null,
-        [["selected","Ga4","Property"].join("")]:null,
-        [["selected","ga4","property"].join("_")]:null,
         accountSelectionRequired:true,
         reconnectSelectionRequired:true,
         spreadsheet_id:null,
@@ -1495,100 +1489,6 @@ app.get("/api/organic/ga4/properties",async(req,res)=>{try{const user=await requ
 app.get("/api/platform/organic/ga4/properties",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await listOrganicGa4Properties(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_discovery"})}});
 // ===== END ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
 
-async function getActiveOrganicAccountRow(userId,platformAccountId=null){
-  let query=supabaseAdmin
-    .from("platform_ad_accounts")
-    .select("platform_account_id,platform_business_id,account_name,status,metadata")
-    .eq("user_id",userId)
-    .eq("platform","organic");
-
-  const normalized=normalizePlatformAccountId(platformAccountId);
-  if(normalized)query=query.eq("platform_account_id",normalized);
-
-  const {data,error}=normalized
-    ?await query.maybeSingle()
-    :await query.eq("status","active").order("updated_at",{ascending:false}).limit(1).maybeSingle();
-
-  if(error)throw error;
-  return data||null;
-}
-
-async function getActiveOrganicOwnershipRow(userId,platformAccountId=null){
-  let query=supabaseAdmin
-    .from("platform_account_ownerships")
-    .select("platform_account_id,platform_account_name,status,metadata")
-    .eq("owner_user_id",userId)
-    .eq("platform","organic")
-    .in("status",activeOwnershipStatuses());
-
-  const normalized=normalizePlatformAccountId(platformAccountId);
-  if(normalized)query=query.eq("platform_account_id",normalized);
-
-  const {data,error}=await query.order("updated_at",{ascending:false}).limit(1).maybeSingle();
-  if(error)throw error;
-  return data||null;
-}
-
-async function resolveActiveOrganicPropertyId(userId,{requestedId=null,connectionId=null,scheduleId=null}={}){
-  const candidates=[
-    normalizePlatformAccountId(requestedId),
-    normalizePlatformAccountId(scheduleId),
-    normalizePlatformAccountId(connectionId)
-  ].filter(Boolean);
-
-  for(const candidate of candidates){
-    const ownership=await getActiveOrganicOwnershipRow(userId,candidate);
-    if(!ownership)continue;
-    const accountRow=await getActiveOrganicAccountRow(userId,candidate);
-    if(accountRow||candidate)return candidate;
-  }
-
-  const ownership=await getActiveOrganicOwnershipRow(userId);
-  if(ownership?.platform_account_id)return normalizePlatformAccountId(ownership.platform_account_id);
-
-  const accountRow=await getActiveOrganicAccountRow(userId);
-  if(accountRow?.platform_account_id)return normalizePlatformAccountId(accountRow.platform_account_id);
-
-  return null;
-}
-
-async function buildOrganicBindingStatus(userId){
-  const conn=await getConnection(userId,"organic");
-  if(!conn){
-    return {
-      ok:true,
-      platform:"organic",
-      configured:false,
-      setupStage:"property_selection_required",
-      ga4_property:null,
-      updatedAt:null
-    };
-  }
-
-  const propertyId=await resolveActiveOrganicPropertyId(userId,{connectionId:conn.account_id});
-  const accountRow=propertyId?await getActiveOrganicAccountRow(userId,propertyId):null;
-  const propertySource=accountRow?.metadata?.ga4_property||null;
-  const ga4Property=propertyId?{
-    property_id:propertyId,
-    platform_account_id:propertyId,
-    property_name:propertySource?.property_name||accountRow?.account_name||conn.account_name||`GA4 Property ${propertyId}`,
-    property_resource_name:propertySource?.property_resource_name||`properties/${propertyId}`,
-    account_id:propertySource?.account_id||accountRow?.platform_business_id||null,
-    account_name:propertySource?.account_name||null,
-    account_resource_name:propertySource?.account_resource_name||
-      (propertySource?.account_id?`accounts/${propertySource.account_id}`:null)
-  }:null;
-
-  return {
-    ok:true,
-    platform:"organic",
-    configured:Boolean(conn.metadata?.configured&&ga4Property),
-    setupStage:ga4Property?(conn.metadata?.setupStage||"configured"):"property_selection_required",
-    ga4_property:ga4Property,
-    updatedAt:conn.updated_at||null
-  };
-}
-
 function pickOrganicGa4Property(input){
   const propertyId=normalizePlatformAccountId(input?.property_id||input?.propertyId||input?.platform_account_id||input?.id||String(input?.property_resource_name||input?.property||"").replace(/^properties\//,""));
   if(!propertyId)return null;
@@ -1666,6 +1566,7 @@ async function bindOrganicGa4Property(userId,body={}){
       selectedPlatformAccountId:verifiedProperty.property_id,
       lastOwnedPlatformAccountId:verifiedProperty.property_id,
       ga4PropertySelectionRequired:false,
+      selectedGa4Property:verifiedProperty,
       organicCoreSource:"ga4"
     }
   });
@@ -1683,190 +1584,9 @@ async function bindOrganicGa4Property(userId,body={}){
 }
 app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
 app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
-app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await buildOrganicBindingStatus(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await buildOrganicBindingStatus(user.id))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
 
-// ===== TEMPORARY GA4 SOURCE / MEDIUM AUDIT ENDPOINT =====
-// Read-only audit block. Safe to remove after GA4 production verification.
-// No mapping, filtering, snapshot, dataset, ownership, schedule or refresh mutation.
-app.get("/api/audit/organic/ga4-source-medium",async(req,res)=>{
-  let propertyId=null;
-  let requestBody=null;
-  let apiUrl=null;
-
-  try{
-    const user=await requireUser(req,res);
-    if(!user)return;
-
-    const conn=await getConnection(user.id,"organic");
-    if(!conn){
-      return res.status(404).json({
-        ok:false,
-        stage:"ga4_audit_connection",
-        error:"Organic not connected",
-        property_id:null
-      });
-    }
-
-    propertyId=await resolveActiveOrganicPropertyId(user.id,{
-      connectionId:conn.account_id
-    });
-
-    if(!propertyId){
-      return res.status(400).json({
-        ok:false,
-        stage:"ga4_audit_property_resolution",
-        error:"Active GA4 property ID was not found",
-        property_id:null
-      });
-    }
-
-    const accessToken=await getFreshOrganicAccessToken(user.id);
-    apiUrl=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(propertyId)}:runReport`;
-
-    requestBody={
-      dateRanges:[{
-        startDate:"30daysAgo",
-        endDate:"today"
-      }],
-      dimensions:[
-        {name:"sessionSource"},
-        {name:"sessionMedium"}
-      ],
-      metrics:[
-        {name:"sessions"},
-        {name:"addToCarts"},
-        {name:"checkouts"},
-        {name:"ecommercePurchases"},
-        {name:"purchaseRevenue"}
-      ]
-    };
-
-    const response=await fetch(apiUrl,{
-      method:"POST",
-      headers:{
-        Authorization:`Bearer ${accessToken}`,
-        Accept:"application/json",
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify(requestBody)
-    });
-
-    const rawText=await response.text();
-    let data;
-    try{
-      data=rawText?JSON.parse(rawText):{};
-    }catch{
-      data={raw_text:rawText};
-    }
-
-    if(!response.ok){
-      return res.status(response.status).json({
-        ok:false,
-        stage:"ga4_audit_run_report",
-        property_id:propertyId,
-        api_status:response.status,
-        api_status_text:response.statusText,
-        api_url:apiUrl,
-        request:requestBody,
-        error:data?.error||data,
-        raw_response:data
-      });
-    }
-
-    return res.json({
-      ok:true,
-      audit:"organic_ga4_source_medium_last_30_days",
-      property_id:propertyId,
-      date_range:{
-        startDate:"30daysAgo",
-        endDate:"today"
-      },
-      dimensionHeaders:data.dimensionHeaders||[],
-      metricHeaders:data.metricHeaders||[],
-      rows:data.rows||[],
-      rowCount:data.rowCount??(Array.isArray(data.rows)?data.rows.length:0),
-      raw_response:data
-    });
-  }catch(e){
-    return res.status(e.status||500).json({
-      ok:false,
-      stage:"ga4_audit_unhandled",
-      property_id:propertyId,
-      api_url:apiUrl,
-      request:requestBody,
-      error:{
-        name:e.name||"Error",
-        message:e.message||String(e),
-        code:e.code||null,
-        status:e.status||null,
-        stack:process.env.NODE_ENV==="production"?undefined:e.stack
-      }
-    });
-  }
-});
-// ===== END TEMPORARY GA4 SOURCE / MEDIUM AUDIT ENDPOINT =====
-
-
-
-
-// ===== TEMPORARY GA4 PAID SOURCE / MEDIUM AUDIT ENDPOINT =====
-// Read-only evidence endpoint. Safe to remove after the paid-source audit.
-// No filters, mapping, classification, snapshot, dataset, ownership, schedule or refresh mutation.
-app.get("/api/audit/ga4-paid-source-medium",async(req,res)=>{
-  let propertyId=null;
-  let requestBody=null;
-  let apiUrl=null;
-
-  try{
-    const user=await requireUser(req,res);
-    if(!user)return;
-
-    const conn=await getConnection(user.id,"organic");
-    if(!conn){
-      return res.status(404).json({error:{message:"Organic not connected",stage:"ga4_paid_audit_connection"}});
-    }
-
-    propertyId=await resolveActiveOrganicPropertyId(user.id,{connectionId:conn.account_id});
-    if(!propertyId){
-      return res.status(400).json({error:{message:"Active GA4 property ID was not found",stage:"ga4_paid_audit_property_resolution"}});
-    }
-
-    const accessToken=await getFreshOrganicAccessToken(user.id);
-    apiUrl=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(propertyId)}:runReport`;
-    requestBody={
-      dateRanges:[{startDate:"30daysAgo",endDate:"today"}],
-      dimensions:[
-        {name:"sessionSource"},
-        {name:"sessionMedium"},
-        {name:"sessionDefaultChannelGroup"}
-      ],
-      metrics:[
-        {name:"sessions"},
-        {name:"ecommercePurchases"},
-        {name:"purchaseRevenue"}
-      ]
-    };
-
-    const response=await fetch(apiUrl,{
-      method:"POST",
-      headers:{Authorization:`Bearer ${accessToken}`,Accept:"application/json","Content-Type":"application/json"},
-      body:JSON.stringify(requestBody)
-    });
-
-    const rawText=await response.text();
-    let rawResponse;
-    try{rawResponse=rawText?JSON.parse(rawText):{}}catch{rawResponse=rawText}
-
-    return res
-      .status(response.status)
-      .type(typeof rawResponse==="string"?"text/plain":"application/json")
-      .send(rawResponse);
-  }catch(e){
-    return res.status(e.status||500).json({error:{message:e.message||String(e),name:e.name||"Error",code:e.code||null,stage:"ga4_paid_audit_unhandled"}});
-  }
-});
-// ===== END TEMPORARY GA4 PAID SOURCE / MEDIUM AUDIT ENDPOINT =====
 
 // ===== ORGANIC SNAPSHOT v1 =====
 const ORGANIC_GA4_CHANNEL_GROUPS_V1=[
@@ -1889,149 +1609,17 @@ function organicGa4ChannelFilterV1(){
   };
 }
 
-function organicIsoDate(value){
-  return fxDateOnly(value||new Date());
-}
-
-const ORGANIC_SOURCE_MEDIUM_GROUPS_V2=[
-  "Direct",
-  "Meta Organic",
-  "Google Organic",
-  "TikTok Organic",
-  "Klaviyo Organic",
-  "Others"
-];
-
-function organicGa4Value(value){
-  const n=Number(value||0);
+function organicMetricValue(row,metricName){
+  const headers=row?.metricHeaders||[];
+  const values=row?.rows?.[0]?.metricValues||[];
+  const index=headers.findIndex(h=>h?.name===metricName);
+  if(index<0)return 0;
+  const n=Number(values[index]?.value||0);
   return Number.isFinite(n)?n:0;
 }
 
-function organicGa4HeaderIndex(headers,name){
-  return (headers||[]).findIndex(header=>header?.name===name);
-}
-
-function organicNormalizeSourceMedium(value){
-  return String(value??"")
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//,"")
-    .replace(/^www\./,"")
-    .replace(/\/+$/,"");
-}
-
-function organicSourceMatchesDomainAllowlist(source,exactValues,rootDomains){
-  if(exactValues.includes(source))return true;
-  return rootDomains.some(domain=>source.endsWith(`.${domain}`));
-}
-
-function organicMediumIsPaidV2(medium){
-  const normalized=organicNormalizeSourceMedium(medium).replace(/\s+/g,"_");
-  const explicitPaidMediums=new Set([
-    "cpc","ppc","paid","paid_social","paid-social","paidsearch","paid_search",
-    "retargeting","display","banner","expandable","interstitial","cpm"
-  ]);
-  if(explicitPaidMediums.has(normalized))return true;
-  if(/.*cp.*/.test(normalized))return true;
-  if(/^paid.*/.test(normalized))return true;
-  return false;
-}
-
-function classifyOrganicSourceMediumV2(source,medium){
-  const normalizedSource=organicNormalizeSourceMedium(source);
-  const normalizedMedium=organicNormalizeSourceMedium(medium);
-
-  if(organicMediumIsPaidV2(normalizedMedium))return null;
-
-  if(normalizedSource==="(direct)"&&
-     (normalizedMedium==="(none)"||normalizedMedium==="(not set)"))return "Direct";
-
-  if(normalizedSource==="google"&&normalizedMedium==="organic")return "Google Organic";
-
-  const metaExactSources=[
-    "apps.facebook.com","business.facebook.com","facebook","facebook.com","fb","fb.me",
-    "free.facebook.com","l.facebook.com","lm.facebook.com","m.facebook.com",
-    "mobile.facebook.com","touch.facebook.com","web.facebook.com",
-    "instagram","instagram.com","ig","l.instagram.com",
-    "messenger","messenger.com","l.messenger.com"
-  ];
-  if(organicSourceMatchesDomainAllowlist(
-    normalizedSource,
-    metaExactSources,
-    ["facebook.com","instagram.com","messenger.com"]
-  ))return "Meta Organic";
-
-  if(organicSourceMatchesDomainAllowlist(
-    normalizedSource,
-    ["tiktok","tiktok.com"],
-    ["tiktok.com"]
-  ))return "TikTok Organic";
-
-  if(
-    organicSourceMatchesDomainAllowlist(
-      normalizedSource,
-      ["klaviyo","klaviyo.com"],
-      ["klaviyo.com"]
-    )||
-    normalizedSource.includes("klaviyo")
-  )return "Klaviyo Organic";
-
-  return "Others";
-}
-
-function aggregateOrganicSourceMediumRowsV2(report){
-  const dimensionHeaders=report?.dimensionHeaders||[];
-  const metricHeaders=report?.metricHeaders||[];
-  const sourceIndex=organicGa4HeaderIndex(dimensionHeaders,"sessionSource");
-  const mediumIndex=organicGa4HeaderIndex(dimensionHeaders,"sessionMedium");
-  const metricIndexes={
-    sessions:organicGa4HeaderIndex(metricHeaders,"sessions"),
-    addToCarts:organicGa4HeaderIndex(metricHeaders,"addToCarts"),
-    checkouts:organicGa4HeaderIndex(metricHeaders,"checkouts"),
-    ecommercePurchases:organicGa4HeaderIndex(metricHeaders,"ecommercePurchases"),
-    purchaseRevenue:organicGa4HeaderIndex(metricHeaders,"purchaseRevenue")
-  };
-
-  const groups=Object.fromEntries(
-    ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(classification=>[
-      classification,
-      {
-        classification,
-        sessions:0,
-        addToCarts:0,
-        checkouts:0,
-        ecommercePurchases:0,
-        purchaseRevenue:0,
-        ga4_source_medium_rows:[]
-      }
-    ])
-  );
-
-  for(const row of report?.rows||[]){
-    const source=row?.dimensionValues?.[sourceIndex]?.value??"";
-    const medium=row?.dimensionValues?.[mediumIndex]?.value??"";
-    const classification=classifyOrganicSourceMediumV2(source,medium);
-    if(!classification)continue;
-    const rawEvidence={
-      sessionSource:source,
-      sessionMedium:medium,
-      sessions:metricIndexes.sessions>=0?organicGa4Value(row?.metricValues?.[metricIndexes.sessions]?.value):0,
-      addToCarts:metricIndexes.addToCarts>=0?organicGa4Value(row?.metricValues?.[metricIndexes.addToCarts]?.value):0,
-      checkouts:metricIndexes.checkouts>=0?organicGa4Value(row?.metricValues?.[metricIndexes.checkouts]?.value):0,
-      ecommercePurchases:metricIndexes.ecommercePurchases>=0?organicGa4Value(row?.metricValues?.[metricIndexes.ecommercePurchases]?.value):0,
-      purchaseRevenue:metricIndexes.purchaseRevenue>=0?organicGa4Value(row?.metricValues?.[metricIndexes.purchaseRevenue]?.value):0
-    };
-
-    const group=groups[classification];
-    group.sessions+=rawEvidence.sessions;
-    group.addToCarts+=rawEvidence.addToCarts;
-    group.checkouts+=rawEvidence.checkouts;
-    group.ecommercePurchases+=rawEvidence.ecommercePurchases;
-    group.purchaseRevenue+=rawEvidence.purchaseRevenue;
-    group.ga4_source_medium_rows.push(rawEvidence);
-  }
-
-  return ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(name=>groups[name]);
+function organicIsoDate(value){
+  return fxDateOnly(value||new Date());
 }
 
 async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
@@ -2041,10 +1629,7 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
   const url=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(cleanPropertyId)}:runReport`;
   const body={
     dateRanges:[{startDate,endDate}],
-    dimensions:[
-      {name:"sessionSource"},
-      {name:"sessionMedium"}
-    ],
+    dimensionFilter:organicGa4ChannelFilterV1(),
     metrics:[
       {name:"sessions"},
       {name:"addToCarts"},
@@ -2057,115 +1642,90 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
   const data=await r.json().catch(()=>({status:r.status}));
   if(!r.ok)throw new Error(data.error?.message||data.message||`Organic GA4 Data API failed ${r.status}`);
   return {
-    groups:aggregateOrganicSourceMediumRowsV2(data),
+    sessions:organicMetricValue(data,"sessions"),
+    add_to_cart:organicMetricValue(data,"addToCarts"),
+    checkout:organicMetricValue(data,"checkouts"),
+    purchase:organicMetricValue(data,"ecommercePurchases"),
+    revenue:organicMetricValue(data,"purchaseRevenue"),
+    channel_groups:ORGANIC_GA4_CHANNEL_GROUPS_V1,
     raw:data
   };
 }
 
 function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,property}){
-  const currency=accountCurrency||DEFAULT_REPORTING_CURRENCY;
-  const groups=Array.isArray(ga4?.groups)?ga4.groups:[];
-  const totals=groups.reduce((result,group)=>{
-    result.sessions+=organicGa4Value(group.sessions);
-    result.addToCarts+=organicGa4Value(group.addToCarts);
-    result.checkouts+=organicGa4Value(group.checkouts);
-    result.ecommercePurchases+=organicGa4Value(group.ecommercePurchases);
-    result.purchaseRevenue+=organicGa4Value(group.purchaseRevenue);
-    return result;
-  },{sessions:0,addToCarts:0,checkouts:0,ecommercePurchases:0,purchaseRevenue:0});
-
-  const performanceRows=ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(classification=>{
-    const group=groups.find(item=>item.classification===classification)||{
-      classification,
-      sessions:0,
-      addToCarts:0,
-      checkouts:0,
-      ecommercePurchases:0,
-      purchaseRevenue:0,
-      ga4_source_medium_rows:[]
-    };
-    const checkout=organicGa4Value(group.checkouts);
-    const purchase=organicGa4Value(group.ecommercePurchases);
-    const revenue=organicGa4Value(group.purchaseRevenue);
-    const abandoned=Math.max(checkout-purchase,0);
-    const entityId=classification.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
-
-    return {
-      platform:classification,
-      level:"platform",
-      id_in_platform:entityId,
-      campaign_id:entityId,
-      campaign_name:classification,
-      campaign_status:"active",
-      status:"active",
-      currency,
-      impressions:0,
-      clicks:0,
-      ad_clicks:0,
-      sessions:organicGa4Value(group.sessions),
-      ctr:null,
-      cpc:null,
-      spend:0,
-      sales:revenue,
-      revenue,
-      roas:null,
-      cps:null,
-      add_to_cart:organicGa4Value(group.addToCarts),
-      checkout,
-      purchase,
-      purchases:purchase,
-      purchase_count:purchase,
-      abandoned,
-      conversion_value:revenue,
-      conversions:purchase,
-      raw:{
-        source:"organic_snapshot_ga4_source_medium_v2",
-        ga4_source_medium_rows:group.ga4_source_medium_rows||[],
-        classification,
-        property_id:property.property_id,
-        ga4_property:property
-      }
-    };
-  });
-
-  const totalAbandoned=Math.max(totals.checkouts-totals.ecommercePurchases,0);
+  const sessions=Number(ga4.sessions||0);
+  const addToCart=Number(ga4.add_to_cart||0);
+  const checkout=Number(ga4.checkout||0);
+  const purchase=Number(ga4.purchase||0);
+  const revenue=Number(ga4.revenue||0);
+  const abandoned=checkout>0?Math.max(checkout-purchase,0):0;
   return {
     platform:"organic",
     snapshot_date:snapshotDate,
-    account_currency:currency,
+    account_currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
     kpis:{
       spend:0,
-      sales:totals.purchaseRevenue,
-      revenue:totals.purchaseRevenue,
+      sales:revenue,
+      revenue,
       impressions:0,
       clicks:0,
-      sessions:totals.sessions,
+      sessions,
       ctr:null,
       cpc:null,
       roas:null
     },
     purchase_journey:{
-      add_to_cart:totals.addToCarts,
-      checkout:totals.checkouts,
-      abandoned:totalAbandoned,
-      purchase:totals.ecommercePurchases,
-      purchases:totals.ecommercePurchases,
-      purchase_value:totals.purchaseRevenue
+      add_to_cart:addToCart,
+      checkout,
+      abandoned,
+      purchase,
+      purchases:purchase,
+      purchase_value:revenue
     },
     click_journey:{
       ad_clicks:0,
       link_clicks:0,
       landing_page_views:0,
-      sessions:totals.sessions,
+      sessions,
       traffic_score:null,
       real_cpc:null
     },
     performance_summary:{
-      rows:performanceRows,
-      counts:{platform:performanceRows.length},
-      source_confidence:"organic_snapshot_ga4_source_medium_v2",
-      null_policy:"GA4 source/medium rows are classified into six fixed platform groups. Zero-value groups are preserved. Organic spend metrics remain unavailable and are stored as null where non-computable.",
-      raw_report:{ga4:ga4.raw}
+      rows:[{
+        platform:"Organic",
+        level:"platform",
+        campaign_id:"organic",
+        campaign_name:"Organic",
+        campaign_status:"active",
+        currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
+        impressions:0,
+        clicks:0,
+        ad_clicks:0,
+        sessions,
+        ctr:null,
+        cpc:null,
+        spend:0,
+        sales:revenue,
+        revenue,
+        roas:null,
+        add_to_cart:addToCart,
+        checkout,
+        purchase,
+        purchases:purchase,
+        purchase_count:purchase,
+        abandoned,
+        conversion_value:revenue,
+        conversions:purchase,
+        raw:{
+          source:"organic_snapshot_ga4_core_v1",
+          ga4_property:property,
+          channel_groups:ORGANIC_GA4_CHANNEL_GROUPS_V1
+        }
+      }],
+      counts:{platform:1},
+      source_confidence:"organic_snapshot_ga4_core_v1",
+      null_policy:"Organic Core uses only GA4 filtered by AdsTable Organic Channel Filter v1. Search Console is not required and no Search Console metrics are written.",
+      raw_report:{ga4:{...ga4.raw,adstable_channel_filter_v1:ORGANIC_GA4_CHANNEL_GROUPS_V1}}
     }
   };
 }
@@ -2174,48 +1734,10 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
   const conn=await getConnection(user.id,"organic");
   if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
   if(!conn.metadata?.configured)throw Object.assign(new Error("Organic GA4 property binding is required before snapshot"),{status:400});
-
-  const platformAccountId=normalizePlatformAccountId(
-    conn.account_id||
-    conn.metadata?.selectedPlatformAccountId||
-    conn.metadata?.lastOwnedPlatformAccountId
-  );
+  const property=conn.metadata.selectedGa4Property||{};
+  const platformAccountId=normalizePlatformAccountId(conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
   if(!platformAccountId)throw Object.assign(new Error("Organic GA4 property id is missing"),{status:400});
-
   await requireActiveOwnership(user.id,"organic",platformAccountId);
-
-  const {data:activePropertyRow,error:activePropertyError}=await supabaseAdmin
-    .from("platform_ad_accounts")
-    .select("platform_account_id,platform_business_id,account_name,metadata")
-    .eq("user_id",user.id)
-    .eq("platform","organic")
-    .eq("platform_account_id",platformAccountId)
-    .maybeSingle();
-  if(activePropertyError)throw activePropertyError;
-
-  const activePropertySource=activePropertyRow?.metadata?.ga4_property||{};
-  const property={
-    property_id:platformAccountId,
-    platform_account_id:platformAccountId,
-    property_name:
-      activePropertySource.property_name||
-      activePropertyRow?.account_name||
-      conn.account_name||
-      `GA4 Property ${platformAccountId}`,
-    property_resource_name:
-      activePropertySource.property_resource_name||
-      `properties/${platformAccountId}`,
-    account_id:
-      activePropertySource.account_id||
-      activePropertyRow?.platform_business_id||
-      null,
-    account_name:
-      activePropertySource.account_name||
-      null,
-    account_resource_name:
-      activePropertySource.account_resource_name||
-      (activePropertySource.account_id?`accounts/${activePropertySource.account_id}`:null)
-  };
   const platformTimeZone=DEFAULT_PLATFORM_TIMEZONE;
   const effectiveSnapshotDate=e2aSnapshotDate(snapshotDate,platformTimeZone);
   const period=resolveSnapshotCapturePeriod(datePreset,effectiveSnapshotDate,platformTimeZone,new Date());
@@ -2292,11 +1814,9 @@ async function handleOrganicSnapshotWrite(req,res){
     const result=await requireConnection(req,res,"organic");if(!result)return;
     const {user,conn}=result;
     if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
-    const platformAccountId=await resolveActiveOrganicPropertyId(user.id,{
-      requestedId:req.body?.platform_account_id||req.query.platform_account_id,
-      connectionId:conn.account_id
-    });
-    if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing active Organic GA4 property id",stage});
+    const property=conn.metadata.selectedGa4Property||{};
+    const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.query.platform_account_id||conn.account_id||property.property_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
+    if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Organic GA4 property id",stage});
     const datePreset=String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
     stage="job";
@@ -2604,12 +2124,7 @@ app.get("/api/lifecycle/status",async(req,res)=>{
 
 
 // ===== DATASET SPREAD POLICY v1 =====
-function perfNormalizePlatform(platform){
-  const raw=String(platform||"meta").trim();
-  if(ORGANIC_SOURCE_MEDIUM_GROUPS_V2.includes(raw))return raw;
-  const p=raw.toLowerCase();
-  return p==="tik_tok"?"tiktok":p;
-}
+function perfNormalizePlatform(platform){const p=String(platform||"meta").toLowerCase();return p==="tik_tok"?"tiktok":p}
 
 function shouldSpreadSnapshotToPerformanceDataset(snapshotOrClass){
   const cls=typeof snapshotOrClass==="string"?snapshotOrClass:String(snapshotOrClass?.snapshot_class||"");
@@ -2658,7 +2173,7 @@ function performanceDatasetRowFromSnapshotRow(snapshot,row){
   const idInPlatform=perfEntityId(row,level);
   if(!idInPlatform)return null;
 
-  const platform=perfNormalizePlatform(snapshot.platform==="organic"&&row?.platform?row.platform:(snapshot.platform||row.platform));
+  const platform=perfNormalizePlatform(snapshot.platform||row.platform);
   const spend=perfNullableNumber(row.spend);
   const revenue=perfNullableNumber(row.revenue);
   const sales=perfNullableNumber(row.sales);
@@ -4049,106 +3564,7 @@ function microsToMoney(v){return v===null||v===undefined||v===""?null:Number(v)/
 function nested(o,p){return p.split(".").reduce((a,k)=>a&&a[k]!==undefined?a[k]:undefined,o)}
 function googleMatchConversion(actions,kind){const list=Array.isArray(actions)?actions:[];const cfg={add_to_cart:{categories:["ADD_TO_CART"],names:["add_to_cart","add to cart","cart"]},checkout:{categories:["BEGIN_CHECKOUT"],names:["begin_checkout","checkout","start_checkout","started_checkout"]},purchase:{categories:["PURCHASE"],names:["purchase","placed_order","order","sale"]}}[kind];if(!cfg)return null;let total=0,value=0,found=false;for(const a of list){const name=String(a.name||"").toLowerCase();const cat=String(a.category||"").toUpperCase();const matched=cfg.categories.includes(cat)||cfg.names.some(n=>name.includes(n));if(matched){found=true;total+=Number(a.conversions||0);value+=Number(a.conversions_value||0)}}return found?{count:total,value}:null}
 function normalizeGoogleInsight(row,level){const m=row.metrics||{},c=row.campaign||{},ag=row.adGroup||row.ad_group||{},aga=row.adGroupAd||row.ad_group_ad||{},cust=row.customer||{},seg=row.segments||{};const spend=microsToMoney(m.costMicros??m.cost_micros),cpc=microsToMoney(m.averageCpc??m.average_cpc),genericRevenue=Number(m.conversionsValue??m.conversions_value??0),genericConversions=Number(m.conversions??0),invalidClicks=Number(m.invalidClicks??m.invalid_clicks??0),clicks=Number(m.clicks||0),validClicks=Math.max(clicks-invalidClicks,0),landingPageViews=row.__landing_page_views===undefined?null:row.__landing_page_views;const actions=row.__conversion_actions||[];const atc=googleMatchConversion(actions,"add_to_cart"),chk=googleMatchConversion(actions,"checkout"),pur=googleMatchConversion(actions,"purchase");const addToCart=atc?atc.count:null,checkout=chk?chk.count:null,purchase=pur?pur.count:null,purchaseValue=pur?pur.value:genericRevenue||null;const abandoned=checkout!==null&&purchase!==null?Math.max((checkout||0)-(purchase||0),0):null;const sales=purchaseValue;const roas=spend&&spend>0&&sales!==null?sales/spend:null;const acos=sales&&sales>0&&spend!==null?(spend/sales)*100:null;return{platform:"Google",level,date:seg.date||null,campaign_id:c.id||null,campaign_name:c.name||null,campaign_status:c.status||null,channel_type:c.advertisingChannelType||c.advertising_channel_type||null,bidding_strategy_type:nested(row,"biddingStrategy.type")||nested(row,"bidding_strategy.type")||null,adgroup_id:ag.id||null,adgroup_name:ag.name||null,adgroup_status:ag.status||null,ad_id:nested(aga,"ad.id")||null,ad_name:nested(aga,"ad.name")||null,ad_status:aga.status||null,currency:cust.currencyCode||cust.currency_code||null,impressions:Number(m.impressions||0),clicks,ad_clicks:clicks,link_clicks:clicks,landing_page_views:landingPageViews,traffic_score:clicks>0&&landingPageViews!==null?(landingPageViews/clicks)*100:null,real_cpc:landingPageViews>0&&spend!==null?spend/landingPageViews:null,lpv_merge_status:row.__landing_page_view_merge_status||null,invalid_clicks:invalidClicks,valid_clicks:validClicks,ctr:m.ctr!==undefined?Number(m.ctr)*100:null,cpc,spend,conversions:genericConversions,all_conversions:Number(m.allConversions??m.all_conversions??0),add_to_cart:addToCart,checkout,purchase,purchases:purchase,abandoned,purchase_value:purchaseValue,revenue:sales,sales,conversion_rate:m.conversionsFromInteractionsRate!==undefined?Number(m.conversionsFromInteractionsRate)*100:m.conversions_from_interactions_rate!==undefined?Number(m.conversions_from_interactions_rate)*100:null,cvr:clicks&&purchase!==null?(purchase/clicks)*100:null,roas,acos,conversion_actions:actions,raw:{...row,landing_page_view_rows:row.__landing_page_view_rows||[]}}}
-app.get("/api/google/customers",async(req,res)=>{
-  try{
-    const user=await requireUser(req,res);
-    if(!user)return;
-
-    const token=await getFreshGoogleAccessToken(user.id);
-    const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,{
-      method:"GET",
-      headers:googleHeaders(token)
-    });
-    const data=await r.json();
-    if(!r.ok)return res.status(r.status).json({error:JSON.stringify(data),status:r.status});
-
-    const accessibleCustomers=(data.resourceNames||[]).map(resourceName=>({
-      resourceName,
-      customerId:normalizeCustomerId(String(resourceName).replace("customers/",""))
-    }));
-
-    const managerDiscoveryQuery=`
-      SELECT
-        customer.id,
-        customer.manager
-      FROM customer
-      LIMIT 1
-    `;
-
-    const customerClientQuery=`
-      SELECT
-        customer_client.id,
-        customer_client.descriptive_name,
-        customer_client.manager,
-        customer_client.level,
-        customer_client.status,
-        customer_client.test_account
-      FROM customer_client
-      WHERE customer_client.level > 0
-    `;
-
-    let managerCustomerId=null;
-    let customerClientData=null;
-
-    for(const accessibleCustomer of accessibleCustomers){
-      if(!accessibleCustomer.customerId)continue;
-
-      let customerData;
-      try{
-        customerData=await googleAdsSearch(
-          user.id,
-          accessibleCustomer.customerId,
-          managerDiscoveryQuery,
-          ""
-        );
-      }catch(_error){
-        continue;
-      }
-
-      const customerRow=customerData.results&&customerData.results[0]&&customerData.results[0].customer;
-      const candidateManagerId=normalizeCustomerId(customerRow&&customerRow.id||accessibleCustomer.customerId);
-      if(!customerRow||customerRow.manager!==true||!candidateManagerId)continue;
-
-      try{
-        const candidateCustomerClientData=await googleAdsSearch(
-          user.id,
-          candidateManagerId,
-          customerClientQuery,
-          candidateManagerId
-        );
-        managerCustomerId=candidateManagerId;
-        customerClientData=candidateCustomerClientData;
-        break;
-      }catch(_error){
-        continue;
-      }
-    }
-
-    if(!managerCustomerId||!customerClientData){
-      return res.json({customers:[]});
-    }
-
-    const customers=(customerClientData.results||[])
-      .map(row=>{
-        const customerClient=row.customerClient||row.customer_client||{};
-        const customerId=normalizeCustomerId(customerClient.id);
-        return{
-          resourceName:customerId?`customers/${customerId}`:null,
-          customerId,
-          descriptiveName:customerClient.descriptiveName??customerClient.descriptive_name??null,
-          manager:customerClient.manager??null,
-          level:customerClient.level??null,
-          status:customerClient.status??null,
-          testAccount:customerClient.testAccount??customerClient.test_account??null
-        };
-      })
-      .filter(customer=>customer.customerId&&String(customer.status||"").toUpperCase()==="ENABLED");
-
-    res.json({customers});
-  }catch(e){
-    res.status(e.status||500).json({error:e.message});
-  }
-});
+app.get("/api/google/customers",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const token=await getFreshGoogleAccessToken(user.id);const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,{method:"GET",headers:googleHeaders(token)});const data=await r.json();if(!r.ok)return res.status(r.status).json({error:JSON.stringify(data),status:r.status});const customers=(data.resourceNames||[]).map(resourceName=>({resourceName,customerId:String(resourceName).replace("customers/","")}));res.json({customers})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/google/insights",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const customerId=req.query.customerId||req.query.customer_id;if(!customerId)return res.status(400).json({error:"Missing customerId"});const level=["campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const loginCustomerId=req.query.loginCustomerId||req.query.login_customer_id||"";const query=googleQuery(level,dateRange);const data=await googleAdsSearch(user.id,customerId,query,loginCustomerId);let breakdownData={results:[]},breakdownError=null;try{breakdownData=await googleAdsSearch(user.id,customerId,googleConversionBreakdownQuery(level,dateRange),loginCustomerId)}catch(err){breakdownError=err.message}const performanceRows=data.results||[];let lpvData={results:[]},lpvError=null;try{lpvData=await googleAdsSearch(user.id,customerId,googleLandingPageViewQuery(level,dateRange),loginCustomerId)}catch(err){lpvError=err.message}const withConversions=mergeGoogleConversionActions(performanceRows,breakdownData.results||[],level);const mergedRows=mergeGoogleLandingPageViews(withConversions,lpvData.results||[],level);res.json({platform:"Google",level,customerId:normalizeCustomerId(customerId),loginCustomerId:loginCustomerId?normalizeCustomerId(loginCustomerId):null,date_range:dateRange,rows:mergedRows.map(r=>normalizeGoogleInsight(r,level)),rawCount:mergedRows.length,conversionBreakdownCount:breakdownData.results?breakdownData.results.length:0,conversionBreakdownError:breakdownError,landingPageViewCount:lpvData.results?lpvData.results.length:0,landingPageViewError:lpvError,fieldMask:data.fieldMask||null,conversionFieldMask:breakdownData.fieldMask||null,landingPageViewFieldMask:lpvData.fieldMask||null,requestId:data.requestId||null,nextPageToken:data.nextPageToken||null})}catch(e){res.status(e.status||500).json({error:e.message})}});
 
 // ===== GOOGLE SNAPSHOT WRITE v1 (Snapshot Layer only) =====
@@ -5643,9 +5059,8 @@ async function ensureConfiguredOrganicSchedules(){
   const results=[];
   for(const conn of connections||[]){
     if(!conn.metadata?.configured)continue;
-    const platformAccountId=await resolveActiveOrganicPropertyId(conn.user_id,{
-      connectionId:conn.account_id
-    });
+    const property=conn.metadata.selectedGa4Property||{};
+    const platformAccountId=normalizePlatformAccountId(conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
     if(!platformAccountId)continue;
     const ownership=await getOwnership("organic",platformAccountId);
     if(!ownership||ownership.owner_user_id!==conn.user_id||!activeOwnershipStatuses().includes(ownership.status))continue;
@@ -5668,11 +5083,9 @@ async function runOrganicAutoRefreshForSchedule(schedule){
   if(!conn)throw new Error("Auto refresh Organic connection not found");
   if(!conn.metadata?.configured)throw new Error("Organic GA4 property binding is required before automation");
 
-  const platformAccountId=await resolveActiveOrganicPropertyId(schedule.user_id,{
-    scheduleId:schedule.platform_account_id,
-    connectionId:conn.account_id
-  });
-  if(!platformAccountId)throw new Error("Auto refresh missing active Organic GA4 property id");
+  const property=conn.metadata.selectedGa4Property||{};
+  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id||property.property_id||conn.metadata.selectedPlatformAccountId);
+  if(!platformAccountId)throw new Error("Auto refresh missing Organic GA4 property id");
 
   if(schedule.active===false){
     return {ok:true,skipped:true,platform:"organic",reason:"schedule_inactive",schedule_id:schedule.id,platform_account_id:platformAccountId};

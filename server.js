@@ -4049,36 +4049,90 @@ function microsToMoney(v){return v===null||v===undefined||v===""?null:Number(v)/
 function nested(o,p){return p.split(".").reduce((a,k)=>a&&a[k]!==undefined?a[k]:undefined,o)}
 function googleMatchConversion(actions,kind){const list=Array.isArray(actions)?actions:[];const cfg={add_to_cart:{categories:["ADD_TO_CART"],names:["add_to_cart","add to cart","cart"]},checkout:{categories:["BEGIN_CHECKOUT"],names:["begin_checkout","checkout","start_checkout","started_checkout"]},purchase:{categories:["PURCHASE"],names:["purchase","placed_order","order","sale"]}}[kind];if(!cfg)return null;let total=0,value=0,found=false;for(const a of list){const name=String(a.name||"").toLowerCase();const cat=String(a.category||"").toUpperCase();const matched=cfg.categories.includes(cat)||cfg.names.some(n=>name.includes(n));if(matched){found=true;total+=Number(a.conversions||0);value+=Number(a.conversions_value||0)}}return found?{count:total,value}:null}
 function normalizeGoogleInsight(row,level){const m=row.metrics||{},c=row.campaign||{},ag=row.adGroup||row.ad_group||{},aga=row.adGroupAd||row.ad_group_ad||{},cust=row.customer||{},seg=row.segments||{};const spend=microsToMoney(m.costMicros??m.cost_micros),cpc=microsToMoney(m.averageCpc??m.average_cpc),genericRevenue=Number(m.conversionsValue??m.conversions_value??0),genericConversions=Number(m.conversions??0),invalidClicks=Number(m.invalidClicks??m.invalid_clicks??0),clicks=Number(m.clicks||0),validClicks=Math.max(clicks-invalidClicks,0),landingPageViews=row.__landing_page_views===undefined?null:row.__landing_page_views;const actions=row.__conversion_actions||[];const atc=googleMatchConversion(actions,"add_to_cart"),chk=googleMatchConversion(actions,"checkout"),pur=googleMatchConversion(actions,"purchase");const addToCart=atc?atc.count:null,checkout=chk?chk.count:null,purchase=pur?pur.count:null,purchaseValue=pur?pur.value:genericRevenue||null;const abandoned=checkout!==null&&purchase!==null?Math.max((checkout||0)-(purchase||0),0):null;const sales=purchaseValue;const roas=spend&&spend>0&&sales!==null?sales/spend:null;const acos=sales&&sales>0&&spend!==null?(spend/sales)*100:null;return{platform:"Google",level,date:seg.date||null,campaign_id:c.id||null,campaign_name:c.name||null,campaign_status:c.status||null,channel_type:c.advertisingChannelType||c.advertising_channel_type||null,bidding_strategy_type:nested(row,"biddingStrategy.type")||nested(row,"bidding_strategy.type")||null,adgroup_id:ag.id||null,adgroup_name:ag.name||null,adgroup_status:ag.status||null,ad_id:nested(aga,"ad.id")||null,ad_name:nested(aga,"ad.name")||null,ad_status:aga.status||null,currency:cust.currencyCode||cust.currency_code||null,impressions:Number(m.impressions||0),clicks,ad_clicks:clicks,link_clicks:clicks,landing_page_views:landingPageViews,traffic_score:clicks>0&&landingPageViews!==null?(landingPageViews/clicks)*100:null,real_cpc:landingPageViews>0&&spend!==null?spend/landingPageViews:null,lpv_merge_status:row.__landing_page_view_merge_status||null,invalid_clicks:invalidClicks,valid_clicks:validClicks,ctr:m.ctr!==undefined?Number(m.ctr)*100:null,cpc,spend,conversions:genericConversions,all_conversions:Number(m.allConversions??m.all_conversions??0),add_to_cart:addToCart,checkout,purchase,purchases:purchase,abandoned,purchase_value:purchaseValue,revenue:sales,sales,conversion_rate:m.conversionsFromInteractionsRate!==undefined?Number(m.conversionsFromInteractionsRate)*100:m.conversions_from_interactions_rate!==undefined?Number(m.conversions_from_interactions_rate)*100:null,cvr:clicks&&purchase!==null?(purchase/clicks)*100:null,roas,acos,conversion_actions:actions,raw:{...row,landing_page_view_rows:row.__landing_page_view_rows||[]}}}
-app.get("/api/google/customers",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const token=await getFreshGoogleAccessToken(user.id);const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,{method:"GET",headers:googleHeaders(token)});const data=await r.json();if(!r.ok)return res.status(r.status).json({error:JSON.stringify(data),status:r.status});const customers=(data.resourceNames||[]).map(resourceName=>({resourceName,customerId:String(resourceName).replace("customers/","")}));res.json({customers})}catch(e){res.status(500).json({error:e.message})}});
-async function resolveGoogleInsightCustomerIds(userId,customerId,loginCustomerId){
-  const cleanCustomerId=normalizeCustomerId(customerId);
-  const managerCheck=await googleAdsSearch(userId,cleanCustomerId,"SELECT customer.id, customer.manager FROM customer LIMIT 1",loginCustomerId);
-  const managerRow=(managerCheck.results||[])[0]||{};
-  const customer=managerRow.customer||{};
-  const isManager=customer.manager===true;
-  if(!isManager)return [cleanCustomerId];
+app.get("/api/google/customers",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);
+    if(!user)return;
 
-  const clientData=await googleAdsSearch(
-    userId,
-    cleanCustomerId,
-    "SELECT customer_client.id, customer_client.client_customer, customer_client.descriptive_name, customer_client.manager, customer_client.status, customer_client.level FROM customer_client WHERE customer_client.level = 1",
-    loginCustomerId
-  );
-  const clientIds=[...new Set((clientData.results||[])
-    .map(row=>row.customerClient||row.customer_client||{})
-    .filter(client=>client.manager!==true&&String(client.status||"").toUpperCase()!=="CANCELED")
-    .map(client=>normalizeCustomerId(client.id||String(client.clientCustomer||client.client_customer||"").replace("customers/","")))
-    .filter(Boolean))];
+    const token=await getFreshGoogleAccessToken(user.id);
+    const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,{
+      method:"GET",
+      headers:googleHeaders(token)
+    });
+    const data=await r.json();
+    if(!r.ok)return res.status(r.status).json({error:JSON.stringify(data),status:r.status});
 
-  console.log("[MCC CLIENTS]\n");
-  console.log(`loginCustomerId: ${loginCustomerId?normalizeCustomerId(loginCustomerId):""}\n`);
-  console.log(`clientCount: ${clientIds.length}\n`);
-  console.log("clients:");
-  for(const clientId of clientIds)console.log(clientId);
+    const accessibleCustomers=(data.resourceNames||[]).map(resourceName=>({
+      resourceName,
+      customerId:String(resourceName).replace("customers/","")
+    }));
 
-  return clientIds;
-}
-app.get("/api/google/insights",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const customerId=req.query.customerId||req.query.customer_id;if(!customerId)return res.status(400).json({error:"Missing customerId"});const level=["campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const loginCustomerId=req.query.loginCustomerId||req.query.login_customer_id||"";const query=googleQuery(level,dateRange);const insightCustomerIds=await resolveGoogleInsightCustomerIds(user.id,customerId,loginCustomerId);const performanceRows=[];const breakdownRows=[];const lpvRows=[];const breakdownErrors=[];const lpvErrors=[];let fieldMask=null,conversionFieldMask=null,landingPageViewFieldMask=null,requestId=null,nextPageToken=null;for(const insightCustomerId of insightCustomerIds){console.log("[METRICS REQUEST]\n");console.log(`loginCustomerId: ${loginCustomerId?normalizeCustomerId(loginCustomerId):""}\n`);console.log(`customerId: ${normalizeCustomerId(insightCustomerId)}\n`);console.log(`GAQL:\n${query}`);const data=await googleAdsSearch(user.id,insightCustomerId,query,loginCustomerId);performanceRows.push(...(data.results||[]));fieldMask=fieldMask||data.fieldMask||null;requestId=requestId||data.requestId||null;nextPageToken=nextPageToken||data.nextPageToken||null;try{const breakdownQuery=googleConversionBreakdownQuery(level,dateRange);console.log("[METRICS REQUEST]\n");console.log(`loginCustomerId: ${loginCustomerId?normalizeCustomerId(loginCustomerId):""}\n`);console.log(`customerId: ${normalizeCustomerId(insightCustomerId)}\n`);console.log(`GAQL:\n${breakdownQuery}`);const breakdownData=await googleAdsSearch(user.id,insightCustomerId,breakdownQuery,loginCustomerId);breakdownRows.push(...(breakdownData.results||[]));conversionFieldMask=conversionFieldMask||breakdownData.fieldMask||null}catch(err){breakdownErrors.push(err.message)}try{const lpvQuery=googleLandingPageViewQuery(level,dateRange);console.log("[METRICS REQUEST]\n");console.log(`loginCustomerId: ${loginCustomerId?normalizeCustomerId(loginCustomerId):""}\n`);console.log(`customerId: ${normalizeCustomerId(insightCustomerId)}\n`);console.log(`GAQL:\n${lpvQuery}`);const lpvData=await googleAdsSearch(user.id,insightCustomerId,lpvQuery,loginCustomerId);lpvRows.push(...(lpvData.results||[]));landingPageViewFieldMask=landingPageViewFieldMask||lpvData.fieldMask||null}catch(err){lpvErrors.push(err.message)}}const withConversions=mergeGoogleConversionActions(performanceRows,breakdownRows,level);const mergedRows=mergeGoogleLandingPageViews(withConversions,lpvRows,level);res.json({platform:"Google",level,customerId:normalizeCustomerId(customerId),loginCustomerId:loginCustomerId?normalizeCustomerId(loginCustomerId):null,date_range:dateRange,rows:mergedRows.map(r=>normalizeGoogleInsight(r,level)),rawCount:mergedRows.length,conversionBreakdownCount:breakdownRows.length,conversionBreakdownError:breakdownErrors.length?breakdownErrors.join(" | "):null,landingPageViewCount:lpvRows.length,landingPageViewError:lpvErrors.length?lpvErrors.join(" | "):null,fieldMask,conversionFieldMask,landingPageViewFieldMask,requestId,nextPageToken})}catch(e){res.status(e.status||500).json({error:e.message})}});
+    let managerCustomerId=null;
+    const managerDiscoveryQuery=`
+      SELECT
+        customer.id,
+        customer.manager
+      FROM customer
+      LIMIT 1
+    `;
+
+    for(const accessibleCustomer of accessibleCustomers){
+      const customerData=await googleAdsSearch(
+        user.id,
+        accessibleCustomer.customerId,
+        managerDiscoveryQuery,
+        ""
+      );
+      const customerRow=customerData.results&&customerData.results[0]&&customerData.results[0].customer;
+      if(customerRow&&customerRow.manager===true){
+        managerCustomerId=normalizeCustomerId(customerRow.id||accessibleCustomer.customerId);
+        break;
+      }
+    }
+
+    if(!managerCustomerId){
+      return res.json({customers:[]});
+    }
+
+    const customerClientQuery=`
+      SELECT
+        customer_client.id,
+        customer_client.descriptive_name,
+        customer_client.manager,
+        customer_client.level,
+        customer_client.status,
+        customer_client.test_account
+      FROM customer_client
+      WHERE customer_client.level > 0
+    `;
+
+    const customerClientData=await googleAdsSearch(
+      user.id,
+      managerCustomerId,
+      customerClientQuery,
+      managerCustomerId
+    );
+
+    const customers=(customerClientData.results||[]).map(row=>{
+      const customerClient=row.customerClient||row.customer_client||{};
+      const customerId=normalizeCustomerId(customerClient.id);
+      return{
+        resourceName:customerId?`customers/${customerId}`:null,
+        customerId,
+        descriptiveName:customerClient.descriptiveName??customerClient.descriptive_name??null,
+        manager:customerClient.manager??null,
+        level:customerClient.level??null,
+        status:customerClient.status??null,
+        testAccount:customerClient.testAccount??customerClient.test_account??null
+      };
+    });
+
+    res.json({customers});
+  }catch(e){
+    res.status(e.status||500).json({error:e.message});
+  }
+});
+app.get("/api/google/insights",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const customerId=req.query.customerId||req.query.customer_id;if(!customerId)return res.status(400).json({error:"Missing customerId"});const level=["campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const loginCustomerId=req.query.loginCustomerId||req.query.login_customer_id||"";const query=googleQuery(level,dateRange);const data=await googleAdsSearch(user.id,customerId,query,loginCustomerId);let breakdownData={results:[]},breakdownError=null;try{breakdownData=await googleAdsSearch(user.id,customerId,googleConversionBreakdownQuery(level,dateRange),loginCustomerId)}catch(err){breakdownError=err.message}const performanceRows=data.results||[];let lpvData={results:[]},lpvError=null;try{lpvData=await googleAdsSearch(user.id,customerId,googleLandingPageViewQuery(level,dateRange),loginCustomerId)}catch(err){lpvError=err.message}const withConversions=mergeGoogleConversionActions(performanceRows,breakdownData.results||[],level);const mergedRows=mergeGoogleLandingPageViews(withConversions,lpvData.results||[],level);res.json({platform:"Google",level,customerId:normalizeCustomerId(customerId),loginCustomerId:loginCustomerId?normalizeCustomerId(loginCustomerId):null,date_range:dateRange,rows:mergedRows.map(r=>normalizeGoogleInsight(r,level)),rawCount:mergedRows.length,conversionBreakdownCount:breakdownData.results?breakdownData.results.length:0,conversionBreakdownError:breakdownError,landingPageViewCount:lpvData.results?lpvData.results.length:0,landingPageViewError:lpvError,fieldMask:data.fieldMask||null,conversionFieldMask:breakdownData.fieldMask||null,landingPageViewFieldMask:lpvData.fieldMask||null,requestId:data.requestId||null,nextPageToken:data.nextPageToken||null})}catch(e){res.status(e.status||500).json({error:e.message})}});
 
 // ===== GOOGLE SNAPSHOT WRITE v1 (Snapshot Layer only) =====
 function googleDateRangeWindow(range,snapshotDate){

@@ -20,6 +20,8 @@ const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOM
 const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
+const TIKTOK_REVIEW_ADVERTISER_ID=process.env.TIKTOK_REVIEW_ADVERTISER_ID||"7654240828777955348";
+const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"TikTok Test Advertiser";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
@@ -3902,15 +3904,6 @@ async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
   const requestedLogin=normalizeCustomerId(
     arguments.length>2?arguments[2]:""
   );
-  // Google review routing: the account-selection screen exposes the MCC,
-  // while reporting queries must target the working child account.
-  if(requested==="5383556660"){
-    return {
-      customerId:"5252399301",
-      loginCustomerId:"5383556660",
-      source:"review_routing"
-    };
-  }
   if(requested)return {customerId:requested,loginCustomerId:requestedLogin,source:"request"};
 
   // Google Snapshot must follow the same working account pair as Google Test:
@@ -4757,7 +4750,27 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
       status:a.status||a.advertiser_status||null,
       currency:a.currency||a.currency_code||null
     }));
-    res.json({platform:"tiktok",advertisers,raw:data});
+
+    // TikTok Review/Test routing:
+    // OAuth account discovery can return no accessible advertisers even though
+    // the approved test advertiser is queryable with the connected token.
+    // Surface that advertiser in the existing account-selection flow.
+    if(!advertisers.length&&TIKTOK_REVIEW_ADVERTISER_ID){
+      advertisers.push({
+        advertiser_id:TIKTOK_REVIEW_ADVERTISER_ID,
+        advertiser_name:TIKTOK_REVIEW_ADVERTISER_NAME,
+        status:"active",
+        currency:null,
+        review_fallback:true
+      });
+    }
+
+    res.json({
+      platform:"tiktok",
+      advertisers,
+      advertiser_source:list.length?"oauth_accessible_advertisers":"review_fallback",
+      raw:data
+    });
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
 

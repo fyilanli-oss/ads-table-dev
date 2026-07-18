@@ -4064,10 +4064,9 @@ app.get("/api/google/customers",async(req,res)=>{
 
     const accessibleCustomers=(data.resourceNames||[]).map(resourceName=>({
       resourceName,
-      customerId:String(resourceName).replace("customers/","")
+      customerId:normalizeCustomerId(String(resourceName).replace("customers/",""))
     }));
 
-    let managerCustomerId=null;
     const managerDiscoveryQuery=`
       SELECT
         customer.id,
@@ -4075,24 +4074,6 @@ app.get("/api/google/customers",async(req,res)=>{
       FROM customer
       LIMIT 1
     `;
-
-    for(const accessibleCustomer of accessibleCustomers){
-      const customerData=await googleAdsSearch(
-        user.id,
-        accessibleCustomer.customerId,
-        managerDiscoveryQuery,
-        ""
-      );
-      const customerRow=customerData.results&&customerData.results[0]&&customerData.results[0].customer;
-      if(customerRow&&customerRow.manager===true){
-        managerCustomerId=normalizeCustomerId(customerRow.id||accessibleCustomer.customerId);
-        break;
-      }
-    }
-
-    if(!managerCustomerId){
-      return res.json({customers:[]});
-    }
 
     const customerClientQuery=`
       SELECT
@@ -4106,26 +4087,62 @@ app.get("/api/google/customers",async(req,res)=>{
       WHERE customer_client.level > 0
     `;
 
-    const customerClientData=await googleAdsSearch(
-      user.id,
-      managerCustomerId,
-      customerClientQuery,
-      managerCustomerId
-    );
+    let managerCustomerId=null;
+    let customerClientData=null;
 
-    const customers=(customerClientData.results||[]).map(row=>{
-      const customerClient=row.customerClient||row.customer_client||{};
-      const customerId=normalizeCustomerId(customerClient.id);
-      return{
-        resourceName:customerId?`customers/${customerId}`:null,
-        customerId,
-        descriptiveName:customerClient.descriptiveName??customerClient.descriptive_name??null,
-        manager:customerClient.manager??null,
-        level:customerClient.level??null,
-        status:customerClient.status??null,
-        testAccount:customerClient.testAccount??customerClient.test_account??null
-      };
-    });
+    for(const accessibleCustomer of accessibleCustomers){
+      if(!accessibleCustomer.customerId)continue;
+
+      let customerData;
+      try{
+        customerData=await googleAdsSearch(
+          user.id,
+          accessibleCustomer.customerId,
+          managerDiscoveryQuery,
+          ""
+        );
+      }catch(_error){
+        continue;
+      }
+
+      const customerRow=customerData.results&&customerData.results[0]&&customerData.results[0].customer;
+      const candidateManagerId=normalizeCustomerId(customerRow&&customerRow.id||accessibleCustomer.customerId);
+      if(!customerRow||customerRow.manager!==true||!candidateManagerId)continue;
+
+      try{
+        const candidateCustomerClientData=await googleAdsSearch(
+          user.id,
+          candidateManagerId,
+          customerClientQuery,
+          candidateManagerId
+        );
+        managerCustomerId=candidateManagerId;
+        customerClientData=candidateCustomerClientData;
+        break;
+      }catch(_error){
+        continue;
+      }
+    }
+
+    if(!managerCustomerId||!customerClientData){
+      return res.json({customers:[]});
+    }
+
+    const customers=(customerClientData.results||[])
+      .map(row=>{
+        const customerClient=row.customerClient||row.customer_client||{};
+        const customerId=normalizeCustomerId(customerClient.id);
+        return{
+          resourceName:customerId?`customers/${customerId}`:null,
+          customerId,
+          descriptiveName:customerClient.descriptiveName??customerClient.descriptive_name??null,
+          manager:customerClient.manager??null,
+          level:customerClient.level??null,
+          status:customerClient.status??null,
+          testAccount:customerClient.testAccount??customerClient.test_account??null
+        };
+      })
+      .filter(customer=>customer.customerId&&String(customer.status||"").toUpperCase()==="ENABLED");
 
     res.json({customers});
   }catch(e){

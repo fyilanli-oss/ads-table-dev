@@ -63,6 +63,8 @@ async function saveConnection(userId,platform,payload){
     account_name:payload.accountName!==undefined?payload.accountName:(existing?.account_name||null),
     metadata:{...(existing?.metadata||{}),...(payload.metadata||{})},
     connected:true,
+    disconnected_at:null,
+    disconnect_reason:null,
     updated_at:new Date().toISOString()
   };
   const {error}=await supabaseAdmin.from("platform_connections").upsert(row,{onConflict:"user_id,platform"});

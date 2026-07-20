@@ -15,8 +15,17 @@ const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
 const GA4_DATA_API_BASE=process.env.GA4_DATA_API_BASE||"https://analyticsdata.googleapis.com/v1beta";
-const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||process.env.GOOGLE_TEST_CUSTOMER_ID||"5580593360";
+const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||process.env.GOOGLE_TEST_CUSTOMER_ID||"5252399301";
 const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||process.env.GOOGLE_TEST_LOGIN_CUSTOMER_ID||"5383556660";
+const GOOGLE_REVIEW_HARD_ROUTE_ENABLED=String(process.env.GOOGLE_REVIEW_HARD_ROUTE_ENABLED||"true").toLowerCase()!=="false";
+function googleReviewAccountPair(){
+  const customerId=normalizeCustomerId(GOOGLE_SNAPSHOT_CUSTOMER_ID);
+  const loginCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
+  if(!customerId)throw new Error("Google review hard-route customer id is missing");
+  if(!loginCustomerId)throw new Error("Google review hard-route login customer id is missing");
+  if(customerId===loginCustomerId)throw new Error("Google customer id cannot equal login customer id");
+  return {customerId,loginCustomerId,source:"google_review_hard_route"};
+}
 const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
@@ -1087,7 +1096,60 @@ if(metaConnAfterReconnect){
 }
 req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,accountId:null,accountName:null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
+app.get("/auth/google/callback",async(req,res)=>{try{
+  const{code,state,error}=req.query;
+  if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);
+  if(!code)return res.redirect("/dashboard?google_error=missing_code");
+  if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");
+  const userId=req.session.oauthUserId;
+  if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");
+  const client=googleOAuthClient();
+  const{tokens}=await client.getToken(code);
+  const reviewPair=GOOGLE_REVIEW_HARD_ROUTE_ENABLED?googleReviewAccountPair():null;
+  await saveConnection(userId,"google",{
+    accessToken:tokens.access_token,
+    refreshToken:tokens.refresh_token||null,
+    tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,
+    accountId:reviewPair?.customerId||null,
+    accountName:reviewPair?`Google customer ${reviewPair.customerId}`:null,
+    metadata:{
+      scope:tokens.scope||null,
+      expiryDate:tokens.expiry_date||null,
+      tokenType:tokens.token_type||null,
+      selectedCustomerId:reviewPair?.customerId||null,
+      selected_customer_id:reviewPair?.customerId||null,
+      selectedPlatformAccountId:reviewPair?.customerId||null,
+      selectedPlatformAccountIds:reviewPair?[reviewPair.customerId]:[],
+      selectedPlatformAccounts:reviewPair?[{
+        platform_account_id:reviewPair.customerId,
+        customerId:reviewPair.customerId,
+        loginCustomerId:reviewPair.loginCustomerId,
+        account_name:`Google customer ${reviewPair.customerId}`
+      }]:[],
+      platform_account_id:reviewPair?.customerId||null,
+      customerId:reviewPair?.customerId||null,
+      customer_id:reviewPair?.customerId||null,
+      loginCustomerId:reviewPair?.loginCustomerId||null,
+      login_customer_id:reviewPair?.loginCustomerId||null,
+      lastOwnedPlatformAccountId:reviewPair?.customerId||null,
+      accountSelectionRequired:reviewPair?false:true,
+      reconnectSelectionRequired:reviewPair?false:true,
+      accountSelectionGuardVersion:"v2-explicit-selection",
+      accountResolutionSource:reviewPair?.source||"oauth"
+    }
+  });
+  if(reviewPair){
+    const user={id:userId};
+    await ensureGoogleSnapshotLifecycle(user,reviewPair.customerId,reviewPair.loginCustomerId,{
+      accountName:`Google customer ${reviewPair.customerId}`,
+      source:"google_oauth_review_hard_route",
+      accountResolutionSource:reviewPair.source
+    });
+  }
+  req.session.googleOAuthState=null;
+  req.session.oauthUserId=null;
+  res.redirect(reviewPair?"/dashboard?google_connected=1":"/dashboard?google_connected=1&account_selection_required=1");
+}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
 
 
 // ===== GOOGLE SHEETS BACKEND INTEGRATION v1 =====
@@ -3009,8 +3071,12 @@ async function runQueuedBackfillJob(job){
       const platformTimeZone=await getPlatformAccountTimezone(job.user_id,"meta",platformAccountId,conn,ownership);
       writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate:null,limit:String(job.metadata?.limit||"100"),sourceJobId:job.id,captureReason,platformTimeZone,snapshotClass});
     }else if(platform==="google"){
-      const resolved=await resolveGoogleRefreshAccount(user,platformAccountId,job.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
-      writeResult=await writeGoogleSnapshotImmutable({user,customerId:normalizeCustomerId(resolved.customerId||platformAccountId),loginCustomerId:normalizeCustomerId(resolved.loginCustomerId||job.metadata?.loginCustomerId||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||""),dateRange:datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
+      const resolved=await resolveGoogleRefreshAccount(
+        user,
+        platformAccountId,
+        job.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||null
+      );
+      writeResult=await writeGoogleSnapshotImmutable({user,customerId:normalizeCustomerId(resolved.customerId),loginCustomerId:normalizeCustomerId(resolved.loginCustomerId),dateRange:datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
     }else if(platform==="tiktok"){
       writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
     }else if(platform==="klaviyo"){
@@ -3899,16 +3965,15 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
 }
 
-async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
+async function resolveGoogleRefreshAccount(user,requestedCustomerId=null,requestedLoginCustomerId=""){
+  // Temporary Google App Review hard-route. Every Google data path must use
+  // the same customer/manager pair after connect, reconnect and refresh.
+  if(GOOGLE_REVIEW_HARD_ROUTE_ENABLED)return googleReviewAccountPair();
+
   const requested=normalizeCustomerId(requestedCustomerId);
-  const requestedLogin=normalizeCustomerId(
-    arguments.length>2?arguments[2]:""
-  );
+  const requestedLogin=normalizeCustomerId(requestedLoginCustomerId);
   if(requested)return {customerId:requested,loginCustomerId:requestedLogin,source:"request"};
 
-  // Google Snapshot must follow the same working account pair as Google Test:
-  // loginCustomerId = Manager/MCC, customerId = test Ad Account.
-  // Do not fall back to the first platform_ad_accounts row; it may select a non-test account.
   const snapshotCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_CUSTOMER_ID);
   const snapshotLoginCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
   if(snapshotCustomerId){
@@ -3925,7 +3990,7 @@ async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
     conn?.metadata?.lastOwnedPlatformAccountId||
     conn?.metadata?.platform_account_id
   );
-  if(fromConn)return {customerId:fromConn,loginCustomerId:conn?.metadata?.loginCustomerId||conn?.metadata?.login_customer_id||"",source:"platform_connections"};
+  if(fromConn)return {customerId:fromConn,loginCustomerId:normalizeCustomerId(conn?.metadata?.loginCustomerId||conn?.metadata?.login_customer_id||""),source:"platform_connections"};
 
   const err=new Error("Missing Google customerId and no configured Google snapshot account found");
   err.status=400;
@@ -3990,10 +4055,15 @@ async function runGoogleAutoRefreshForSchedule(schedule){
   if(connError)throw connError;
   if(!conn)throw new Error("Auto refresh Google connection not found");
 
-  const resolved=await resolveGoogleRefreshAccount(user,schedule.platform_account_id||conn.account_id||GOOGLE_SNAPSHOT_CUSTOMER_ID,schedule.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
-  const platformAccountId=normalizeCustomerId(schedule.platform_account_id||resolved.customerId);
-  const loginCustomerId=normalizeCustomerId(schedule.metadata?.loginCustomerId||resolved.loginCustomerId||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||"");
+  const resolved=await resolveGoogleRefreshAccount(
+    user,
+    schedule.platform_account_id||conn.account_id||null,
+    schedule.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||null
+  );
+  const platformAccountId=normalizeCustomerId(resolved.customerId);
+  const loginCustomerId=normalizeCustomerId(resolved.loginCustomerId);
   if(!platformAccountId)throw new Error("Auto refresh missing Google customer id");
+  if(!loginCustomerId)throw new Error("Auto refresh missing Google login customer id");
 
   if(schedule.active===false){
     return {ok:true,skipped:true,reason:"schedule_inactive",schedule_id:schedule.id,platform_account_id:platformAccountId};
@@ -4126,7 +4196,9 @@ async function handleGoogleSnapshotWrite(req,res){
     const requestedLoginCustomerId=req.body?.loginCustomerId||req.body?.login_customer_id||req.query.loginCustomerId||req.query.login_customer_id||"";
     const resolvedGoogleAccount=await resolveGoogleRefreshAccount(user,requestedCustomerId,requestedLoginCustomerId);
     const platformAccountId=normalizeCustomerId(resolvedGoogleAccount.customerId);
-    const loginCustomerId=normalizeCustomerId(requestedLoginCustomerId||resolvedGoogleAccount.loginCustomerId||"");
+    const loginCustomerId=normalizeCustomerId(resolvedGoogleAccount.loginCustomerId);
+    if(!platformAccountId)throw new Error("Manual refresh missing Google customer id");
+    if(!loginCustomerId)throw new Error("Manual refresh missing Google login customer id");
     const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
     stage="lifecycle";

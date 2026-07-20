@@ -148,14 +148,21 @@ async function revokePlatformToken(platform,conn){
     }
 
     if((platform==="google"||platform==="organic"||platform==="google_sheets")&&(conn.refresh_token||conn.access_token)){
-      result.attempted=true;
-      result.provider="google";
-      const url=new URL("https://oauth2.googleapis.com/revoke");
-      url.searchParams.set("token",conn.refresh_token||conn.access_token);
-      const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"}});
-      result.response={status:r.status};
-      if(!r.ok&&r.status!==400)throw new Error(`${platform} Google revoke failed ${r.status}`);
+      // Ads, Organic and Google Sheets currently share the same Google OAuth client.
+      // Revoking one token at Google's provider can invalidate the shared user grant
+      // and break the other still-connected Google integrations. Disconnect therefore
+      // destroys only this platform's stored credentials; the lifecycle cleanup below
+      // still clears tokens, ownerships, schedules and open jobs locally.
+      result.attempted=false;
+      result.provider="internal_token_destruction";
       result.ok=true;
+      result.error=null;
+      result.response={
+        revocation_mode:"internal_token_destruction",
+        shared_google_oauth_client:true,
+        access_token_present:Boolean(conn.access_token),
+        refresh_token_present:Boolean(conn.refresh_token)
+      };
       return result;
     }
 

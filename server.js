@@ -15,22 +15,11 @@ const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
 const GA4_DATA_API_BASE=process.env.GA4_DATA_API_BASE||"https://analyticsdata.googleapis.com/v1beta";
-const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||process.env.GOOGLE_TEST_CUSTOMER_ID||"5252399301";
+const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||process.env.GOOGLE_TEST_CUSTOMER_ID||"5580593360";
 const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||process.env.GOOGLE_TEST_LOGIN_CUSTOMER_ID||"5383556660";
-const GOOGLE_REVIEW_HARD_ROUTE_ENABLED=String(process.env.GOOGLE_REVIEW_HARD_ROUTE_ENABLED||"true").toLowerCase()!=="false";
-function googleReviewAccountPair(){
-  const customerId=normalizeCustomerId(GOOGLE_SNAPSHOT_CUSTOMER_ID);
-  const loginCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
-  if(!customerId)throw new Error("Google review hard-route customer id is missing");
-  if(!loginCustomerId)throw new Error("Google review hard-route login customer id is missing");
-  if(customerId===loginCustomerId)throw new Error("Google customer id cannot equal login customer id");
-  return {customerId,loginCustomerId,source:"google_review_hard_route"};
-}
 const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
-const TIKTOK_REVIEW_ADVERTISER_ID=process.env.TIKTOK_REVIEW_ADVERTISER_ID||"7654240828777955348";
-const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"TikTok Test Advertiser";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
@@ -63,8 +52,6 @@ async function saveConnection(userId,platform,payload){
     account_name:payload.accountName!==undefined?payload.accountName:(existing?.account_name||null),
     metadata:{...(existing?.metadata||{}),...(payload.metadata||{})},
     connected:true,
-    disconnected_at:null,
-    disconnect_reason:null,
     updated_at:new Date().toISOString()
   };
   const {error}=await supabaseAdmin.from("platform_connections").upsert(row,{onConflict:"user_id,platform"});
@@ -150,21 +137,14 @@ async function revokePlatformToken(platform,conn){
     }
 
     if((platform==="google"||platform==="organic"||platform==="google_sheets")&&(conn.refresh_token||conn.access_token)){
-      // Ads, Organic and Google Sheets currently share the same Google OAuth client.
-      // Revoking one token at Google's provider can invalidate the shared user grant
-      // and break the other still-connected Google integrations. Disconnect therefore
-      // destroys only this platform's stored credentials; the lifecycle cleanup below
-      // still clears tokens, ownerships, schedules and open jobs locally.
-      result.attempted=false;
-      result.provider="internal_token_destruction";
+      result.attempted=true;
+      result.provider="google";
+      const url=new URL("https://oauth2.googleapis.com/revoke");
+      url.searchParams.set("token",conn.refresh_token||conn.access_token);
+      const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"}});
+      result.response={status:r.status};
+      if(!r.ok&&r.status!==400)throw new Error(`${platform} Google revoke failed ${r.status}`);
       result.ok=true;
-      result.error=null;
-      result.response={
-        revocation_mode:"internal_token_destruction",
-        shared_google_oauth_client:true,
-        access_token_present:Boolean(conn.access_token),
-        refresh_token_present:Boolean(conn.refresh_token)
-      };
       return result;
     }
 
@@ -190,19 +170,7 @@ async function revokePlatformToken(platform,conn){
         })
       });
       const data=await r.json().catch(()=>({status:r.status}));
-      result.response={status:r.status,body:data};
-
-      if(r.status===404){
-        result.ok=false;
-        result.tolerated=true;
-        result.error=data.message||data.error?.message||"TikTok revoke endpoint returned 404";
-        console.warn("[TikTok Disconnect] Provider revoke returned 404; continuing local lifecycle cleanup.",{
-          status:r.status,
-          endpoint:TIKTOK_REVOKE_ENDPOINT,
-          error:result.error
-        });
-        return result;
-      }
+      result.response=data;
 
       if(!r.ok || (data.code!==undefined&&data.code!==0)){
         throw new Error(data.message||data.error?.message||`TikTok revoke failed ${r.status}`);
@@ -287,6 +255,19 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
     .maybeSingle();
   if(existingError)throw existingError;
 
+  if(!existing){
+    const fallback=await supabaseAdmin
+      .from("snapshot_schedules")
+      .select("*")
+      .eq("user_id",userId)
+      .eq("platform",platform)
+      .order("updated_at",{ascending:false})
+      .limit(1)
+      .maybeSingle();
+    if(fallback.error)throw fallback.error;
+    existing=fallback.data||null;
+  }
+
   const patch={
     user_id:userId,
     platform,
@@ -322,21 +303,62 @@ async function ensureSnapshotSchedule(userId,platform,platformAccountId,metadata
 }
 
 async function requestLifecycleBackfill({userId,platform,platformAccountId,reason}){
+  const now=new Date().toISOString();
   const normalized=normalizePlatformAccountId(platformAccountId);
   const cleanPlatform=String(platform||"").toLowerCase().trim();
   const cleanReason=String(reason||"account_backfill_30d").trim();
-
   if(!normalized)throw new Error("Backfill platform account id is required");
   if(!cleanPlatform)throw new Error("Backfill platform is required");
 
-  return {
-    created:false,
-    job:null,
-    reason:"automatic_lifecycle_backfill_disabled",
-    platform:cleanPlatform,
-    platform_account_id:normalized,
-    capture_reason:cleanReason
-  };
+  const {data:existing,error:existingError}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .select("id,status,created_at,updated_at,job_type,capture_reason,metadata")
+    .eq("user_id",userId)
+    .eq("platform",cleanPlatform)
+    .eq("platform_account_id",normalized)
+    .eq("job_type","backfill_30d")
+    .eq("capture_reason",cleanReason)
+    .in("status",["queued","running","completed"])
+    .order("created_at",{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(existingError)throw existingError;
+  if(existing)return {created:false,job:existing,reason:"existing_backfill_30d"};
+
+  const {data,error}=await supabaseAdmin
+    .from("snapshot_jobs")
+    .insert({
+      user_id:userId,
+      platform:cleanPlatform,
+      platform_account_id:normalized,
+      status:"queued",
+      job_type:"backfill_30d",
+      capture_reason:cleanReason,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      metadata:{
+        trigger:cleanReason,
+        days:BACKFILL_DAYS_ON_RECONNECT,
+        datePreset:"last_30d",
+        captureReason:cleanReason,
+        snapshotClass:"backfill",
+        queuedBackfillVersion:"v1",
+        lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION
+      },
+      created_at:now,
+      updated_at:now
+    })
+    .select("*")
+    .maybeSingle();
+  if(error)throw error;
+
+  await supabaseAdmin
+    .from("platform_account_ownerships")
+    .update({last_backfill_requested_at:now,updated_at:now,lifecycle_version:DISCONNECT_LIFECYCLE_VERSION})
+    .eq("owner_user_id",userId)
+    .eq("platform",cleanPlatform)
+    .eq("platform_account_id",normalized);
+
+  return {created:true,job:data};
 }
 
 async function reactivatePlatformLifecycle(userId,platform,platformAccountId,reason="account_reactivation"){
@@ -951,62 +973,29 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
   }
 
   const failedRevoke=revoke_results.find(r=>r.attempted&&r.ok===false);
-  if(failedRevoke&&platform!=="tiktok"){
+  if(failedRevoke){
     const err=new Error(`${platform} revoke failed: ${failedRevoke.error}`);
     err.status=502;
     err.revoke_results=revoke_results;
     throw err;
   }
 
-  if(failedRevoke&&platform==="tiktok"){
-    failedRevoke.tolerated=true;
-    console.warn("[TikTok Disconnect] Provider revoke failed; local lifecycle cleanup will continue.",{
-      error:failedRevoke.error,
-      response:failedRevoke.response||null
-    });
-  }
-
-  const connData=[];
-  for(const conn of connections||[]){
-    const metadata={...(conn.metadata||{})};
-    metadata.selectedPlatformAccountId=null;
-    metadata.selectedPlatformAccountIds=[];
-    metadata.selectedPlatformAccounts=[];
-    metadata.lastOwnedPlatformAccountId=null;
-    metadata.accountSelectionRequired=true;
-    metadata.reconnectSelectionRequired=true;
-    metadata.disconnectedSelectionClearedAt=now;
-
-    if(platform===GOOGLE_SHEETS_PLATFORM){
-      metadata.spreadsheet_id=null;
-      metadata.spreadsheet_name=null;
-      metadata.last_sync_at=null;
-      metadata.last_sync_status=null;
-      metadata.last_sync_error=null;
-    }
-
-    const {data:updatedConnection,error:connError}=await supabaseAdmin
-      .from("platform_connections")
-      .update({
-        connected:false,
-        access_token:null,
-        refresh_token:null,
-        token_expires_at:null,
-        account_id:null,
-        account_name:null,
-        metadata,
-        disconnected_at:now,
-        disconnect_reason:reason,
-        lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
-        updated_at:now
-      })
-      .eq("user_id",userId)
-      .eq("platform",platform)
-      .select("platform,account_id,account_name,connected,metadata,disconnected_at,disconnect_reason,lifecycle_version")
-      .maybeSingle();
-    if(connError)throw connError;
-    if(updatedConnection)connData.push(updatedConnection);
-  }
+  const {data:connData,error:connError}=await supabaseAdmin
+    .from("platform_connections")
+    .update({
+      connected:false,
+      access_token:null,
+      refresh_token:null,
+      token_expires_at:null,
+      disconnected_at:now,
+      disconnect_reason:reason,
+      lifecycle_version:DISCONNECT_LIFECYCLE_VERSION,
+      updated_at:now
+    })
+    .eq("user_id",userId)
+    .eq("platform",platform)
+    .select("platform,account_id,account_name,connected,disconnected_at,disconnect_reason,lifecycle_version");
+  if(connError)throw connError;
 
   const {data:ownershipData,error:ownershipError}=await supabaseAdmin
     .from("platform_account_ownerships")
@@ -1091,7 +1080,7 @@ async function setRefreshJobStatus(jobId,status,extra={}){
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
 app.get("/auth/meta",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.META_APP_ID||!process.env.META_REDIRECT_URI)throw new Error("Missing Meta env");const state=Math.random().toString(36).slice(2);req.session.metaOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({client_id:process.env.META_APP_ID,redirect_uri:process.env.META_REDIRECT_URI,state,response_type:"code",scope:"ads_read"});res.redirect(`https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/meta/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");if(!state||state!==req.session.metaOAuthState)return res.redirect("/dashboard?meta_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?meta_error=missing_user_id");const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});
+app.get("/auth/meta/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");if(!state||state!==req.session.metaOAuthState)return res.redirect("/dashboard?meta_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?meta_error=missing_user_id");const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});
 
 const metaConnAfterReconnect=await getConnection(userId,"meta");
 if(metaConnAfterReconnect){
@@ -1105,60 +1094,7 @@ if(metaConnAfterReconnect){
 }
 req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/google/callback",async(req,res)=>{try{
-  const{code,state,error}=req.query;
-  if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);
-  if(!code)return res.redirect("/dashboard?google_error=missing_code");
-  if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");
-  const userId=req.session.oauthUserId;
-  if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");
-  const client=googleOAuthClient();
-  const{tokens}=await client.getToken(code);
-  const reviewPair=GOOGLE_REVIEW_HARD_ROUTE_ENABLED?googleReviewAccountPair():null;
-  await saveConnection(userId,"google",{
-    accessToken:tokens.access_token,
-    refreshToken:tokens.refresh_token||null,
-    tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,
-    accountId:reviewPair?.customerId||null,
-    accountName:reviewPair?`Google customer ${reviewPair.customerId}`:null,
-    metadata:{
-      scope:tokens.scope||null,
-      expiryDate:tokens.expiry_date||null,
-      tokenType:tokens.token_type||null,
-      selectedCustomerId:reviewPair?.customerId||null,
-      selected_customer_id:reviewPair?.customerId||null,
-      selectedPlatformAccountId:reviewPair?.customerId||null,
-      selectedPlatformAccountIds:reviewPair?[reviewPair.customerId]:[],
-      selectedPlatformAccounts:reviewPair?[{
-        platform_account_id:reviewPair.customerId,
-        customerId:reviewPair.customerId,
-        loginCustomerId:reviewPair.loginCustomerId,
-        account_name:`Google customer ${reviewPair.customerId}`
-      }]:[],
-      platform_account_id:reviewPair?.customerId||null,
-      customerId:reviewPair?.customerId||null,
-      customer_id:reviewPair?.customerId||null,
-      loginCustomerId:reviewPair?.loginCustomerId||null,
-      login_customer_id:reviewPair?.loginCustomerId||null,
-      lastOwnedPlatformAccountId:reviewPair?.customerId||null,
-      accountSelectionRequired:reviewPair?false:true,
-      reconnectSelectionRequired:reviewPair?false:true,
-      accountSelectionGuardVersion:"v2-explicit-selection",
-      accountResolutionSource:reviewPair?.source||"oauth"
-    }
-  });
-  if(reviewPair){
-    const user={id:userId};
-    await ensureGoogleSnapshotLifecycle(user,reviewPair.customerId,reviewPair.loginCustomerId,{
-      accountName:`Google customer ${reviewPair.customerId}`,
-      source:"google_oauth_review_hard_route",
-      accountResolutionSource:reviewPair.source
-    });
-  }
-  req.session.googleOAuthState=null;
-  req.session.oauthUserId=null;
-  res.redirect(reviewPair?"/dashboard?google_connected=1":"/dashboard?google_connected=1&account_selection_required=1");
-}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
+app.get("/auth/google/callback",async(req,res)=>{try{const{code,state,error}=req.query;if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);if(!code)return res.redirect("/dashboard?google_error=missing_code");if(!state||state!==req.session.googleOAuthState)return res.redirect("/dashboard?google_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?google_error=missing_user_id");const client=googleOAuthClient();const{tokens}=await client.getToken(code);await saveConnection(userId,"google",{accessToken:tokens.access_token,refreshToken:tokens.refresh_token||null,tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,accountId:null,accountName:null,metadata:{scope:tokens.scope||null,expiryDate:tokens.expiry_date||null,tokenType:tokens.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});req.session.googleOAuthState=null;res.redirect("/dashboard?google_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
 
 
 // ===== GOOGLE SHEETS BACKEND INTEGRATION v1 =====
@@ -1339,30 +1275,24 @@ app.get("/auth/google-sheets/callback",async(req,res)=>{
       accessToken:tokens.access_token||existing?.access_token||null,
       refreshToken:tokens.refresh_token||existing?.refresh_token||null,
       tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:null,
-      accountName:null,
+      accountId:existing?.account_id||null,
+      accountName:existing?.account_name||"Google Sheets",
       metadata:{
         googleSheetsOAuthVersion:"v1",
         scope:tokens.scope||GOOGLE_SHEETS_SCOPES.join(" "),
         tokenType:tokens.token_type||null,
         connectedAt:new Date().toISOString(),
-        selectedPlatformAccountId:null,
-        selectedPlatformAccountIds:[],
-        selectedPlatformAccounts:[],
-        lastOwnedPlatformAccountId:null,
-        accountSelectionRequired:true,
-        reconnectSelectionRequired:true,
-        spreadsheet_id:null,
-        spreadsheet_name:null,
-        worksheet_name:GOOGLE_SHEETS_DEFAULT_WORKSHEET,
-        auto_sync_enabled:false,
-        last_sync_at:null,
-        last_sync_status:null,
-        last_sync_error:null
+        spreadsheet_id:existing?.metadata?.spreadsheet_id||null,
+        spreadsheet_name:existing?.metadata?.spreadsheet_name||null,
+        worksheet_name:existing?.metadata?.worksheet_name||GOOGLE_SHEETS_DEFAULT_WORKSHEET,
+        auto_sync_enabled:existing?.metadata?.auto_sync_enabled===true,
+        last_sync_at:existing?.metadata?.last_sync_at||null,
+        last_sync_status:existing?.metadata?.last_sync_status||null,
+        last_sync_error:existing?.metadata?.last_sync_error||null
       }
     });
     req.session.googleSheetsOAuthState=null;req.session.googleSheetsOAuthUserId=null;
-    res.redirect("/dashboard?google_sheets_connected=1&account_selection_required=1");
+    res.redirect("/dashboard?google_sheets_connected=1");
   }catch(e){res.redirect(`/dashboard?google_sheets_error=${encodeURIComponent(e.message)}`)}
 });
 app.get("/api/google-sheets/status",async(req,res)=>{
@@ -1463,8 +1393,8 @@ app.get("/auth/organic/callback",async(req,res)=>{
       accessToken:tokens.access_token||existing?.access_token||null,
       refreshToken:tokens.refresh_token||existing?.refresh_token||null,
       tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:null,
-      accountName:null,
+      accountId:existing?.account_id||null,
+      accountName:existing?.account_name||"Organic",
       metadata:{
         organicOAuthVersion:"v1.1-callback-fix",
         organicOAuthConnectedAt:callbackAt,
@@ -1473,12 +1403,7 @@ app.get("/auth/organic/callback",async(req,res)=>{
         scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),
         tokenType:tokens.token_type||null,
         expiryDate:tokens.expiry_date||null,
-        selectedPlatformAccountId:null,
-        selectedPlatformAccountIds:[],
-        selectedPlatformAccounts:[],
-        lastOwnedPlatformAccountId:null,
         accountSelectionRequired:true,
-        reconnectSelectionRequired:true,
         organicConfigured:false,
         organicCallbackSaved:true
       }
@@ -1682,149 +1607,17 @@ function organicGa4ChannelFilterV1(){
   };
 }
 
-function organicIsoDate(value){
-  return fxDateOnly(value||new Date());
-}
-
-const ORGANIC_SOURCE_MEDIUM_GROUPS_V2=[
-  "Direct",
-  "Meta Organic",
-  "Google Organic",
-  "TikTok Organic",
-  "Klaviyo Organic",
-  "Others"
-];
-
-function organicGa4Value(value){
-  const n=Number(value||0);
+function organicMetricValue(row,metricName){
+  const headers=row?.metricHeaders||[];
+  const values=row?.rows?.[0]?.metricValues||[];
+  const index=headers.findIndex(h=>h?.name===metricName);
+  if(index<0)return 0;
+  const n=Number(values[index]?.value||0);
   return Number.isFinite(n)?n:0;
 }
 
-function organicGa4HeaderIndex(headers,name){
-  return (headers||[]).findIndex(header=>header?.name===name);
-}
-
-function organicNormalizeSourceMedium(value){
-  return String(value??"")
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//,"")
-    .replace(/^www\./,"")
-    .replace(/\/+$/,"");
-}
-
-function organicSourceMatchesDomainAllowlist(source,exactValues,rootDomains){
-  if(exactValues.includes(source))return true;
-  return rootDomains.some(domain=>source.endsWith(`.${domain}`));
-}
-
-function organicMediumIsPaidV2(medium){
-  const normalized=organicNormalizeSourceMedium(medium).replace(/\s+/g,"_");
-  const explicitPaidMediums=new Set([
-    "cpc","ppc","paid","paid_social","paid-social","paidsearch","paid_search",
-    "retargeting","display","banner","expandable","interstitial","cpm"
-  ]);
-  if(explicitPaidMediums.has(normalized))return true;
-  if(/.*cp.*/.test(normalized))return true;
-  if(/^paid.*/.test(normalized))return true;
-  return false;
-}
-
-function classifyOrganicSourceMediumV2(source,medium){
-  const normalizedSource=organicNormalizeSourceMedium(source);
-  const normalizedMedium=organicNormalizeSourceMedium(medium);
-
-  if(organicMediumIsPaidV2(normalizedMedium))return null;
-
-  if(normalizedSource==="(direct)"&&
-     (normalizedMedium==="(none)"||normalizedMedium==="(not set)"))return "Direct";
-
-  if(normalizedSource==="google"&&normalizedMedium==="organic")return "Google Organic";
-
-  const metaExactSources=[
-    "apps.facebook.com","business.facebook.com","facebook","facebook.com","fb","fb.me",
-    "free.facebook.com","l.facebook.com","lm.facebook.com","m.facebook.com",
-    "mobile.facebook.com","touch.facebook.com","web.facebook.com",
-    "instagram","instagram.com","ig","l.instagram.com",
-    "messenger","messenger.com","l.messenger.com"
-  ];
-  if(organicSourceMatchesDomainAllowlist(
-    normalizedSource,
-    metaExactSources,
-    ["facebook.com","instagram.com","messenger.com"]
-  ))return "Meta Organic";
-
-  if(organicSourceMatchesDomainAllowlist(
-    normalizedSource,
-    ["tiktok","tiktok.com"],
-    ["tiktok.com"]
-  ))return "TikTok Organic";
-
-  if(
-    organicSourceMatchesDomainAllowlist(
-      normalizedSource,
-      ["klaviyo","klaviyo.com"],
-      ["klaviyo.com"]
-    )||
-    normalizedSource.includes("klaviyo")
-  )return "Klaviyo Organic";
-
-  return "Others";
-}
-
-function aggregateOrganicSourceMediumRowsV2(report){
-  const dimensionHeaders=report?.dimensionHeaders||[];
-  const metricHeaders=report?.metricHeaders||[];
-  const sourceIndex=organicGa4HeaderIndex(dimensionHeaders,"sessionSource");
-  const mediumIndex=organicGa4HeaderIndex(dimensionHeaders,"sessionMedium");
-  const metricIndexes={
-    sessions:organicGa4HeaderIndex(metricHeaders,"sessions"),
-    addToCarts:organicGa4HeaderIndex(metricHeaders,"addToCarts"),
-    checkouts:organicGa4HeaderIndex(metricHeaders,"checkouts"),
-    ecommercePurchases:organicGa4HeaderIndex(metricHeaders,"ecommercePurchases"),
-    purchaseRevenue:organicGa4HeaderIndex(metricHeaders,"purchaseRevenue")
-  };
-
-  const groups=Object.fromEntries(
-    ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(classification=>[
-      classification,
-      {
-        classification,
-        sessions:0,
-        addToCarts:0,
-        checkouts:0,
-        ecommercePurchases:0,
-        purchaseRevenue:0,
-        ga4_source_medium_rows:[]
-      }
-    ])
-  );
-
-  for(const row of report?.rows||[]){
-    const source=row?.dimensionValues?.[sourceIndex]?.value??"";
-    const medium=row?.dimensionValues?.[mediumIndex]?.value??"";
-    const classification=classifyOrganicSourceMediumV2(source,medium);
-    if(!classification)continue;
-    const rawEvidence={
-      sessionSource:source,
-      sessionMedium:medium,
-      sessions:metricIndexes.sessions>=0?organicGa4Value(row?.metricValues?.[metricIndexes.sessions]?.value):0,
-      addToCarts:metricIndexes.addToCarts>=0?organicGa4Value(row?.metricValues?.[metricIndexes.addToCarts]?.value):0,
-      checkouts:metricIndexes.checkouts>=0?organicGa4Value(row?.metricValues?.[metricIndexes.checkouts]?.value):0,
-      ecommercePurchases:metricIndexes.ecommercePurchases>=0?organicGa4Value(row?.metricValues?.[metricIndexes.ecommercePurchases]?.value):0,
-      purchaseRevenue:metricIndexes.purchaseRevenue>=0?organicGa4Value(row?.metricValues?.[metricIndexes.purchaseRevenue]?.value):0
-    };
-
-    const group=groups[classification];
-    group.sessions+=rawEvidence.sessions;
-    group.addToCarts+=rawEvidence.addToCarts;
-    group.checkouts+=rawEvidence.checkouts;
-    group.ecommercePurchases+=rawEvidence.ecommercePurchases;
-    group.purchaseRevenue+=rawEvidence.purchaseRevenue;
-    group.ga4_source_medium_rows.push(rawEvidence);
-  }
-
-  return ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(name=>groups[name]);
+function organicIsoDate(value){
+  return fxDateOnly(value||new Date());
 }
 
 async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
@@ -1834,10 +1627,7 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
   const url=`${GA4_DATA_API_BASE}/properties/${encodeURIComponent(cleanPropertyId)}:runReport`;
   const body={
     dateRanges:[{startDate,endDate}],
-    dimensions:[
-      {name:"sessionSource"},
-      {name:"sessionMedium"}
-    ],
+    dimensionFilter:organicGa4ChannelFilterV1(),
     metrics:[
       {name:"sessions"},
       {name:"addToCarts"},
@@ -1850,115 +1640,90 @@ async function fetchOrganicGa4Metrics(userId,propertyId,startDate,endDate){
   const data=await r.json().catch(()=>({status:r.status}));
   if(!r.ok)throw new Error(data.error?.message||data.message||`Organic GA4 Data API failed ${r.status}`);
   return {
-    groups:aggregateOrganicSourceMediumRowsV2(data),
+    sessions:organicMetricValue(data,"sessions"),
+    add_to_cart:organicMetricValue(data,"addToCarts"),
+    checkout:organicMetricValue(data,"checkouts"),
+    purchase:organicMetricValue(data,"ecommercePurchases"),
+    revenue:organicMetricValue(data,"purchaseRevenue"),
+    channel_groups:ORGANIC_GA4_CHANNEL_GROUPS_V1,
     raw:data
   };
 }
 
 function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,property}){
-  const currency=accountCurrency||DEFAULT_REPORTING_CURRENCY;
-  const groups=Array.isArray(ga4?.groups)?ga4.groups:[];
-  const totals=groups.reduce((result,group)=>{
-    result.sessions+=organicGa4Value(group.sessions);
-    result.addToCarts+=organicGa4Value(group.addToCarts);
-    result.checkouts+=organicGa4Value(group.checkouts);
-    result.ecommercePurchases+=organicGa4Value(group.ecommercePurchases);
-    result.purchaseRevenue+=organicGa4Value(group.purchaseRevenue);
-    return result;
-  },{sessions:0,addToCarts:0,checkouts:0,ecommercePurchases:0,purchaseRevenue:0});
-
-  const performanceRows=ORGANIC_SOURCE_MEDIUM_GROUPS_V2.map(classification=>{
-    const group=groups.find(item=>item.classification===classification)||{
-      classification,
-      sessions:0,
-      addToCarts:0,
-      checkouts:0,
-      ecommercePurchases:0,
-      purchaseRevenue:0,
-      ga4_source_medium_rows:[]
-    };
-    const checkout=organicGa4Value(group.checkouts);
-    const purchase=organicGa4Value(group.ecommercePurchases);
-    const revenue=organicGa4Value(group.purchaseRevenue);
-    const abandoned=Math.max(checkout-purchase,0);
-    const entityId=classification.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
-
-    return {
-      platform:classification,
-      level:"platform",
-      id_in_platform:entityId,
-      campaign_id:entityId,
-      campaign_name:classification,
-      campaign_status:"active",
-      status:"active",
-      currency,
-      impressions:0,
-      clicks:0,
-      ad_clicks:0,
-      sessions:organicGa4Value(group.sessions),
-      ctr:null,
-      cpc:null,
-      spend:0,
-      sales:revenue,
-      revenue,
-      roas:null,
-      cps:null,
-      add_to_cart:organicGa4Value(group.addToCarts),
-      checkout,
-      purchase,
-      purchases:purchase,
-      purchase_count:purchase,
-      abandoned,
-      conversion_value:revenue,
-      conversions:purchase,
-      raw:{
-        source:"organic_snapshot_ga4_source_medium_v2",
-        ga4_source_medium_rows:group.ga4_source_medium_rows||[],
-        classification,
-        property_id:property.property_id,
-        ga4_property:property
-      }
-    };
-  });
-
-  const totalAbandoned=Math.max(totals.checkouts-totals.ecommercePurchases,0);
+  const sessions=Number(ga4.sessions||0);
+  const addToCart=Number(ga4.add_to_cart||0);
+  const checkout=Number(ga4.checkout||0);
+  const purchase=Number(ga4.purchase||0);
+  const revenue=Number(ga4.revenue||0);
+  const abandoned=checkout>0?Math.max(checkout-purchase,0):0;
   return {
     platform:"organic",
     snapshot_date:snapshotDate,
-    account_currency:currency,
+    account_currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
     kpis:{
       spend:0,
-      sales:totals.purchaseRevenue,
-      revenue:totals.purchaseRevenue,
+      sales:revenue,
+      revenue,
       impressions:0,
       clicks:0,
-      sessions:totals.sessions,
+      sessions,
       ctr:null,
       cpc:null,
       roas:null
     },
     purchase_journey:{
-      add_to_cart:totals.addToCarts,
-      checkout:totals.checkouts,
-      abandoned:totalAbandoned,
-      purchase:totals.ecommercePurchases,
-      purchases:totals.ecommercePurchases,
-      purchase_value:totals.purchaseRevenue
+      add_to_cart:addToCart,
+      checkout,
+      abandoned,
+      purchase,
+      purchases:purchase,
+      purchase_value:revenue
     },
     click_journey:{
       ad_clicks:0,
       link_clicks:0,
       landing_page_views:0,
-      sessions:totals.sessions,
+      sessions,
       traffic_score:null,
       real_cpc:null
     },
     performance_summary:{
-      rows:performanceRows,
-      counts:{platform:performanceRows.length},
-      source_confidence:"organic_snapshot_ga4_source_medium_v2",
-      null_policy:"GA4 source/medium rows are classified into six fixed platform groups. Zero-value groups are preserved. Organic spend metrics remain unavailable and are stored as null where non-computable.",
-      raw_report:{ga4:ga4.raw}
+      rows:[{
+        platform:"Organic",
+        level:"platform",
+        campaign_id:"organic",
+        campaign_name:"Organic",
+        campaign_status:"active",
+        currency:accountCurrency||DEFAULT_REPORTING_CURRENCY,
+        impressions:0,
+        clicks:0,
+        ad_clicks:0,
+        sessions,
+        ctr:null,
+        cpc:null,
+        spend:0,
+        sales:revenue,
+        revenue,
+        roas:null,
+        add_to_cart:addToCart,
+        checkout,
+        purchase,
+        purchases:purchase,
+        purchase_count:purchase,
+        abandoned,
+        conversion_value:revenue,
+        conversions:purchase,
+        raw:{
+          source:"organic_snapshot_ga4_core_v1",
+          ga4_property:property,
+          channel_groups:ORGANIC_GA4_CHANNEL_GROUPS_V1
+        }
+      }],
+      counts:{platform:1},
+      source_confidence:"organic_snapshot_ga4_core_v1",
+      null_policy:"Organic Core uses only GA4 filtered by AdsTable Organic Channel Filter v1. Search Console is not required and no Search Console metrics are written.",
+      raw_report:{ga4:{...ga4.raw,adstable_channel_filter_v1:ORGANIC_GA4_CHANNEL_GROUPS_V1}}
     }
   };
 }
@@ -2046,7 +1811,6 @@ async function handleOrganicSnapshotWrite(req,res){
   try{
     const result=await requireConnection(req,res,"organic");if(!result)return;
     const {user,conn}=result;
-    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
     if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
     const property=conn.metadata.selectedGa4Property||{};
     const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.query.platform_account_id||conn.account_id||property.property_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
@@ -2067,8 +1831,8 @@ async function handleOrganicSnapshotWrite(req,res){
   }
 }
 
-app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
-app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
+app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
+app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
 // ===== END ORGANIC SNAPSHOT v1 =====
 
 
@@ -2230,7 +1994,7 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
   }
 }
 app.get("/auth/klaviyo",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const state=Math.random().toString(36).slice(2);const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());req.session.klaviyoOAuthState=state;req.session.klaviyoCodeVerifier=codeVerifier;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});res.redirect(`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});const klaviyoConn=await getConnection(userId,"klaviyo");
+app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});const klaviyoConn=await getConnection(userId,"klaviyo");
 const klaviyoAccount=await resolveKlaviyoAccountIdentity(klaviyoConn);
 await saveConnection(userId,"klaviyo",{accountId:null,accountName:null,metadata:{selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastDiscoveredPlatformAccountId:klaviyoAccount.platform_account_id,availableAccounts:[{platform_account_id:klaviyoAccount.platform_account_id,account_name:klaviyoAccount.account_name,currency:klaviyoAccount.currency||null}],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection",rawAccount:klaviyoAccount.raw_account}});
 req.session.klaviyoOAuthState=null;req.session.klaviyoCodeVerifier=null;res.redirect("/dashboard?klaviyo_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
@@ -2896,7 +2660,6 @@ async function handleMetaSnapshotWrite(req,res){
     if(!result)return;
 
     const {user,conn}=result;
-    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
     const requestedAdAccountId=req.body?.adAccountId||req.body?.ad_account_id||req.query.adAccountId||req.query.ad_account_id;
 
     stage="ownership";
@@ -3011,104 +2774,19 @@ async function getDefaultConnectionAccountId(userId,platform){
   return {conn,platformAccountId:fallbackId};
 }
 
-async function getActiveRefreshOwnerships(userId,platform){
-  const {data,error}=await supabaseAdmin
-    .from("platform_account_ownerships")
-    .select("platform_account_id,platform_account_name,metadata")
-    .eq("owner_user_id",userId)
-    .eq("platform",platform)
-    .in("status",activeOwnershipStatuses())
-    .order("updated_at",{ascending:true});
-  if(error)throw error;
-  return (data||[]).filter(row=>normalizePlatformAccountId(row.platform_account_id));
-}
-
-function refreshRequestOverrides(platform,ownership){
-  const platformAccountId=normalizePlatformAccountId(ownership.platform_account_id);
-  const metadata=ownership.metadata||{};
-
-  if(platform==="meta"){
-    return {
-      body:{adAccountId:platformAccountId,ad_account_id:platformAccountId},
-      query:{adAccountId:platformAccountId,ad_account_id:platformAccountId}
-    };
-  }
-
-  if(platform==="google"){
-    const loginCustomerId=normalizePlatformAccountId(
-      metadata.loginCustomerId||
-      metadata.login_customer_id||
-      metadata.manager_customer_id||
-      ""
-    );
-    return {
-      body:{
-        customerId:platformAccountId,
-        customer_id:platformAccountId,
-        loginCustomerId,
-        login_customer_id:loginCustomerId
-      },
-      query:{
-        customerId:platformAccountId,
-        customer_id:platformAccountId,
-        loginCustomerId,
-        login_customer_id:loginCustomerId
-      }
-    };
-  }
-
-  if(platform==="tiktok"){
-    return {
-      body:{advertiser_id:platformAccountId,advertiserId:platformAccountId,platform_account_id:platformAccountId},
-      query:{advertiser_id:platformAccountId,advertiserId:platformAccountId,platform_account_id:platformAccountId}
-    };
-  }
-
-  return {
-    body:{platform_account_id:platformAccountId},
-    query:{platform_account_id:platformAccountId}
-  };
-}
-
-async function runRefreshPlatform(platform,handler,req,user,ownership){
-  const platformAccountId=normalizePlatformAccountId(ownership.platform_account_id);
+async function runRefreshPlatform(platform,handler,req){
   try{
-    const overrides=refreshRequestOverrides(platform,ownership);
-    const accountReq=makeSyntheticReqForUser(user,req,overrides);
-    accountReq._skipGoogleSheetsAutoSync=true;
-    const result=await invokeRefreshHandler(handler,accountReq);
-    return {
-      ...result,
-      platform,
-      platform_account_id:platformAccountId,
-      data:{
-        ...(result.data||{}),
-        platform_account_id:result.data?.platform_account_id||platformAccountId
-      }
-    };
+    return await invokeRefreshHandler(handler,req);
   }catch(e){
-    return {
-      ok:false,
-      status:e.status||500,
-      platform,
-      platform_account_id:platformAccountId,
-      data:{
-        ok:false,
-        platform,
-        platform_account_id:platformAccountId,
-        error:e.message,
-        stage:e.stage||`${platform}_refresh`
-      }
-    };
+    return {ok:false,status:e.status||500,data:{ok:false,error:e.message,stage:e.stage||`${platform}_refresh`}};
   }
 }
 
 async function handleGlobalRefresh(req,res){
   const refreshUser=await requireUser(req,res);if(!refreshUser)return;
-  const accessCheck=await requireAccess(req,res,refreshUser.id,"manualRefresh");if(!accessCheck)return;
   req._skipGoogleSheetsAutoSync=true;
-
-  const platformHandlers=[
+  const results={};
+  const platforms=[
     ["meta",handleMetaSnapshotWrite],
     ["google",handleGoogleSnapshotWrite],
     ["tiktok",typeof handleTikTokSnapshotWrite==="function"?handleTikTokSnapshotWrite:null],
@@ -3116,69 +2794,35 @@ async function handleGlobalRefresh(req,res){
     ["organic",typeof handleOrganicSnapshotWrite==="function"?handleOrganicSnapshotWrite:null]
   ];
 
-  const accountResults=[];
-  const platforms={};
-
-  for(const [platform,handler] of platformHandlers){
+  for(const [platform,handler] of platforms){
     if(!handler){
-      platforms[platform]={
-        ok:false,
-        status:501,
-        accounts:[],
-        error:`${platform} refresh handler not implemented`,
-        stage:"refresh_dispatcher"
-      };
+      results[platform]={ok:false,status:501,data:{ok:false,error:`${platform} refresh handler not implemented`,stage:"refresh_dispatcher"}};
       continue;
     }
-
-    const ownerships=await getActiveRefreshOwnerships(refreshUser.id,platform);
-    const results=[];
-
-    for(const ownership of ownerships){
-      results.push(await runRefreshPlatform(platform,handler,req,refreshUser,ownership));
-    }
-
-    accountResults.push(...results);
-
-    const successful=results.filter(result=>result.ok);
-    const failed=results.filter(result=>!result.ok);
-    platforms[platform]={
-      ok:results.length>0&&failed.length===0,
-      status:results.length===0?204:(failed.length===0?200:(successful.length>0?207:500)),
-      active_account_count:ownerships.length,
-      refreshed_account_count:results.length,
-      completed_account_count:successful.length,
-      failed_account_count:failed.length,
-      accounts:results.map(result=>result.data)
-    };
+    results[platform]=await runRefreshPlatform(platform,handler,req);
   }
 
-  const completedResults=accountResults.filter(result=>result.ok);
-  const failedResults=accountResults.filter(result=>!result.ok);
-  const firstCompleted=completedResults[0]?.data||{};
-  const googleSheetsSync=completedResults.length
-    ?await maybeAutoSyncGoogleSheets(refreshUser.id)
-    :{attempted:false,ok:true,skipped:true,reason:"no_platform_refresh_completed",spreadsheet_id:null,rows_written:0,error:null};
+  const completed=Object.entries(results).filter(([,r])=>r.ok).map(([platform])=>platform);
+  const failed=Object.entries(results).filter(([,r])=>!r.ok).map(([platform,r])=>({platform,status:r.status,error:r.data?.error||"Refresh failed",stage:r.data?.stage||null}));
+  const firstCompleted=completed[0]?results[completed[0]]?.data:{};
+  const googleSheetsSync=completed.length?await maybeAutoSyncGoogleSheets(refreshUser.id):{attempted:false,ok:true,skipped:true,reason:"no_platform_refresh_completed",spreadsheet_id:null,rows_written:0,error:null};
 
-  const completed=[...new Set(completedResults.map(result=>result.platform))];
-  const failed=failedResults.map(result=>({
-    platform:result.platform,
-    platform_account_id:result.platform_account_id,
-    status:result.status,
-    error:result.data?.error||"Refresh failed",
-    stage:result.data?.stage||null
-  }));
-
-  res.status(completedResults.length?200:500).json({
-    ok:completedResults.length>0,
-    refresh_scope:"global_multi_account",
+  res.status(completed.length?200:500).json({
+    ok:completed.length>0,
+    refresh_scope:"global",
     completed,
     failed,
     refresh_job:firstCompleted?.refresh_job||null,
     snapshot_id:firstCompleted?.snapshot_id||null,
     snapshot_date:firstCompleted?.snapshot_date||null,
     google_sheets_sync:googleSheetsSync,
-    platforms
+    platforms:{
+      meta:results.meta?.data||null,
+      google:results.google?.data||null,
+      tiktok:results.tiktok?.data||null,
+      klaviyo:results.klaviyo?.data||null,
+      organic:results.organic?.data||null
+    }
   });
 }
 
@@ -3243,12 +2887,8 @@ async function runQueuedBackfillJob(job){
       const platformTimeZone=await getPlatformAccountTimezone(job.user_id,"meta",platformAccountId,conn,ownership);
       writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate:null,limit:String(job.metadata?.limit||"100"),sourceJobId:job.id,captureReason,platformTimeZone,snapshotClass});
     }else if(platform==="google"){
-      const resolved=await resolveGoogleRefreshAccount(
-        user,
-        platformAccountId,
-        job.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||null
-      );
-      writeResult=await writeGoogleSnapshotImmutable({user,customerId:normalizeCustomerId(resolved.customerId),loginCustomerId:normalizeCustomerId(resolved.loginCustomerId),dateRange:datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
+      const resolved=await resolveGoogleRefreshAccount(user,platformAccountId,job.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
+      writeResult=await writeGoogleSnapshotImmutable({user,customerId:normalizeCustomerId(resolved.customerId||platformAccountId),loginCustomerId:normalizeCustomerId(resolved.loginCustomerId||job.metadata?.loginCustomerId||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||""),dateRange:datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
     }else if(platform==="tiktok"){
       writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate:null,sourceJobId:job.id,captureReason,snapshotClass});
     }else if(platform==="klaviyo"){
@@ -4137,15 +3777,16 @@ async function writeGoogleSnapshotImmutable({user,customerId,loginCustomerId="",
   return {mode:"insert",snapshot:data,row_counts:snapshot.performance_summary.counts,performance_spread_result,google_api:{campaign:campaignResult,adgroup:adgroupResult,ad:adResult}};
 }
 
-async function resolveGoogleRefreshAccount(user,requestedCustomerId=null,requestedLoginCustomerId=""){
-  // Temporary Google App Review hard-route. Every Google data path must use
-  // the same customer/manager pair after connect, reconnect and refresh.
-  if(GOOGLE_REVIEW_HARD_ROUTE_ENABLED)return googleReviewAccountPair();
-
+async function resolveGoogleRefreshAccount(user,requestedCustomerId=null){
   const requested=normalizeCustomerId(requestedCustomerId);
-  const requestedLogin=normalizeCustomerId(requestedLoginCustomerId);
+  const requestedLogin=normalizeCustomerId(
+    arguments.length>2?arguments[2]:""
+  );
   if(requested)return {customerId:requested,loginCustomerId:requestedLogin,source:"request"};
 
+  // Google Snapshot must follow the same working account pair as Google Test:
+  // loginCustomerId = Manager/MCC, customerId = test Ad Account.
+  // Do not fall back to the first platform_ad_accounts row; it may select a non-test account.
   const snapshotCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_CUSTOMER_ID);
   const snapshotLoginCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
   if(snapshotCustomerId){
@@ -4162,7 +3803,7 @@ async function resolveGoogleRefreshAccount(user,requestedCustomerId=null,request
     conn?.metadata?.lastOwnedPlatformAccountId||
     conn?.metadata?.platform_account_id
   );
-  if(fromConn)return {customerId:fromConn,loginCustomerId:normalizeCustomerId(conn?.metadata?.loginCustomerId||conn?.metadata?.login_customer_id||""),source:"platform_connections"};
+  if(fromConn)return {customerId:fromConn,loginCustomerId:conn?.metadata?.loginCustomerId||conn?.metadata?.login_customer_id||"",source:"platform_connections"};
 
   const err=new Error("Missing Google customerId and no configured Google snapshot account found");
   err.status=400;
@@ -4227,15 +3868,10 @@ async function runGoogleAutoRefreshForSchedule(schedule){
   if(connError)throw connError;
   if(!conn)throw new Error("Auto refresh Google connection not found");
 
-  const resolved=await resolveGoogleRefreshAccount(
-    user,
-    schedule.platform_account_id||conn.account_id||null,
-    schedule.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||null
-  );
-  const platformAccountId=normalizeCustomerId(resolved.customerId);
-  const loginCustomerId=normalizeCustomerId(resolved.loginCustomerId);
+  const resolved=await resolveGoogleRefreshAccount(user,schedule.platform_account_id||conn.account_id||GOOGLE_SNAPSHOT_CUSTOMER_ID,schedule.metadata?.loginCustomerId||conn.metadata?.loginCustomerId||conn.metadata?.login_customer_id||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
+  const platformAccountId=normalizeCustomerId(schedule.platform_account_id||resolved.customerId);
+  const loginCustomerId=normalizeCustomerId(schedule.metadata?.loginCustomerId||resolved.loginCustomerId||GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||"");
   if(!platformAccountId)throw new Error("Auto refresh missing Google customer id");
-  if(!loginCustomerId)throw new Error("Auto refresh missing Google login customer id");
 
   if(schedule.active===false){
     return {ok:true,skipped:true,reason:"schedule_inactive",schedule_id:schedule.id,platform_account_id:platformAccountId};
@@ -4368,9 +4004,7 @@ async function handleGoogleSnapshotWrite(req,res){
     const requestedLoginCustomerId=req.body?.loginCustomerId||req.body?.login_customer_id||req.query.loginCustomerId||req.query.login_customer_id||"";
     const resolvedGoogleAccount=await resolveGoogleRefreshAccount(user,requestedCustomerId,requestedLoginCustomerId);
     const platformAccountId=normalizeCustomerId(resolvedGoogleAccount.customerId);
-    const loginCustomerId=normalizeCustomerId(resolvedGoogleAccount.loginCustomerId);
-    if(!platformAccountId)throw new Error("Manual refresh missing Google customer id");
-    if(!loginCustomerId)throw new Error("Manual refresh missing Google login customer id");
+    const loginCustomerId=normalizeCustomerId(requestedLoginCustomerId||resolvedGoogleAccount.loginCustomerId||"");
     const dateRange=String(req.body?.date_range||req.body?.dateRange||req.query.date_range||req.query.dateRange||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
     stage="lifecycle";
@@ -4948,7 +4582,7 @@ app.get("/auth/tiktok/callback",async(req,res)=>{
       tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
       accountId:null,
       accountName:null,
-      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}
+      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}
     });
     req.session.tiktokOAuthState=null;
     res.redirect("/dashboard?tiktok_connected=1&account_selection_required=1");
@@ -4994,27 +4628,7 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
       status:a.status||a.advertiser_status||null,
       currency:a.currency||a.currency_code||null
     }));
-
-    // TikTok Review/Test routing:
-    // OAuth account discovery can return no accessible advertisers even though
-    // the approved test advertiser is queryable with the connected token.
-    // Surface that advertiser in the existing account-selection flow.
-    if(!advertisers.length&&TIKTOK_REVIEW_ADVERTISER_ID){
-      advertisers.push({
-        advertiser_id:TIKTOK_REVIEW_ADVERTISER_ID,
-        advertiser_name:TIKTOK_REVIEW_ADVERTISER_NAME,
-        status:"active",
-        currency:null,
-        review_fallback:true
-      });
-    }
-
-    res.json({
-      platform:"tiktok",
-      advertisers,
-      advertiser_source:list.length?"oauth_accessible_advertisers":"review_fallback",
-      raw:data
-    });
+    res.json({platform:"tiktok",advertisers,raw:data});
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
 
@@ -5234,7 +4848,6 @@ async function handleTikTokSnapshotWrite(req,res){
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
     const {user,conn}=result;
-    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
     const requested=req.body?.advertiser_id||req.body?.advertiserId||req.body?.platform_account_id||req.query.advertiser_id||req.query.advertiserId||req.query.platform_account_id;
     const platformAccountId=normalizePlatformAccountId(requested||conn.account_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing TikTok advertiser id",stage});
@@ -5296,7 +4909,6 @@ async function handleKlaviyoSnapshotWrite(req,res){
   try{
     const result=await requireConnection(req,res,"klaviyo");if(!result)return;
     const {user,conn}=result;
-    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
     if(conn.metadata?.requiresSetup)return res.status(400).json({ok:false,error:"Klaviyo setup required. Please enter estimated monthly spend and currency.",stage:"settings"});
     const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.query.platform_account_id||conn.account_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Klaviyo account id",stage});

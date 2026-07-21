@@ -3436,6 +3436,31 @@ body.account-mode .accountSettingsView{
 }
 .phase1RefreshStatus.show{display:block;}
 .phase1RefreshStatus.error{color:#b00020;}
+.phase1RefreshStatus.withAction{
+  min-width:290px !important;
+  max-width:min(360px,calc(100vw - 28px)) !important;
+  padding:10px 12px !important;
+  border-radius:14px !important;
+  white-space:normal !important;
+  line-height:1.3 !important;
+  text-align:left !important;
+}
+.phase1RefreshStatusText{
+  display:block;
+}
+.phase1RenewSubscriptionBtn{
+  display:block;
+  width:100%;
+  height:34px;
+  margin-top:9px;
+  border:0;
+  border-radius:8px;
+  background:#111;
+  color:#fff;
+  font-size:12px;
+  font-weight:950;
+  cursor:pointer;
+}
 @keyframes phase1RefreshSpin{to{transform:rotate(360deg)}}
 /* ===== END PHASE 1 REFRESH VISIBILITY PATCH ===== */
 </style>
@@ -8523,6 +8548,23 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     status.textContent = text;
     status.classList.add("show");
     status.classList.toggle("error", !!isError);
+    status.classList.remove("withAction");
+  }
+
+  function setExpiredStatus(){
+    status.replaceChildren();
+
+    const message = document.createElement("span");
+    message.className = "phase1RefreshStatusText";
+    message.textContent = "Your subscription has expired. Manual refresh is no longer available.";
+
+    const renewButton = document.createElement("button");
+    renewButton.type = "button";
+    renewButton.className = "phase1RenewSubscriptionBtn";
+    renewButton.textContent = "Renew Subscription";
+
+    status.append(message, renewButton);
+    status.classList.add("show", "error", "withAction");
   }
 
   async function getPhase1Session(){
@@ -8561,18 +8603,6 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     const m = String(d.getMonth()+1).padStart(2,"0");
     const day = String(d.getDate()).padStart(2,"0");
     return y + "-" + m + "-" + day;
-  }
-
-  async function findMetaAccount(headers){
-    const r = await fetch("/api/accounts", {headers});
-    if(!r.ok) throw new Error("Accounts request failed");
-    const data = await r.json();
-    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
-    const meta = accounts.find(function(a){ return String(a.platform || "").toLowerCase() === "meta"; });
-    if(!meta) throw new Error("Meta account not found");
-    const id = meta.platform_account_id || meta.account_id || meta.id;
-    if(!id) throw new Error("Meta account id not found");
-    return id;
   }
 
   async function pollRefreshStatus(headers, platformAccountId){
@@ -8668,9 +8698,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 
     try{
       const headers = await authHeaders();
-      const adAccountId = await findMetaAccount(headers);
       const body = {
-        adAccountId: adAccountId,
         // Manual refresh always writes today's incremental snapshot.
         // Date filter only controls dashboard read/aggregation.
         date_preset: "today",
@@ -8685,6 +8713,14 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       });
 
       const data = await r.json().catch(function(){ return {}; });
+
+      if(r.status === 403 && String(data.status || "").toLowerCase() === "expired"){
+        setExpiredStatus();
+        btn.disabled = false;
+        btn.classList.remove("loading");
+        return;
+      }
+
       const truth = summarizeGlobalRefresh(data);
 
       if(truth.totalAccounts > 0){
@@ -8709,11 +8745,18 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
         return;
       }
 
+      if(data.refresh_scope === "global" && truth.totalAccounts === 0){
+        setStatus("No connected platforms found. Connect at least one platform to refresh your dashboard.", true);
+        btn.disabled = false;
+        btn.classList.remove("loading");
+        return;
+      }
+
       if(!r.ok || data.ok === false){
         throw new Error(data.error || "Refresh request failed");
       }
 
-      throw new Error("Refresh response contained no account results");
+      throw new Error("No connected platforms found. Connect at least one platform to refresh your dashboard.");
     }catch(err){
       setStatus(err && err.message ? err.message : "Failed", true);
       console.error("[Patch 17D.2 Frontend Truth Status]", err);

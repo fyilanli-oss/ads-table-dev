@@ -2046,6 +2046,7 @@ async function handleOrganicSnapshotWrite(req,res){
   try{
     const result=await requireConnection(req,res,"organic");if(!result)return;
     const {user,conn}=result;
+    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
     if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
     const property=conn.metadata.selectedGa4Property||{};
     const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.query.platform_account_id||conn.account_id||property.property_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
@@ -2066,8 +2067,8 @@ async function handleOrganicSnapshotWrite(req,res){
   }
 }
 
-app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
-app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
+app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
+app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
 // ===== END ORGANIC SNAPSHOT v1 =====
 
 
@@ -2895,6 +2896,7 @@ async function handleMetaSnapshotWrite(req,res){
     if(!result)return;
 
     const {user,conn}=result;
+    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
     const requestedAdAccountId=req.body?.adAccountId||req.body?.ad_account_id||req.query.adAccountId||req.query.ad_account_id;
 
     stage="ownership";
@@ -3103,6 +3105,7 @@ async function runRefreshPlatform(platform,handler,req,user,ownership){
 
 async function handleGlobalRefresh(req,res){
   const refreshUser=await requireUser(req,res);if(!refreshUser)return;
+  const accessCheck=await requireAccess(req,res,refreshUser.id,"manualRefresh");if(!accessCheck)return;
   req._skipGoogleSheetsAutoSync=true;
 
   const platformHandlers=[
@@ -5231,6 +5234,7 @@ async function handleTikTokSnapshotWrite(req,res){
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
     const {user,conn}=result;
+    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
     const requested=req.body?.advertiser_id||req.body?.advertiserId||req.body?.platform_account_id||req.query.advertiser_id||req.query.advertiserId||req.query.platform_account_id;
     const platformAccountId=normalizePlatformAccountId(requested||conn.account_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing TikTok advertiser id",stage});
@@ -5292,6 +5296,7 @@ async function handleKlaviyoSnapshotWrite(req,res){
   try{
     const result=await requireConnection(req,res,"klaviyo");if(!result)return;
     const {user,conn}=result;
+    const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;
     if(conn.metadata?.requiresSetup)return res.status(400).json({ok:false,error:"Klaviyo setup required. Please enter estimated monthly spend and currency.",stage:"settings"});
     const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.query.platform_account_id||conn.account_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
     if(!platformAccountId)return res.status(400).json({ok:false,error:"Missing Klaviyo account id",stage});

@@ -8714,7 +8714,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 
       const data = await r.json().catch(function(){ return {}; });
 
-      if(r.status === 403 && ["expired", "cancelled"].includes(String(data.status || "").toLowerCase())){
+      if(r.status === 403 && String(data.status || "").toLowerCase() === "expired"){
         setExpiredStatus();
         btn.disabled = false;
         btn.classList.remove("loading");

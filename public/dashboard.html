@@ -8508,259 +8508,278 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 
 
 
+<style id="blocking-operation-ui-css">
+body.ads-operation-locked{overflow:hidden !important;}
+.adsOperationOverlay{
+  position:fixed; inset:0; z-index:1000000; display:none;
+  align-items:center; justify-content:center; padding:18px;
+  background:rgba(17,17,17,.48); backdrop-filter:blur(2px);
+}
+.adsOperationOverlay.open{display:flex;}
+.adsOperationModal{
+  width:min(390px,100%); max-height:min(680px,calc(100vh - 36px));
+  overflow:hidden; background:#fff; border:2px solid #111; border-radius:20px;
+  box-shadow:0 18px 55px rgba(0,0,0,.24); padding:22px;
+  display:flex; flex-direction:column; gap:16px;
+}
+.adsOperationTitle{font-size:24px;font-weight:950;letter-spacing:-.6px;}
+.adsOperationBody{font-size:15px;font-weight:800;line-height:1.45;overflow:auto;}
+.adsOperationSpinner{
+  width:48px;height:48px;border:5px solid #ddd;border-top-color:#111;
+  border-radius:50%;animation:adsSpin .85s linear infinite;margin:4px auto 2px;
+}
+@keyframes adsSpin{to{transform:rotate(360deg)}}
+.adsOperationResults{display:grid;gap:10px;margin-top:4px;}
+.adsOperationResult{padding:10px 12px;border:1px solid #ddd;border-radius:12px;background:#fafafa;}
+.adsOperationResult strong{display:block;margin-bottom:3px;}
+.adsOperationResult.error{border-color:#d9a5a8;background:#fff8f8;}
+.adsOperationActions{display:flex;justify-content:flex-end;padding-top:2px;}
+.adsOperationClose{
+  min-width:110px;height:42px;border:2px solid #111;border-radius:13px;
+  background:#111;color:#fff;font-size:14px;font-weight:950;cursor:pointer;
+}
+.adsOperationClose:disabled{opacity:.45;cursor:not-allowed;}
+#connectModalOverlay.open{z-index:999998 !important;}
+#connectModal.open{z-index:999999 !important;max-height:min(680px,calc(100vh - 36px)) !important;overflow:hidden !important;}
+#connectModalDescription{max-height:420px !important;overflow-y:auto !important;padding-right:4px;}
+#connectModalAction[disabled]{opacity:.55;cursor:not-allowed;}
+.connectSavingSpinner{
+  display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-3px;
+  border:2px solid rgba(255,255,255,.45);border-top-color:#fff;border-radius:50%;
+  animation:adsSpin .8s linear infinite;
+}
+</style>
+
+<div id="refreshOperationOverlay" class="adsOperationOverlay" aria-hidden="true">
+  <section class="adsOperationModal" role="dialog" aria-modal="true" aria-labelledby="refreshOperationTitle">
+    <div id="refreshOperationTitle" class="adsOperationTitle">Refreshing Data</div>
+    <div id="refreshOperationBody" class="adsOperationBody"></div>
+    <div class="adsOperationActions">
+      <button id="refreshOperationClose" class="adsOperationClose" type="button" disabled>Close</button>
+    </div>
+  </section>
+</div>
+
 <script id="phase1-refresh-visibility-patch">
 (function(){
   "use strict";
 
-  const btn = document.getElementById("phase1RefreshBtn");
-  const status = document.getElementById("phase1RefreshStatus");
-  if(!btn || !status) return;
+  const btn=document.getElementById("phase1RefreshBtn");
+  const status=document.getElementById("phase1RefreshStatus");
+  const overlay=document.getElementById("refreshOperationOverlay");
+  const body=document.getElementById("refreshOperationBody");
+  const closeBtn=document.getElementById("refreshOperationClose");
+  if(!btn||!status||!overlay||!body||!closeBtn)return;
 
-  let phase1Client = null;
-  let phase1Session = null;
+  let phase1Client=null;
+  let phase1Session=null;
+  let refreshRunning=false;
+  let reloadAfterClose=false;
 
-  function setStatus(text, isError){
-    status.textContent = text;
-    status.classList.add("show");
-    status.classList.toggle("error", !!isError);
+  function setStatus(text,isError){
+    status.textContent=text||"";
+    status.classList.toggle("show",Boolean(text));
+    status.classList.toggle("error",Boolean(isError));
   }
 
   async function getPhase1Session(){
-    if(phase1Session && phase1Session.access_token) return phase1Session;
-    const cfg = await fetch("/api/public-config").then(function(r){ return r.json(); });
-    phase1Client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
-    const s = await phase1Client.auth.getSession();
-    phase1Session = s && s.data ? s.data.session : null;
-    if(!phase1Session || !phase1Session.access_token){
-      throw new Error("Session not found");
-    }
+    if(phase1Session&&phase1Session.access_token)return phase1Session;
+    const cfg=await fetch("/api/public-config").then(function(r){return r.json();});
+    phase1Client=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey);
+    const sessionResult=await phase1Client.auth.getSession();
+    phase1Session=sessionResult&&sessionResult.data?sessionResult.data.session:null;
+    if(!phase1Session||!phase1Session.access_token)throw new Error("Session not found");
     return phase1Session;
   }
 
   async function authHeaders(){
-    const s = await getPhase1Session();
+    const session=await getPhase1Session();
     return {
       "Accept":"application/json",
       "Content-Type":"application/json",
-      "Authorization":"Bearer " + s.access_token
+      "Authorization":"Bearer "+session.access_token
     };
   }
 
   async function applyRefreshAccessState(){
     try{
-      const headers = await authHeaders();
-      const r = await fetch("/api/account/status", {headers});
-      const data = await r.json().catch(function(){ return {}; });
-      const accountStatus = String(data.status || "").toLowerCase();
-      const manualRefreshAllowed = Boolean(data.access && data.access.manualRefresh === true);
-
-      if(accountStatus === "expired" || !manualRefreshAllowed){
-        btn.disabled = true;
+      const response=await fetch("/api/account/status",{headers:await authHeaders()});
+      const data=await response.json().catch(function(){return {};});
+      const accountStatus=String(data.status||"").toLowerCase();
+      const allowed=Boolean(data.access&&data.access.manualRefresh===true);
+      if(accountStatus==="expired"||!allowed){
+        btn.disabled=true;
         btn.classList.remove("loading");
-        btn.setAttribute("aria-disabled", "true");
-        btn.title = accountStatus === "expired" ? "Subscription expired" : "Refresh unavailable";
-        setStatus(accountStatus === "expired" ? "Subscription expired" : "Refresh unavailable", true);
+        btn.setAttribute("aria-disabled","true");
+        btn.title=accountStatus==="expired"?"Subscription expired":"Refresh unavailable";
+        setStatus(accountStatus==="expired"?"Subscription expired":"Refresh unavailable",true);
         return false;
       }
-
       btn.removeAttribute("aria-disabled");
+      btn.disabled=false;
       return true;
-    }catch(err){
-      console.error("[Refresh Access Check]", err);
+    }catch(error){
+      console.error("[Refresh Access Check]",error);
       return false;
     }
   }
 
-  function currentDatePreset(){
-    const label = document.querySelector(".filters .filter:nth-child(1) .filterText");
-    const v = (label ? label.textContent : "Last 7 Days").trim().toLowerCase();
-    if(v === "today") return "today";
-    if(v === "yesterday") return "yesterday";
-    if(v === "this month") return "this_month";
-    return "last_7d";
-  }
-
   function todayIso(){
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,"0");
-    const day = String(d.getDate()).padStart(2,"0");
-    return y + "-" + m + "-" + day;
+    const d=new Date();
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
   }
 
-  async function findMetaAccount(headers){
-    const r = await fetch("/api/accounts", {headers});
-    if(!r.ok) throw new Error("Accounts request failed");
-    const data = await r.json();
-    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
-    const meta = accounts.find(function(a){ return String(a.platform || "").toLowerCase() === "meta"; });
-    if(!meta) throw new Error("Meta account not found");
-    const id = meta.platform_account_id || meta.account_id || meta.id;
-    if(!id) throw new Error("Meta account id not found");
-    return id;
+  function openOperation(){
+    reloadAfterClose=false;
+    closeBtn.disabled=true;
+    body.innerHTML='<div class="adsOperationSpinner" aria-label="Refreshing"></div><div style="text-align:center">Please wait while connected platforms are refreshed.</div>';
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden","false");
+    document.body.classList.add("ads-operation-locked");
   }
 
-  async function pollRefreshStatus(headers, platformAccountId){
-    const url = "/api/refresh/status?platform=meta&platform_account_id=" + encodeURIComponent(String(platformAccountId)) + "&limit=1";
-    for(let i=0;i<8;i++){
-      const r = await fetch(url, {headers});
-      if(r.ok){
-        const data = await r.json();
-        const job = Array.isArray(data.jobs) ? data.jobs[0] : null;
-        if(job && job.status){
-          setStatus(String(job.status));
-          if(job.status === "completed") return "completed";
-          if(job.status === "failed") throw new Error(job.error_message || "Refresh failed");
+  function completeOperation(message,results,shouldReload){
+    reloadAfterClose=Boolean(shouldReload);
+    body.textContent="";
+    const messageEl=document.createElement("div");
+    messageEl.textContent=message;
+    body.appendChild(messageEl);
+    if(Array.isArray(results)&&results.length){
+      const list=document.createElement("div");
+      list.className="adsOperationResults";
+      results.forEach(function(item){
+        const row=document.createElement("div");
+        row.className="adsOperationResult"+(item.error?" error":"");
+        const title=document.createElement("strong");
+        title.textContent=item.label;
+        row.appendChild(title);
+        if(item.message){
+          const detail=document.createElement("div");
+          detail.textContent=item.message;
+          row.appendChild(detail);
         }
-      }
-      await new Promise(function(resolve){ setTimeout(resolve, 900); });
+        list.appendChild(row);
+      });
+      body.appendChild(list);
     }
-    return "unknown";
+    closeBtn.disabled=false;
+    closeBtn.focus();
   }
 
-  function summarizeGlobalRefresh(data){
-    const platforms = data && data.platforms && typeof data.platforms === "object"
-      ? data.platforms
-      : {};
+  function closeOperation(){
+    if(refreshRunning||closeBtn.disabled)return;
+    overlay.classList.remove("open");
+    overlay.setAttribute("aria-hidden","true");
+    document.body.classList.remove("ads-operation-locked");
+    btn.classList.remove("loading");
+    if(reloadAfterClose)window.location.reload();
+    else btn.disabled=false;
+  }
 
-    let totalAccounts = 0;
-    let completedAccounts = 0;
-    let failedAccounts = 0;
-    const failedByPlatform = [];
+  function platformLabel(value){
+    const labels={meta:"Meta",google:"Google Ads",tiktok:"TikTok",klaviyo:"Klaviyo",organic:"Google Analytics"};
+    const key=String(value||"").toLowerCase();
+    return labels[key]||key.charAt(0).toUpperCase()+key.slice(1)||"Platform";
+  }
 
-    Object.entries(platforms).forEach(function(entry){
-      const platform = entry[0];
-      const result = entry[1] || {};
-      const accounts = Array.isArray(result.accounts) ? result.accounts : [];
+  function summarize(data){
+    const platforms=data&&data.platforms&&typeof data.platforms==="object"?data.platforms:{};
+    let total=0,completed=0,failed=0;
+    const details=[];
 
-      const refreshedCount = Number.isFinite(Number(result.refreshed_account_count))
-        ? Number(result.refreshed_account_count)
-        : accounts.length;
+    Object.keys(platforms).forEach(function(platform){
+      const result=platforms[platform]||{};
+      const refreshed=Number(result.refreshed_account_count||0);
+      const success=Number(result.completed_account_count||0);
+      const failure=Number(result.failed_account_count||0);
+      total+=refreshed;
+      completed+=success;
+      failed+=failure;
 
-      const completedCount = Number.isFinite(Number(result.completed_account_count))
-        ? Number(result.completed_account_count)
-        : accounts.filter(function(account){ return account && account.ok !== false; }).length;
-
-      const failedCount = Number.isFinite(Number(result.failed_account_count))
-        ? Number(result.failed_account_count)
-        : accounts.filter(function(account){ return account && account.ok === false; }).length;
-
-      totalAccounts += refreshedCount;
-      completedAccounts += completedCount;
-      failedAccounts += failedCount;
-
-      if(failedCount > 0){
-        failedByPlatform.push({
-          platform: platform,
-          count: failedCount
+      if(failure>0){
+        const accountErrors=(Array.isArray(result.accounts)?result.accounts:[])
+          .filter(function(account){return account&&account.ok===false;})
+          .map(function(account){return account.error||account.message||"Refresh failed";});
+        const topLevelErrors=Array.isArray(data.failed)
+          ?data.failed.filter(function(item){return String(item.platform||"").toLowerCase()===platform;}).map(function(item){return item.error||"Refresh failed";})
+          :[];
+        const errors=accountErrors.concat(topLevelErrors).filter(Boolean);
+        details.push({
+          label:platformLabel(platform),
+          error:true,
+          message:errors.length?Array.from(new Set(errors)).join(" · "):failure+" account refresh failed."
         });
       }
     });
 
-    let state = "failed";
-    if(totalAccounts > 0 && completedAccounts === totalAccounts){
-      state = "completed";
-    }else if(completedAccounts > 0 && failedAccounts > 0){
-      state = "partial";
-    }
-
-    let message = "Failed";
-    if(state === "completed"){
-      message = "Completed";
-    }else if(state === "partial"){
-      message = "Partial";
-    }else if(failedByPlatform.length === 1){
-      const item = failedByPlatform[0];
-      const label = item.platform.charAt(0).toUpperCase() + item.platform.slice(1);
-      message = "Failed — " + item.count + " " + label + " account refresh failed";
-    }else if(failedAccounts > 0){
-      message = "Failed — " + failedAccounts + " account refresh failed";
-    }
-
-    return {
-      state: state,
-      message: message,
-      totalAccounts: totalAccounts,
-      completedAccounts: completedAccounts,
-      failedAccounts: failedAccounts
-    };
+    if(total===0)return {state:"empty",details:[]};
+    if(completed===total&&failed===0)return {state:"completed",details:[]};
+    if(completed>0&&failed>0)return {state:"partial",details:details};
+    return {state:"failed",details:details.length?details:[{label:"Refresh failed",error:true,message:data&&data.error?data.error:"No platform could be refreshed."}]};
   }
 
   async function runRefresh(){
-    btn.disabled = true;
+    if(refreshRunning)return;
+    refreshRunning=true;
+    btn.disabled=true;
     btn.classList.add("loading");
     setStatus("Refreshing...");
+    openOperation();
 
     try{
-      const allowed = await applyRefreshAccessState();
-      if(!allowed) return;
-      const headers = await authHeaders();
-      const adAccountId = await findMetaAccount(headers);
-      const body = {
-        adAccountId: adAccountId,
-        // Manual refresh always writes today's incremental snapshot.
-        // Date filter only controls dashboard read/aggregation.
-        date_preset: "today",
-        snapshot_date: todayIso(),
-        limit: "100"
-      };
-
-      const r = await fetch("/api/refresh/meta", {
-        method:"POST",
-        headers,
-        body: JSON.stringify(body)
-      });
-
-      const data = await r.json().catch(function(){ return {}; });
-      const truth = summarizeGlobalRefresh(data);
-
-      if(truth.totalAccounts > 0){
-        if(truth.state === "completed"){
-          setStatus(truth.message);
-          setTimeout(function(){ window.location.reload(); }, 900);
-          return;
-        }
-
-        if(truth.state === "partial"){
-          setStatus(truth.message, true);
-          console.warn("[Patch 17D.2 Partial Refresh]", data);
-          btn.disabled = false;
-          btn.classList.remove("loading");
-          return;
-        }
-
-        setStatus(truth.message, true);
-        console.error("[Patch 17D.2 Failed Refresh]", data);
-        btn.disabled = false;
-        btn.classList.remove("loading");
+      const allowed=await applyRefreshAccessState();
+      if(!allowed){
+        completeOperation("Refresh unavailable.",[],false);
         return;
       }
 
-      if(!r.ok || data.ok === false){
-        throw new Error(data.error || "Refresh request failed");
-      }
+      const response=await fetch("/api/refresh/all",{
+        method:"POST",
+        headers:await authHeaders(),
+        body:JSON.stringify({date_preset:"today",snapshot_date:todayIso(),limit:"100"})
+      });
+      const data=await response.json().catch(function(){return {};});
+      const result=summarize(data);
 
-      throw new Error("Refresh response contained no account results");
-    }catch(err){
-      setStatus(err && err.message ? err.message : "Failed", true);
-      console.error("[Patch 17D.2 Frontend Truth Status]", err);
-      btn.disabled = false;
-      btn.classList.remove("loading");
+      if(result.state==="empty"){
+        setStatus("No connected platforms to refresh.");
+        completeOperation("No connected platforms to refresh.",[],false);
+      }else if(result.state==="completed"){
+        setStatus("Refresh completed.");
+        completeOperation("Refresh completed.",[],true);
+      }else if(result.state==="partial"){
+        setStatus("Refresh completed with errors.",true);
+        completeOperation("Refresh completed with errors.",result.details,true);
+      }else{
+        setStatus("Refresh failed.",true);
+        completeOperation("Refresh failed.",result.details,false);
+      }
+    }catch(error){
+      console.error("[Refresh Blocking Modal]",error);
+      setStatus("Refresh failed.",true);
+      completeOperation("Refresh failed.",[{label:"Refresh error",error:true,message:error&&error.message?error.message:"Refresh request failed."}],false);
+    }finally{
+      refreshRunning=false;
     }
   }
 
-  btn.addEventListener("click", function(e){
-    e.preventDefault();
-    e.stopPropagation();
-    if(btn.disabled) return;
-    runRefresh();
-  }, true);
+  closeBtn.addEventListener("click",closeOperation);
+  overlay.addEventListener("click",function(event){
+    if(event.target===overlay&&refreshRunning)event.preventDefault();
+  });
+  document.addEventListener("keydown",function(event){
+    if(event.key==="Escape"&&overlay.classList.contains("open"))event.preventDefault();
+  },true);
 
-  if(document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", applyRefreshAccessState, {once:true});
-  }else{
-    applyRefreshAccessState();
-  }
+  btn.addEventListener("click",function(event){
+    event.preventDefault();
+    event.stopPropagation();
+    if(btn.disabled)return;
+    runRefresh();
+  },true);
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",applyRefreshAccessState,{once:true});
+  else applyRefreshAccessState();
 })();
 </script>
 
@@ -8901,6 +8920,9 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     const list=document.createElement("div");
     list.style.display="grid";
     list.style.gap="10px";
+    list.style.maxHeight="360px";
+    list.style.overflowY="auto";
+    list.style.paddingRight="4px";
 
     accounts.forEach(function(account,index){
       const label=document.createElement("label");
@@ -8927,8 +8949,10 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     action.textContent="Continue";
     action.disabled=false;
     if(cancel)cancel.style.display="none";
+    delete modal.dataset.selectionComplete;
     modal.classList.add("open");
     overlay.classList.add("open");
+    document.body.classList.add("ads-operation-locked");
   }
 
   function cleanReconnectUrl(){
@@ -8945,6 +8969,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       if(row)selected.push(row);
     });
     if(!selected.length){
+      if(availableAccounts.length)throw new Error("Select at least one account.");
       return {empty:true};
     }
 
@@ -8988,16 +9013,18 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
         if(desc)desc.textContent="No accessible account was found.";
         if(action){
           action.disabled=false;
-          action.textContent="Continue";
+          action.textContent="Close";
         }
+        if(modal)modal.dataset.selectionComplete="true";
       }
     }catch(error){
       openSelection(platform,[]);
       if(desc)desc.textContent=error.message||"Account selection could not be loaded.";
       if(action){
         action.disabled=false;
-        action.textContent="Continue";
+        action.textContent="Close";
       }
+      if(modal)modal.dataset.selectionComplete="true";
     }
   }
 
@@ -9008,8 +9035,12 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       if(!modal||modal.dataset.platform!=="global_account_selection")return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      if(modal.dataset.selectionComplete==="true"){
+        window.location.reload();
+        return;
+      }
       action.disabled=true;
-      action.textContent="Saving...";
+      action.innerHTML='<span class="connectSavingSpinner" aria-hidden="true"></span>Saving...';
       const desc=byId("connectModalDescription");
       try{
         const result=await submitSelection();
@@ -9023,6 +9054,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
           modal.classList.remove("open");
           if(overlay)overlay.classList.remove("open");
           delete modal.dataset.platform;
+          document.body.classList.remove("ads-operation-locked");
           return;
         }
 
@@ -9049,7 +9081,12 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
           spendOverlay.setAttribute("aria-hidden","false");
           return;
         }
-        window.location.reload();
+        if(desc){
+          desc.textContent="Account selection saved.";
+        }
+        modal.dataset.selectionComplete="true";
+        action.disabled=false;
+        action.textContent="Close";
       }catch(error){
         if(desc){
           let box=desc.querySelector("[data-global-reconnect-error]");

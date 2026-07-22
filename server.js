@@ -40,7 +40,7 @@ async function getUserFromRequest(req){const a=req.headers.authorization||"";con
 async function requireUser(req,res){const u=await getUserFromRequest(req);if(!u){res.status(401).json({error:"Not authenticated"});return null}return u}
 async function expireTrialsIfNeeded(){if(!supabaseAdmin)return;const{error}=await supabaseAdmin.rpc("expire_trials");if(error)throw error}
 async function getUserSubscription(userId){await expireTrialsIfNeeded();const{data,error}=await supabaseAdmin.from("subscriptions").select("status,trial_end_date").eq("user_id",userId).maybeSingle();if(error)throw error;return data}
-function getAccessByStatus(status){const full=["trial","active"].includes(status);const readonly=["expired","cancelled"].includes(status);const blocked=["suspended","deleted"].includes(status);return{dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
+function getAccessByStatus(status){const full=["trial","active"].includes(status);const readonly=status==="expired";const blocked=["suspended","deleted"].includes(status);return{dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
 async function requireAccess(req,res,userId,capability){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);if(access.blocked||!access[capability]){res.status(403).json({error:"Subscription inactive",status:sub?.status||null});return null}return{sub,access}}
 async function requireConnectAccessForOAuth(req,res){const userId=req.query.user_id;if(!userId){res.redirect("/dashboard?error=missing_user_id");return null}const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);if(access.blocked||!access.connect){res.redirect(`/dashboard?subscription_inactive=1&status=${encodeURIComponent(sub?.status||"")}`);return null}return{userId,sub,access}}
 function parseExpiry(s){return s?new Date(Date.now()+Number(s)*1000).toISOString():null}
@@ -73,6 +73,8 @@ async function saveConnection(userId,platform,payload){
 async function getConnection(userId,platform){if(!supabaseAdmin||!userId)return null;const {data,error}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",platform).eq("connected",true).maybeSingle();if(error)throw new Error(error.message);return data}
 async function connectionStatus(userId,platform){const r=await getConnection(userId,platform).catch(()=>null);return{connected:Boolean(r&&(r.access_token||r.refresh_token)),source:r?"database":"none",updatedAt:r?.updated_at||null}}
 async function requireConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked){res.status(403).json({error:"Account access blocked",status:access.status});return null}const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn}}
+async function requireRefreshConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return null;const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn,sub:accessCheck.sub,access:accessCheck.access}}
+async function canRunScheduledRefresh(userId){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);return Boolean(!access.blocked&&access.dailySync)}
 
 // ===== PHASE 1 CONSTITUTION PACK HELPERS =====
 const PHASE1_PLATFORM_LIMITS={meta:3,google:3,klaviyo:3,tiktok:3,organic:1};
@@ -2044,7 +2046,7 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
 async function handleOrganicSnapshotWrite(req,res){
   let job=null,stage="connection";
   try{
-    const result=await requireConnection(req,res,"organic");if(!result)return;
+    const result=await requireRefreshConnection(req,res,"organic");if(!result)return;
     const {user,conn}=result;
     if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
     const property=conn.metadata.selectedGa4Property||{};
@@ -2066,8 +2068,8 @@ async function handleOrganicSnapshotWrite(req,res){
   }
 }
 
-app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
-app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
+app.post("/api/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
+app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return;res.json(await writeOrganicSnapshotV1({user,datePreset:String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today"),snapshotDate:req.body?.snapshot_date||req.query.snapshot_date||null,captureReason:req.body?.capture_reason||"manual_refresh",snapshotClass:req.body?.snapshot_class||"primary"}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_snapshot_v1"})}});
 // ===== END ORGANIC SNAPSHOT v1 =====
 
 
@@ -2891,7 +2893,7 @@ async function handleMetaSnapshotWrite(req,res){
   let job=null;
   let stage="connection";
   try{
-    const result=await requireConnection(req,res,"meta");
+    const result=await requireRefreshConnection(req,res,"meta");
     if(!result)return;
 
     const {user,conn}=result;
@@ -3103,6 +3105,7 @@ async function runRefreshPlatform(platform,handler,req,user,ownership){
 
 async function handleGlobalRefresh(req,res){
   const refreshUser=await requireUser(req,res);if(!refreshUser)return;
+  const accessCheck=await requireAccess(req,res,refreshUser.id,"manualRefresh");if(!accessCheck)return;
   req._skipGoogleSheetsAutoSync=true;
 
   const platformHandlers=[
@@ -3272,7 +3275,10 @@ async function processQueuedBackfills({limit=10}={}){
   if(error)throw error;
   const results=[];
   for(const job of jobs||[]){
-    try{results.push(await runQueuedBackfillJob(job));}
+    try{
+      const allowed=await canRunScheduledRefresh(job.user_id);
+      if(!allowed){results.push({ok:true,skipped:true,reason:"subscription_inactive",job_id:job.id,platform:job.platform,platform_account_id:job.platform_account_id});continue;}
+      results.push(await runQueuedBackfillJob(job));}
     catch(e){results.push({ok:false,job_id:job.id,platform:job.platform,platform_account_id:job.platform_account_id,error:e.message});}
   }
   return {ok:true,count:results.length,results};
@@ -3458,6 +3464,8 @@ app.get("/api/cron/auto-refresh",async(req,res)=>{
     const results=[];
     for(const schedule of schedules||[]){
       try{
+        const allowed=await canRunScheduledRefresh(schedule.user_id);
+        if(!allowed){results.push({ok:true,skipped:true,reason:"subscription_inactive",platform:schedule.platform,schedule_id:schedule.id});continue;}
         if(schedule.platform==="meta")results.push(await runMetaAutoRefreshForSchedule(schedule));
         else if(schedule.platform==="google")results.push(await runGoogleAutoRefreshForSchedule(schedule));
         else if(schedule.platform==="tiktok")results.push(await runTikTokAutoRefreshForSchedule(schedule));
@@ -4749,11 +4757,11 @@ app.post("/api/account/currency",async(req,res)=>{try{const user=await requireLi
 
 // ===== PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
 function normalizeAccountStatus(status){return String(status||"").toLowerCase()}
-function getLifecycleAccess(status){const s=normalizeAccountStatus(status);const full=["trial","active"].includes(s);const readonly=["expired","cancelled"].includes(s);const blocked=["suspended","deleted"].includes(s);return{status:s||null,login:full||readonly,dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,refresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
+function getLifecycleAccess(status){const s=normalizeAccountStatus(status);const full=["trial","active"].includes(s);const readonly=s==="expired";const blocked=["suspended","deleted"].includes(s);return{status:s||null,login:full||readonly,dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,refresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
 async function getSubscriptionForLifecycle(userId){await expireTrialsIfNeeded();const{data,error}=await supabaseAdmin.from("subscriptions").select("status,trial_end_date").eq("user_id",userId).maybeSingle();if(error)throw error;return data}
 async function requireLifecycleAccess(req,res,capability){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked||!access[capability]){res.status(403).json({error:"Account access blocked",status:access.status,capability});return null}return{user,sub,access}}
 app.get("/api/account/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);res.json({status:access.status,access,deleted_at:null,hard_delete_at:null})}catch(e){res.status(500).json({error:e.message})}});
-app.post("/api/account/request-delete",async(req,res)=>{try{const result=await requireLifecycleAccess(req,res,"dashboard");if(!result)return;const token=crypto.randomBytes(32).toString("hex");const expiresAt=new Date(Date.now()+30*60*1000).toISOString();const{error}=await supabaseAdmin.from("subscriptions").update({deletion_token:token,deletion_token_expires_at:expiresAt,updated_at:new Date().toISOString()}).eq("user_id",result.user.id).in("status",["trial","active","expired","cancelled"]);if(error)throw error;const proto=req.headers["x-forwarded-proto"]||req.protocol||"https";const host=req.headers["x-forwarded-host"]||req.headers.host;const confirmationUrl=`${proto}://${host}/api/account/confirm-delete?token=${encodeURIComponent(token)}`;res.json({message:"Delete confirmation ready",confirmationUrl,tokenExpiresAt:expiresAt})}catch(e){res.status(500).json({error:e.message})}});
+app.post("/api/account/request-delete",async(req,res)=>{try{const result=await requireLifecycleAccess(req,res,"dashboard");if(!result)return;const token=crypto.randomBytes(32).toString("hex");const expiresAt=new Date(Date.now()+30*60*1000).toISOString();const{error}=await supabaseAdmin.from("subscriptions").update({deletion_token:token,deletion_token_expires_at:expiresAt,updated_at:new Date().toISOString()}).eq("user_id",result.user.id).in("status",["trial","active","expired"]);if(error)throw error;const proto=req.headers["x-forwarded-proto"]||req.protocol||"https";const host=req.headers["x-forwarded-host"]||req.headers.host;const confirmationUrl=`${proto}://${host}/api/account/confirm-delete?token=${encodeURIComponent(token)}`;res.json({message:"Delete confirmation ready",confirmationUrl,tokenExpiresAt:expiresAt})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(req.query.token||"");if(!token)return res.status(400).send("Missing delete token.");const{data,error}=await supabaseAdmin.from("subscriptions").select("user_id,status,deletion_token_expires_at").eq("deletion_token",token).maybeSingle();if(error)throw error;if(!data)return res.status(400).send("Invalid or expired delete token.");if(data.status==="deleted")return res.redirect("/login?account_deleted=1");const expiresAt=data.deletion_token_expires_at?new Date(data.deletion_token_expires_at).getTime():0;if(!expiresAt||expiresAt<Date.now())return res.status(400).send("Invalid or expired delete token.");const deletedAt=new Date();const hardDeleteAt=new Date(deletedAt.getTime()+90*24*60*60*1000);const{error:updateError}=await supabaseAdmin.from("subscriptions").update({status:"deleted",deleted_at:deletedAt.toISOString(),hard_delete_at:hardDeleteAt.toISOString(),deletion_token:null,deletion_token_expires_at:null,updated_at:deletedAt.toISOString()}).eq("user_id",data.user_id);if(updateError)throw updateError;res.redirect("/login?account_deleted=1")}catch(e){res.status(500).send(e.message)}});
 // ===== END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
 
@@ -5229,7 +5237,7 @@ async function writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePre
 async function handleTikTokSnapshotWrite(req,res){
   let job=null,stage="connection";
   try{
-    const result=await requireConnection(req,res,"tiktok");if(!result)return;
+    const result=await requireRefreshConnection(req,res,"tiktok");if(!result)return;
     const {user,conn}=result;
     const requested=req.body?.advertiser_id||req.body?.advertiserId||req.body?.platform_account_id||req.query.advertiser_id||req.query.advertiserId||req.query.platform_account_id;
     const platformAccountId=normalizePlatformAccountId(requested||conn.account_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);
@@ -5290,7 +5298,7 @@ async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePr
 async function handleKlaviyoSnapshotWrite(req,res){
   let job=null,stage="connection";
   try{
-    const result=await requireConnection(req,res,"klaviyo");if(!result)return;
+    const result=await requireRefreshConnection(req,res,"klaviyo");if(!result)return;
     const {user,conn}=result;
     if(conn.metadata?.requiresSetup)return res.status(400).json({ok:false,error:"Klaviyo setup required. Please enter estimated monthly spend and currency.",stage:"settings"});
     const platformAccountId=normalizePlatformAccountId(req.body?.platform_account_id||req.query.platform_account_id||conn.account_id||conn.metadata?.selectedPlatformAccountId||conn.metadata?.lastOwnedPlatformAccountId);

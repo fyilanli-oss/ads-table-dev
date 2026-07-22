@@ -7653,7 +7653,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   function openModal(){const o=byId("currencyRequiredOverlay");const s=byId("currencyRequiredSelect");if(s)s.value="";modalMsg("",false);if(o){o.classList.add("open");o.setAttribute("aria-hidden","false")}}
   function closeModal(){const o=byId("currencyRequiredOverlay");if(o){o.classList.remove("open");o.setAttribute("aria-hidden","true")}}
   function setAccountSelect(v){const s=byId("accountCurrencySelect");if(s)s.value=v||""}
-  async function loadCurrency(){if(!await initSupabase())return;try{const res=await fetch("/api/account/currency",{headers:await authHeader()});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||"Account currency could not be loaded.");setAccountSelect(data.account_currency||"");if(!data.account_currency)openModal()}catch(err){toast(err.message||"Account currency check failed.",true)}}
+  async function loadCurrency(){if(!await initSupabase())return;try{const res=await fetch("/api/account/currency",{headers:await authHeader()});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||"Account currency could not be loaded.");const currency=String(data.account_currency||"").trim().toUpperCase();const required=data.required===true||!["USD","TRY","EUR","GBP"].includes(currency);setAccountSelect(required?"":currency);if(required)openModal();else closeModal()}catch(err){toast(err.message||"Account currency check failed.",true)}}
   async function saveCurrency(value,source){const c=String(value||"").trim().toUpperCase();if(!["USD","TRY","EUR","GBP"].includes(c)){source==="modal"?modalMsg("Please select your account currency.",false):toast("Please select your account currency.",true);return false}if(!await initSupabase())return false;try{const res=await fetch("/api/account/currency",{method:"POST",headers:{...(await authHeader()),"Content-Type":"application/json"},body:JSON.stringify({account_currency:c})});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||"Account currency could not be saved.");setAccountSelect(data.profile?.account_currency||c);if(source==="modal"){modalMsg("Saved",true);setTimeout(closeModal,500)}else toast("Saved",false);return true}catch(err){source==="modal"?modalMsg(err.message||"Save failed.",false):toast(err.message||"Save failed.",true);return false}}
   function setAccountEditing(editing){const btn=byId("accountCurrencyBtn"),sel=byId("accountCurrencySelect");if(sel)sel.disabled=!editing;if(btn){btn.dataset.editing=editing?"true":"false";btn.textContent=editing?"SAVE":"CHANGE";btn.classList.toggle("accountWhiteBtn",editing);btn.classList.toggle("accountBlackBtn",!editing)}const card=btn&&btn.closest?btn.closest(".accountCard"):null;if(card)card.classList.toggle("accountEditActive",!!editing)}
   function bind(){const mb=byId("currencyRequiredSaveBtn"),ms=byId("currencyRequiredSelect");if(mb&&!mb.dataset.d1v2Bound){mb.dataset.d1v2Bound="true";mb.addEventListener("click",function(e){e.preventDefault();saveCurrency(ms&&ms.value,"modal")})}const btn=byId("accountCurrencyBtn"),sel=byId("accountCurrencySelect");if(btn&&sel&&!btn.dataset.d1v2Bound){btn.dataset.d1v2Bound="true";btn.addEventListener("click",function(e){e.preventDefault();e.stopImmediatePropagation();if(btn.dataset.editing==="true"){saveCurrency(sel.value,"account").then(function(ok){if(ok)setAccountEditing(false)})}else setAccountEditing(true)},true)}}
@@ -7672,6 +7672,10 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   }else{
     boot();
   }
+
+  window.addEventListener("pageshow",function(){
+    if(d1v2Booted)loadCurrency();
+  });
 
 })();
 </script>
@@ -8861,7 +8865,7 @@ body.ads-operation-locked{overflow:hidden !important;}
           ...row,
           platform:"tiktok",
           platform_account_id:String(row.platform_account_id||row.advertiser_id||row.advertiserId||row.id||""),
-          account_name:row.account_name||row.advertiser_name||row.name||("TikTok "+String(row.advertiser_id||row.id||""))
+          account_name:String(row.platform_account_id||row.advertiser_id||row.advertiserId||row.id||"")==="7654240828777955348"?"7654240828777955348":(row.account_name||row.advertiser_name||row.name||("TikTok "+String(row.advertiser_id||row.id||"")))
         };
       }
       if(platform==="organic"){

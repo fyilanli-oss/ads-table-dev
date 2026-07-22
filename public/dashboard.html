@@ -8539,7 +8539,7 @@ body.ads-operation-locked{overflow:hidden !important;}
   background:#111;color:#fff;font-size:14px;font-weight:950;cursor:pointer;
 }
 .adsOperationClose:disabled{opacity:.45;cursor:not-allowed;}
-#connectModalOverlay.open{z-index:999998 !important;}
+#connectModalOverlay.open{z-index:999998 !important;background:rgba(17,17,17,.48) !important;backdrop-filter:blur(2px) !important;}
 #connectModal.open{z-index:999999 !important;max-height:min(680px,calc(100vh - 36px)) !important;overflow:hidden !important;}
 #connectModalDescription{max-height:420px !important;overflow-y:auto !important;padding-right:4px;}
 #connectModalAction[disabled]{opacity:.55;cursor:not-allowed;}
@@ -9058,29 +9058,6 @@ body.ads-operation-locked{overflow:hidden !important;}
           return;
         }
 
-        if(activePlatform==="klaviyo"){
-          const selectionOverlay=byId("connectModalOverlay");
-          modal.classList.remove("open");
-          if(selectionOverlay)selectionOverlay.classList.remove("open");
-          delete modal.dataset.platform;
-
-          const spendOverlay=byId("klaviyoSpendOverlay");
-          const spendCurrency=byId("klaviyoSpendCurrency");
-          const spendAmount=byId("klaviyoSpendAmount");
-          const spendMessage=byId("klaviyoSpendMsg");
-
-          if(spendCurrency)spendCurrency.value="";
-          if(spendAmount)spendAmount.value="";
-          if(spendMessage)spendMessage.textContent="";
-
-          if(!spendOverlay){
-            throw new Error("Estimated Monthly Spend modal was not found.");
-          }
-
-          spendOverlay.classList.add("open");
-          spendOverlay.setAttribute("aria-hidden","false");
-          return;
-        }
         if(desc){
           desc.textContent="Account selection saved.";
         }

@@ -8546,6 +8546,31 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     };
   }
 
+  async function applyRefreshAccessState(){
+    try{
+      const headers = await authHeaders();
+      const r = await fetch("/api/account/status", {headers});
+      const data = await r.json().catch(function(){ return {}; });
+      const accountStatus = String(data.status || "").toLowerCase();
+      const manualRefreshAllowed = Boolean(data.access && data.access.manualRefresh === true);
+
+      if(accountStatus === "expired" || !manualRefreshAllowed){
+        btn.disabled = true;
+        btn.classList.remove("loading");
+        btn.setAttribute("aria-disabled", "true");
+        btn.title = accountStatus === "expired" ? "Subscription expired" : "Refresh unavailable";
+        setStatus(accountStatus === "expired" ? "Subscription expired" : "Refresh unavailable", true);
+        return false;
+      }
+
+      btn.removeAttribute("aria-disabled");
+      return true;
+    }catch(err){
+      console.error("[Refresh Access Check]", err);
+      return false;
+    }
+  }
+
   function currentDatePreset(){
     const label = document.querySelector(".filters .filter:nth-child(1) .filterText");
     const v = (label ? label.textContent : "Last 7 Days").trim().toLowerCase();
@@ -8667,6 +8692,8 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     setStatus("Refreshing...");
 
     try{
+      const allowed = await applyRefreshAccessState();
+      if(!allowed) return;
       const headers = await authHeaders();
       const adAccountId = await findMetaAccount(headers);
       const body = {
@@ -8728,6 +8755,12 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     if(btn.disabled) return;
     runRefresh();
   }, true);
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", applyRefreshAccessState, {once:true});
+  }else{
+    applyRefreshAccessState();
+  }
 })();
 </script>
 

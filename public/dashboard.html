@@ -4158,7 +4158,7 @@ function togglePJ(groupName){
     if(modalTitle)modalTitle.textContent=connected?`Disconnect ${label}?`:`Connect ${label}`;
     if(modalDescription)modalDescription.innerHTML=connected
       ?'<div>Disconnecting closes the secure communication channel between AdsTable and your platform in accordance with the platform\'s policies.</div><div style="margin-top:12px"><strong>Before you disconnect:</strong></div><ul><li>Your historical data will <strong>not</strong> be deleted unless you explicitly choose <strong>Delete My Data</strong>.</li><li>If you reconnect this platform later, AdsTable <strong>cannot recover</strong> data generated between the disconnect date and the new connection date.</li><li>This may result in a <strong>permanent gap</strong> in your historical reporting.</li><li>Disconnecting does <strong>not</strong> delete your AdsTable account or subscription. It only removes the connection to the selected platform.</li></ul>'
-      :'<div><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
+      :'<div><strong>This app is currently under review.</strong></div><div style="margin-top:12px"><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
     modalAction.textContent=connected?"Disconnect":"Connect";
     if(modalCancel)modalCancel.style.display="";
     modal.classList.add("open");
@@ -8233,7 +8233,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 
     if(mode==="connect"){
       if(title)title.textContent="Connect Google";
-      if(desc)desc.innerHTML='<div><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
+      if(desc)desc.innerHTML='<div><strong>This app is currently under review.</strong></div><div style="margin-top:12px"><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
       action.textContent="Connect Google";
       if(cancel)cancel.style.display="none";
     }else{
@@ -8410,7 +8410,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 
     if(mode==="connect"){
       if(title)title.textContent="Connect Klaviyo";
-      if(desc)desc.innerHTML='<div><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
+      if(desc)desc.innerHTML='<div><strong>This app is currently under review.</strong></div><div style="margin-top:12px"><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
       action.textContent="Connect Klaviyo";
       if(cancel)cancel.style.display="none";
     }else{

@@ -3560,103 +3560,6 @@ body.account-mode .accountSettingsView{
 .klaviyoSpendMsg{min-height:18px;text-align:center;color:#9b111e;font-size:13px;font-weight:850;margin-top:12px}
 </style>
 
-
-<style id="v32-unified-blocking-modal-style">
-/* Currency, Estimated Spend, Connect/Disconnect and Refresh share one modal language. */
-.connectModalOverlay,
-.adsOperationOverlay{
-  background:rgba(244,244,244,.76) !important;
-  backdrop-filter:blur(2px) !important;
-  -webkit-backdrop-filter:blur(2px) !important;
-}
-.connectModalOverlay.open{
-  background:rgba(244,244,244,.76) !important;
-}
-.connectModal{
-  position:fixed !important;
-  left:50% !important;
-  top:50% !important;
-  transform:translate(-50%,-50%) !important;
-  width:calc(100% - 44px) !important;
-  max-width:390px !important;
-  min-height:0 !important;
-  max-height:calc(100vh - 44px) !important;
-  overflow:hidden !important;
-  background:#fff !important;
-  border:1px solid #d9d9d9 !important;
-  border-radius:22px !important;
-  box-shadow:0 12px 34px rgba(0,0,0,.14) !important;
-  padding:22px !important;
-}
-.connectModalTitle{
-  font-size:24px !important;
-  line-height:1 !important;
-  font-weight:950 !important;
-  letter-spacing:-.8px !important;
-  margin:0 0 10px !important;
-}
-.connectModalDescription{
-  max-width:none !important;
-  max-height:min(420px,calc(100vh - 230px)) !important;
-  margin:0 0 16px !important;
-  padding-right:4px !important;
-  font-size:14px !important;
-  line-height:1.4 !important;
-  font-weight:850 !important;
-  color:#555 !important;
-  overflow-y:auto !important;
-}
-.connectModalAction,
-.connectModalCancel{
-  position:static !important;
-  width:100% !important;
-  height:54px !important;
-  border-radius:16px !important;
-  font-size:17px !important;
-  font-weight:950 !important;
-}
-.connectModalAction{
-  border:0 !important;
-  background:#111 !important;
-  color:#fff !important;
-}
-.connectModalCancel{
-  border:1px solid #ddd !important;
-  background:#fff !important;
-  color:#111 !important;
-  margin:0 0 10px !important;
-}
-.adsOperationModal{
-  width:100% !important;
-  max-width:390px !important;
-  max-height:calc(100vh - 44px) !important;
-  background:#fff !important;
-  border:1px solid #d9d9d9 !important;
-  border-radius:22px !important;
-  box-shadow:0 12px 34px rgba(0,0,0,.14) !important;
-  padding:22px !important;
-  gap:16px !important;
-}
-.adsOperationTitle{
-  font-size:24px !important;
-  line-height:1 !important;
-  font-weight:950 !important;
-  letter-spacing:-.8px !important;
-}
-.adsOperationBody{font-size:14px !important;line-height:1.4 !important;font-weight:850 !important;color:#555 !important;}
-.adsOperationActions{display:block !important;padding-top:0 !important;}
-.adsOperationClose{
-  width:100% !important;
-  height:54px !important;
-  border:0 !important;
-  border-radius:16px !important;
-  background:#111 !important;
-  color:#fff !important;
-  font-size:17px !important;
-  font-weight:950 !important;
-}
-.adsOperationSpinner{width:48px !important;height:48px !important;margin:4px auto 2px !important;}
-</style>
 </head>
 <!-- PHASE D.0 PRODUCTION DASHBOARD MARKER: real user dashboard; no mock-only routing. -->
 <body>
@@ -7809,7 +7712,6 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
   let session=null;
   let metaState="NOT_CONNECTED";
   let modalMode=null;
-  let metaUserId=null;
 
   function byId(id){return document.getElementById(id)}
 
@@ -7824,7 +7726,6 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
         window.location.href="/login";
         return false;
       }
-      metaUserId=session.user&&session.user.id?session.user.id:null;
       return true;
     }catch(e){
       return false;
@@ -8065,32 +7966,48 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
           action.disabled=true;
           action.textContent="Loading...";
 
-          /* Mobile browsers can stall when multiple Supabase clients compete for
-             the same storage lock. The authenticated user id is cached during the
-             initial status load, so OAuth navigation can begin immediately. */
-          let userId=metaUserId||(session&&session.user&&session.user.id)||null;
+          let userId=null;
+
+          /* Mobile-safe fast path: read the already authenticated Supabase session
+             directly from localStorage. This avoids getSession() lock contention
+             when multiple dashboard modules initialize Supabase at the same time. */
+          try{
+            for(let i=0;i<window.localStorage.length;i+=1){
+              const key=window.localStorage.key(i);
+              if(!key || !/^sb-.*-auth-token$/.test(key))continue;
+              const raw=window.localStorage.getItem(key);
+              if(!raw)continue;
+              const stored=JSON.parse(raw);
+              const candidate=(stored&&stored.user&&stored.user.id)
+                ? stored.user.id
+                : (stored&&stored.currentSession&&stored.currentSession.user&&stored.currentSession.user.id)
+                  ? stored.currentSession.user.id
+                  : null;
+              if(candidate){userId=candidate;break;}
+            }
+          }catch(_storageError){}
 
           if(!userId){
             try{
               const ready=await Promise.race([
                 initSupabase(),
-                new Promise(resolve=>setTimeout(()=>resolve(false),2500))
+                new Promise(resolve=>setTimeout(()=>resolve(false),4000))
               ]);
               if(ready&&session&&session.user&&session.user.id){
                 userId=session.user.id;
-                metaUserId=userId;
               }
             }catch(_sessionError){}
           }
 
           if(userId){
-            window.location.assign("/auth/meta?user_id="+encodeURIComponent(userId));
+            window.location.replace("/auth/meta?user_id="+encodeURIComponent(userId));
             return;
           }
 
           if(desc)desc.textContent="Your session could not be loaded. Please sign in again.";
           action.disabled=false;
           action.textContent="Connect Meta";
+          window.location.replace("/login");
         }else{
           disconnectMeta();
         }
@@ -9145,9 +9062,6 @@ body.ads-operation-locked{overflow:hidden !important;}
           return;
         }
 
-        if(activePlatform==="klaviyo"){
-          sessionStorage.setItem("klaviyo_spend_after_account_selection","1");
-        }
         if(desc){
           desc.textContent="Account selection saved.";
         }
@@ -9176,48 +9090,6 @@ body.ads-operation-locked{overflow:hidden !important;}
 })();
 </script>
 <!-- END PATCH 17E-FIX -->
-
-
-<!-- ===== CLEAN DASHBOARD ENTRY STATE ===== -->
-<script id="clean-dashboard-entry-state">
-(function(){
-  "use strict";
-
-  function closeElement(id){
-    const element=document.getElementById(id);
-    if(!element)return;
-    element.classList.remove("open");
-    element.setAttribute("aria-hidden","true");
-  }
-
-  function resetInitialUiState(){
-    /* A fresh dashboard/login entry must never inherit an open drawer or
-       a blocking overlay. Legitimate onboarding dialogs open afterwards
-       from their own API checks. */
-    closeElement("platformDrawer");
-    closeElement("platformOverlay");
-    closeElement("connectModal");
-    closeElement("connectModalOverlay");
-    closeElement("refreshOperationOverlay");
-
-    document.body.classList.remove("ads-operation-locked");
-    document.documentElement.style.removeProperty("overflow");
-    document.body.style.removeProperty("overflow");
-  }
-
-  /* This script is at the end of the document, so run immediately before
-     asynchronous session/onboarding checks can open the correct screen. */
-  resetInitialUiState();
-
-  /* Mobile browsers may restore a page from the back-forward cache with
-     stale classes. Only reset on an actual bfcache restoration, not on a
-     normal user interaction. */
-  window.addEventListener("pageshow",function(event){
-    if(event.persisted)resetInitialUiState();
-  });
-})();
-</script>
-<!-- ===== END CLEAN DASHBOARD ENTRY STATE ===== -->
 
 </body>
 </html>

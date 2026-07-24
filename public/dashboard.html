@@ -9177,6 +9177,61 @@ body.ads-operation-locked{overflow:hidden !important;}
 </script>
 <!-- END PATCH 17E-FIX -->
 
+
+<!-- ===== ORPHAN MODAL OVERLAY SAFETY PATCH ===== -->
+<script id="orphan-modal-overlay-safety">
+(function(){
+  "use strict";
+
+  function isVisiblyOpen(element){
+    if(!element) return false;
+    if(!element.classList.contains("open")) return false;
+    const style=window.getComputedStyle(element);
+    return style.display!=="none" && style.visibility!=="hidden" && style.opacity!=="0";
+  }
+
+  function clearOrphanBlockingLayers(){
+    const connectOverlay=document.getElementById("connectModalOverlay");
+    const connectModal=document.getElementById("connectModal");
+    const refreshOverlay=document.getElementById("refreshOperationOverlay");
+    const currencyOverlay=document.getElementById("currencyRequiredOverlay");
+    const klaviyoSpendOverlay=document.getElementById("klaviyoSpendOverlay");
+
+    const connectIsOpen=isVisiblyOpen(connectModal);
+    const refreshIsOpen=isVisiblyOpen(refreshOverlay);
+    const currencyIsOpen=isVisiblyOpen(currencyOverlay);
+    const spendIsOpen=isVisiblyOpen(klaviyoSpendOverlay);
+
+    if(connectOverlay && connectOverlay.classList.contains("open") && !connectIsOpen){
+      connectOverlay.classList.remove("open");
+      connectOverlay.setAttribute("aria-hidden","true");
+    }
+
+    if(!connectIsOpen && !refreshIsOpen && !currencyIsOpen && !spendIsOpen){
+      document.body.classList.remove("ads-operation-locked");
+    }
+  }
+
+  function scheduleSafetyCheck(){
+    clearOrphanBlockingLayers();
+    window.setTimeout(clearOrphanBlockingLayers,150);
+    window.setTimeout(clearOrphanBlockingLayers,700);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",scheduleSafetyCheck,{once:true});
+  }else{
+    scheduleSafetyCheck();
+  }
+
+  window.addEventListener("pageshow",scheduleSafetyCheck);
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="visible")scheduleSafetyCheck();
+  });
+})();
+</script>
+<!-- ===== END ORPHAN MODAL OVERLAY SAFETY PATCH ===== -->
+
 </body>
 </html>
 <!-- =========================================================

@@ -4155,10 +4155,10 @@ function togglePJ(groupName){
     const label=labels[platform]||platform;
     activeDrawerButton=btn;
     modal.dataset.platform=platform;
-    if(modalTitle)modalTitle.textContent=connected?`Disconnect ${label}?`:`Connect ${label}?`;
-    if(modalDescription)modalDescription.textContent=connected
-      ?`This will stop future ${label} syncs. Historical dashboard data will remain available.`
-      :`Continue to authorize ${label} for AdsTable.`;
+    if(modalTitle)modalTitle.textContent=connected?`Disconnect ${label}?`:`Connect ${label}`;
+    if(modalDescription)modalDescription.innerHTML=connected
+      ?'<div>Disconnecting closes the secure communication channel between AdsTable and your platform in accordance with the platform\'s policies.</div><div style="margin-top:12px"><strong>Before you disconnect:</strong></div><ul><li>Your historical data will <strong>not</strong> be deleted unless you explicitly choose <strong>Delete My Data</strong>.</li><li>If you reconnect this platform later, AdsTable <strong>cannot recover</strong> data generated between the disconnect date and the new connection date.</li><li>This may result in a <strong>permanent gap</strong> in your historical reporting.</li><li>Disconnecting does <strong>not</strong> delete your AdsTable account or subscription. It only removes the connection to the selected platform.</li></ul>'
+      :'<div><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
     modalAction.textContent=connected?"Disconnect":"Connect";
     if(modalCancel)modalCancel.style.display="";
     modal.classList.add("open");
@@ -8232,13 +8232,13 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     modal.dataset.platform = "google";
 
     if(mode==="connect"){
-      if(title)title.textContent="Google Not Connected";
-      if(desc)desc.textContent="Connect your Google Ads account to start tracking performance.";
+      if(title)title.textContent="Connect Google";
+      if(desc)desc.innerHTML='<div><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
       action.textContent="Connect Google";
       if(cancel)cancel.style.display="none";
     }else{
       if(title)title.textContent="Disconnect Google?";
-      if(desc)desc.textContent="This will stop future Google syncs. Your historical dashboard data will remain available.";
+      if(desc)desc.innerHTML='<div>Disconnecting closes the secure communication channel between AdsTable and your platform in accordance with the platform\'s policies.</div><div style="margin-top:12px"><strong>Before you disconnect:</strong></div><ul><li>Your historical data will <strong>not</strong> be deleted unless you explicitly choose <strong>Delete My Data</strong>.</li><li>If you reconnect this platform later, AdsTable <strong>cannot recover</strong> data generated between the disconnect date and the new connection date.</li><li>This may result in a <strong>permanent gap</strong> in your historical reporting.</li><li>Disconnecting does <strong>not</strong> delete your AdsTable account or subscription. It only removes the connection to the selected platform.</li></ul>';
       action.textContent="Disconnect";
       if(cancel)cancel.style.display="";
     }
@@ -8409,13 +8409,13 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     modal.dataset.platform = "klaviyo";
 
     if(mode==="connect"){
-      if(title)title.textContent="Klaviyo Not Connected";
-      if(desc)desc.textContent="Connect your Klaviyo account to start tracking email performance.";
+      if(title)title.textContent="Connect Klaviyo";
+      if(desc)desc.innerHTML='<div><strong>Before connecting:</strong></div><ul><li>A tracking pixel must already be installed and active on your platform.</li><li>AdsTable is a <strong>read-only</strong> application. It cannot create, edit, pause, delete, or publish anything in your advertising account.</li><li>After connecting, you can use <strong>Refresh</strong> at any time to retrieve the latest available data.</li><li>Your connected platforms are automatically refreshed every <strong>4 hours</strong>.</li></ul>';
       action.textContent="Connect Klaviyo";
       if(cancel)cancel.style.display="none";
     }else{
       if(title)title.textContent="Disconnect Klaviyo?";
-      if(desc)desc.textContent="This will stop future Klaviyo syncs. Your historical dashboard data will remain available.";
+      if(desc)desc.innerHTML='<div>Disconnecting closes the secure communication channel between AdsTable and your platform in accordance with the platform\'s policies.</div><div style="margin-top:12px"><strong>Before you disconnect:</strong></div><ul><li>Your historical data will <strong>not</strong> be deleted unless you explicitly choose <strong>Delete My Data</strong>.</li><li>If you reconnect this platform later, AdsTable <strong>cannot recover</strong> data generated between the disconnect date and the new connection date.</li><li>This may result in a <strong>permanent gap</strong> in your historical reporting.</li><li>Disconnecting does <strong>not</strong> delete your AdsTable account or subscription. It only removes the connection to the selected platform.</li></ul>';
       action.textContent="Disconnect";
       if(cancel)cancel.style.display="";
     }

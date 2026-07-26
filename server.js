@@ -5208,6 +5208,68 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
   }catch(e){res.status(e.status||500).json({error:e.message})}
 });
 
+
+app.get("/api/tiktok/campaigns",async(req,res)=>{
+  try{
+    const user=await requireUser(req,res);if(!user)return;
+    const sandbox=String(req.query.sandbox||"false").toLowerCase()==="true";
+    const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
+    if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
+
+    let token=null,tokenSource=null;
+    if(sandbox){
+      token=String(req.headers["x-sandbox-access-token"]||req.query.sandbox_access_token||"").trim();
+      tokenSource="manual_sandbox_access_token";
+      if(!token)return res.status(400).json({error:"sandbox_access_token is required when sandbox=true"});
+    }else{
+      const conn=await getConnection(user.id,"tiktok");
+      if(!conn?.access_token)return res.status(404).json({error:"tiktok not connected"});
+      token=conn.access_token;
+      tokenSource="platform_connections.access_token";
+    }
+
+    const base=sandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
+    const endpoint="/v1.3/campaign/get/";
+    const headers={"Access-Token":token};
+    const params={
+      advertiser_id:advertiserId,
+      page:1,
+      page_size:100
+    };
+
+    const data=await tiktokApiFetch({base,endpoint,headers,params});
+    const list=Array.isArray(data?.data?.list)?data.data.list:[];
+    const campaigns=list.map(item=>({
+      campaign_id:item.campaign_id||item.id||null,
+      campaign_name:item.campaign_name||item.name||null,
+      campaign_status:item.secondary_status||item.operation_status||item.status||null,
+      objective_type:item.objective_type||null,
+      budget:item.budget??null,
+      budget_mode:item.budget_mode||null,
+      create_time:item.create_time||null,
+      modify_time:item.modify_time||null
+    }));
+
+    res.json({
+      platform:"tiktok",
+      sandbox,
+      advertiser_id:advertiserId,
+      campaign_count:campaigns.length,
+      campaigns,
+      request:{
+        sandbox,
+        base:base.endsWith("/")?base:`${base}/`,
+        endpoint,
+        advertiser_id:advertiserId,
+        page:1,
+        page_size:100,
+        token_source:tokenSource
+      },
+      raw:data
+    });
+  }catch(e){res.status(e.status||500).json({error:e.message})}
+});
+
 app.get("/api/tiktok/report",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;

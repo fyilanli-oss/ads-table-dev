@@ -2239,6 +2239,114 @@ app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(
 app.get("/api/klaviyo/accounts",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const account=await resolveKlaviyoAccountIdentity(result.conn);res.json({platform:"klaviyo",accounts:[{platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null}]})}catch(e){res.status(e.status||500).json({error:e.message})}});
 app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/klaviyo/campaigns",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const channel=String(req.query.channel||"email");const filter=`equals(messages.channel,\'${channel}\'),greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const data=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);res.json(data)}catch(e){res.status(500).json({error:e.message})}});
+
+
+function klaviyoMetricSummary(metric){
+  const attributes=metric?.attributes||{};
+  return {
+    id:metric?.id||null,
+    name:attributes.name||metric?.name||null,
+    integration:attributes.integration||null,
+    created:attributes.created||null,
+    updated:attributes.updated||null
+  };
+}
+
+function klaviyoEventMetricId(event){
+  return event?.relationships?.metric?.data?.id||event?.attributes?.metric_id||null;
+}
+
+function klaviyoEventSummary(event,metricById){
+  const attributes=event?.attributes||{};
+  const metricId=klaviyoEventMetricId(event);
+  const metric=metricById.get(metricId)||null;
+  return {
+    id:event?.id||null,
+    datetime:attributes.datetime||null,
+    timestamp:attributes.timestamp??null,
+    uuid:attributes.uuid||null,
+    metric_id:metricId,
+    metric_name:metric?.name||null,
+    event_properties:attributes.event_properties||{},
+    profile_id:event?.relationships?.profile?.data?.id||null
+  };
+}
+
+app.get("/api/klaviyo/metrics",async(req,res)=>{
+  try{
+    const result=await requireConnection(req,res,"klaviyo");
+    if(!result)return;
+    const data=await klaviyoFetch(result.conn,"/api/metrics/?page%5Bsize%5D=200");
+    const metrics=(Array.isArray(data.data)?data.data:[]).map(klaviyoMetricSummary);
+    const wantedNames=[
+      "Added to Cart","Started Checkout","Placed Order","Ordered Product",
+      "Received Email","Opened Email","Clicked Email"
+    ];
+    const wantedSet=new Set(wantedNames.map(name=>name.toLowerCase()));
+    const sampleMetrics=metrics.filter(metric=>wantedSet.has(String(metric.name||"").toLowerCase()));
+    res.json({
+      platform:"Klaviyo",
+      endpoint:"metrics",
+      metricCount:metrics.length,
+      sampleMetricCount:sampleMetrics.length,
+      sampleMetrics,
+      metrics,
+      links:data.links||null
+    });
+  }catch(e){
+    res.status(e.status||500).json({error:e.message,stage:"klaviyo_metrics"});
+  }
+});
+
+app.get("/api/klaviyo/events",async(req,res)=>{
+  try{
+    const result=await requireConnection(req,res,"klaviyo");
+    if(!result)return;
+    const range=String(req.query.date_range||req.query.dateRange||"last_30d");
+    const window=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);
+    const requestedLimit=Math.max(1,Number(req.query.limit||200));
+    const pageSize=Math.min(requestedLimit,200);
+    const metricId=String(req.query.metric_id||req.query.metricId||"").trim();
+    const filters=[
+      `greater-or-equal(datetime,${window.start})`,
+      `less-or-equal(datetime,${window.end})`
+    ];
+    if(metricId)filters.unshift(`equals(metric_id,'${metricId.replace(/'/g,"\\'")}')`);
+    const filter=filters.length===1?filters[0]:`and(${filters.join(",")})`;
+    const params=new URLSearchParams();
+    params.set("filter",filter);
+    params.set("include","metric");
+    params.set("sort","-datetime");
+    params.set("page[size]",String(pageSize));
+    const data=await klaviyoFetch(result.conn,`/api/events/?${params.toString()}`);
+    const included=Array.isArray(data.included)?data.included:[];
+    const metricById=new Map(
+      included
+        .filter(item=>item?.type==="metric")
+        .map(item=>[item.id,klaviyoMetricSummary(item)])
+    );
+    const events=(Array.isArray(data.data)?data.data:[]).map(event=>klaviyoEventSummary(event,metricById));
+    const summary={};
+    for(const event of events){
+      const key=event.metric_name||event.metric_id||"Unknown Metric";
+      summary[key]=(summary[key]||0)+1;
+    }
+    res.json({
+      platform:"Klaviyo",
+      endpoint:"events",
+      date_range:range,
+      start:window.start,
+      end:window.end,
+      requested_metric_id:metricId||null,
+      eventCount:events.length,
+      summary,
+      events,
+      links:data.links||null
+    });
+  }catch(e){
+    res.status(e.status||500).json({error:e.message,stage:"klaviyo_events"});
+  }
+});
 app.get("/api/klaviyo/insights",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;if(conn.metadata?.requiresSetup)return res.status(400).json({error:"Klaviyo setup required. Please enter estimated monthly spend and currency."});const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const campaignLimit=Math.min(Number(req.query.limit||25),50);const channel=String(req.query.channel||"email");const filter=`equals(messages.channel,\'${channel}\'),greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const campaignsData=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);const campaigns=(campaignsData.data||[]).slice(0,campaignLimit);let placedOrderMetricId=req.query.placedOrderMetricId||process.env.KLAVIYO_PLACED_ORDER_METRIC_ID||null;if(!placedOrderMetricId)placedOrderMetricId=await getKlaviyoMetricId(conn,["Placed Order","Placed order","Order Placed"]);
 const rows=[];const errors=[];
 for(const campaign of campaigns){

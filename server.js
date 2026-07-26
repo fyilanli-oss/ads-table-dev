@@ -2108,11 +2108,88 @@ function deepFindNumber(obj,keys){
   for(const v of Object.values(obj)){if(v&&typeof v==="object"){const found=deepFindNumber(v,keys);if(found!==null)return found}}
   return null
 }
+const klaviyoRefreshInFlight=new Map();
+
+function klaviyoTokenExpiresSoon(conn,skewMs=120000){
+  if(!conn?.access_token)return true;
+  if(!conn?.token_expires_at)return false;
+  const expiresAt=new Date(conn.token_expires_at).getTime();
+  return !Number.isFinite(expiresAt)||expiresAt<=Date.now()+skewMs;
+}
+
+async function refreshKlaviyoConnectionToken(conn){
+  const userId=conn?.user_id;
+  if(!userId)throw Object.assign(new Error("Klaviyo connection user is missing"),{status:401,code:"KLAVIYO_USER_MISSING"});
+  if(!conn?.refresh_token)throw Object.assign(new Error("Klaviyo refresh token missing. Please reconnect Klaviyo."),{status:401,code:"KLAVIYO_REFRESH_TOKEN_MISSING"});
+  if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET)throw Object.assign(new Error("Missing Klaviyo OAuth client credentials"),{status:500,code:"KLAVIYO_OAUTH_ENV_MISSING"});
+
+  if(klaviyoRefreshInFlight.has(userId))return klaviyoRefreshInFlight.get(userId);
+
+  const refreshPromise=(async()=>{
+    const body=new URLSearchParams({grant_type:"refresh_token",refresh_token:conn.refresh_token});
+    const response=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{
+      method:"POST",
+      headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},
+      body:body.toString()
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.access_token){
+      const message=data.error_description||data.error||data.message||`Klaviyo token refresh failed ${response.status}`;
+      const error=Object.assign(new Error(message),{status:response.status===400?401:response.status,code:data.error||"KLAVIYO_TOKEN_REFRESH_FAILED"});
+      throw error;
+    }
+
+    await saveConnection(userId,"klaviyo",{
+      accessToken:data.access_token,
+      refreshToken:data.refresh_token||conn.refresh_token,
+      tokenExpiresAt:parseExpiry(data.expires_in),
+      metadata:{
+        scope:data.scope||conn.metadata?.scope||klaviyoScopes(),
+        tokenType:data.token_type||conn.metadata?.tokenType||"bearer",
+        expiresIn:data.expires_in||null,
+        tokenRefreshedAt:new Date().toISOString()
+      }
+    });
+    return await getConnection(userId,"klaviyo");
+  })();
+
+  klaviyoRefreshInFlight.set(userId,refreshPromise);
+  try{return await refreshPromise}
+  finally{klaviyoRefreshInFlight.delete(userId)}
+}
+
+async function getFreshKlaviyoConnection(conn,{forceRefresh=false}={}){
+  if(!conn)throw Object.assign(new Error("Klaviyo not connected"),{status:404,code:"KLAVIYO_NOT_CONNECTED"});
+  if(!forceRefresh&&!klaviyoTokenExpiresSoon(conn))return conn;
+  return await refreshKlaviyoConnectionToken(conn);
+}
+
+function isKlaviyoAuthenticationError(response,data){
+  if(response.status===401)return true;
+  const error=data?.errors?.[0]||{};
+  const text=String(error.detail||error.title||data?.error_description||data?.error||data?.message||"").toLowerCase();
+  return text.includes("incorrect authentication credentials")||text.includes("invalid access token")||text.includes("missing or invalid access token");
+}
+
 async function klaviyoFetch(conn,endpoint,options={}){
-  const r=await fetch(`${KLAVIYO_API_BASE}${endpoint}`,{...options,headers:{Authorization:`Bearer ${conn.access_token}`,Accept:"application/json",Revision:process.env.KLAVIYO_REVISION||"2024-10-15","Content-Type":"application/json",...(options.headers||{})}});
-  const text=await r.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
-  if(!r.ok)throw new Error(data.errors?.[0]?.detail||data.errors?.[0]?.title||data.message||text||`Klaviyo API error ${r.status}`);
-  return data
+  let activeConn=await getFreshKlaviyoConnection(conn);
+  for(let attempt=0;attempt<2;attempt++){
+    const response=await fetch(`${KLAVIYO_API_BASE}${endpoint}`,{
+      ...options,
+      headers:{Authorization:`Bearer ${activeConn.access_token}`,Accept:"application/json",Revision:process.env.KLAVIYO_REVISION||"2024-10-15","Content-Type":"application/json",...(options.headers||{})}
+    });
+    const text=await response.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
+    if(response.ok)return data;
+
+    if(attempt===0&&isKlaviyoAuthenticationError(response,data)){
+      activeConn=await getFreshKlaviyoConnection(activeConn,{forceRefresh:true});
+      continue;
+    }
+
+    const error=Object.assign(new Error(data.errors?.[0]?.detail||data.errors?.[0]?.title||data.error_description||data.error||data.message||text||`Klaviyo API error ${response.status}`),{status:response.status});
+    throw error;
+  }
+  throw Object.assign(new Error("Klaviyo authentication failed after token refresh"),{status:401});
 }
 
 async function resolveKlaviyoAccountIdentity(conn){
@@ -2276,7 +2353,7 @@ app.get("/api/klaviyo/metrics",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"klaviyo");
     if(!result)return;
-    const data=await klaviyoFetch(result.conn,"/api/metrics/?page%5Bsize%5D=200");
+    const data=await klaviyoFetch(result.conn,"/api/metrics/");
     const metrics=(Array.isArray(data.data)?data.data:[]).map(klaviyoMetricSummary);
     const wantedNames=[
       "Added to Cart","Started Checkout","Placed Order","Ordered Product",

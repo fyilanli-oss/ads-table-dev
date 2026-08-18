@@ -9,6 +9,7 @@ const {createRequireConnectAccessForOAuth} = require('../security/oauth-access')
 
 const SERVER_PATH = path.join(__dirname, '..', 'server.js');
 const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 const dashboardSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'dashboard.html'), 'utf8');
 
 function registeredAuthRoutes(source) {
@@ -111,13 +112,41 @@ test('every active OAuth start and callback uses the transaction store', () => {
     assert.notEqual(callback, -1, `${route.provider} callback route must exist`);
     const nextRoute = serverSource.indexOf('\napp.', callback + 1);
     const body = serverSource.slice(callback, nextRoute === -1 ? serverSource.length : nextRoute);
-    assert.match(serverSource.slice(start, callback), /createOAuthTransaction\(/, `${route.provider} start must create a transaction`);
-    assert.match(body, /consumeOAuthTransaction\(/, `${route.provider} callback must consume a transaction`);
-    assert.doesNotMatch(body, /req\.session\.(?:oauthUserId|\w*OAuthState|klaviyoCodeVerifier)/);
+    assert.match(serverSource.slice(start, callback), /\{state\}=await createOAuthTransaction\(/, `${route.provider} start state must come from a created transaction`);
+    assert.match(body, /consumeOAuthTransaction\(state,/, `${route.provider} callback state must be consumed through the transaction store`);
+    assert.match(body, /transaction\.user_id/, `${route.provider} callback identity must come from the transaction`);
+    assert.doesNotMatch(serverSource.slice(start, nextRoute === -1 ? serverSource.length : nextRoute), /req\.session/);
   }
 });
 
-test('production session configuration characterizes the known fallback and MemoryStore debt', () => {
-  assert.match(serverSource, /process\.env\.SESSION_SECRET\|\|"dev_secret_change_me"/);
-  assert.doesNotMatch(serverSource, /app\.use\(session\(\{[^}]*store\s*:/s);
+test('Klaviyo callback reads its PKCE verifier from the consumed transaction', () => {
+  const callback = serverSource.indexOf('app.get("/auth/klaviyo/callback"');
+  const nextRoute = serverSource.indexOf('\napp.', callback + 1);
+  const body = serverSource.slice(callback, nextRoute);
+  assert.match(body, /const verifier=transaction\.pkce_verifier/);
+});
+
+test('Express session infrastructure is absent from runtime and dependencies', () => {
+  assert.doesNotMatch(serverSource, /require\(["']express-session["']\)/);
+  assert.doesNotMatch(serverSource, /app\.use\(session\(/);
+  assert.doesNotMatch(serverSource, /req\.session/);
+  assert.doesNotMatch(serverSource, /SESSION_SECRET/);
+  assert.doesNotMatch(serverSource, /dev_secret_change_me/);
+  assert.equal(packageJson.dependencies?.['express-session'], undefined);
+  assert.equal(packageJson.devDependencies?.['express-session'], undefined);
+});
+
+test('Pinterest start and callback remain passive legacy dashboard redirects without session access', () => {
+  for (const route of ROUTES.filter(item => !item.active)) {
+    const start = serverSource.indexOf(`app.get("${route.start}"`);
+    const callback = serverSource.indexOf(`app.get("${route.callback}"`, start);
+    const nextRoute = serverSource.indexOf('\napp.', callback + 1);
+    const startBody = serverSource.slice(start, callback);
+    const callbackBody = serverSource.slice(callback, nextRoute);
+    for (const body of [startBody, callbackBody]) {
+      assert.match(body, /passiveLegacyPlatformStatus\("pinterest"\)/);
+      assert.match(body, /res\.redirect\(`\/dashboard\?pinterest_legacy=1/);
+      assert.doesNotMatch(body, /req\.session|createOAuthTransaction|consumeOAuthTransaction/);
+    }
+  }
 });

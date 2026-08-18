@@ -521,14 +521,14 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 5. E1 — OAuth ve session güvenliği
 
-**Durum:** `In progress` — E1-T1, E1-T2 ve E1-T3 tamamlandı; E1-T4 sıradaki uygulama paketidir.
+**Durum:** `In progress` — E1-T1, E1-T2, E1-T3 ve E1-T4 tamamlandı; E1-T5 sıradaki uygulama paketidir.
 
 ### Planlanan işler
 
 - **E1-T1 — `Done` — OAuth route envanteri ve threat model:** Tüm start/callback yolları, identity kaynakları, state, replay ve token yazma noktaları çıkarıldı; executable current-state baseline eklendi.
 - **E1-T2 — `Done` — Bearer-bound identity:** Aktif OAuth başlangıçları doğrulanmış bearer kullanıcıya bağlandı; legacy query `user_id` reddedildi ve dashboard bearer-authenticated JSON handshake'e geçirildi.
 - **E1-T3 — `Done` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction store; SHA-256 state özeti, 10 dakika TTL, provider/redirect/user bağları ve Klaviyo PKCE taşımasıyla kuruldu.
-- **E1-T4 — `Not started` — Session hardening:** Production `SESSION_SECRET` fail-fast olur; shared TTL store kurulur; cookie politikası doğrulanır.
+- **E1-T4 — `Done` — Session elimination:** E1-T3 sonrasında runtime session consumer kalmadığı doğrulandığı için kullanılmayan shared store eklemek yerine Express session katmanı tamamen kaldırıldı. Böylece MemoryStore, known fallback secret, session cookie ve multi-instance affinity riski ortadan kaldırıldı.
 - **E1-T5 — `Not started` — Unsafe default guard:** Review/test hard-route ve test account varsayımları production'da reddedilir.
 - **E1-T6 — `Not started` — Token protection:** Encryption/rotation çözümü uygulanır veya süreli, sahibi olan risk kabulü kaydedilir.
 - **E1-T7 — `Not started` — Security regression suite:** Auth, IDOR, tamper, replay ve expiry testleri CI'a eklenir.
@@ -538,8 +538,8 @@ Mutabakat dışında bağımlılık yoktur.
 - OAuth user kimliği yalnız doğrulanmış bearer context'ten gelir.
 - State ve transaction user/provider/redirect bağlamına bağlıdır; bir kez tüketilir ve sürelidir.
 - Callback replay, state mismatch, expired transaction ve cross-user tamper reddedilir.
-- Production eksik secret veya unsafe config ile başlamaz.
-- Multi-instance session davranışı shared store ile çalışır.
+- Uygulama session secret'a ihtiyaç duymaz; E1-T5 kapsamındaki unsafe production config ayrıca reddedilir.
+- OAuth callback'leri shared transaction store ile multi-instance çalışır ve session affinity gerektirmez.
 - Token değerleri response, log ve test artefaktlarında görünmez.
 
 ### Test planı
@@ -548,8 +548,8 @@ Mutabakat dışında bağımlılık yoktur.
 - Query/body user ID tamper negatif testi.
 - State mismatch, replay, expiry ve provider mismatch testleri.
 - User A transaction'ının User B tarafından tüketilememe testi.
-- Missing `SESSION_SECRET` production boot testi.
-- Shared store TTL ve atomic consume integration testi.
+- Session middleware, cookie, secret fallback ve dependency elimination testi.
+- OAuth transaction store TTL ve atomic consume integration testi.
 - Log redaction testi.
 
 ### Rollback planı
@@ -557,12 +557,11 @@ Mutabakat dışında bağımlılık yoktur.
 - Provider bazlı OAuth feature flag kullanılır.
 - Yeni transaction store sorununda yeni bağlantı başlatma kontrollü kapatılır; güvenli olmayan eski identity yoluna dönülmez.
 - Mevcut geçerli connection kayıtları korunur.
-- Session store migration'ında dual-read yalnız süreli ve ölçümlü uygulanır.
+- Bilinmeyen kritik bir session consumer bulunursa merge durdurulur; merge sonrası yeniden ekleme yalnız açık evidence ve yeni security review ile değerlendirilir. Known fallback secret hiçbir rollback senaryosunda geri getirilmez.
 
 ### Bağımlılıklar
 
 - E0.
-- Shared store ve secret yönetimi için deployment kararı.
 - Provider callback URL envanteri.
 
 ### Evidence
@@ -574,6 +573,27 @@ Mutabakat dışında bağımlılık yoktur.
 - Config startup testleri.
 - E1-T1 gerçekleşen evidence: `security/oauth-route-inventory.js`, `tests/oauth-security-baseline.test.js` ve `docs/security/E1_T1_OAUTH_SECURITY_BASELINE.md`.
 - E1-T2 gerçekleşen evidence: `security/oauth-access.js`, bearer/tamper/unauthenticated acceptance testleri ve `public/dashboard.html` authenticated OAuth handshake'i.
+- E1-T3 gerçekleşen evidence: `security/oauth-transaction-store.js`, atomik transaction migration'ı ve replay/expiry/provider/redirect/PKCE testleri.
+- E1-T4 gerçekleşen evidence: session-elimination runtime/package guard'ları, pasif Pinterest redirect regresyonu ve güncellenmiş security baseline.
+
+### E1-T4 task aynası
+
+**Planlanan:**
+- Production secret fail-fast ve shared TTL session store.
+
+**Gerçekleşen:**
+- Aktif runtime session consumer kalmadığı doğrulandı.
+- Express session dependency/middleware/cookie bütünüyle kaldırıldı.
+
+**Sapma gerekçesi:**
+- Kullanılmayan bir shared store eklemek gereksiz altyapı ve saldırı yüzeyi oluşturacaktı.
+- Session elimination aynı güvenlik hedefini daha güçlü ve daha basit biçimde sağlıyor.
+
+**Rollback:**
+- OAuth transaction store geri alınmaz; query-controlled identity veya session-bound OAuth state geri getirilmez.
+- Kritik bir legacy consumer tespit edilirse değişiklik merge edilmez.
+- Merge sonrasında bilinmeyen session consumer bulunursa yalnız açık evidence ve yeni security review ile session altyapısı yeniden değerlendirilir.
+- Known development secret fallback hiçbir rollback senaryosunda geri getirilmez.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 

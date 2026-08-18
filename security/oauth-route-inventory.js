@@ -12,7 +12,7 @@ const ROUTES = Object.freeze([
   Object.freeze({provider: 'google_ads', start: '/auth/google', callback: '/auth/google/callback', active: true, transaction: true, pkce: false}),
   Object.freeze({provider: 'google_sheets', start: '/auth/google-sheets', callback: '/auth/google-sheets/callback', active: true, transaction: true, pkce: false}),
   Object.freeze({provider: 'ga4_organic', start: '/auth/organic', callback: '/auth/organic/callback', active: true, transaction: true, pkce: false}),
-  Object.freeze({provider: 'pinterest', start: '/auth/pinterest', callback: '/auth/pinterest/callback', active: false, state: 'pinterestOAuthState', user: 'oauthUserId', pkce: false}),
+  Object.freeze({provider: 'pinterest', start: '/auth/pinterest', callback: '/auth/pinterest/callback', active: false, transaction: false, pkce: false}),
   Object.freeze({provider: 'klaviyo', start: '/auth/klaviyo', callback: '/auth/klaviyo/callback', active: true, transaction: true, pkce: true}),
   Object.freeze({provider: 'tiktok', start: '/auth/tiktok', callback: '/auth/tiktok/callback', active: true, transaction: true, pkce: false})
 ]);

@@ -1,6 +1,5 @@
 
 const express=require("express");
-const session=require("express-session");
 const path=require("path");
 const crypto=require("crypto");
 const {google}=require("googleapis");
@@ -9,7 +8,6 @@ const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
 const {createOAuthTransactionStore}=require("./security/oauth-transaction-store");
 const app=express(); const PORT=process.env.PORT||3000;
 app.set("trust proxy",1); app.use(express.json());
-app.use(session({secret:process.env.SESSION_SECRET||"dev_secret_change_me",resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:"lax",secure:process.env.NODE_ENV==="production"||process.env.VERCEL==="1"}}));
 app.use(express.static(path.join(__dirname,"public")));
 const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
@@ -2083,8 +2081,6 @@ app.get("/auth/pinterest",async(req,res)=>{
   res.redirect(`/dashboard?pinterest_legacy=1&platform_status=${encodeURIComponent(status.status)}&message=${encodeURIComponent(status.message)}`);
 });
 app.get("/auth/pinterest/callback",async(req,res)=>{
-  req.session.pinterestOAuthState=null;
-  req.session.oauthUserId=null;
   const status=passiveLegacyPlatformStatus("pinterest");
   res.redirect(`/dashboard?pinterest_legacy=1&platform_status=${encodeURIComponent(status.status)}&message=${encodeURIComponent(status.message)}`);
 });

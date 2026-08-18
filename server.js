@@ -3435,8 +3435,7 @@ async function runQueuedBackfillJob(job){
     return {ok:true,skipped:true,reason:"ownership_not_active",job_id:job.id,platform,platform_account_id:platformAccountId,ownership_status:ownership?.status||null};
   }
 
-  const {data:conn,error:connError}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",job.user_id).eq("platform",platform).eq("connected",true).maybeSingle();
-  if(connError)throw connError;
+  const conn=await getConnection(job.user_id,platform);
   if(!conn)throw new Error(`Queued backfill ${platform} connection not found`);
 
   await setRefreshJobStatus(job.id,"running");
@@ -3508,14 +3507,7 @@ async function runMetaAutoRefreshForSchedule(schedule){
   if(userError)throw userError;
   if(!user)throw new Error("Auto refresh user not found");
 
-  const {data:conn,error:connError}=await supabaseAdmin
-    .from("platform_connections")
-    .select("*")
-    .eq("user_id",schedule.user_id)
-    .eq("platform","meta")
-    .eq("connected",true)
-    .maybeSingle();
-  if(connError)throw connError;
+  const conn=await getConnection(schedule.user_id,"meta");
   if(!conn)throw new Error("Auto refresh Meta connection not found");
 
   const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);
@@ -4425,14 +4417,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
   if(userError)throw userError;
   if(!user)throw new Error("Auto refresh user not found");
 
-  const {data:conn,error:connError}=await supabaseAdmin
-    .from("platform_connections")
-    .select("*")
-    .eq("user_id",schedule.user_id)
-    .eq("platform","google")
-    .eq("connected",true)
-    .maybeSingle();
-  if(connError)throw connError;
+  const conn=await getConnection(schedule.user_id,"google");
   if(!conn)throw new Error("Auto refresh Google connection not found");
 
   const resolved=await resolveGoogleRefreshAccount(

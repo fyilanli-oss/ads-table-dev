@@ -1331,7 +1331,7 @@ Bu V4 plan ile:
 
 1. **E1-T6B — Schema (`artefact ready / live acceptance pending`):** `platform_connection_tokens` dedicated table; encrypted access/refresh envelope CHECK'leri, forced RLS ve service-role-only grant migration'ı hazırlandı. Canlı DDL/grant/anon negatif doğrulaması yapılmadan runtime write açılmaz.
 2. **E1-T6C — Dual path (`artefact ready / activation pending`):** Yeni write'lar yalnız ciphertext üretir; mevcut plaintext satırlar explicit legacy-read flag'iyle okunur. Encrypted envelope varsa decrypt fail-closed çalışır. Migration ve key provisioning acceptance olmadan encryption flag açılamaz.
-3. **E1-T6D — Backfill/rotation:** Resumable, idempotent ve redacted backfill; row-count/parity/cleanup evidence.
+3. **E1-T6D — Backfill/rotation (`artefact ready / activation pending`):** Cursor ile devam edebilen, batch-limitli, dry-run varsayılanlı ve idempotent backfill/rotation runner hazırdır. Sonuçlar yalnız sayım ile redacted user/platform/error-code evidence taşır; token veya exception mesajı taşımaz. Scheduled ve queued refresh yollarındaki doğrudan plaintext connection okumaları merkezi encrypted hydration sınırına alınmıştır. Production key provisioning, dry-run ve kontrollü write acceptance tamamlanmadan çalıştırılmaz.
 4. **E1-T6E — Retirement:** Plaintext token kolonlarının boş olduğu kanıtlandıktan ve rollback süresi tamamlandıktan sonra ayrı destructive migration.
 
 **Sapma:** Yok. Anahtar materyali veya canlı token migration'ı foundation PR'ına alınmadı; production key provisioning ve schema deployment bağımsız operasyon kapısı olarak tutuldu.

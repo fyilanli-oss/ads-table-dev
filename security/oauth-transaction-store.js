@@ -33,15 +33,14 @@ function createOAuthTransactionStore({client, now = () => new Date()} = {}) {
     const {data, error} = await client.rpc('consume_oauth_transaction', {
       p_state_hash: stateDigest(state),
       p_provider: provider,
-      p_redirect_uri: redirectUri,
-      p_now: now().toISOString()
+      p_redirect_uri: redirectUri
     });
     if (error) throw new Error(error.message);
     return Array.isArray(data) ? (data[0] || null) : (data || null);
   }
 
   async function cleanupExpired() {
-    const {data, error} = await client.rpc('cleanup_expired_oauth_transactions', {p_now: now().toISOString()});
+    const {data, error} = await client.rpc('cleanup_expired_oauth_transactions');
     if (error) throw new Error(error.message);
     return Number(data || 0);
   }

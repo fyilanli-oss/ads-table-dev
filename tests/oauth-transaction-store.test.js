@@ -6,24 +6,29 @@ const path = require('node:path');
 const test = require('node:test');
 const {createOAuthTransactionStore, stateDigest, OAUTH_TRANSACTION_TTL_MS} = require('../security/oauth-transaction-store');
 
-function memoryClient() {
+function memoryClient({now = () => new Date()} = {}) {
   const rows = new Map();
+  const calls = [];
   return {
     rows,
+    calls,
     from(table) {
       assert.equal(table, 'oauth_transactions');
       return {insert: async row => { rows.set(row.state_hash, {...row}); return {error: null}; }};
     },
     async rpc(name, args) {
+      calls.push({name, args});
       if (name === 'consume_oauth_transaction') {
+        assert.equal(Object.hasOwn(args, 'p_now'), false);
         const row = rows.get(args.p_state_hash);
-        if (!row || row.provider !== args.p_provider || row.redirect_uri !== args.p_redirect_uri || row.expires_at <= args.p_now) return {data: [], error: null};
+        if (!row || row.provider !== args.p_provider || row.redirect_uri !== args.p_redirect_uri || row.expires_at <= now().toISOString()) return {data: [], error: null};
         rows.delete(args.p_state_hash);
         return {data: [{user_id: row.user_id, provider: row.provider, redirect_uri: row.redirect_uri, pkce_verifier: row.pkce_verifier}], error: null};
       }
       if (name === 'cleanup_expired_oauth_transactions') {
+        assert.equal(args, undefined);
         let count = 0;
-        for (const [key, row] of rows) if (row.expires_at <= args.p_now) { rows.delete(key); count++; }
+        for (const [key, row] of rows) if (row.expires_at <= now().toISOString()) { rows.delete(key); count++; }
         return {data: count, error: null};
       }
       throw new Error(`unexpected RPC ${name}`);
@@ -44,7 +49,7 @@ test('stores only a SHA-256 digest of a cryptographically random 32-byte state',
 
 test('transaction is bound to a ten-minute TTL and expires', async () => {
   let clock = new Date('2026-08-18T09:00:00.000Z');
-  const client = memoryClient();
+  const client = memoryClient({now: () => clock});
   const store = createOAuthTransactionStore({client, now: () => clock});
   const created = await store.create({userId: 'user-1', provider: 'meta', redirectUri: 'https://app/callback'});
   assert.equal(new Date(created.expiresAt).getTime() - clock.getTime(), OAUTH_TRANSACTION_TTL_MS);
@@ -76,7 +81,7 @@ test('Klaviyo PKCE verifier round-trips in the same transaction', async () => {
 
 test('cleanup deletes expired abandoned transactions only', async () => {
   let clock = new Date('2026-08-18T09:00:00.000Z');
-  const client = memoryClient();
+  const client = memoryClient({now: () => clock});
   const store = createOAuthTransactionStore({client, now: () => clock});
   await store.create({userId: 'old', provider: 'meta', redirectUri: 'https://app/callback'});
   clock = new Date(clock.getTime() + OAUTH_TRANSACTION_TTL_MS);
@@ -93,4 +98,24 @@ test('migration enforces service-role-only RLS and atomic DELETE RETURNING RPC',
   assert.match(sql, /delete from public\.oauth_transactions[\s\S]*returning oauth_transactions\.user_id/i);
   assert.match(sql, /revoke all on function public\.consume_oauth_transaction[\s\S]*from public, anon, authenticated/i);
   assert.match(sql, /grant execute on function public\.consume_oauth_transaction[\s\S]*to service_role/i);
+  assert.doesNotMatch(sql, /\bp_now\b/i);
+  assert.match(sql, /oauth_transactions\.expires_at\s*>\s*now\(\)/i);
+  assert.match(sql, /expires_at\s*<=\s*now\(\)/i);
+  assert.match(sql, /check\s*\(expires_at\s*>\s*created_at\s+and\s+expires_at\s*<=\s*created_at\s*\+\s*interval\s*'30 minutes'\)/i);
+  assert.match(sql, /provider\s+text\s+not null\s+check\s*\(provider in\s*\('meta',\s*'google_ads',\s*'google_sheets',\s*'ga4_organic',\s*'klaviyo',\s*'tiktok'\)\)/i);
+  assert.equal((sql.match(/set search_path\s*=\s*public,\s*pg_temp/gi) || []).length, 2);
+});
+
+test('RPC calls never accept a caller-supplied clock', async () => {
+  const client = memoryClient();
+  const store = createOAuthTransactionStore({client, now: () => new Date('1999-01-01T00:00:00.000Z')});
+  const created = await store.create({userId: 'user-1', provider: 'meta', redirectUri: 'https://app/callback'});
+  await store.consume({state: created.state, provider: 'meta', redirectUri: 'https://app/callback'});
+  await store.cleanupExpired();
+  assert.deepEqual(client.calls[0].args, {
+    p_state_hash: stateDigest(created.state),
+    p_provider: 'meta',
+    p_redirect_uri: 'https://app/callback'
+  });
+  assert.equal(client.calls[1].args, undefined);
 });

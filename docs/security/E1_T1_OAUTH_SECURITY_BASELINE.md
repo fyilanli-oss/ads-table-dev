@@ -3,7 +3,7 @@
 **Date:** 2026-08-18  
 **Status:** E1-T1 baseline retained; E1-T2 through E1-T5 implemented
 
-**Next gate:** E1-T6B/C live deployment readiness: encrypted schema acceptance, key provisioning and feature-flag activation. Vault, migration and dual-path code artefacts are complete.
+**Next gate:** E1-T6B/C/D live deployment readiness: encrypted schema acceptance, key provisioning, dry-run review and feature-flag activation. Vault, migration, dual-path and backfill/rotation code artefacts are complete.
 
 ## Purpose
 
@@ -82,3 +82,5 @@ E1-T1 added inventory, documentation and tests. E1-T2 changed start authenticati
 ## Next implementation package
 
 E1-T5 is complete: production rejects review/sandbox switches, test routes require explicit non-production sandbox mode, and known review identities and query-string sandbox tokens are absent from runtime/UI sources. E1-T6A adds the versioned AES-256-GCM vault; E1-T6B adds the additive forced-RLS token table; E1-T6C adds feature-flagged encrypted writes, explicit legacy reads, fail-closed decrypt and encrypted disconnect cleanup. Runtime behavior remains unchanged while `PROVIDER_TOKEN_ENCRYPTION_ENABLED` is disabled. Live schema acceptance and key provisioning must precede activation.
+
+E1-T6D is **`artefact ready / activation pending`**. Its runner is dry-run-first, batch-bounded, resumable by a stable `user_id + platform` keyset cursor, idempotent for active-key envelopes, and able to rotate old-key envelopes. Evidence excludes tokens, ciphertext, exception messages and real user IDs; failures expose only a hashed `userRef`, platform and safe error code. Production key provisioning was not performed, no live dry-run or write-mode backfill was run, the encryption flag was not enabled, plaintext columns were not cleaned, and E1-T6E retirement has not started.

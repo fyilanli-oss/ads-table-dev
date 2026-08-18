@@ -968,12 +968,8 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
   const now=new Date().toISOString();
   const reason=disconnectReasonText(options.reason||"user_disconnect");
 
-  const {data:connections,error:connReadError}=await supabaseAdmin
-    .from("platform_connections")
-    .select("*")
-    .eq("user_id",userId)
-    .eq("platform",platform);
-  if(connReadError)throw connReadError;
+  const hydratedConnection=await getConnection(userId,platform);
+  const connections=hydratedConnection?[hydratedConnection]:[];
 
   const revoke_results=[];
   for(const conn of connections||[]){
@@ -1361,7 +1357,7 @@ app.get("/auth/google-sheets/callback",async(req,res)=>{
     const client=googleSheetsOAuthClient(req);
     const {tokens}=await client.getToken(code);
     if(!tokens.access_token&&!tokens.refresh_token)throw new Error("Google Sheets token exchange returned no token");
-    const {data:existing}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",GOOGLE_SHEETS_PLATFORM).maybeSingle();
+    const existing=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
     await saveConnection(userId,GOOGLE_SHEETS_PLATFORM,{
       accessToken:tokens.access_token||existing?.access_token||null,
       refreshToken:tokens.refresh_token||existing?.refresh_token||null,
@@ -3435,8 +3431,7 @@ async function runQueuedBackfillJob(job){
     return {ok:true,skipped:true,reason:"ownership_not_active",job_id:job.id,platform,platform_account_id:platformAccountId,ownership_status:ownership?.status||null};
   }
 
-  const {data:conn,error:connError}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",job.user_id).eq("platform",platform).eq("connected",true).maybeSingle();
-  if(connError)throw connError;
+  const conn=await getConnection(job.user_id,platform);
   if(!conn)throw new Error(`Queued backfill ${platform} connection not found`);
 
   await setRefreshJobStatus(job.id,"running");
@@ -3508,14 +3503,7 @@ async function runMetaAutoRefreshForSchedule(schedule){
   if(userError)throw userError;
   if(!user)throw new Error("Auto refresh user not found");
 
-  const {data:conn,error:connError}=await supabaseAdmin
-    .from("platform_connections")
-    .select("*")
-    .eq("user_id",schedule.user_id)
-    .eq("platform","meta")
-    .eq("connected",true)
-    .maybeSingle();
-  if(connError)throw connError;
+  const conn=await getConnection(schedule.user_id,"meta");
   if(!conn)throw new Error("Auto refresh Meta connection not found");
 
   const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);
@@ -4425,14 +4413,7 @@ async function runGoogleAutoRefreshForSchedule(schedule){
   if(userError)throw userError;
   if(!user)throw new Error("Auto refresh user not found");
 
-  const {data:conn,error:connError}=await supabaseAdmin
-    .from("platform_connections")
-    .select("*")
-    .eq("user_id",schedule.user_id)
-    .eq("platform","google")
-    .eq("connected",true)
-    .maybeSingle();
-  if(connError)throw connError;
+  const conn=await getConnection(schedule.user_id,"google");
   if(!conn)throw new Error("Auto refresh Google connection not found");
 
   const resolved=await resolveGoogleRefreshAccount(

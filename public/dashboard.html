@@ -4040,6 +4040,15 @@ function togglePJ(groupName){
     return {Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"};
   }
 
+  window.startAuthenticatedOAuth=async function(connectUrl){
+    const separator=connectUrl.includes("?")?"&":"?";
+    const response=await fetch(connectUrl+separator+"response_mode=json",{headers:await authHeaders()});
+    const data=await response.json().catch(function(){return {}});
+    if(response.status===401){window.location.href="/login";return;}
+    if(!response.ok||!data.authorization_url)throw new Error(data.error||"OAuth could not be started");
+    window.location.assign(data.authorization_url);
+  };
+
   function isConnected(data){
     return data&&(data.state==="CONNECTED"||data.connected===true||data.status==="connected");
   }
@@ -4069,7 +4078,7 @@ function togglePJ(groupName){
     if(!button||button.disabled)return;
     if(button.dataset.state!=="connected"){
       if(!await initSession()){window.location.href="/login";return;}
-      window.location.href=service.connectUrl+"?user_id="+encodeURIComponent(session.user.id);
+      await window.startAuthenticatedOAuth(service.connectUrl);
       return;
     }
 
@@ -8128,7 +8137,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
           }
 
           if(userId){
-            window.location.replace("/auth/meta?user_id="+encodeURIComponent(userId));
+            await window.startAuthenticatedOAuth("/auth/meta");
             return;
           }
 
@@ -8296,7 +8305,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     const action=byId("connectModalAction");
     if(action&&!action.dataset.d2a2GoogleBound){
       action.dataset.d2a2GoogleBound="true";
-      action.addEventListener("click",function(e){
+      action.addEventListener("click",async function(e){
         const modal=byId("connectModal");
         if(!modal || modal.dataset.platform !== "google") return;
         if(modalMode!=="connect"&&modalMode!=="disconnect")return;
@@ -8305,7 +8314,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 
         if(modalMode==="connect"){
           if(session&&session.user&&session.user.id){
-            window.location.href="/auth/google?user_id="+encodeURIComponent(session.user.id);
+            await window.startAuthenticatedOAuth("/auth/google");
           }
         }else{
           disconnectGoogle();
@@ -8574,7 +8583,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
     const action=byId("connectModalAction");
     if(action&&!action.dataset.d2b1KlaviyoBound){
       action.dataset.d2b1KlaviyoBound="true";
-      action.addEventListener("click",function(e){
+      action.addEventListener("click",async function(e){
         const modal=byId("connectModal");
         if(!modal||modal.dataset.platform!=="klaviyo")return;
         if(modalMode!=="connect"&&modalMode!=="disconnect")return;
@@ -8583,7 +8592,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 
         if(modalMode==="connect"){
           if(session&&session.user&&session.user.id){
-            window.location.href="/auth/klaviyo?user_id="+encodeURIComponent(session.user.id);
+            await window.startAuthenticatedOAuth("/auth/klaviyo");
           }
         }else{
           disconnectKlaviyo();

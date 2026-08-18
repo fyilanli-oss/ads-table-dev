@@ -18,12 +18,12 @@ const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
 const GA4_DATA_API_BASE=process.env.GA4_DATA_API_BASE||"https://analyticsdata.googleapis.com/v1beta";
-const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||process.env.GOOGLE_TEST_CUSTOMER_ID||"";
-const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||process.env.GOOGLE_TEST_LOGIN_CUSTOMER_ID||"";
+const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||"";
+const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||"";
 const GOOGLE_REVIEW_HARD_ROUTE_ENABLED=productionConfig.googleReviewHardRouteEnabled;
 function googleReviewAccountPair(){
-  const customerId=normalizeCustomerId(GOOGLE_SNAPSHOT_CUSTOMER_ID);
-  const loginCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
+  const customerId=normalizeCustomerId(process.env.GOOGLE_TEST_CUSTOMER_ID);
+  const loginCustomerId=normalizeCustomerId(process.env.GOOGLE_TEST_LOGIN_CUSTOMER_ID);
   if(!customerId)throw new Error("Google review hard-route customer id is missing");
   if(!loginCustomerId)throw new Error("Google review hard-route login customer id is missing");
   if(customerId===loginCustomerId)throw new Error("Google customer id cannot equal login customer id");
@@ -5212,6 +5212,7 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
 app.get("/api/tiktok/campaigns",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
+    if(Object.prototype.hasOwnProperty.call(req.query,"sandbox_access_token"))return res.status(400).json({error:"sandbox_access_token query parameter is not supported"});
     const sandbox=String(req.query.sandbox||"false").toLowerCase()==="true";
     const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
     if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
@@ -5274,6 +5275,7 @@ app.get("/api/tiktok/campaigns",async(req,res)=>{
 app.get("/api/tiktok/report",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
+    if(Object.prototype.hasOwnProperty.call(req.query,"sandbox_access_token"))return res.status(400).json({error:"sandbox_access_token query parameter is not supported"});
     const sandbox=String(req.query.sandbox||"false").toLowerCase()==="true";
     let token=null,tokenSource=null;
     if(sandbox){
@@ -5382,8 +5384,8 @@ function tiktokSnapshotRow(row,level,platformAccountId,synthetic=false){
 }
 
 async function fetchTikTokSnapshotRows(conn,platformAccountId,datePreset){
-  const sandboxToken=process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||"";
-  const useSandbox=Boolean(sandboxToken&&(conn?.metadata?.tokenSource==="manual_sandbox_access_token"||conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE||process.env.TIKTOK_FORCE_SANDBOX_REPORTS==="1"));
+  const sandboxToken=productionConfig.tiktokSandboxEnabled?(process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||""):"";
+  const useSandbox=Boolean(productionConfig.tiktokSandboxEnabled&&sandboxToken&&(conn?.metadata?.tokenSource==="manual_sandbox_access_token"||conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE||productionConfig.tiktokForceSandboxReports));
   const token=useSandbox?sandboxToken:conn.access_token;
   const base=useSandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
   const endpoint="/v1.3/report/integrated/get/";

@@ -530,7 +530,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E1-T3 — `Done` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction store; SHA-256 state özeti, 10 dakika TTL, provider/redirect/user bağları ve Klaviyo PKCE taşımasıyla kuruldu.
 - **E1-T4 — `Done` — Session elimination:** E1-T3 sonrasında runtime session consumer kalmadığı doğrulandığı için kullanılmayan shared store eklemek yerine Express session katmanı tamamen kaldırıldı. Böylece MemoryStore, known fallback secret, session cookie ve multi-instance affinity riski ortadan kaldırıldı.
 - **E1-T5 — `Done` — Unsafe default guard:** Review/test hard-route ve sandbox varsayılanları kapatıldı; production fail-fast guard, header-only test token taşıması, test route matrisi ve metin evidence eklendi.
-- **E1-T6 — `In progress` — Token protection:** E1-T6A kapsamında AES-256-GCM envelope, user/platform/token-type AAD bağlamı, versionlı keyring ve rotation primitive'i tamamlandı. Şema genişletme, dual-read/write, kontrollü backfill, plaintext doğrulama ve kolon retirement ayrı kabul kapılarıyla ilerleyecek.
+- **E1-T6 — `In progress` — Token protection:** E1-T6A AES-256-GCM vault tamamlandı. E1-T6B dedicated server-only encrypted token table migration artefaktı hazır; canlı deployment/DDL/RLS acceptance bekliyor. Dual-read/write, kontrollü backfill, plaintext doğrulama ve legacy retirement sonraki ayrı kapılardır.
 - **E1-T7 — `Not started` — Security regression suite:** Auth, IDOR, tamper, replay ve expiry testleri CI'a eklenir.
 
 ### Kabul kriterleri
@@ -1323,9 +1323,11 @@ Bu V4 plan ile:
 
 **Gerçekleşen (E1-T6A foundation):** AES-256-GCM token vault eklendi. Ciphertext; `user_id`, `platform` ve `token_type` AAD bağlamına bağlıdır. Raw token envelope içine yazılmaz. Version ve key ID envelope'da tutulur; önceki key'ler read-only keyring içinde kalabilir ve active key dışındaki envelope'lar rotation adayı olarak işaretlenir.
 
+**Gerçekleşen (E1-T6B artefakt):** Plaintext kolonları genişletmek yerine `platform_connection_tokens` adlı ayrı server-only tablo seçildi. Tablo yalnız versionlı JSONB envelope taşır; forced RLS açıktır, `public`/`anon`/`authenticated` grant'leri kaldırılmıştır ve yalnız `service_role` read/write yetkisi alır. Migration additive'dir; `platform_connections` ve canlı plaintext token'lara dokunmaz.
+
 **Sonraki kapılar:**
 
-1. **E1-T6B — Schema:** Encrypted access/refresh envelope kolonları ve server-only grant/RLS doğrulaması.
+1. **E1-T6B — Schema (`artefact ready / live acceptance pending`):** `platform_connection_tokens` dedicated table; encrypted access/refresh envelope CHECK'leri, forced RLS ve service-role-only grant migration'ı hazırlandı. Canlı DDL/grant/anon negatif doğrulaması yapılmadan runtime write açılmaz.
 2. **E1-T6C — Dual path:** Yeni write'ların yalnız ciphertext üretmesi; mevcut plaintext satırlar için ölçümlü legacy read ve fail-closed decrypt.
 3. **E1-T6D — Backfill/rotation:** Resumable, idempotent ve redacted backfill; row-count/parity/cleanup evidence.
 4. **E1-T6E — Retirement:** Plaintext token kolonlarının boş olduğu kanıtlandıktan ve rollback süresi tamamlandıktan sonra ayrı destructive migration.

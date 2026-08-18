@@ -521,7 +521,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 5. E1 — OAuth ve session güvenliği
 
-**Durum:** `In progress` — E1-T1, E1-T2, E1-T3 ve E1-T4 tamamlandı; E1-T5 sıradaki uygulama paketidir.
+**Durum:** `In progress` — E1-T1–E1-T5 tamamlandı; E1-T6 sıradaki uygulama paketidir.
 
 ### Planlanan işler
 
@@ -529,7 +529,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E1-T2 — `Done` — Bearer-bound identity:** Aktif OAuth başlangıçları doğrulanmış bearer kullanıcıya bağlandı; legacy query `user_id` reddedildi ve dashboard bearer-authenticated JSON handshake'e geçirildi.
 - **E1-T3 — `Done` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction store; SHA-256 state özeti, 10 dakika TTL, provider/redirect/user bağları ve Klaviyo PKCE taşımasıyla kuruldu.
 - **E1-T4 — `Done` — Session elimination:** E1-T3 sonrasında runtime session consumer kalmadığı doğrulandığı için kullanılmayan shared store eklemek yerine Express session katmanı tamamen kaldırıldı. Böylece MemoryStore, known fallback secret, session cookie ve multi-instance affinity riski ortadan kaldırıldı.
-- **E1-T5 — `Not started` — Unsafe default guard:** Review/test hard-route ve test account varsayımları production'da reddedilir.
+- **E1-T5 — `Done` — Unsafe default guard:** Review/test hard-route ve sandbox varsayılanları kapatıldı; production fail-fast guard, header-only test token taşıması, test route matrisi ve metin evidence eklendi.
 - **E1-T6 — `Not started` — Token protection:** Encryption/rotation çözümü uygulanır veya süreli, sahibi olan risk kabulü kaydedilir.
 - **E1-T7 — `Not started` — Security regression suite:** Auth, IDOR, tamper, replay ve expiry testleri CI'a eklenir.
 
@@ -538,7 +538,7 @@ Mutabakat dışında bağımlılık yoktur.
 - OAuth user kimliği yalnız doğrulanmış bearer context'ten gelir.
 - State ve transaction user/provider/redirect bağlamına bağlıdır; bir kez tüketilir ve sürelidir.
 - Callback replay, state mismatch, expired transaction ve cross-user tamper reddedilir.
-- Uygulama session secret'a ihtiyaç duymaz; E1-T5 kapsamındaki unsafe production config ayrıca reddedilir.
+- Uygulama session secret'a ihtiyaç duymaz; unsafe review/sandbox production config fail-fast olarak reddedilir.
 - OAuth callback'leri shared transaction store ile multi-instance çalışır ve session affinity gerektirmez.
 - Token değerleri response, log ve test artefaktlarında görünmez.
 
@@ -1307,3 +1307,12 @@ Bu V4 plan ile:
 - Big-bang rewrite yapılmaz; monolit büyütülmez ve dokunulan alan güvenli biçimde çıkarılır.
 - Her task planlanan/gerçekleşen/sapma/evidence ayrımını taşır.
 - Production cutover ve legacy retirement ölçülebilir GO kapıları olmadan yapılmaz.
+
+
+### E1-T5 task aynası
+
+- Production configuration pure/testable bir modülde merkezileştirildi ve unsafe review/sandbox flag'leri production başlangıcında reddediliyor.
+- Google/TikTok review fallback kimlikleri runtime/UI kaynaklarından kaldırıldı.
+- TikTok sandbox token yalnız explicit non-production sandbox modunda `X-Sandbox-Access-Token` header'ından kabul ediliyor.
+- `/tiktok-test` route matrisi ve güvenli UI varsayılanları otomatik testlerle korunuyor.
+- Evidence metin/Markdown ve test çıktılarıyla sınırlıdır; E1-T6 sıradaki pakettir.

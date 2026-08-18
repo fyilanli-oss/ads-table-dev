@@ -1,9 +1,9 @@
 # E1-T1 — OAuth Security Baseline
 
 **Date:** 2026-08-18  
-**Status:** E1-T1 baseline retained; E1-T2, E1-T3 and E1-T4 implemented
+**Status:** E1-T1 baseline retained; E1-T2 through E1-T5 implemented
 
-**Next gate:** E1-T5 unsafe default guard
+**Next gate:** E1-T6 provider token-at-rest protection
 
 ## Purpose
 
@@ -81,4 +81,4 @@ E1-T1 added inventory, documentation and tests. E1-T2 changed start authenticati
 
 ## Next implementation package
 
-E1-T4 is complete through session elimination. E1-T5 unsafe production defaults is the next package.
+E1-T5 is complete: production rejects review/sandbox switches, test routes require explicit non-production sandbox mode, and known review identities and query-string sandbox tokens are absent from runtime/UI sources. E1-T6 provider token-at-rest protection is the next package.

@@ -6,8 +6,11 @@ const {google}=require("googleapis");
 const {createClient}=require("@supabase/supabase-js");
 const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
 const {createOAuthTransactionStore}=require("./security/oauth-transaction-store");
+const {loadProductionConfig}=require("./security/production-config");
+const productionConfig=loadProductionConfig();
 const app=express(); const PORT=process.env.PORT||3000;
 app.set("trust proxy",1); app.use(express.json());
+app.use((req,res,next)=>req.path==="/tiktok-test.html"&&!productionConfig.tiktokTestPageEnabled?res.sendStatus(404):next());
 app.use(express.static(path.join(__dirname,"public")));
 const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
@@ -15,12 +18,12 @@ const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
 const GOOGLE_ADS_API_VERSION=process.env.GOOGLE_ADS_API_VERSION||"v24";
 const GA4_DATA_API_BASE=process.env.GA4_DATA_API_BASE||"https://analyticsdata.googleapis.com/v1beta";
-const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||process.env.GOOGLE_TEST_CUSTOMER_ID||"5252399301";
-const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||process.env.GOOGLE_TEST_LOGIN_CUSTOMER_ID||"5383556660";
-const GOOGLE_REVIEW_HARD_ROUTE_ENABLED=String(process.env.GOOGLE_REVIEW_HARD_ROUTE_ENABLED||"true").toLowerCase()!=="false";
+const GOOGLE_SNAPSHOT_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_CUSTOMER_ID||"";
+const GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID=process.env.GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID||"";
+const GOOGLE_REVIEW_HARD_ROUTE_ENABLED=productionConfig.googleReviewHardRouteEnabled;
 function googleReviewAccountPair(){
-  const customerId=normalizeCustomerId(GOOGLE_SNAPSHOT_CUSTOMER_ID);
-  const loginCustomerId=normalizeCustomerId(GOOGLE_SNAPSHOT_LOGIN_CUSTOMER_ID);
+  const customerId=normalizeCustomerId(process.env.GOOGLE_TEST_CUSTOMER_ID);
+  const loginCustomerId=normalizeCustomerId(process.env.GOOGLE_TEST_LOGIN_CUSTOMER_ID);
   if(!customerId)throw new Error("Google review hard-route customer id is missing");
   if(!loginCustomerId)throw new Error("Google review hard-route login customer id is missing");
   if(customerId===loginCustomerId)throw new Error("Google customer id cannot equal login customer id");
@@ -29,13 +32,13 @@ function googleReviewAccountPair(){
 const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
-const TIKTOK_REVIEW_ADVERTISER_ID=process.env.TIKTOK_REVIEW_ADVERTISER_ID||"7654240828777955348";
-const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"TikTok Test Advertiser";
+const TIKTOK_REVIEW_ADVERTISER_ID=process.env.TIKTOK_REVIEW_ADVERTISER_ID||"";
+const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 const oauthTransactionStore=supabaseAdmin?createOAuthTransactionStore({client:supabaseAdmin}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
-app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>sendFile(res,"tiktok-test.html"));
+app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>productionConfig.tiktokTestPageEnabled?sendFile(res,"tiktok-test.html"):res.sendStatus(404));
 app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));
 async function getUserFromRequest(req){const a=req.headers.authorization||"";const t=a.startsWith("Bearer ")?a.slice(7):null;if(!t||!supabaseAdmin)return null;const {data,error}=await supabaseAdmin.auth.getUser(t);if(error||!data?.user?.id)return null;return data.user}
 async function requireUser(req,res){const u=await getUserFromRequest(req);if(!u){res.status(401).json({error:"Not authenticated"});return null}return u}
@@ -5186,7 +5189,7 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
     // OAuth account discovery can return no accessible advertisers even though
     // the approved test advertiser is queryable with the connected token.
     // Surface that advertiser in the existing account-selection flow.
-    if(!advertisers.length&&TIKTOK_REVIEW_ADVERTISER_ID){
+    if(!advertisers.length&&productionConfig.tiktokReviewFallbackEnabled&&TIKTOK_REVIEW_ADVERTISER_ID){
       advertisers.push({
         advertiser_id:TIKTOK_REVIEW_ADVERTISER_ID,
         advertiser_name:TIKTOK_REVIEW_ADVERTISER_NAME,
@@ -5209,13 +5212,15 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
 app.get("/api/tiktok/campaigns",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
+    if(Object.prototype.hasOwnProperty.call(req.query,"sandbox_access_token"))return res.status(400).json({error:"sandbox_access_token query parameter is not supported"});
     const sandbox=String(req.query.sandbox||"false").toLowerCase()==="true";
     const advertiserId=String(req.query.advertiser_id||req.query.advertiserId||"").trim();
     if(!advertiserId)return res.status(400).json({error:"advertiser_id is required"});
 
     let token=null,tokenSource=null;
     if(sandbox){
-      token=String(req.headers["x-sandbox-access-token"]||req.query.sandbox_access_token||"").trim();
+      if(!productionConfig.tiktokSandboxEnabled)return res.status(404).json({error:"TikTok sandbox mode is disabled"});
+      token=String(req.headers["x-sandbox-access-token"]||"").trim();
       tokenSource="manual_sandbox_access_token";
       if(!token)return res.status(400).json({error:"sandbox_access_token is required when sandbox=true"});
     }else{
@@ -5270,10 +5275,12 @@ app.get("/api/tiktok/campaigns",async(req,res)=>{
 app.get("/api/tiktok/report",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
+    if(Object.prototype.hasOwnProperty.call(req.query,"sandbox_access_token"))return res.status(400).json({error:"sandbox_access_token query parameter is not supported"});
     const sandbox=String(req.query.sandbox||"false").toLowerCase()==="true";
     let token=null,tokenSource=null;
     if(sandbox){
-      token=String(req.query.sandbox_access_token||req.headers["x-sandbox-access-token"]||"").trim();
+      if(!productionConfig.tiktokSandboxEnabled)return res.status(404).json({error:"TikTok sandbox mode is disabled"});
+      token=String(req.headers["x-sandbox-access-token"]||"").trim();
       tokenSource="manual_sandbox_access_token";
       if(!token)return res.status(400).json({error:"sandbox_access_token is required when sandbox=true"});
     }else{
@@ -5377,8 +5384,8 @@ function tiktokSnapshotRow(row,level,platformAccountId,synthetic=false){
 }
 
 async function fetchTikTokSnapshotRows(conn,platformAccountId,datePreset){
-  const sandboxToken=process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||"";
-  const useSandbox=Boolean(sandboxToken&&(conn?.metadata?.tokenSource==="manual_sandbox_access_token"||conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE||process.env.TIKTOK_FORCE_SANDBOX_REPORTS==="1"));
+  const sandboxToken=productionConfig.tiktokSandboxEnabled?(process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||""):"";
+  const useSandbox=Boolean(productionConfig.tiktokSandboxEnabled&&sandboxToken&&(conn?.metadata?.tokenSource==="manual_sandbox_access_token"||conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE||productionConfig.tiktokForceSandboxReports));
   const token=useSandbox?sandboxToken:conn.access_token;
   const base=useSandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
   const endpoint="/v1.3/report/integrated/get/";

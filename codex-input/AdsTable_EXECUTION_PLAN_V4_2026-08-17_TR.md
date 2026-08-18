@@ -530,7 +530,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E1-T3 — `Done` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction store; SHA-256 state özeti, 10 dakika TTL, provider/redirect/user bağları ve Klaviyo PKCE taşımasıyla kuruldu.
 - **E1-T4 — `Done` — Session elimination:** E1-T3 sonrasında runtime session consumer kalmadığı doğrulandığı için kullanılmayan shared store eklemek yerine Express session katmanı tamamen kaldırıldı. Böylece MemoryStore, known fallback secret, session cookie ve multi-instance affinity riski ortadan kaldırıldı.
 - **E1-T5 — `Done` — Unsafe default guard:** Review/test hard-route ve sandbox varsayılanları kapatıldı; production fail-fast guard, header-only test token taşıması, test route matrisi ve metin evidence eklendi.
-- **E1-T6 — `In progress` — Token protection:** E1-T6A vault, E1-T6B server-only schema ve E1-T6C feature-flagged encrypted write/legacy-read artefaktları hazırdır. Canlı migration, key provisioning ve acceptance tamamlanmadan flag kapalı kalır; backfill, plaintext doğrulama ve legacy retirement sonraki ayrı kapılardır.
+- **E1-T6 — `In progress` — Token protection:** E1-T6A vault, E1-T6B server-only schema, E1-T6C feature-flagged encrypted write/legacy-read ve E1-T6D backfill/rotation artefaktları hazırdır. Canlı migration, key provisioning ve acceptance tamamlanmadan flag kapalı kalır; canlı backfill, plaintext doğrulama ve legacy retirement sonraki ayrı kapılardır.
 - **E1-T7 — `Not started` — Security regression suite:** Auth, IDOR, tamper, replay ve expiry testleri CI'a eklenir.
 
 ### Kabul kriterleri
@@ -1327,11 +1327,13 @@ Bu V4 plan ile:
 
 **Gerçekleşen (E1-T6C artefakt):** `PROVIDER_TOKEN_ENCRYPTION_ENABLED` varsayılan kapalı feature flag'i arkasında encrypted store bağlandı. Açıldığında yeni/yenilenen token önce encrypted tabloya yazılır, legacy plaintext kolonları `null` kalır ve bütün provider consumer'ları merkezi `getConnection` hydration yolundan plaintext'i yalnız process memory'de alır. Legacy read ayrı `PROVIDER_TOKEN_LEGACY_READ_ENABLED` flag'iyle ölçülü geçiş için korunur; authenticated envelope decrypt hatası legacy'ye düşmez ve disconnect encrypted satırı siler.
 
+**Gerçekleşen (E1-T6D — `artefact ready / activation pending`):** Varsayılan dry-run çalışan, 25 varsayılan/100 azami batch sınırı olan, stable `user_id + platform` keyset cursor ile devam edebilen ve satır bazında idempotent backfill/rotation runner'ı hazırlandı. Evidence yalnız sayaç, hashlenmiş `userRef`, platform ve güvenli hata kodu taşır. Production key provisioning yapılmadı; canlı dry-run ve write-mode backfill çalıştırılmadı; encryption flag açılmadı; plaintext kolonlar temizlenmedi ve E1-T6E retirement henüz başlamadı.
+
 **Sonraki kapılar:**
 
 1. **E1-T6B — Schema (`artefact ready / live acceptance pending`):** `platform_connection_tokens` dedicated table; encrypted access/refresh envelope CHECK'leri, forced RLS ve service-role-only grant migration'ı hazırlandı. Canlı DDL/grant/anon negatif doğrulaması yapılmadan runtime write açılmaz.
 2. **E1-T6C — Dual path (`artefact ready / activation pending`):** Yeni write'lar yalnız ciphertext üretir; mevcut plaintext satırlar explicit legacy-read flag'iyle okunur. Encrypted envelope varsa decrypt fail-closed çalışır. Migration ve key provisioning acceptance olmadan encryption flag açılamaz.
-3. **E1-T6D — Backfill/rotation:** Resumable, idempotent ve redacted backfill; row-count/parity/cleanup evidence.
+3. **E1-T6D — Backfill/rotation (`artefact ready / activation pending`):** Resumable, idempotent, dry-run-first ve redacted backfill/rotation runner'ı hazır; production key provisioning, canlı dry-run, write-mode backfill ve flag activation yapılmadı.
 4. **E1-T6E — Retirement:** Plaintext token kolonlarının boş olduğu kanıtlandıktan ve rollback süresi tamamlandıktan sonra ayrı destructive migration.
 
 **Sapma:** Yok. Anahtar materyali veya canlı token migration'ı foundation PR'ına alınmadı; production key provisioning ve schema deployment bağımsız operasyon kapısı olarak tutuldu.

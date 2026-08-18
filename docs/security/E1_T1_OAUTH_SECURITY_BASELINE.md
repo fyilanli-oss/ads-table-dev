@@ -3,7 +3,7 @@
 **Date:** 2026-08-18  
 **Status:** E1-T1 baseline retained; E1-T2 through E1-T5 implemented
 
-**Next gate:** E1-T6 provider token-at-rest protection
+**Next gate:** E1-T6B encrypted token schema and deployment acceptance; E1-T6A cryptographic foundation is complete.
 
 ## Purpose
 
@@ -81,4 +81,4 @@ E1-T1 added inventory, documentation and tests. E1-T2 changed start authenticati
 
 ## Next implementation package
 
-E1-T5 is complete: production rejects review/sandbox switches, test routes require explicit non-production sandbox mode, and known review identities and query-string sandbox tokens are absent from runtime/UI sources. E1-T6 provider token-at-rest protection is the next package.
+E1-T5 is complete: production rejects review/sandbox switches, test routes require explicit non-production sandbox mode, and known review identities and query-string sandbox tokens are absent from runtime/UI sources. E1-T6A adds a versioned AES-256-GCM token vault with user/platform/token-type AAD binding and key-rotation primitives, without touching live tokens or persistence. E1-T6B encrypted schema acceptance is the next package.

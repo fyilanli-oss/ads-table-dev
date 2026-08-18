@@ -1,8 +1,9 @@
 # E1-T1 — OAuth Security Baseline
 
 **Date:** 2026-08-18  
-**Status:** E1-T1 baseline retained; E1-T2 and E1-T3 implemented
-**Next gate:** E1-T4 session hardening
+**Status:** E1-T1 baseline retained; E1-T2, E1-T3 and E1-T4 implemented
+
+**Next gate:** E1-T5 unsafe default guard
 
 ## Purpose
 
@@ -16,7 +17,7 @@ This baseline freezes the current OAuth surface before security behavior is chan
 | Google Ads | `/auth/google` | `/auth/google/callback` | Verified bearer user | Atomic transaction | No | Active |
 | Google Sheets | `/auth/google-sheets` | `/auth/google-sheets/callback` | Verified bearer user | Atomic transaction | No | Active |
 | GA4 Organic | `/auth/organic` | `/auth/organic/callback` | Verified bearer user | Atomic transaction | No | Active |
-| Pinterest | `/auth/pinterest` | `/auth/pinterest/callback` | None; passive legacy redirect | Legacy fields cleared | No | Passive |
+| Pinterest | `/auth/pinterest` | `/auth/pinterest/callback` | None; passive legacy redirect | None | No | Passive |
 | Klaviyo | `/auth/klaviyo` | `/auth/klaviyo/callback` | Verified bearer user | Atomic transaction + verifier | Yes | Active |
 | TikTok | `/auth/tiktok` | `/auth/tiktok/callback` | Verified bearer user | Atomic transaction | No | Active |
 
@@ -38,7 +39,7 @@ Dashboard Supabase access token
 → saveConnection(transaction user, provider tokens)
 ```
 
-The shared start guard makes the verified bearer identity authoritative. E1-T3 correlates callbacks through a server-only PostgreSQL record containing only a SHA-256 state digest. It binds user, provider and exact redirect URI, expires after ten minutes, and is consumed using `DELETE ... RETURNING`. Klaviyo's PKCE verifier travels in that record. Active callbacks no longer use session identity or state. Shared session storage and secret hardening remain E1-T4 work.
+The shared start guard makes the verified bearer identity authoritative. E1-T3 correlates callbacks through a server-only PostgreSQL record containing only a SHA-256 state digest. It binds user, provider and exact redirect URI, expires after ten minutes, and is consumed using `DELETE ... RETURNING`. Klaviyo's PKCE verifier travels in that record. Active callbacks no longer use session identity or state. E1-T4 verified there were no remaining runtime session consumers and removed the obsolete Express session layer instead of adding an unused shared store.
 
 ## Threat model
 
@@ -49,8 +50,8 @@ The shared start guard makes the verified bearer identity authoritative. E1-T3 c
 | OAUTH-REPLAY-003 | Callback transaction replay | Session state comparison; inconsistent cleanup | Single-use atomic transaction consume with TTL |
 | OAUTH-RACE-004 | Concurrent provider flows overwrite shared `oauthUserId` | Provider state is separate; user field is often shared | Transaction-specific user/provider binding |
 | OAUTH-EXPIRY-005 | Stale state remains usable | No common transaction TTL | Server-enforced expiry |
-| SESSION-STORE-006 | Callback reaches another instance | Default in-memory session store | Shared TTL-capable store |
-| SESSION-SECRET-007 | Production starts with known fallback secret | Development fallback is unconditional | Production fail-fast configuration |
+| SESSION-STORE-006 | Callback reaches another instance | **Resolved:** callbacks use the shared atomic transaction store; the unused session layer was removed | Retain session-elimination and transaction-store regression guards |
+| SESSION-SECRET-007 | Production starts with known fallback secret | **Resolved:** session middleware, secret dependency and fallback were removed | Retain runtime-source and dependency regression guards |
 | TOKEN-LOG-008 | Provider token leaks through logs/evidence | No centralized evidence guard | Redaction tests and structured logging policy |
 
 ## Characterization evidence
@@ -61,9 +62,10 @@ The shared start guard makes the verified bearer identity authoritative. E1-T3 c
 2. Every active start route currently uses the shared guard.
 3. The shared guard resolves the verified bearer user and rejects legacy query-user input.
 4. Every active start/callback uses the transaction store and callbacks contain no OAuth session identity/state fields.
-5. The known session-secret fallback and default-store debt remain visible until E1-T4.
+5. Runtime and package guards prove the session middleware, session access, secret dependency, known fallback and package dependency are absent.
+6. Pinterest remains a passive legacy dashboard redirect and never accesses a session object.
 
-The original assertions described current debt rather than the desired end state. E1-T2 replaced the query-user assertion with executable bearer-user, unauthenticated and tamper rejection acceptance tests; E1-T4 still owns the session fallback assertions.
+The original assertions described current debt rather than the desired end state. E1-T2 replaced the query-user assertion with executable bearer-user, unauthenticated and tamper rejection acceptance tests. E1-T4 replaced the session-debt characterization with executable elimination guards.
 
 ## E1-T1 acceptance
 
@@ -75,8 +77,8 @@ The original assertions described current debt rather than the desired end state
 
 ## Rollback
 
-E1-T1 added inventory, documentation and tests. E1-T2 changed start authentication and the dashboard handshake. E1-T3 adds the transaction schema and swaps callback correlation without changing provider token exchange or `platform_connections` behavior. The migration must be applied before deploying the server. Rollback may disable new connection starts, but must not restore query-controlled or session-bound OAuth identity.
+E1-T1 added inventory, documentation and tests. E1-T2 changed start authentication and the dashboard handshake. E1-T3 adds the transaction schema and swaps callback correlation without changing provider token exchange or `platform_connections` behavior. E1-T4 removes only the now-unused session layer. The transaction migration must be applied before deploying the server. Rollback may disable new connection starts, but must not restore query-controlled or session-bound OAuth identity, and the known fallback secret must never be restored. Session infrastructure may be reconsidered only if an unknown consumer is demonstrated and receives a new security review.
 
 ## Next implementation package
 
-E1-T3 is complete. E1-T4 is the next package and separately owns production `SESSION_SECRET`, shared session storage and cookie hardening.
+E1-T4 is complete through session elimination. E1-T5 unsafe production defaults is the next package.

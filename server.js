@@ -6,7 +6,9 @@ const {google}=require("googleapis");
 const {createClient}=require("@supabase/supabase-js");
 const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
 const {createOAuthTransactionStore}=require("./security/oauth-transaction-store");
-const {loadProductionConfig}=require("./security/production-config");
+const {loadProductionConfig,parseExplicitBoolean}=require("./security/production-config");
+const {createProviderTokenVaultFromEnv}=require("./security/provider-token-vault");
+const {createProviderTokenStore}=require("./security/provider-token-store");
 const productionConfig=loadProductionConfig();
 const app=express(); const PORT=process.env.PORT||3000;
 app.set("trust proxy",1); app.use(express.json());
@@ -37,6 +39,10 @@ const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
 const oauthTransactionStore=supabaseAdmin?createOAuthTransactionStore({client:supabaseAdmin}):null;
+const providerTokenEncryptionEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_ENCRYPTION_ENABLED,false,"PROVIDER_TOKEN_ENCRYPTION_ENABLED");
+const providerTokenLegacyReadsEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_LEGACY_READ_ENABLED,true,"PROVIDER_TOKEN_LEGACY_READ_ENABLED");
+const providerTokenVault=providerTokenEncryptionEnabled?createProviderTokenVaultFromEnv():null;
+const providerTokenStore=providerTokenEncryptionEnabled&&supabaseAdmin?createProviderTokenStore({client:supabaseAdmin,vault:providerTokenVault,legacyReadsEnabled:providerTokenLegacyReadsEnabled}):null;
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
 app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>productionConfig.tiktokTestPageEnabled?sendFile(res,"tiktok-test.html"):res.sendStatus(404));
 app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));
@@ -67,11 +73,19 @@ async function saveConnection(userId,platform,payload){
     .eq("platform",platform)
     .maybeSingle();
   if(existingError)throw new Error(existingError.message);
+  let accessToken=payload.accessToken!==undefined?payload.accessToken:(existing?.access_token||null);
+  let refreshToken=payload.refreshToken!==undefined?payload.refreshToken:(existing?.refresh_token||null);
+  if(providerTokenStore){
+    const current=await providerTokenStore.resolve({userId,platform,legacyAccessToken:existing?.access_token||null,legacyRefreshToken:existing?.refresh_token||null});
+    accessToken=payload.accessToken!==undefined?payload.accessToken:current.accessToken;
+    refreshToken=payload.refreshToken!==undefined?payload.refreshToken:current.refreshToken;
+    await providerTokenStore.write({userId,platform,accessToken,refreshToken});
+  }
   const row={
     user_id:userId,
     platform,
-    access_token:payload.accessToken!==undefined?payload.accessToken:(existing?.access_token||null),
-    refresh_token:payload.refreshToken!==undefined?payload.refreshToken:(existing?.refresh_token||null),
+    access_token:providerTokenStore?null:accessToken,
+    refresh_token:providerTokenStore?null:refreshToken,
     token_expires_at:payload.tokenExpiresAt!==undefined?payload.tokenExpiresAt:(existing?.token_expires_at||null),
     account_id:payload.accountId!==undefined?payload.accountId:(existing?.account_id||null),
     account_name:payload.accountName!==undefined?payload.accountName:(existing?.account_name||null),
@@ -84,7 +98,7 @@ async function saveConnection(userId,platform,payload){
   const {error}=await supabaseAdmin.from("platform_connections").upsert(row,{onConflict:"user_id,platform"});
   if(error)throw new Error(error.message)
 }
-async function getConnection(userId,platform){if(!supabaseAdmin||!userId)return null;const {data,error}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",platform).eq("connected",true).maybeSingle();if(error)throw new Error(error.message);return data}
+async function getConnection(userId,platform){if(!supabaseAdmin||!userId)return null;const {data,error}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",platform).eq("connected",true).maybeSingle();if(error)throw new Error(error.message);if(!data||!providerTokenStore)return data;const tokens=await providerTokenStore.resolve({userId,platform,legacyAccessToken:data.access_token,legacyRefreshToken:data.refresh_token});return{...data,access_token:tokens.accessToken,refresh_token:tokens.refreshToken,token_storage_source:tokens.source,token_rotation_required:tokens.needsRotation}}
 async function connectionStatus(userId,platform){const r=await getConnection(userId,platform).catch(()=>null);return{connected:Boolean(r&&(r.access_token||r.refresh_token)),source:r?"database":"none",updatedAt:r?.updated_at||null}}
 async function requireConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked){res.status(403).json({error:"Account access blocked",status:access.status});return null}const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn}}
 async function requireRefreshConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return null;const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn,sub:accessCheck.sub,access:accessCheck.access}}
@@ -1021,6 +1035,7 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
       .select("platform,account_id,account_name,connected,metadata,disconnected_at,disconnect_reason,lifecycle_version")
       .maybeSingle();
     if(connError)throw connError;
+    if(providerTokenStore)await providerTokenStore.remove({userId,platform});
     if(updatedConnection)connData.push(updatedConnection);
   }
 

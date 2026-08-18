@@ -968,12 +968,8 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
   const now=new Date().toISOString();
   const reason=disconnectReasonText(options.reason||"user_disconnect");
 
-  const {data:connections,error:connReadError}=await supabaseAdmin
-    .from("platform_connections")
-    .select("*")
-    .eq("user_id",userId)
-    .eq("platform",platform);
-  if(connReadError)throw connReadError;
+  const hydratedConnection=await getConnection(userId,platform);
+  const connections=hydratedConnection?[hydratedConnection]:[];
 
   const revoke_results=[];
   for(const conn of connections||[]){
@@ -1361,7 +1357,7 @@ app.get("/auth/google-sheets/callback",async(req,res)=>{
     const client=googleSheetsOAuthClient(req);
     const {tokens}=await client.getToken(code);
     if(!tokens.access_token&&!tokens.refresh_token)throw new Error("Google Sheets token exchange returned no token");
-    const {data:existing}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",GOOGLE_SHEETS_PLATFORM).maybeSingle();
+    const existing=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
     await saveConnection(userId,GOOGLE_SHEETS_PLATFORM,{
       accessToken:tokens.access_token||existing?.access_token||null,
       refreshToken:tokens.refresh_token||existing?.refresh_token||null,

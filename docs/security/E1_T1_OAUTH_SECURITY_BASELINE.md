@@ -1,8 +1,8 @@
 # E1-T1 — OAuth Security Baseline
 
 **Date:** 2026-08-18  
-**Status:** E1-T1 baseline retained; E1-T2 bearer-bound identity implemented
-**Next gate:** E1-T3 single-use OAuth transaction store
+**Status:** E1-T1 baseline retained; E1-T2 and E1-T3 implemented
+**Next gate:** E1-T4 session hardening
 
 ## Purpose
 
@@ -12,13 +12,13 @@ This baseline freezes the current OAuth surface before security behavior is chan
 
 | Provider | Start | Callback | Current user source | State/session | PKCE | Status |
 |---|---|---|---|---|---|---|
-| Meta | `/auth/meta` | `/auth/meta/callback` | Verified bearer user | `metaOAuthState`, `oauthUserId` | No | Active |
-| Google Ads | `/auth/google` | `/auth/google/callback` | Verified bearer user | `googleOAuthState`, `oauthUserId` | No | Active |
-| Google Sheets | `/auth/google-sheets` | `/auth/google-sheets/callback` | Verified bearer user | `googleSheetsOAuthState`, `googleSheetsOAuthUserId` | No | Active |
-| GA4 Organic | `/auth/organic` | `/auth/organic/callback` | Verified bearer user | `organicOAuthState`, `oauthUserId` | No | Active |
+| Meta | `/auth/meta` | `/auth/meta/callback` | Verified bearer user | Atomic transaction | No | Active |
+| Google Ads | `/auth/google` | `/auth/google/callback` | Verified bearer user | Atomic transaction | No | Active |
+| Google Sheets | `/auth/google-sheets` | `/auth/google-sheets/callback` | Verified bearer user | Atomic transaction | No | Active |
+| GA4 Organic | `/auth/organic` | `/auth/organic/callback` | Verified bearer user | Atomic transaction | No | Active |
 | Pinterest | `/auth/pinterest` | `/auth/pinterest/callback` | None; passive legacy redirect | Legacy fields cleared | No | Passive |
-| Klaviyo | `/auth/klaviyo` | `/auth/klaviyo/callback` | Verified bearer user | `klaviyoOAuthState`, `oauthUserId`, verifier | Yes | Active |
-| TikTok | `/auth/tiktok` | `/auth/tiktok/callback` | Verified bearer user | `tiktokOAuthState`, `oauthUserId` | No | Active |
+| Klaviyo | `/auth/klaviyo` | `/auth/klaviyo/callback` | Verified bearer user | Atomic transaction + verifier | Yes | Active |
+| TikTok | `/auth/tiktok` | `/auth/tiktok/callback` | Verified bearer user | Atomic transaction | No | Active |
 
 The executable inventory is `security/oauth-route-inventory.js`. The baseline test fails when an `/auth` route is introduced without an inventory decision.
 
@@ -30,15 +30,15 @@ Dashboard Supabase access token
 → requireUser
 → reject any legacy query user_id
 → subscription lookup for verified user.id
-→ provider-specific state + session user field
+→ SHA-256 state digest + user/provider/exact redirect transaction
 → provider callback
-→ state comparison
-→ session user field
+→ atomic, expiring DELETE ... RETURNING consume
+→ transaction-bound verified user
 → token exchange
-→ saveConnection(session user, provider tokens)
+→ saveConnection(transaction user, provider tokens)
 ```
 
-The shared start guard now makes the verified bearer identity authoritative. The callback is still correlated through provider-specific session fields; transaction-specific TTL, atomic consume and multi-instance persistence remain E1-T3/E1-T4 work.
+The shared start guard makes the verified bearer identity authoritative. E1-T3 correlates callbacks through a server-only PostgreSQL record containing only a SHA-256 state digest. It binds user, provider and exact redirect URI, expires after ten minutes, and is consumed using `DELETE ... RETURNING`. Klaviyo's PKCE verifier travels in that record. Active callbacks no longer use session identity or state. Shared session storage and secret hardening remain E1-T4 work.
 
 ## Threat model
 
@@ -60,7 +60,7 @@ The shared start guard now makes the verified bearer identity authoritative. The
 1. The inventory covers every registered `/auth` route.
 2. Every active start route currently uses the shared guard.
 3. The shared guard resolves the verified bearer user and rejects legacy query-user input.
-4. Active callbacks currently use their documented session state/user fields.
+4. Every active start/callback uses the transaction store and callbacks contain no OAuth session identity/state fields.
 5. The known session-secret fallback and default-store debt remain visible until E1-T4.
 
 The original assertions described current debt rather than the desired end state. E1-T2 replaced the query-user assertion with executable bearer-user, unauthenticated and tamper rejection acceptance tests; E1-T4 still owns the session fallback assertions.
@@ -75,8 +75,8 @@ The original assertions described current debt rather than the desired end state
 
 ## Rollback
 
-E1-T1 added inventory, documentation and tests only. E1-T2 changes OAuth start authentication and the dashboard handshake without changing callback token exchange or database schema. Rollback may disable the new start flow, but must not restore query-controlled identity.
+E1-T1 added inventory, documentation and tests. E1-T2 changed start authentication and the dashboard handshake. E1-T3 adds the transaction schema and swaps callback correlation without changing provider token exchange or `platform_connections` behavior. The migration must be applied before deploying the server. Rollback may disable new connection starts, but must not restore query-controlled or session-bound OAuth identity.
 
 ## Next implementation package
 
-E1-T2 makes the verified bearer user authoritative for every active OAuth start route and adds negative tests for unauthenticated access and query-user tampering. It does not introduce the shared transaction store; that remains E1-T3.
+E1-T3 is complete. E1-T4 is the next package and separately owns production `SESSION_SECRET`, shared session storage and cookie hardening.

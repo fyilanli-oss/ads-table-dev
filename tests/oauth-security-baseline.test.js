@@ -103,15 +103,17 @@ test('dashboard starts OAuth with a bearer-authenticated JSON handshake', () => 
   assert.doesNotMatch(dashboardSource, /\/auth\/(?:meta|google|klaviyo|tiktok|organic|google-sheets)\?user_id=/);
 });
 
-test('active callbacks characterize their current session-bound state and user fields', () => {
+test('every active OAuth start and callback uses the transaction store', () => {
   for (const route of ROUTES.filter(item => item.active)) {
+    const start = serverSource.indexOf(`app.get("${route.start}"`);
     const callback = serverSource.indexOf(`app.get("${route.callback}"`);
+    assert.notEqual(start, -1, `${route.provider} start route must exist`);
     assert.notEqual(callback, -1, `${route.provider} callback route must exist`);
     const nextRoute = serverSource.indexOf('\napp.', callback + 1);
     const body = serverSource.slice(callback, nextRoute === -1 ? serverSource.length : nextRoute);
-    assert.match(body, new RegExp(`req\\.session\\.${route.state}`), `${route.provider} callback must check its current state field`);
-    assert.match(body, new RegExp(`req\\.session\\.${route.user}`), `${route.provider} callback must read its current user field`);
-    if (route.pkce) assert.match(body, new RegExp(`req\\.session\\.${route.verifier}`));
+    assert.match(serverSource.slice(start, callback), /createOAuthTransaction\(/, `${route.provider} start must create a transaction`);
+    assert.match(body, /consumeOAuthTransaction\(/, `${route.provider} callback must consume a transaction`);
+    assert.doesNotMatch(body, /req\.session\.(?:oauthUserId|\w*OAuthState|klaviyoCodeVerifier)/);
   }
 });
 

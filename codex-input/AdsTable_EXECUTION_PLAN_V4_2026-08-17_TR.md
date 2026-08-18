@@ -521,13 +521,13 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 5. E1 — OAuth ve session güvenliği
 
-**Durum:** `In progress` — E1-T1 ve E1-T2 tamamlandı; E1-T3 sıradaki uygulama paketidir.
+**Durum:** `In progress` — E1-T1, E1-T2 ve E1-T3 tamamlandı; E1-T4 sıradaki uygulama paketidir.
 
 ### Planlanan işler
 
 - **E1-T1 — `Done` — OAuth route envanteri ve threat model:** Tüm start/callback yolları, identity kaynakları, state, replay ve token yazma noktaları çıkarıldı; executable current-state baseline eklendi.
 - **E1-T2 — `Done` — Bearer-bound identity:** Aktif OAuth başlangıçları doğrulanmış bearer kullanıcıya bağlandı; legacy query `user_id` reddedildi ve dashboard bearer-authenticated JSON handshake'e geçirildi.
-- **E1-T3 — `Not started` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction kurulur.
+- **E1-T3 — `Done` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction store; SHA-256 state özeti, 10 dakika TTL, provider/redirect/user bağları ve Klaviyo PKCE taşımasıyla kuruldu.
 - **E1-T4 — `Not started` — Session hardening:** Production `SESSION_SECRET` fail-fast olur; shared TTL store kurulur; cookie politikası doğrulanır.
 - **E1-T5 — `Not started` — Unsafe default guard:** Review/test hard-route ve test account varsayımları production'da reddedilir.
 - **E1-T6 — `Not started` — Token protection:** Encryption/rotation çözümü uygulanır veya süreli, sahibi olan risk kabulü kaydedilir.

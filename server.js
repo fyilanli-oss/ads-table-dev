@@ -5,6 +5,7 @@ const path=require("path");
 const crypto=require("crypto");
 const {google}=require("googleapis");
 const {createClient}=require("@supabase/supabase-js");
+const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
 const app=express(); const PORT=process.env.PORT||3000;
 app.set("trust proxy",1); app.use(express.json());
 app.use(session({secret:process.env.SESSION_SECRET||"dev_secret_change_me",resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:"lax",secure:process.env.NODE_ENV==="production"||process.env.VERCEL==="1"}}));
@@ -42,7 +43,8 @@ async function expireTrialsIfNeeded(){if(!supabaseAdmin)return;const{error}=awai
 async function getUserSubscription(userId){await expireTrialsIfNeeded();const{data,error}=await supabaseAdmin.from("subscriptions").select("status,trial_end_date").eq("user_id",userId).maybeSingle();if(error)throw error;return data}
 function getAccessByStatus(status){const full=["trial","active"].includes(status);const readonly=status==="expired";const blocked=["suspended","deleted"].includes(status);return{dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
 async function requireAccess(req,res,userId,capability){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);if(access.blocked||!access[capability]){res.status(403).json({error:"Subscription inactive",status:sub?.status||null});return null}return{sub,access}}
-async function requireConnectAccessForOAuth(req,res){const userId=req.query.user_id;if(!userId){res.redirect("/dashboard?error=missing_user_id");return null}const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);if(access.blocked||!access.connect){res.redirect(`/dashboard?subscription_inactive=1&status=${encodeURIComponent(sub?.status||"")}`);return null}return{userId,sub,access}}
+const requireConnectAccessForOAuth=createRequireConnectAccessForOAuth({requireUser,getUserSubscription,getAccessByStatus});
+function sendOAuthAuthorizationResponse(req,res,authorizationUrl){if(req.query.response_mode==="json")return res.json({authorization_url:authorizationUrl});return res.redirect(authorizationUrl)}
 function parseExpiry(s){return s?new Date(Date.now()+Number(s)*1000).toISOString():null}
 async function saveConnection(userId,platform,payload){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
@@ -1092,7 +1094,7 @@ async function setRefreshJobStatus(jobId,status,extra={}){
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
-app.get("/auth/meta",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.META_APP_ID||!process.env.META_REDIRECT_URI)throw new Error("Missing Meta env");const state=Math.random().toString(36).slice(2);req.session.metaOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({client_id:process.env.META_APP_ID,redirect_uri:process.env.META_REDIRECT_URI,state,response_type:"code",scope:"ads_read"});res.redirect(`https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${p}`)}catch(e){res.status(500).send(e.message)}});
+app.get("/auth/meta",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.META_APP_ID||!process.env.META_REDIRECT_URI)throw new Error("Missing Meta env");const state=Math.random().toString(36).slice(2);req.session.metaOAuthState=state;req.session.oauthUserId=userId;const p=new URLSearchParams({client_id:process.env.META_APP_ID,redirect_uri:process.env.META_REDIRECT_URI,state,response_type:"code",scope:"ads_read"});sendOAuthAuthorizationResponse(req,res,`https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${p}`)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/meta/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");if(!state||state!==req.session.metaOAuthState)return res.redirect("/dashboard?meta_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?meta_error=missing_user_id");const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});
 
 const metaConnAfterReconnect=await getConnection(userId,"meta");
@@ -1106,7 +1108,7 @@ if(metaConnAfterReconnect){
   }
 }
 req.session.metaOAuthState=null;res.redirect("/dashboard?meta_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
-app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});res.redirect(url)}catch(e){res.status(500).send(e.message)}});
+app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const state=Math.random().toString(36).slice(2);req.session.googleOAuthState=state;req.session.oauthUserId=userId;const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});sendOAuthAuthorizationResponse(req,res,url)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/google/callback",async(req,res)=>{try{
   const{code,state,error}=req.query;
   if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);
@@ -1322,7 +1324,7 @@ app.get("/auth/google-sheets",async(req,res)=>{
     req.session.googleSheetsOAuthState=state;
     req.session.googleSheetsOAuthUserId=accessCheck.userId;
     const url=googleSheetsOAuthClient(req).generateAuthUrl({access_type:"offline",prompt:"consent",include_granted_scopes:true,state,scope:GOOGLE_SHEETS_SCOPES});
-    res.redirect(url);
+    sendOAuthAuthorizationResponse(req,res,url);
   }catch(e){res.status(500).send(e.message)}
 });
 app.get("/auth/google-sheets/callback",async(req,res)=>{
@@ -1445,7 +1447,7 @@ app.get("/auth/organic",async(req,res)=>{
       state,
       scope:ORGANIC_GOOGLE_SCOPES
     });
-    res.redirect(url);
+    sendOAuthAuthorizationResponse(req,res,url);
   }catch(e){res.status(500).send(e.message)}
 });
 app.get("/auth/organic/callback",async(req,res)=>{
@@ -2307,7 +2309,7 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     raw:{campaign,report,extraEvents}
   }
 }
-app.get("/auth/klaviyo",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const state=Math.random().toString(36).slice(2);const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());req.session.klaviyoOAuthState=state;req.session.klaviyoCodeVerifier=codeVerifier;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});res.redirect(`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
+app.get("/auth/klaviyo",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const state=Math.random().toString(36).slice(2);const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());req.session.klaviyoOAuthState=state;req.session.klaviyoCodeVerifier=codeVerifier;req.session.oauthUserId=userId;const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});sendOAuthAuthorizationResponse(req,res,`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");if(!state||state!==req.session.klaviyoOAuthState)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=req.session.oauthUserId;if(!userId)return res.redirect("/dashboard?klaviyo_error=missing_user_id");const verifier=req.session.klaviyoCodeVerifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});const klaviyoConn=await getConnection(userId,"klaviyo");
 const klaviyoAccount=await resolveKlaviyoAccountIdentity(klaviyoConn);
 await saveConnection(userId,"klaviyo",{accountId:null,accountName:null,metadata:{selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastDiscoveredPlatformAccountId:klaviyoAccount.platform_account_id,availableAccounts:[{platform_account_id:klaviyoAccount.platform_account_id,account_name:klaviyoAccount.account_name,currency:klaviyoAccount.currency||null}],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection",rawAccount:klaviyoAccount.raw_account}});
@@ -5111,7 +5113,7 @@ app.get("/auth/tiktok",async(req,res)=>{
     req.session.tiktokOAuthState=state;
     req.session.oauthUserId=userId;
     const p=new URLSearchParams({app_id:tiktokClientId(),redirect_uri:tiktokRedirectUri(),state});
-    res.redirect(`${TIKTOK_AUTH_BASE}?${p}`);
+    sendOAuthAuthorizationResponse(req,res,`${TIKTOK_AUTH_BASE}?${p}`);
   }catch(e){res.status(500).send(e.message)}
 });
 

@@ -13,21 +13,25 @@ create table if not exists public.platform_connection_tokens (
   constraint platform_connection_tokens_access_envelope_check check (
     access_token_envelope is null or (
       jsonb_typeof(access_token_envelope) = 'object'
+      and access_token_envelope ?& array['version', 'keyId', 'iv', 'tag', 'ciphertext']
+      and access_token_envelope - array['version', 'keyId', 'iv', 'tag', 'ciphertext'] = '{}'::jsonb
       and access_token_envelope->>'version' = 'v1'
-      and length(access_token_envelope->>'keyId') > 0
-      and length(access_token_envelope->>'iv') > 0
-      and length(access_token_envelope->>'tag') > 0
-      and length(access_token_envelope->>'ciphertext') > 0
+      and coalesce(length(access_token_envelope->>'keyId'), 0) > 0
+      and coalesce(length(access_token_envelope->>'iv'), 0) > 0
+      and coalesce(length(access_token_envelope->>'tag'), 0) > 0
+      and coalesce(length(access_token_envelope->>'ciphertext'), 0) > 0
     )
   ),
   constraint platform_connection_tokens_refresh_envelope_check check (
     refresh_token_envelope is null or (
       jsonb_typeof(refresh_token_envelope) = 'object'
+      and refresh_token_envelope ?& array['version', 'keyId', 'iv', 'tag', 'ciphertext']
+      and refresh_token_envelope - array['version', 'keyId', 'iv', 'tag', 'ciphertext'] = '{}'::jsonb
       and refresh_token_envelope->>'version' = 'v1'
-      and length(refresh_token_envelope->>'keyId') > 0
-      and length(refresh_token_envelope->>'iv') > 0
-      and length(refresh_token_envelope->>'tag') > 0
-      and length(refresh_token_envelope->>'ciphertext') > 0
+      and coalesce(length(refresh_token_envelope->>'keyId'), 0) > 0
+      and coalesce(length(refresh_token_envelope->>'iv'), 0) > 0
+      and coalesce(length(refresh_token_envelope->>'tag'), 0) > 0
+      and coalesce(length(refresh_token_envelope->>'ciphertext'), 0) > 0
     )
   )
 );

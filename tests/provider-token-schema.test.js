@@ -19,9 +19,13 @@ test("encrypted token table stores only versioned envelope objects",()=>{
   for(const column of ["access_token_envelope","refresh_token_envelope"]){
     assert.match(sql,new RegExp(`${column} jsonb`,`i`));
     assert.match(sql,new RegExp(`jsonb_typeof\\(${column}\\) = 'object'`,`i`));
+    assert.match(sql,new RegExp(`${column} \\?& array\\['version', 'keyId', 'iv', 'tag', 'ciphertext'\\]`,`i`));
+    assert.match(sql,new RegExp(`${column} - array\\['version', 'keyId', 'iv', 'tag', 'ciphertext'\\] = '\\{\\}'::jsonb`,`i`));
   }
   for(const field of ["version","keyId","iv","tag","ciphertext"])assert.match(sql,new RegExp(`->>'${field}'`));
   assert.match(sql,/version' = 'v1'/);
+  assert.match(sql,/coalesce\(length\(access_token_envelope->>'keyId'\), 0\) > 0/i);
+  assert.match(sql,/coalesce\(length\(refresh_token_envelope->>'ciphertext'\), 0\) > 0/i);
   assert.match(sql,/access_token_envelope is not null or refresh_token_envelope is not null/i);
 });
 

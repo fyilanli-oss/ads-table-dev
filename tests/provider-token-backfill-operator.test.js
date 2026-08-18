@@ -1,0 +1,12 @@
+"use strict";
+const test=require("node:test");
+const assert=require("node:assert/strict");
+const {WRITE_CONFIRMATION,parseArgs,projectOrigin,projectRefFromOrigin,validateOperatorConfig,safeFailure}=require("../scripts/provider-token-backfill");
+
+const baseEnv={SUPABASE_URL:"https://projectref.supabase.co/rest/v1/",SUPABASE_PROJECT_REF:"projectref",SUPABASE_SERVICE_ROLE_KEY:"service-role-fixture",PROVIDER_TOKEN_BACKFILL_SECRET:"backfill-secret-fixture"};
+
+test("operator defaults to dry-run and accepts bounded execution inputs",()=>{assert.deepEqual(parseArgs([]),{dryRun:true,batchSize:25,cursor:null,projectRef:null,confirmation:null});assert.deepEqual(parseArgs(["--batch-size","10","--cursor","cursor","--project-ref","projectref"]),{dryRun:true,batchSize:10,cursor:"cursor",projectRef:"projectref",confirmation:null});});
+test("project guard normalizes the origin and rejects a mismatched target",()=>{assert.equal(projectOrigin(baseEnv.SUPABASE_URL),"https://projectref.supabase.co");assert.equal(projectRefFromOrigin("https://projectref.supabase.co"),"projectref");assert.deepEqual(validateOperatorConfig(parseArgs([]),baseEnv),{origin:"https://projectref.supabase.co",projectRef:"projectref"});assert.throws(()=>validateOperatorConfig(parseArgs(["--project-ref","other"]),baseEnv),{code:"PROJECT_REF_MISMATCH"});});
+test("write mode requires environment policy and exact confirmation",()=>{const write=parseArgs(["--write","--confirm",WRITE_CONFIRMATION]);assert.throws(()=>validateOperatorConfig(write,baseEnv),{code:"WRITE_NOT_ENABLED"});assert.throws(()=>validateOperatorConfig(parseArgs(["--write","--confirm","wrong"]),{...baseEnv,PROVIDER_TOKEN_BACKFILL_WRITE_ENABLED:"true"}),{code:"WRITE_CONFIRMATION_REQUIRED"});assert.equal(validateOperatorConfig(write,{...baseEnv,PROVIDER_TOKEN_BACKFILL_WRITE_ENABLED:"true"}).projectRef,"projectref");});
+test("operator failures never disclose secret values",()=>{const secret="do-not-disclose-this-value";const failure=safeFailure(Object.assign(new Error(secret),{code:"unsafe secret code"}));assert.deepEqual(failure,{ok:false,code:"TOKEN_BACKFILL_FAILED"});assert.doesNotMatch(JSON.stringify(failure),new RegExp(secret));});
+test("unknown or incomplete arguments are rejected",()=>{assert.throws(()=>parseArgs(["--unknown","value"]),{code:"INVALID_OPERATOR_ARGUMENT"});assert.throws(()=>parseArgs(["--cursor"]),{code:"INVALID_OPERATOR_ARGUMENT"});});

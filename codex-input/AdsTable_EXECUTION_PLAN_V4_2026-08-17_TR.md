@@ -1,0 +1,1345 @@
+# AdsTable — V4 Execution Plan
+
+**Sürüm:** V4  
+**Tarih:** 17 Ağustos 2026  
+**Belge türü:** Güncel uygulama, kabul ve takip planı  
+**Durum:** Mutabık kalınan execution baseline  
+
+## 0. Belge hiyerarşisi ve kullanım kuralı
+
+Bu belge, aşağıdaki iki belgeyi değiştirmez:
+
+1. **Final analiz raporu:** Tarihli mevcut durum ve karar baseline'ıdır; değiştirilmeden korunur.
+2. **V3 Implementation Plan:** Canonical contract, platform semantiği, hierarchy, metric support, time, FX, formula, Dataset V2 ve Funnel API için teknik referanstır.
+
+**V4 Execution Plan**, bu iki kaynağı uygulanabilir epic, task, kabul kapısı ve kanıt yapısına dönüştürür. Günlük ilerleme bu belge üzerinden takip edilir. Teknik contract çatışmasında V3; öncelik, güvenlik, geçiş ve production kabul sıralamasında Final Rapor; iş takibinde V4 esas alınır. Bir çatışma görülürse sessizce yorumlanmaz, karar kaydı açılır.
+
+### 0.1 Planlanan ve gerçekleşen ayrımı
+
+- **Planlanan:** Başlangıçta onaylanan kapsam, bağımlılık, kabul, test ve rollback'tir.
+- **Gerçekleşen:** Yalnız repository, canlı sistem ve evidence ile doğrulanmış sonuçtur.
+- **Sapma:** Planlanandan farklı yapılan veya yapılmayan her şey, gerekçesi ve etkisiyle kaydedilir.
+- Bir task kodu yazıldığı için değil, kabul kriterleri ve evidence tamamlandığı için `Done` olur.
+- Plan geçmişe dönük olarak gerçekleşene uydurulmaz; değişiklikler decision log ile versionlanır.
+
+### 0.2 Durum sözlüğü
+
+| Durum | Anlamı |
+|---|---|
+| `Not started` | İşe başlanmadı. |
+| `Ready` | Bağımlılıklar tamam, başlanabilir. |
+| `In progress` | Uygulama devam ediyor. |
+| `Blocked` | Belgelenmiş dış bağımlılık nedeniyle ilerleyemiyor. |
+| `Verification` | Kod tamam; kabul, test ve evidence doğrulanıyor. |
+| `Done` | Bütün kabul, test, rollback ve evidence koşulları sağlandı. |
+| `Deferred` | Açık karar ve gerekçeyle ileri tarihe taşındı. |
+
+## 1. Değiştirilemez execution prensipleri
+
+1. Proje baştan yazılmayacaktır.
+2. Çalışan V1 snapshot/dashboard hattı kontrollü geçiş boyunca korunacaktır.
+3. Yeni canonical analytics kaynağı Dataset V2 olacaktır.
+4. Business math'in sahibi backend Formula/Compare/Intent katmanlarıdır.
+5. Funnel UI presentation-only olacaktır.
+6. Güvenlik ve ownership kontrolleri provider ingest'ten önce tamamlanacaktır.
+7. Provider geçişleri feature flag, dual-write, parity ve rollback ile yapılacaktır.
+8. Backfill resumable, idempotent ve ölçülebilir olacaktır.
+9. Legacy retirement en son yapılacaktır.
+10. Production GO yalnız ölçülebilir kabul kapılarıyla verilecektir.
+
+### 1.1 Monolit büyütmeme kuralı
+
+V4 başladıktan sonra yeni Funnel, provider adapter, OAuth, analytics ve job business logic'i doğrudan kök `server.js` veya inline `public/dashboard.html` içine eklenemez.
+
+### 1.2 Dokunurken çıkarma kuralı
+
+Her epic dokunduğu eski davranışı hedef modüle taşır; fakat ilgisiz alanlarda big-bang refactor yapmaz. Taşıma characterization testleriyle başlar, delegation/feature flag ile devreye alınır ve parity kanıtlanmadan eski uygulama silinmez.
+
+### 1.3 Zorunlu task aynası
+
+Her task aşağıdaki alanları eksiksiz taşımalıdır:
+
+```markdown
+## [EPIC]-[TASK] İş başlığı
+
+### Amaç
+### Mevcut durum
+### Planlanan durum
+### Kapsam
+### Kapsam dışı
+### Bağımlılıklar
+### Uygulama adımları
+### Kabul kriterleri
+### Test planı
+### Rollback planı
+### Gözlemlenebilirlik
+### Güvenlik ve veri etkisi
+### Planlanan
+### Gerçekleşen
+### Sapmalar
+### Evidence
+### Durum
+```
+
+Alanlardan biri uygulanabilir değilse silinmez; `Uygulanamaz — gerekçe` yazılır.
+
+## 2. V3 gerçekleşme haritası
+
+| V3 fazı | Planlanan | Doğrulanmış gerçekleşen | V4 kararı |
+|---|---|---|---|
+| Phase 1 | Funnel Core iskeleti | Canonical contract, hierarchy, analysis scope, Formula/Time/FX servisleri, repository arayüzü ve Query Service uygulanmış; yerel senaryolar mevcut | **Tamamlandı — koruma/regresyon kapsamı** |
+| Phase 2 | Dataset V2 migration | Migration, corrective migration ve Supabase repository uygulanmış; canlı tablo mevcut | **Kod artefaktı tamam; canlı kabul E2'de açık** |
+| Phase 3 | Meta adapter | Provider→canonical→V2 production vertical slice | **Açık — E4** |
+| Phase 4 | Google adapter | Standard mapping; PMax contract hazırlığı | **Açık — E5; PMax gerçek adapter kapsamına yükseltildi** |
+| Phase 5 | TikTok adapter | Gerçek metrics ve synthetic ayrımı | **Açık — E6** |
+| Phase 6 | Klaviyo adapter | Campaign/Flow/Message ve Email/SMS | **Açık — E7** |
+| Phase 7 | GA4 Organic | Property/domain/timezone/currency/provenance | **Açık — E8** |
+| Phase 8 | Funnel API | Authenticated, scope-aware backend output | **Açık — E10** |
+| Phase 9 | Funnel backend binding | Mock/API flag ve presentation-only UI | **Açık — E11** |
+| Phase 10 | Parity/geçiş | Uçtan uca zincir doğrulaması | **E4–E12 boyunca zorunlu kapı** |
+
+> Phase 1 ve Phase 2'nin `Done` işareti yalnız kendi önceki faz sınırları içindir. Canlı DB kabulü, runtime ingest ve production binding'in tamamlandığı anlamına gelmez.
+
+### 2.1 Canonical provider envelope ve capability-aware hierarchy — V4 freeze
+
+V3 §10.2'nin ana kararı yalnız entity seviyelerinin farklılığı değildir. **Meta, Google, TikTok, Klaviyo ve GA4 kaynaklı Organic dahil bütün adapter'ların aynı canonical envelope'a normalize edilmesidir.** Bu standart provider'ların farklı API şekillerini Dataset V2, Formula Engine, Funnel API ve UI için tek dile çeviren mimari omurgadır. Bir adapter'ın bu envelope dışına çıkması provider-specific şemaları yeniden bütün katmanlara sızdırır ve sistemi başlangıç noktasına döndürür.
+
+Bu nedenle aşağıdaki envelope V4'te E0–E13 boyunca **değiştirilemez cross-cutting contract ve acceptance gate** olarak freeze edilmiştir. Adapter'lar yalnız alanların değerini ve provider capability'sine göre support durumunu belirler; blokları kaldırmaz, yeniden adlandırmaz veya provider'a özel paralel payload üretmez.
+
+Canonical model provider'da bulunmayan bir seviyeyi uydurmaz. Her leaf satır provider'ın gerçekten desteklediği en düşük analytical entity'yi temsil eder; root ve parent lineage açıkça taşınır.
+
+| Capability branch | Zorunlu canonical hierarchy | Yasaklanan sentetik davranış |
+|---|---|---|
+| Meta Paid | `Campaign → AdSet → Ad` | AdSet'i AdGroup olarak yeniden adlandırmak veya lineage'ı düşürmek |
+| Google Standard | `Campaign → AdGroup → Ad` | Campaign/AdGroup lineage'ı olmayan leaf üretmek |
+| Google PMax | `Campaign(type=performance_max) → Asset Group` | Sahte AdGroup veya Ad üretmek |
+| TikTok Paid | `Campaign → AdGroup → Ad` | Aynı fact'i birden fazla seviyede toplayarak double-count üretmek |
+| Klaviyo Campaign | `Campaign → Campaign Message` | Sahte AdGroup/Ad seviyesi üretmek |
+| Klaviyo Flow | `Flow → Flow Message` | Flow'u Campaign altına yerleştirmek veya sentetik `Email Flow` parent üretmek |
+| GA4 Organic | `Platform-level Organic identity` | Organic satırı Campaign/AdGroup/Ad altına zorlamak |
+
+#### Tek standart canonical envelope
+
+```json
+{
+  "identity": {
+    "user_id": "uuid",
+    "platform": "meta|google|tiktok|klaviyo",
+    "traffic_type": "paid|organic",
+    "source_system": "meta_ads|google_ads|tiktok_ads|klaviyo|ga4",
+    "channel": "email|sms|null",
+    "platform_account_id": "string",
+    "date": "YYYY-MM-DD"
+  },
+  "entity": {
+    "campaign_type": "standard|performance_max|null",
+    "root_entity_type": "campaign|flow|organic|null",
+    "root_entity_id": "string|null",
+    "root_entity_name": "string|null",
+    "parent_entity_type": "adset|adgroup|campaign|flow|null",
+    "parent_entity_id": "string|null",
+    "parent_entity_name": "string|null",
+    "entity_type": "ad|asset_group|campaign_message|flow_message|organic",
+    "entity_id": "string",
+    "entity_name": "string"
+  },
+  "raw_metrics": {
+    "impression": "number|null",
+    "ad_click": "number|null",
+    "session": "number|null",
+    "spend_value": "number|null",
+    "add_to_cart": "number|null",
+    "add_to_cart_value": "number|null",
+    "checkout": "number|null",
+    "checkout_value": "number|null",
+    "purchase": "number|null",
+    "purchase_value": "number|null"
+  },
+  "metric_support": {
+    "impression": "supported|unsupported|unknown",
+    "ad_click": "supported|unsupported|unknown",
+    "session": "supported|unsupported|unknown",
+    "spend_value": "supported|unsupported|unknown",
+    "add_to_cart": "supported|unsupported|unknown",
+    "add_to_cart_value": "supported|unsupported|unknown",
+    "checkout": "supported|unsupported|unknown",
+    "checkout_value": "supported|unsupported|unknown",
+    "purchase": "supported|unsupported|unknown",
+    "purchase_value": "supported|unsupported|unknown"
+  },
+  "currency": {
+    "source_currency": "USD",
+    "target_currency": "TRY",
+    "fx_rate": 1,
+    "fx_rate_date": "YYYY-MM-DD",
+    "fx_provider": "provider",
+    "fx_engine_version": "vN"
+  },
+  "time": {
+    "source_timezone": "IANA timezone",
+    "business_date": "YYYY-MM-DD",
+    "time_engine_version": "vN"
+  },
+  "provenance": {
+    "source_system": "meta_ads|google_ads|tiktok_ads|klaviyo|ga4",
+    "adapter_version": "vN",
+    "source_confidence": "real|fallback|partial",
+    "synthetic": false,
+    "ga4_property_id": "string|null",
+    "raw_reference": {}
+  }
+}
+```
+
+Envelope her adapter için aynı yedi bloğu taşır: `identity`, `entity`, `raw_metrics`, `metric_support`, `currency`, `time`, `provenance`. `identity.date` ile `time.business_date` aynı canonical business date'i ifade eder. `identity.source_system` ile `provenance.source_system` aynı olmalıdır. Her raw metric anahtarı karşılık gelen bir `metric_support` anahtarıyla birlikte bulunur.
+
+Provider'da bir metrik veya entity seviyesi bulunmuyorsa contract değiştirilmez: değer `null`, support durumu `unsupported|unknown` olur ve provenance sebebi açıklar. Gerçek ölçülen `0` ise `supported` olarak korunur. Provider'a özgü ek ham detay gerekiyorsa canonical alanları değiştirmek yerine redacted `provenance.raw_reference` veya versionlı adapter evidence içinde tutulur; Formula Engine bu provider-specific ayrıntıya bağımlı olamaz.
+
+Entity alanlarının geçerli kombinasyonu capability branch tarafından belirlenir. Alanın provider'da bulunmaması durumunda değer `null` kalır; görünen ad, placeholder ID veya sentetik entity ile doldurulmaz. Stable `entity_key`, identity ve hierarchy branch'inden deterministik üretilir; frontend görünen isimlerden identity üretmez.
+
+#### Canonical envelope invariants
+
+- Bütün provider ve GA4 Organic adapter'ları aynı yedi top-level bloğu eksiksiz üretir.
+- Platforma özel alternatif raw fact DTO'su Dataset V2 repository sınırını geçemez.
+- `source_system`, `traffic_type`, `channel` ve platform kombinasyonu canonical validation'dan geçer.
+- On raw metric anahtarının tamamı ve birebir support anahtarları bulunur.
+- `supported` metrik finite number taşır; gerçek `0` geçerlidir. `unsupported|unknown` metrik yalnız `null` taşır.
+- Time normalization tamamlanmadan `identity.date/time.business_date`; FX tamamlanmadan monetary facts production-ready sayılmaz.
+- Organic satır `source_system=ga4` ve `ga4_property_id` provenance taşır; GA4 bir paid platform olarak modellenmez.
+- `synthetic=true` production canonical performance olarak Dataset V2'ye yazılamaz.
+- Contract, adapter, time ve FX version provenance'ı yeniden üretim ve parity için izlenebilir olur.
+- Derived KPI'lar bu envelope'un raw fact kaynağına yazılmaz; aggregate sonrası Formula Engine tarafından hesaplanır.
+
+#### Hierarchy kabul kriterleri
+
+- Adapter output'u ilgili capability branch'in root/parent/leaf kombinasyonunu taşır.
+- Aynı provider ID ve branch aynı deterministik `entity_key`i üretir.
+- Klaviyo Campaign Message ve Flow Message aynı leaf ID'ye sahip olsa bile branch identity nedeniyle çakışmaz.
+- PMax, Klaviyo ve Organic için olmayan canonical seviyeler `null` kalır.
+- Dataset V2 round-trip hierarchy ve lineage alanlarını kayıpsız korur.
+- Funnel API stable identity ile capability-aware child ilişkisi döndürür.
+- Funnel UI yalnız API hierarchy'sini render eder; klasik Ad hierarchy'sine zorlamaz.
+- Aggregate yalnız seçilen analytical grain'deki canonical leaf fact'leri toplar; parent/leaf double-count oluşmaz.
+
+#### Hierarchy test kapısı
+
+- Her branch için accepted golden fixture.
+- Her yasak sentetik şekil için canonical ve DB rejection fixture'ı.
+- Deterministic key ve same-ID/different-branch collision testi.
+- Provider raw→canonical→V2 round-trip lineage testi.
+- Parent/leaf double-count negatif testi.
+- API drilldown ve UI capability render contract/E2E testi.
+
+#### Canonical envelope test kapısı
+
+- Meta, Google Standard, Google PMax, TikTok, Klaviyo Email/SMS ve GA4 Organic için aynı schema validator'a giren golden fixture.
+- Eksik top-level blok, eksik metric/support anahtarı ve provider-specific paralel şekil rejection testleri.
+- Identity/source/channel, date/business-date ve provenance/source-system cross-field invariant testleri.
+- Gerçek `0`, unsupported `null`, unknown `null`, partial provenance ve synthetic rejection testleri.
+- Time/FX öncesi ve sonrası envelope testi; dört monetary fact'in birlikte normalize edildiğinin kanıtı.
+- Canonical envelope→Dataset V2→canonical envelope kayıpsız round-trip testi.
+- Adapter/contract/time/FX version provenance ve replay testleri.
+
+#### Contract rollback ve değişiklik yönetimi
+
+- Hierarchy contract değişikliği adapter içinde sessizce yapılamaz; contract/adapter version artışı ve decision log gerektirir.
+- Yeni branch provider/account feature flag ile açılır; eski branch verisiyle aynı aggregate'e version kontrolü olmadan karıştırılmaz.
+- Hatalı hierarchy yazımında ilgili adapter version durdurulur, run ID ile etkilenen V2 satırları belirlenir ve doğrulanmış adapter ile yeniden üretilir.
+- Rollback hiçbir zaman sahte entity üretmeye veya unsupported seviyeyi `0`/placeholder ile doldurmaya dönemez.
+- Canonical blok/alan değişikliği yalnız versionlı contract migration, bütün adapter fixture'ları, Dataset V2 mapper, API contract ve rollback planı birlikte kabul edilirse yapılabilir.
+- Tek bir provider ihtiyacı ortak envelope'u sessizce çatallayamaz; yeni capability önce ortak contract decision log'unda değerlendirilir.
+
+### 2.2 Normalization pipeline — V4 freeze
+
+V3 §11–12'deki Time ve FX kararları canonical envelope'un opsiyonel yardımcıları değildir. Bütün provider'lar için production fact oluşma sırası aşağıdaki tek pipeline'dır:
+
+```text
+Provider raw response
+→ provider adapter mapping
+→ canonical identity/entity/support validation
+→ provider business-date normalization
+→ monetary raw facts için tek-rate FX normalization
+→ production canonical validation
+→ Dataset V2 upsert
+→ scope-aware aggregate
+→ Formula/Compare/Intent
+→ Funnel API
+→ presentation-only UI/export
+```
+
+#### Time contract
+
+- Paid satırın `source_timezone` değeri provider account metadata'sından gelir.
+- Organic satırın `source_timezone` değeri GA4 Property metadata'sından gelir.
+- Server UTC tarihi hiçbir provider'ın business date'i olarak kullanılamaz.
+- `identity.date = time.business_date` olmalıdır ve canonical unique identity bu business date'i kullanır.
+- Timezone bulunamıyorsa UTC fallback ile production fact üretilmez; satır rejection/evidence akışına gider.
+
+#### FX contract
+
+- FX aggregation ve Formula Engine'den önce uygulanır.
+- `spend_value`, `add_to_cart_value`, `checkout_value` ve `purchase_value` aynı satırda aynı rate/date/provider ile normalize edilir.
+- Aynı canonical satırın monetary alanları farklı currency veya rate halinde bırakılamaz.
+- Cross-currency rate yoksa sentetik `1` kullanılmaz; satır retry/rejection akışına gider.
+- Aynı currency durumunda rate `1` gerçek, izlenebilir normalization sonucu olarak taşınır.
+
+#### Pipeline kabul/test/rollback kapısı
+
+- Hiçbir adapter Dataset V2'ye Time/FX ve production canonical validation'ı atlayarak yazamaz.
+- Her provider için timezone boundary/DST ve currency fixture'ları bulunur.
+- Dört monetary metric'in aynı rate ile dönüştüğü ve source provenance'ın korunduğu test edilir.
+- Missing timezone/rate, mixed currency ve invalid rate negatif testleri zorunludur.
+- Time/FX engine version değişikliği decision log, version bump, parity ve hedefli replay planı gerektirir.
+- Hatalı engine version feature flag ile durdurulur; run/version ile etkilenen facts yeniden üretilir. UTC fallback veya sentetik FX rollback değildir.
+
+### 2.3 Analysis Scope, aggregation ve Formula Engine — V4 freeze
+
+V3 §13–14'teki business math tek backend standardıdır. Dataset V2 yalnız normalized raw fact source-of-truth'tur; UI, export, adapter veya repository ayrı formül motoru olamaz.
+
+#### Analysis Scope contract
+
+```text
+PAID:
+  funnel_click = paid.ad_click
+
+ORGANIC:
+  funnel_click = organic.session
+
+PAID_ORGANIC_BLEND:
+  additive paid raw facts + additive organic raw facts
+  → derived metrics toplam raw facts üzerinden yeniden hesaplanır
+
+INTENT:
+  Paid-only
+```
+
+Blend, Paid ve Organic satır KPI'larının ortalaması değildir. Organic yalnız seçili AdsTable platform hesabına deterministic olarak eşleşmiş GA4 facts'ten gelir. En az bir analysis scope aktif kalır.
+
+#### Aggregate-first Formula contract
+
+Önce aynı scope ve grain içindeki on canonical raw metric toplanır; sonra derived değerler hesaplanır:
+
+```text
+sales           = purchase_value
+abandoned       = max(checkout - purchase, 0)
+abandoned_value = max(checkout_value - purchase_value, 0)
+ctr             = funnel_click / impressions * 100
+cpc             = spend / funnel_click
+roas            = sales / spend
+cps             = spend / purchase
+profit          = sales - spend
+margin          = profit / sales * 100
+```
+
+Intent Paid-only oranları:
+
+```text
+add_to_cart_rate = paid_add_to_cart / paid_ad_click * 100
+checkout_rate    = paid_checkout / paid_add_to_cart * 100
+abandoned_rate   = paid_abandoned / paid_checkout * 100
+purchase_rate    = paid_purchase / paid_checkout * 100
+```
+
+#### Formula invariants
+
+- Oranlar toplanmaz veya satır oranlarının ortalaması alınmaz: `SUM(raw numerator) / SUM(raw denominator)` kullanılır.
+- Denominator `0`, unsupported veya hesaplanamazsa derived sonuç `null` olur.
+- Unsupported/unknown additive input kısmi toplamı sessizce gerçek toplam gibi sunulmaz; support sonucu propagate edilir.
+- `sales - spend` canonical adı `profit`tir; `revenue` olarak kalıcılaştırılmaz.
+- Campaign ve child facts aynı total içinde double-count edilmez.
+- Compare iki period için aynı Formula Engine'i kullanır: `(current - previous) / abs(previous) * 100`; previous `0` ise change `null`dır.
+- Different-length period normalization gerekiyorsa tek versionlı backend policy olur.
+- Funnel Table, Compare, Intent ve Export aynı Dataset V2/engine output'unu tüketir.
+
+#### Formula kabul/test/rollback kapısı
+
+- Aynı aggregate fixture Formula, API, Compare, Intent, Export ve UI'da aynı sonucu verir.
+- Blend aggregate-first sonucu ile yanlış KPI-average sonucu arasındaki negatif test bulunur.
+- Zero denominator, unsupported propagation, abandoned floor, profit naming ve hierarchy double-count testleri zorunludur.
+- Formula değişikliği `formula_engine_version`, golden parity, decision log ve önceki versiona read rollback gerektirir.
+- Frontend veya adapter'da duplicate formula tespit edilirse production acceptance verilmez.
+
+### 2.4 Dataset V2 grain, identity ve transition — V4 freeze
+
+Dataset V2, snapshot geçmişi veya derived sonuç deposu değil, Funnel'ın daily canonical raw fact source-of-truth katmanıdır.
+
+#### Tek canonical grain
+
+```text
+1 user
++ 1 platform
++ 1 platform account
++ 1 provider business date
++ 1 traffic type
++ 1 gerçek capability-aware leaf entity
+```
+
+Mantıksal unique key:
+
+```text
+user_id
++ platform
++ platform_account_id
++ business_date
++ traffic_type
++ entity_key
+```
+
+- Aynı key ile refresh yeni satır üretmez; idempotent UPSERT yapar.
+- `snapshot_id` canonical identity'ye girmez.
+- CTR, CPC, ROAS, CPS, abandoned, profit, margin ve rate'ler raw Dataset V2 facts değildir.
+- Derived cache gerekirse Dataset V2'den ayrı olur ve `formula_engine_version` taşır.
+- Direct/Others final analytical Dataset grain'ine girmez.
+
+#### Organic account mapping contract
+
+GA4 Organic satırın analytical `platform_account_id` değeri GA4 Property ID değildir; deterministic olarak eşleşmiş AdsTable Meta/Google/TikTok/Klaviyo platform hesabıdır. Gerçek GA4 Property ID `provenance.ga4_property_id` olarak ayrı kalır. Deterministic match yoksa canonical Organic row yazılmaz; unmapped evidence olarak tutulur.
+
+#### V1/V2 transition contract
+
+- Migration boyunca refresh, Legacy Snapshot ve Canonical Dataset V2'ye kontrollü dual-write yapabilir.
+- Snapshot capture evidence, job/debug history ve legacy compatibility rolünü korur.
+- Dataset V2 Funnel, Paid/Organic/Blend, Compare, Intent ve Export'un yeni source-of-truth'udur.
+- Operational Dashboard/Auth/Connect/Account/Refresh/Job lifecycle cutover'dan etkilenmez.
+- V1 read ve legacy analysis yalnız parity, consumer-zero ve rollback süresi tamamlanınca E13'te emekli edilir.
+
+#### Dataset kabul/test/rollback kapısı
+
+- Same-key upsert, different date/entity isolation ve concurrent retry testleri zorunludur.
+- Organic platform-account/property ayrımı ve unmatched rejection test edilir.
+- Raw tabloda derived KPI veya snapshot-version duplication bulunamaz.
+- Dual-write run'ında V1 no-change ve V1/V2 raw parity evidence üretilir.
+- V2 read flag kapatılabilir; legacy yol stabilizasyon boyunca korunur. Destructive retirement yalnız E13 kapsamındadır.
+
+### 2.5 Backend analysis boundary ve deferred capability — V4 freeze
+
+- Funnel browser'dan Supabase'e doğrudan bağlanamaz; authenticated Funnel API tek analysis boundary'dir.
+- API user/account ownership, query bounds, Dataset V2 read, scope-aware aggregate, Formula, Compare ve Intent orchestration'ın sahibidir.
+- UI ve Export hazır backend contract'ını tüketir; business anlamını değiştiremez.
+- Intent yalnız Paid scope'tur; Organic/Blend facts Intent oranlarına karıştırılmaz.
+- Top Selling/Ranking core acceptance değildir. Ürün kararıyla açılırsa ayrı backend Ranking Engine Dataset V2'yi capability-aware tüketir; farklı entity tiplerini sahte Ad üreterek aynı leaderboard'a zorlamaz.
+- Klaviyo automatic Email Spend ayrı ürün/araştırma kararıdır; mevcut manual/estimated değer yalnız provenance'ı açık fallback olabilir ve provider gerçek spend ile karıştırılamaz.
+
+Bu boundary'lerden sapma yeni provider ihtiyacı gerekçesiyle epic içinde yapılamaz; versionlı contract/decision log ve bütün consumer parity'si gerekir.
+
+### 2.6 V3 contract → V4 enforcement matrisi
+
+| V3 teknik standardı | V4 freeze/gate | Uygulama epic'leri |
+|---|---|---|
+| §10.1 Platform/source/channel | Canonical envelope invariants | E0, E4–E8 |
+| §10.2 Capability-aware hierarchy | Hierarchy matrix, deterministic identity ve sentetik seviye yasağı | E0, E2, E4–E11 |
+| §10.3 Metric Support/NULL | Envelope invariant, support propagation ve UI state | E2, E4–E11 |
+| §10.4 Organic account mapping | Deterministic AdsTable account + ayrı GA4 provenance | E2, E8, E9 |
+| §10.5–10.7 Klaviyo channel/spend | Ortak envelope, channel ve provenance/fallback ayrımı | E7 |
+| §11 Time Engine | Provider/Property timezone ve UTC fallback yasağı | E4–E9 |
+| §12 FX Engine | Formula öncesi dört monetary fact için tek rate | E4–E9 |
+| §13 Analysis/Formula | Backend-only Paid/Organic/Blend ve versionlı formulas | E10–E11 |
+| §14 Aggregation | Aggregate-first, ratio-average ve double-count yasağı | E4–E11 |
+| §15 Dataset V2 | Raw source-of-truth, canonical grain ve unique upsert | E2, E4–E10 |
+| §16 V1/V2 transition | Dual-write, parity, operational compatibility | E4–E9, E12–E13 |
+| §17 Funnel API | Authenticated backend analysis boundary | E10–E11 |
+| §18 Compare | Aynı engine, previous-zero `null`, versionlı period policy | E10–E11 |
+| §19 Intent/Ranking | Paid-only Intent; Ranking deferred ve capability-aware | E10–E11 |
+
+Bu matris V3 standardının yalnız “referans” olarak kalıp execution task'larında unutulmasını engeller. Bir V3 standardı uygulanırken ilgili V4 gate'in kabul, test, rollback ve evidence maddeleri task aynasına kopyalanır.
+
+## 3. Revize epic mimarisi
+
+| Epic | İçerik | Başlangıç şartı | Bitiş şartı |
+|---|---|---|---|
+| **E0** | Plan freeze, baseline ve mimari sınırlar | Mutabakat | V4 plan ve modül sınırları onaylı |
+| **E1** | OAuth ve session güvenliği | E0 | Güvenlik testleri geçiyor |
+| **E2** | Dataset V2 canlı kabulü | E1 | DB/RLS evidence paketi tamam |
+| **E3** | Backend modularization foundation | E1 | Yeni işler `server.js` dışında geliştirilebiliyor |
+| **E4** | Meta vertical slice | E2 + E3 | Dual-write ve parity kabulü |
+| **E5** | Google Standard/PMax adapter | E4 | Google parity kabulü |
+| **E6** | TikTok adapter | E4 | TikTok parity kabulü |
+| **E7** | Klaviyo adapter | E4 | Campaign/Flow/channel kabulü |
+| **E8** | GA4 Organic adapter | E4 | Organic provenance kabulü |
+| **E9** | Backfill ve data readiness | İlgili adapter | Coverage/parity eşikleri sağlanmış |
+| **E10** | Funnel API | E2 + E3 + gerçek V2 veri | API security/contract kabulü |
+| **E11** | Dashboard modularization ve Funnel UI binding | E10 + parity | UI canary kabulü |
+| **E12** | Production cutover | E4–E11 | Full production GO |
+| **E13** | Legacy retirement ve monolit kapanışı | Stabilizasyon dönemi | V1 consumer sıfır; legacy yüzey kaldırılmış |
+
+### 3.1 Bağımlılık grafiği
+
+```text
+E0 → E1 ─┬→ E2 ───────────────┬→ E4 → E5/E6/E7/E8 → E9 ─┐
+         └→ E3 ───────────────┤                           │
+                              └→ E10 ─────────────────→ E11
+                                                           ↓
+                                                          E12 → E13
+```
+
+E5–E8, Meta referans vertical slice kabul edildikten sonra kapasiteye göre paralel yürütülebilir. E9 her provider için ayrı cursor ve readiness durumu taşır.
+
+## 4. E0 — Plan freeze, baseline ve mimari sınırlar
+
+**Durum:** `Done` — V4 mutabakatıyla baseline oluşturuldu; repository kabulü commit/PR ile kanıtlanacaktır.
+
+### Planlanan işler
+
+- **E0-T1:** V3, Final Rapor ve V4 belge hiyerarşisini freeze et.
+- **E0-T2:** Epic/task durum sözlüğünü ve zorunlu task şablonunu kabul et.
+- **E0-T3:** `server.js` ve `dashboard.html` sorumluluk envanterini çıkar.
+- **E0-T4:** Hedef backend/frontend modül sınırlarını karar kaydına bağla.
+- **E0-T5:** Feature flag, evidence ve decision-log isimlendirmesini belirle.
+- **E0-T6:** V3 §10.2 yedi bloklu canonical provider envelope ve capability-aware hierarchy matrixini V4 cross-cutting contract olarak freeze et.
+- **E0-T7:** Time/FX pipeline, Analysis Scope/Formula/Aggregation, Dataset grain/transition ve backend analysis boundary contract'larını V4 enforcement matrisine bağla.
+
+### Kabul kriterleri
+
+- Tek execution takip belgesi V4'tür.
+- V3 teknik referans, Final Rapor baseline olarak korunur.
+- Epic bağımlılıkları ve GO/NO-GO sahipleri bellidir.
+- Monolit büyütmeme ve dokunurken çıkarma kuralları onaylıdır.
+- Her iş zorunlu task aynasını kullanır.
+- Her adapter için aynı `identity/entity/raw_metrics/metric_support/currency/time/provenance` envelope'u zorunludur.
+- Her provider branch için root/parent/leaf, deterministic key ve yasak sentetik şekiller bellidir.
+- V3 §10.1–§19 arasındaki her cross-cutting standardın sahibi, uygulama epic'i ve acceptance gate'i bellidir.
+
+### Test / kontrol
+
+- Markdown link ve başlık kontrolü.
+- V3 fazlarının V4 epic'lerinde karşılığı olduğunun izlenebilirlik kontrolü.
+- V3 §10.1–§19 contract→V4 enforcement matrisi completeness kontrolü.
+- Epic'lerde kabul, test, rollback ve bağımlılık alanlarının varlık kontrolü.
+
+### Rollback
+
+Belge geri alınabilir; V3 ve Final Rapor değişmediği için teknik baseline kaybolmaz. V4 değişikliği yeni sürüm ve decision log ile yapılır, geçmiş sessizce yeniden yazılmaz.
+
+### Bağımlılıklar
+
+Mutabakat dışında bağımlılık yoktur.
+
+### Evidence
+
+- V4 dosyasının repository commit'i.
+- PR incelemesi ve mutabakat kaydı.
+
+## 5. E1 — OAuth ve session güvenliği
+
+**Durum:** `In progress` — E1-T1–E1-T5 tamamlandı; E1-T6 token-protection foundation ile başlatıldı.
+
+### Planlanan işler
+
+- **E1-T1 — `Done` — OAuth route envanteri ve threat model:** Tüm start/callback yolları, identity kaynakları, state, replay ve token yazma noktaları çıkarıldı; executable current-state baseline eklendi.
+- **E1-T2 — `Done` — Bearer-bound identity:** Aktif OAuth başlangıçları doğrulanmış bearer kullanıcıya bağlandı; legacy query `user_id` reddedildi ve dashboard bearer-authenticated JSON handshake'e geçirildi.
+- **E1-T3 — `Done` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction store; SHA-256 state özeti, 10 dakika TTL, provider/redirect/user bağları ve Klaviyo PKCE taşımasıyla kuruldu.
+- **E1-T4 — `Done` — Session elimination:** E1-T3 sonrasında runtime session consumer kalmadığı doğrulandığı için kullanılmayan shared store eklemek yerine Express session katmanı tamamen kaldırıldı. Böylece MemoryStore, known fallback secret, session cookie ve multi-instance affinity riski ortadan kaldırıldı.
+- **E1-T5 — `Done` — Unsafe default guard:** Review/test hard-route ve sandbox varsayılanları kapatıldı; production fail-fast guard, header-only test token taşıması, test route matrisi ve metin evidence eklendi.
+- **E1-T6 — `In progress` — Token protection:** E1-T6A vault, E1-T6B server-only schema, E1-T6C feature-flagged encrypted write/legacy-read ve E1-T6D backfill/rotation artefaktları hazırdır. Canlı migration, key provisioning ve acceptance tamamlanmadan flag kapalı kalır; canlı backfill, plaintext doğrulama ve legacy retirement sonraki ayrı kapılardır.
+- **E1-T7 — `Not started` — Security regression suite:** Auth, IDOR, tamper, replay ve expiry testleri CI'a eklenir.
+
+### Kabul kriterleri
+
+- OAuth user kimliği yalnız doğrulanmış bearer context'ten gelir.
+- State ve transaction user/provider/redirect bağlamına bağlıdır; bir kez tüketilir ve sürelidir.
+- Callback replay, state mismatch, expired transaction ve cross-user tamper reddedilir.
+- Uygulama session secret'a ihtiyaç duymaz; unsafe review/sandbox production config fail-fast olarak reddedilir.
+- OAuth callback'leri shared transaction store ile multi-instance çalışır ve session affinity gerektirmez.
+- Token değerleri response, log ve test artefaktlarında görünmez.
+
+### Test planı
+
+- OAuth start için unauthenticated `401`.
+- Query/body user ID tamper negatif testi.
+- State mismatch, replay, expiry ve provider mismatch testleri.
+- User A transaction'ının User B tarafından tüketilememe testi.
+- Session middleware, cookie, secret fallback ve dependency elimination testi.
+- OAuth transaction store TTL ve atomic consume integration testi.
+- Log redaction testi.
+
+### Rollback planı
+
+- Provider bazlı OAuth feature flag kullanılır.
+- Yeni transaction store sorununda yeni bağlantı başlatma kontrollü kapatılır; güvenli olmayan eski identity yoluna dönülmez.
+- Mevcut geçerli connection kayıtları korunur.
+- Bilinmeyen kritik bir session consumer bulunursa merge durdurulur; merge sonrası yeniden ekleme yalnız açık evidence ve yeni security review ile değerlendirilir. Known fallback secret hiçbir rollback senaryosunda geri getirilmez.
+
+### Bağımlılıklar
+
+- E0.
+- Provider callback URL envanteri.
+
+### Evidence
+
+- Threat model.
+- Route matrisi.
+- Security test çıktıları.
+- Redacted production-like OAuth trace.
+- Config startup testleri.
+- E1-T1 gerçekleşen evidence: `security/oauth-route-inventory.js`, `tests/oauth-security-baseline.test.js` ve `docs/security/E1_T1_OAUTH_SECURITY_BASELINE.md`.
+- E1-T2 gerçekleşen evidence: `security/oauth-access.js`, bearer/tamper/unauthenticated acceptance testleri ve `public/dashboard.html` authenticated OAuth handshake'i.
+- E1-T3 gerçekleşen evidence: `security/oauth-transaction-store.js`, atomik transaction migration'ı ve replay/expiry/provider/redirect/PKCE testleri.
+- E1-T4 gerçekleşen evidence: session-elimination runtime/package guard'ları, pasif Pinterest redirect regresyonu ve güncellenmiş security baseline.
+
+### E1-T4 task aynası
+
+**Planlanan:**
+- Production secret fail-fast ve shared TTL session store.
+
+**Gerçekleşen:**
+- Aktif runtime session consumer kalmadığı doğrulandı.
+- Express session dependency/middleware/cookie bütünüyle kaldırıldı.
+
+**Sapma gerekçesi:**
+- Kullanılmayan bir shared store eklemek gereksiz altyapı ve saldırı yüzeyi oluşturacaktı.
+- Session elimination aynı güvenlik hedefini daha güçlü ve daha basit biçimde sağlıyor.
+
+**Rollback:**
+- OAuth transaction store geri alınmaz; query-controlled identity veya session-bound OAuth state geri getirilmez.
+- Kritik bir legacy consumer tespit edilirse değişiklik merge edilmez.
+- Merge sonrasında bilinmeyen session consumer bulunursa yalnız açık evidence ve yeni security review ile session altyapısı yeniden değerlendirilir.
+- Known development secret fallback hiçbir rollback senaryosunda geri getirilmez.
+
+## 6. E2 — Dataset V2 canlı kabulü
+
+**Durum:** `Not started` — migration artefaktı var; production acceptance açık.
+
+### Planlanan işler
+
+- **E2-T1:** Canlı column/type/nullability introspection.
+- **E2-T2:** Constraint, index, policy ve grant drift karşılaştırması.
+- **E2-T3:** Yedi bloklu canonical envelope write→read→canonical kayıpsız round-trip.
+- **E2-T4:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü.
+- **E2-T5:** Invalid support/hierarchy/source/channel/synthetic rejection matrisi.
+- **E2-T6:** User A/User B/anon/authenticated mutation/service-role RLS matrisi.
+- **E2-T7:** Fixture cleanup ve V1/snapshot no-change kanıtı.
+- **E2-T8:** Migration ledger, corrective migration sırası ve restore prosedürü.
+
+### Kabul kriterleri
+
+- Canlı DDL migration sözleşmesiyle uyumludur veya drift kapatılmıştır.
+- Aynı canonical key ikinci yazımda duplicate değil upsert üretir.
+- Geçersiz canonical satırlar DB tarafından reddedilir.
+- User yalnız kendi satırını okur; anon okuyamaz; authenticated istemci yazamaz.
+- Service-role backend write/read çalışır.
+- Test verisi temizlenir ve legacy tablolar değişmez.
+- Dataset V2 mapper hiçbir provider için ayrı persistence shape veya alan kaybı üretmez.
+
+### Test planı
+
+- HTTPS Management/Data API ve güvenli SQL introspection evidence.
+- Gerçek repository integration testi.
+- Constraint table-driven negatif testleri.
+- İki izole kullanıcıyla RLS testi.
+- Exact count öncesi/sonrası ve cleanup testi.
+- Migration static testleri.
+
+### Rollback planı
+
+- V2 henüz production read source yapılmaz.
+- Destructive migration uygulanmaz; corrective migration ileri yönlüdür.
+- Acceptance fixture'ları namespaced run ID ile silinir.
+- V1/snapshot hattı değişmeden kalır.
+
+### Bağımlılıklar
+
+- E1 güvenli identity/ownership temeli.
+- Supabase HTTPS Management API erişimi.
+- İzole test kullanıcıları ve service-role test harness'i.
+
+### Evidence
+
+`artifacts/dataset-v2-acceptance/<run-id>/` altında schema, constraint/index, RLS, round-trip, upsert, rejection, cleanup ve legacy-no-change kanıtları.
+
+## 7. E3 — Backend modularization foundation
+
+**Durum:** `Not started`
+
+### Hedef yapı
+
+```text
+src/
+  app.js
+  config/
+  middleware/
+  auth/
+  oauth/
+  routes/
+  services/
+  repositories/
+  providers/
+  jobs/
+  funnel/
+```
+
+### Planlanan işler
+
+- **E3-T1 — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
+- **E3-T2 — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
+- **E3-T3 — Config boundary:** Environment doğrulama ve typed config sınırı kur.
+- **E3-T4 — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
+- **E3-T5 — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
+- **E3-T6 — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
+- **E3-T7 — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
+- **E3-T8 — Job boundary:** Refresh/snapshot orchestration için test edilebilir job sınırı kur.
+- **E3-T9 — Architecture guard:** Yeni business logic'in kök monolite eklenmesini CI kontrolüyle engelle.
+- **E3-T10 — Canonical boundary guard:** Provider-specific DTO'nun canonical validator'ı atlayarak repository, Formula Engine veya Funnel API sınırına geçmesini engelle.
+
+### Kabul kriterleri
+
+- App port dinlemeden testte oluşturulabilir.
+- Yeni provider/Funnel rotası kök `server.js` içine business logic eklemeden kaydedilebilir.
+- Auth ve ownership'in tek canonical uygulaması vardır.
+- Handler'lar dependency injection ile test edilebilir.
+- Standart error contract ve request correlation vardır.
+- Kritik V1 smoke/characterization testleri değişmeden geçer.
+- `server.js` sorumluluk ve satır sayısı yeni epic'lerle artmaz.
+- Bütün adapter'lar aynı canonical validator ve repository portunu kullanır; provider'a özel paralel analytics pipeline yoktur.
+
+### Test planı
+
+- App boot ve graceful shutdown.
+- Route registration ve missing dependency.
+- Auth/ownership negatif testleri.
+- Error normalization.
+- V1 critical route characterization/smoke.
+- Import-cycle ve architecture boundary kontrolü.
+
+### Rollback planı
+
+- Her extraction küçük ve bağımsız değişikliktir.
+- Route-level delegation/feature flag eski handler'a dönebilir.
+- Parity sağlanmadan eski uygulama silinmez.
+- DB schema değişikliği bu epic'e dahil edilmez.
+
+### Bağımlılıklar
+
+- E0 mimari kararları.
+- E1 güvenli auth/OAuth davranışı.
+- Kritik endpoint envanteri.
+
+### Evidence
+
+- Before/after responsibility map.
+- Characterization sonuçları.
+- Architecture guard çıktısı.
+- Route parity raporu.
+
+## 8. E4 — Meta referans vertical slice
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E4-T1:** Meta provider fixture ve mevcut fetch characterization.
+- **E4-T2:** Client/mapper/capabilities/adapter modüllerini `src/providers/meta` altında kur.
+- **E4-T2A:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mappingini uygula.
+- **E4-T2B:** Meta output'unu yedi bloklu canonical envelope'a eksiksiz normalize et; provider DTO'yu adapter sınırının dışına çıkarma.
+- **E4-T3:** ATC/Checkout/Purchase count/value mapping ve provenance'ı explicit yap.
+- **E4-T4:** Account timezone/currency doğrulaması, Time ve FX servislerini bağla.
+- **E4-T5:** Canonical validation ve Dataset V2 idempotent write.
+- **E4-T6:** Refresh job retry/idempotency/telemetry.
+- **E4-T7:** Kullanıcı/account allowlist ile V1+V2 dual-write.
+- **E4-T8:** Provider→canonical→FX→V2→Formula→expected totals parity.
+
+### Kabul kriterleri
+
+- Meta mapping route handler içinde değildir.
+- Meta Ad leaf'i Campaign ve AdSet lineage'ını kayıpsız taşır; AdSet semantiği generic AdGroup'a dönüştürülmez.
+- Meta aynı ortak envelope validator'ından geçer; eksik/özel paralel shape kabul edilmez.
+- Wrong user/account write ownership guard ile reddedilir.
+- Retry duplicate üretmez.
+- Metric support ve gerçek `0`/`null` semantiği korunur.
+- Aynı dönem provider raw, V2 ve Formula output kabul eşiğinde reconciled olur.
+- Legacy snapshot sonucu dual-write nedeniyle değişmez.
+
+### Test planı
+
+- Golden fixtures, Campaign/AdSet/Ad lineage, deterministic key ve mapping unit testleri.
+- Timezone/DST ve currency/FX testleri.
+- Missing/partial metric support testleri.
+- Repository integration ve idempotent retry.
+- Ownership negatif testi.
+- Dual-write legacy no-change ve parity raporu.
+
+### Rollback planı
+
+- `meta_v2_write` provider/account feature flag'i kapatılır.
+- V1 snapshot read/write korunur.
+- V2 yazıları run/adapter version ile izlenir; hatalı batch hedefli temizlenir.
+- Provider fetch değişmeden tutulur; yeni adapter delegation geri alınabilir.
+
+### Bağımlılıklar
+
+- E2 ve E3 `Done`.
+- Meta conversion mapping kararı.
+- Parity eşiği ve canary account listesi.
+
+### Evidence
+
+- Mapping matrix, fixture sonuçları, dual-write run, parity raporu, rejection/error metrics.
+
+## 9. E5 — Google Standard ve PMax adapter
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E5-T1:** Conversion action count/value mapping ve provenance.
+- **E5-T2:** Gerçek customer currency/timezone.
+- **E5-T3:** Standard Campaign→AdGroup→Ad adapter.
+- **E5-T4:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
+- **E5-T4A:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
+- **E5-T5:** Time/FX/V2/job/telemetry entegrasyonu.
+- **E5-T6:** Dual-write, Standard/PMax ayrı completeness ve parity.
+
+### Kabul kriterleri
+
+- Conversion mapping explicit ve versionlıdır.
+- Standard hierarchy provider ile reconciled olur.
+- PMax satırı yalnız desteklenen Asset Group capability'sini taşır.
+- Standard ve PMax ayrı canonical şema üretmez; aynı envelope ve validator'ı kullanır.
+- Unsupported alanlar `null + metric_support` kalır.
+- Retry/idempotency, ownership ve legacy no-change testleri geçer.
+
+### Test planı
+
+Golden fixtures, conversion mapping, Standard/PMax hierarchy, timezone/FX, ownership, retry, dual-write ve parity testleri.
+
+### Rollback planı
+
+Standard ve PMax için ayrı flags; V1 korunur; adapter version/run ID ile hedefli geri alma yapılır.
+
+### Bağımlılıklar
+
+E4 referans slice kabulü; Google conversion action ve PMax reporting kararları.
+
+## 10. E6 — TikTok adapter
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E6-T1:** Production metrics contract'ını resmi provider kaynağıyla freeze et.
+- **E6-T2:** Generic conversion→purchase fallback'ini kaldır.
+- **E6-T3:** ATC/Checkout/Purchase count/value mapping.
+- **E6-T4:** Campaign/AdGroup/Ad double-count önleme.
+- **E6-T4A:** `Campaign → AdGroup → Ad` root/parent/leaf lineage ve deterministic entity key mappingi.
+- **E6-T4B:** TikTok output'unu aynı yedi bloklu canonical envelope'a normalize et.
+- **E6-T5:** Synthetic fallback'i canonical production Dataset'ten ayır.
+- **E6-T6:** Time/FX/V2, dual-write ve parity.
+
+### Kabul kriterleri
+
+- Synthetic row gerçek performance olarak görünmez.
+- Provider hierarchy toplamları double-count üretmez.
+- TikTok Ad leaf'i Campaign ve AdGroup lineage'ını kayıpsız taşır.
+- TikTok provider-specific fact şekli adapter sınırını geçmez.
+- Unknown/unsupported değerler sıfırlaştırılmaz.
+- Ownership, retry, parity ve legacy no-change geçer.
+
+### Test planı
+
+Provider fixtures, Campaign/AdGroup/Ad lineage, deterministic key, synthetic rejection, hierarchy totals, metric support, time/FX, retry ve parity.
+
+### Rollback planı
+
+TikTok V2 flag kapatılır; V1 korunur; synthetic/canonical store ayrımı geriye uyumludur.
+
+### Bağımlılıklar
+
+E4; TikTok production reporting contract kararı.
+
+## 11. E7 — Klaviyo adapter
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E7-T1:** Tek platform altında `channel=email|sms` contract'ı.
+- **E7-T2:** Campaign→Campaign Message mapping.
+- **E7-T3:** Flow→Flow Message ayrı root mapping.
+- **E7-T3A:** Campaign ve Flow branch'leri için branch-aware deterministic entity key; same leaf ID collision koruması.
+- **E7-T3B:** Campaign/Flow ve Email/SMS sonuçlarını aynı yedi bloklu envelope'a normalize et; ayrımı entity/channel değerleriyle taşı.
+- **E7-T4:** Open≠Click düzeltmesi ve journey count/value support.
+- **E7-T5:** SMS provider spend; unsupported ise `null`, uydurma `0` yok.
+- **E7-T6:** Email estimated/manual spend fallback ve provenance.
+- **E7-T7:** Klaviyo Organic'i GA4 platform-level olarak ayır.
+- **E7-T8:** Time/FX/V2, dual-write ve channel-branch parity.
+
+### Kabul kriterleri
+
+- Campaign/Flow ve Message kimlikleri provider'a izlenebilir.
+- Email/SMS gerçek channel ile ayrılır.
+- Provider/manual/estimated spend provenance ayrıdır.
+- Unsupported journey/spend gerçek sıfır görünmez.
+- Organic Campaign/Flow altına dağıtılmaz.
+- Campaign Message ve Flow Message branch identity'leri aynı leaf ID durumunda dahi çakışmaz.
+- Klaviyo branch/channel farklılıkları paralel canonical şemalar üretmez.
+
+### Test planı
+
+Campaign/Flow fixtures, Email/SMS, open-click negative, spend provenance, unsupported/null, Organic separation, retry ve parity.
+
+### Rollback planı
+
+Channel/branch bazlı flags; mevcut Email spend compatibility path korunur; otomatik pricing ayrı karar olmadan açılmaz.
+
+### Bağımlılıklar
+
+E4; Klaviyo event/spend mapping kararları; matched platform account kuralı.
+
+## 12. E8 — GA4 Organic adapter
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E8-T1:** Account/property selection compatibility.
+- **E8-T2:** Property metadata ve Web Stream discovery.
+- **E8-T3:** Domain/site URL match.
+- **E8-T4:** Property timezone/currency; UTC fallback yasağı.
+- **E8-T5:** Organic source/medium/channel classification.
+- **E8-T6:** Session/ATC/Checkout/Purchase/Revenue facts ve support.
+- **E8-T7:** Deterministic platform account + ayrı GA4 property provenance.
+- **E8-T7A:** Platform-level Organic entity identity; paid root/parent seviyelerinin `null` kalması.
+- **E8-T7B:** GA4 verisini paid adapter'larla aynı yedi bloklu envelope'a `traffic_type=organic, source_system=ga4` olarak normalize et.
+- **E8-T8:** ORGANIC ve PAID_ORGANIC_BLEND entegrasyonu, dual-write/parity.
+
+### Kabul kriterleri
+
+- Her satır property/domain/source/medium/channel provenance taşır.
+- Direct/Others paid platforma zorla yazılmaz.
+- Organic satır Campaign/AdGroup/Ad hierarchy'sine zorlanmaz ve sentetik parent taşımaz.
+- GA4 ayrı bir analytics schema veya platform oluşturmaz; ortak envelope içinde source system/provenance olarak kalır.
+- Yanlış currency veya UTC fallback kabul edilmez.
+- Bulunmayan value metriği uydurulmaz.
+- Paid+Organic blend aggregate-first Formula Engine ile üretilir.
+
+### Test planı
+
+Property/domain match, platform-level Organic identity, sentetik parent rejection, classification fixtures, timezone/DST, currency/FX, support/null, provenance, Organic/Blend aggregate ve parity.
+
+### Rollback planı
+
+GA4 Organic V2 ve Blend ayrı flag'lerle kapatılabilir; mevcut selection/binding ve V1 yolu korunur.
+
+### Bağımlılıklar
+
+E4; domain match ve classification policy; property metadata erişimi.
+
+## 13. E9 — Backfill ve data readiness
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E9-T1:** Ürün onaylı tarih aralığı ve provider/account kapsamı.
+- **E9-T2:** Gün/platform/account bazında resumable cursor ve checkpoint.
+- **E9-T3:** Rate-limit/quota budget ve adaptive retry.
+- **E9-T4:** Canonical upsert ile idempotent batch.
+- **E9-T5:** Completeness, duplicate, metric support, timezone, FX, freshness ölçümü.
+- **E9-T6:** Provider bazlı parity/readiness dashboard'u.
+- **E9-T7:** Pause/resume/cancel ve runbook.
+
+### Kabul kriterleri
+
+- Job restart sonrası kaldığı yerden duplicate üretmeden devam eder.
+- Her provider/account/date için status ve failure nedeni görülebilir.
+- Belgelenmiş coverage/parity/freshness eşikleri sağlanır.
+- Rate limit aşımı veri kaybına dönüşmez.
+- UI cutover readiness kapısı otomatik raporlanır.
+
+### Test planı
+
+Interrupted resume, same-batch replay, partial failure, quota/rate limit, missing FX, stale data, duplicate ve reconciliation testleri.
+
+### Rollback planı
+
+Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile hatalı satırlar hedeflenir; V1 etkilenmez.
+
+### Bağımlılıklar
+
+İlgili provider adapter acceptance; tarih kapsamı; quota ve parity eşikleri.
+
+## 14. E10 — Funnel API
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E10-T1:** Versionlı `/api/funnel/data` request/response contract.
+- **E10-T2:** Bearer auth, user/account ownership; query user ID yasağı.
+- **E10-T3:** Date/platform/account/entity ve pagination guard'ları.
+- **E10-T4:** Paid/Organic/Blend repository query ve aggregate.
+- **E10-T5:** Formula, Compare ve Paid-only Intent backend output'u.
+- **E10-T6:** Metric support, currency, contract/engine version metadata.
+- **E10-T7:** Freshness, partial ve warnings metadata.
+- **E10-T8:** Contract, security, performance ve observability testleri.
+- **E10-T9:** V4 §2.1 hierarchy contract'ına göre branch-aware root/parent/leaf ve stable `entity_key` response'u.
+
+### Kabul kriterleri
+
+- UI business math yapmadan response ile render edebilir.
+- Cross-user/account sorgu reddedilir.
+- Unsupported/unknown hiçbir noktada gerçek `0`a dönüşmez.
+- Previous denominator `0` için delta `null` olur.
+- Capability-aware stable entity identity döner.
+- API olmayan hierarchy seviyesini üretmez ve parent/leaf fact'lerini aynı analytical grain'de double-count etmez.
+- Query bounds ve performans bütçesi uygulanır.
+
+### Test planı
+
+Auth/IDOR, ownership, scope, compare-zero, mixed support/currency, her capability branch için hierarchy/drilldown ve deterministic key, double-count negatif, bounds/pagination, empty/partial/stale ve load testleri.
+
+### Rollback planı
+
+API version ve read feature flag; V1 endpoint'leri korunur; breaking contract yeni versiyonla çıkar.
+
+### Bağımlılıklar
+
+E2, E3 ve en az bir kabul edilmiş gerçek provider V2 veri seti; contract freeze.
+
+## 15. E11 — Dashboard modularization ve Funnel UI binding
+
+**Durum:** `Not started`
+
+### Hedef yapı
+
+```text
+public/
+  dashboard.html
+  assets/dashboard/
+    bootstrap.js
+    api-client.js
+    auth-session.js
+    state.js
+    router.js
+    components/
+    features/
+      connections/
+      accounts/
+      legacy-dashboard/
+      funnel/
+```
+
+Framework değişimi bu planın ön koşulu değildir; önce sorumluluk sınırları kurulur.
+
+### Planlanan işler
+
+- **E11-T1:** Kritik dashboard davranışları için browser E2E baseline.
+- **E11-T2:** Minimal dashboard shell/bootstrap ayrımı.
+- **E11-T3:** Merkezi auth-aware API client ve error/timeout/abort davranışı.
+- **E11-T4:** Feature-based state ve component sınırları.
+- **E11-T5:** Funnel API→presentation adapter; business math yok.
+- **E11-T6:** `0`, `null`, unsupported, unknown, loading, empty, partial, stale ve error state'leri.
+- **E11-T7:** Standard/PMax/Klaviyo/Organic capability-aware hierarchy.
+- **E11-T8:** Compare/Intent/Export backend contract binding.
+- **E11-T9:** `legacy_dashboard|funnel_api_canary|funnel_api_enabled` flags.
+- **E11-T10:** Mock/API golden parity, responsive E2E ve canary telemetry.
+- **E11-T11:** Yeni UI business logic'inin inline `dashboard.html`a eklenmesini engelleyen architecture guard.
+
+### Kabul kriterleri
+
+- Production Funnel inline script içinde değildir.
+- Funnel aggregation/formula/compare/intent frontend'de çalışmaz.
+- UI state'leri ve capability hierarchy doğru render edilir.
+- UI API'de bulunmayan AdGroup/Ad veya Campaign parent seviyesini üretmez; görünen isimden identity türetmez.
+- Merkezi API client auth/error davranışının tek sahibidir.
+- Mock/API golden parity ve kritik E2E geçer.
+- Eski dashboard feature flag ile geri açılabilir.
+- Yeni Funnel işi `dashboard.html` sorumluluk ve satır sayısını büyütmez.
+
+### Test planı
+
+- Presentation adapter unit testleri.
+- Null/zero/support state testleri.
+- Bütün V4 §2.1 branch'leri için hierarchy component ve forbidden synthetic level testleri.
+- Auth expiry, network error, abort, partial/stale testleri.
+- Compare/Intent/Export parity.
+- Legacy/Funnel flag ve responsive browser E2E.
+- Visual regression ve accessibility smoke.
+
+### Rollback planı
+
+- UI flag anında legacy dashboard'a döner.
+- V1 ve mock yolu canary/stabilizasyon boyunca korunur.
+- Yeni asset yüklenemezse güvenli fallback sunulur.
+- Eski inline kod stabilizasyon bitmeden silinmez.
+
+### Bağımlılıklar
+
+- E10.
+- Kabul edilmiş provider parity/readiness.
+- UI E2E baseline ve feature flag altyapısı.
+
+### Evidence
+
+- Before/after UI responsibility map.
+- Golden parity ve E2E sonuçları.
+- Canary telemetry.
+- Gerekli perceptible değişiklikler için ekran görüntüleri.
+
+## 16. E12 — Production cutover
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E12-T1:** GO/NO-GO checklist ve sorumlu onayları.
+- **E12-T2:** Provider/account yüzdeli canary ramp.
+- **E12-T3:** Error, lag, partial, rejection ve parity alertleri.
+- **E12-T4:** Backup/restore ve rollback tatbikatı.
+- **E12-T5:** Support/incident runbook ve iletişim planı.
+- **E12-T6:** Full production enable ve stabilizasyon gözlemi.
+
+### Kabul kriterleri
+
+- Hedef provider'lar coverage/parity eşiklerini belirlenen süre korur.
+- API/UI security ve performance SLO'ları sağlanır.
+- Backup/restore hedefi ve rollback uygulanarak doğrulanmıştır.
+- Canary hata bütçesi aşılmamıştır.
+- Product, engineering, security ve operations GO vermiştir.
+
+### Test planı
+
+Canary synthetic checks, smoke/E2E, load, failure injection, flag rollback ve restore rehearsal.
+
+### Rollback planı
+
+UI ve API read flag'leri legacy'ye döner; provider V2 write gerekirse ayrı kapatılır; V1 hattı ve veri korunur; incident evidence saklanır.
+
+### Bağımlılıklar
+
+E4–E11 kapsamındaki hedef provider, readiness, API ve UI kapıları.
+
+## 17. E13 — Legacy retirement ve monolit kapanışı
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E13-T1:** V1/snapshot consumer envanteri ve sıfırlama.
+- **E13-T2:** Read-disable/observe dönemi.
+- **E13-T3:** Legacy route/function/inline UI dead-code kaldırma.
+- **E13-T4:** `server.js`i composition root seviyesine indirme.
+- **E13-T5:** `dashboard.html`ı minimal presentation shell seviyesine indirme.
+- **E13-T6:** Dataset retention/audit ve ayrı retirement migration kararı.
+- **E13-T7:** Operasyon/runbook/documentation kapanışı.
+
+### Hedef son durum
+
+`server.js` yalnız configuration, dependency composition, app creation, listen ve graceful shutdown taşır. Provider mapping, OAuth business logic, refresh/snapshot orchestration, FX ve Funnel query burada bulunmaz.
+
+`dashboard.html` yalnız shell/root container ve asset bootstrap taşır. API erişimi, business state, aggregation/formula ve provider connection business logic'i inline bulunmaz.
+
+### Kabul kriterleri
+
+- V1 analytics consumer sayısı sıfırdır.
+- Rollback/stabilizasyon dönemi tamamlanmıştır.
+- Legacy read path kapatılıp gözlenmiştir.
+- Kullanılmayan route, function, inline script ve asset kaldırılmıştır.
+- Snapshot'ın evidence/operational rolü ve retention kararı belgelidir.
+- Ayrı retirement migration ve geri dönüş planı onaylıdır.
+- Monolitler yeni sistemin business logic sahibi değildir.
+
+### Test planı
+
+Consumer scan, dead-code/static analysis, full regression, production smoke, restore/rollback doğrulaması ve post-removal observability kontrolü.
+
+### Rollback planı
+
+Read-disable gözleminden önce destructive işlem yoktur. Retirement ayrı migration/release olur; restore noktası ve süreli legacy artifact saklama politikası bulunur.
+
+### Bağımlılıklar
+
+E12 stabilizasyon süresi; V1 consumer sıfır; retention/audit ve rollback onayı.
+
+## 18. Ortak kalite, güvenlik ve evidence kapıları
+
+### 18.1 Her provider için zorunlu zincir
+
+```text
+Provider raw sample
+→ Tek standart Canonical Envelope
+→ Time/FX result
+→ Dataset V2 raw fact
+→ Formula Engine
+→ Funnel API
+→ Funnel rendered value
+→ Metric Support/NULL sonucu
+```
+
+Her halka aynı test periodu ve stable identity ile reconcile edilmelidir.
+
+Her provider satırı ilk canonical halkada aynı yedi bloklu schema validator'dan geçmelidir. Provider'a göre değişen şey envelope değil; identity değerleri, capability-aware entity kombinasyonu, metric support ve provenance'dır.
+
+### 18.2 Minimum CI kapısı
+
+- Unit/core tests.
+- Syntax/lint/format.
+- Architecture boundary guard.
+- Migration static validation.
+- Security regression.
+- DB/repository integration.
+- API contract/security.
+- Kritik browser E2E.
+- `git diff --check` eşdeğeri whitespace kontrolü.
+
+### 18.3 Evidence standardı
+
+Evidence:
+
+- Run ID, commit SHA, environment ve timestamp taşır.
+- Secret, token ve PII içermez.
+- Beklenen/gerçek sonucu ve kabul eşiğini gösterir.
+- Başarısız sonuçlar silinmez; takip issue'suna bağlanır.
+- Canlı veriyi değiştiren test cleanup sonucunu içerir.
+
+### 18.4 GO kriterleri
+
+**Provider ingest GO:** E1 ve E2 tamam; wrong-user/account write reddediliyor.  
+**Funnel API GO:** Gerçek V2 veri, freshness ve null/support semantiği doğrulanmış.  
+**UI canary GO:** Backfill/parity eşiği, golden parity ve rollback flag'i tamam.  
+**Full cutover GO:** Coverage/parity belirlenen süre stabil; telemetry ve restore hazır.  
+**Legacy retirement GO:** Consumer sıfır; retention ve geri dönüş planı onaylı.
+
+## 19. Ortak task kayıt örneği
+
+```markdown
+## E4-T5 — Meta canonical V2 write
+
+### Amaç
+Meta raw sonucunu doğrulanmış user/account kapsamında canonical V2'ye idempotent yazmak.
+
+### Mevcut durum
+Meta legacy snapshot hattı çalışıyor; V2 production write yok.
+
+### Planlanan durum
+Meta adapter output'u canonical validation sonrası repository ile V2'ye yazılır.
+
+### Kapsam
+Validation, ownership, repository upsert, telemetry.
+
+### Kapsam dışı
+UI cutover ve legacy retirement.
+
+### Bağımlılıklar
+E2, E3, E4-T2–T4.
+
+### Uygulama adımları
+1. Ownership context oluştur.
+2. Canonical output doğrula.
+3. Repository upsert çağır.
+4. Result/rejection telemetry üret.
+
+### Kabul kriterleri
+- Same-key retry duplicate üretmez.
+- Wrong user/account reddedilir.
+- Support/null korunur.
+
+### Test planı
+Unit mapping, repository integration, ownership negative, retry testleri.
+
+### Rollback planı
+`meta_v2_write` flag kapatılır; V1 etkilenmez.
+
+### Gözlemlenebilirlik
+Accepted/rejected/upserted counts, latency, adapter version.
+
+### Güvenlik ve veri etkisi
+Service-role yalnız backend'de; token/log redaction zorunlu.
+
+### Planlanan
+Onaylanan başlangıç kapsamı yazılır.
+
+### Gerçekleşen
+Commit, migration ve fiili davranış tamamlanınca yazılır.
+
+### Sapmalar
+Yok veya gerekçeli farklar.
+
+### Evidence
+CI run, integration run ID, parity raporu.
+
+### Durum
+Not started.
+```
+
+## 20. Decision log ve plan değişikliği
+
+Her kapsam/sıra/contract değişikliği şu kayıtla yapılır:
+
+| Alan | İçerik |
+|---|---|
+| Decision ID | `ADR/EXEC-YYYY-NNN` |
+| Tarih | Karar tarihi |
+| Sahip | Karar sahibi |
+| Bağlam | Değişikliği gerektiren bulgu |
+| Karar | Seçilen yaklaşım |
+| Alternatifler | Reddedilen seçenekler |
+| Etkilenen işler | Epic/task/contract listesi |
+| Migration/Rollback etkisi | Geri dönüş ve veri etkisi |
+| Evidence | Kaynak ve test bağlantıları |
+
+## 21. İlk uygulama sırası
+
+1. E0 repository/PR mutabakatını tamamla.
+2. E1 OAuth/session threat model ve characterization ile başla.
+3. E1 güvenlik uygulaması ve regresyonlarını kapat.
+4. E2 canlı Dataset V2 acceptance paketini üret.
+5. E3 composition/config/auth/route sınırlarını kur.
+6. E4 Meta referans vertical slice'ı dual-write/parity ile aç.
+7. E5–E8 provider'larını kontrollü ilerlet.
+8. E9 backfill/readiness'i provider bazında işlet.
+9. E10 Funnel API'yi gerçek V2 veriyle kabul et.
+10. E11 dashboard modularization ve UI canary'yi tamamla.
+11. E12 kontrollü production cutover yap.
+12. E13'te consumer sıfırlandıktan sonra legacy ve monolit kapanışını gerçekleştir.
+
+## 22. Nihai mutabakat
+
+Bu V4 plan ile:
+
+- Final Rapor değiştirilmeden baseline olarak tutulur.
+- V3 Implementation Plan teknik referans olarak tutulur.
+- Phase 1 tamamlanmış core, Phase 2 ise artefaktı tamam/canlı kabulü açık olarak izlenir.
+- Meta, Google, TikTok, Klaviyo ve GA4 Organic aynı yedi bloklu canonical provider envelope'una normalize edilir; bu standart hiçbir adapter epic'inde çatallanamaz.
+- Time→FX→Dataset V2→aggregate→Formula/Compare/Intent→API→UI işlem sırası hiçbir provider için atlanamaz veya yeniden sıralanamaz.
+- Paid/Organic/Blend, aggregate-first formulas, canonical Dataset grain, deterministic Organic account mapping ve backend-only analysis boundary ortak mimari standartlardır.
+- Gate 0/E1 güvenlik ve Gate 1/E2 canlı DB kabulü provider ingest'in önündedir.
+- `server.js` ve `dashboard.html` yorgunluğu bağımsız kabul/test/rollback/bağımlılıkları olan E3, E11 ve E13 işleriyle yönetilir.
+- Big-bang rewrite yapılmaz; monolit büyütülmez ve dokunulan alan güvenli biçimde çıkarılır.
+- Her task planlanan/gerçekleşen/sapma/evidence ayrımını taşır.
+- Production cutover ve legacy retirement ölçülebilir GO kapıları olmadan yapılmaz.
+
+
+### E1-T5 task aynası
+
+- Production configuration pure/testable bir modülde merkezileştirildi ve unsafe review/sandbox flag'leri production başlangıcında reddediliyor.
+- Google/TikTok review fallback kimlikleri runtime/UI kaynaklarından kaldırıldı.
+- TikTok sandbox token yalnız explicit non-production sandbox modunda `X-Sandbox-Access-Token` header'ından kabul ediliyor.
+- `/tiktok-test` route matrisi ve güvenli UI varsayılanları otomatik testlerle korunuyor.
+- Evidence metin/Markdown ve test çıktılarıyla sınırlıdır; E1-T6 sıradaki pakettir.
+
+### E1-T6 task aynası — Provider token protection
+
+**Planlanan:** Provider access/refresh token'larını application-level envelope encryption ile korumak; key rotation, backfill, rollback ve plaintext retirement kapılarını tanımlamak.
+
+**Gerçekleşen (E1-T6A foundation):** AES-256-GCM token vault eklendi. Ciphertext; `user_id`, `platform` ve `token_type` AAD bağlamına bağlıdır. Raw token envelope içine yazılmaz. Version ve key ID envelope'da tutulur; önceki key'ler read-only keyring içinde kalabilir ve active key dışındaki envelope'lar rotation adayı olarak işaretlenir.
+
+**Gerçekleşen (E1-T6B artefakt):** Plaintext kolonları genişletmek yerine `platform_connection_tokens` adlı ayrı server-only tablo seçildi. Tablo yalnız versionlı JSONB envelope taşır; forced RLS açıktır, `public`/`anon`/`authenticated` grant'leri kaldırılmıştır ve yalnız `service_role` read/write yetkisi alır. Migration additive'dir; `platform_connections` ve canlı plaintext token'lara dokunmaz.
+
+**Gerçekleşen (E1-T6C artefakt):** `PROVIDER_TOKEN_ENCRYPTION_ENABLED` varsayılan kapalı feature flag'i arkasında encrypted store bağlandı. Açıldığında yeni/yenilenen token önce encrypted tabloya yazılır, legacy plaintext kolonları `null` kalır ve bütün provider consumer'ları merkezi `getConnection` hydration yolundan plaintext'i yalnız process memory'de alır. Legacy read ayrı `PROVIDER_TOKEN_LEGACY_READ_ENABLED` flag'iyle ölçülü geçiş için korunur; authenticated envelope decrypt hatası legacy'ye düşmez ve disconnect encrypted satırı siler.
+
+**Gerçekleşen (E1-T6D — `activation tooling ready / live acceptance pending`):** Varsayılan dry-run çalışan, 25 varsayılan/100 azami batch sınırı olan stable keyset runner'a HTTPS Supabase client kullanan operator entrypoint'i eklendi. Operator exact project-ref guard uygular; write modu hem `PROVIDER_TOKEN_BACKFILL_WRITE_ENABLED=true` policy'si hem sabit confirmation gerektirir. Evidence token, key, gerçek user ID veya exception mesajı taşımaz. Production key provisioning yapılmadı; canlı dry-run ve write-mode backfill çalıştırılmadı; encryption flag açılmadı.
+
+**Sonraki kapılar:**
+
+1. **E1-T6B — Schema (`artefact ready / live acceptance pending`):** `platform_connection_tokens` dedicated table; encrypted access/refresh envelope CHECK'leri, forced RLS ve service-role-only grant migration'ı hazırlandı. Canlı DDL/grant/anon negatif doğrulaması yapılmadan runtime write açılmaz.
+2. **E1-T6C — Dual path (`artefact ready / activation pending`):** Yeni write'lar yalnız ciphertext üretir; mevcut plaintext satırlar explicit legacy-read flag'iyle okunur. Encrypted envelope varsa decrypt fail-closed çalışır. Migration ve key provisioning acceptance olmadan encryption flag açılamaz.
+3. **E1-T6D — Backfill/rotation (`activation tooling ready / live acceptance pending`):** Resumable runner ve guarded operator komutu hazır; production key provisioning, canlı dry-run, write-mode backfill ve flag activation yapılmadı.
+4. **E1-T6E — Retirement:** Plaintext token kolonlarının boş olduğu kanıtlandıktan ve rollback süresi tamamlandıktan sonra ayrı destructive migration.
+
+**Sapma:** Yok. Anahtar materyali veya canlı token migration'ı foundation PR'ına alınmadı; production key provisioning ve schema deployment bağımsız operasyon kapısı olarak tutuldu.
+
+**Kabul:** Token plaintext'i envelope/log/error/test artefaktına girmez; context değişikliği veya ciphertext/tag tamper decrypt'i reddeder; eski key okunabilirken active key rotation adayı deterministik belirlenir; eksik/yanlış keyring fail-fast olur.
+
+**Rollback:** Query-controlled/session-bound OAuth geri getirilemez. Encrypted write açılmadan foundation kodu güvenle kaldırılabilir. Dual path başladıktan sonra active key silinemez; önceki key'ler backfill ve rollback süresi bitmeden keyring'den çıkarılamaz. Plaintext kolonlar E1-T6E öncesinde düşürülemez.
+
+**Evidence:** `tests/provider-token-vault.test.js`, `npm test`, syntax ve diff kontrolleri. Secret/key/token değerleri evidence'a yazılmaz.

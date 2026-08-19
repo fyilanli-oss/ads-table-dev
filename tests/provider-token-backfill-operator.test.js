@@ -4,12 +4,14 @@ const test=require("node:test");
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
+const crypto=require("node:crypto");
 const {encodeCursor}=require("../security/provider-token-backfill");
 const {BackfillOperatorError,parseArguments,readConfig,safeEvidence,runDryRunOperator}=require("../security/provider-token-backfill-operator");
 
-const key=Buffer.alloc(32,7).toString("base64");
-const referenceSecret="operator-test-reference-secret-with-32-bytes";
-const env={SUPABASE_URL:"https://example.supabase.co",SUPABASE_SERVICE_ROLE_KEY:"service-role-test-value",PROVIDER_TOKEN_ACTIVE_KEY_ID:"current",PROVIDER_TOKEN_ENCRYPTION_KEYS:JSON.stringify({current:key}),PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET:referenceSecret};
+const key=crypto.createHash("sha256").update("test-only-provider-key").digest("base64");
+const referenceSecret=crypto.createHash("sha256").update("test-only-reference-key").digest("base64");
+const projectRef="abcdefghijklmnopqrst";
+const env={SUPABASE_URL:`https://${projectRef}.supabase.co`,SUPABASE_PROJECT_REF:projectRef,SUPABASE_SERVICE_ROLE_KEY:"service-role-test-value",PROVIDER_TOKEN_ACTIVE_KEY_ID:"current",PROVIDER_TOKEN_ENCRYPTION_KEYS:JSON.stringify({current:key}),PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET:referenceSecret};
 
 function dependencies(result={scanned:1,eligible:1,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:0,nextCursor:null,failures:[]}){
   const calls={};
@@ -36,13 +38,24 @@ test("all write-mode spellings are forbidden",()=>{
   for(const args of [["--write"],["--execute"],["--apply"],["--dry-run=false"],["--dry-run","false"],["dryRun=false"]])assert.throws(()=>parseArguments(args),{code:"BACKFILL_WRITE_MODE_FORBIDDEN"});
 });
 
-test("config is fail-fast for missing, invalid, short, or reused secrets",()=>{
-  for(const name of ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","PROVIDER_TOKEN_ACTIVE_KEY_ID","PROVIDER_TOKEN_ENCRYPTION_KEYS","PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET"]){
+test("config is fail-fast for missing values and binds the URL to the exact Supabase project",()=>{
+  for(const name of ["SUPABASE_URL","SUPABASE_PROJECT_REF","SUPABASE_SERVICE_ROLE_KEY","PROVIDER_TOKEN_ACTIVE_KEY_ID","PROVIDER_TOKEN_ENCRYPTION_KEYS","PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET"]){
     assert.throws(()=>readConfig({...env,[name]:""}),{code:"BACKFILL_CONFIG_MISSING"});
   }
-  assert.throws(()=>readConfig({...env,SUPABASE_URL:"not-a-url"}),{code:"BACKFILL_CONFIG_INVALID"});
-  assert.throws(()=>readConfig({...env,PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET:"too-short"}),{code:"BACKFILL_CONFIG_INVALID"});
-  assert.throws(()=>readConfig({...env,PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET:env.SUPABASE_SERVICE_ROLE_KEY.padEnd(32,"x"),SUPABASE_SERVICE_ROLE_KEY:env.SUPABASE_SERVICE_ROLE_KEY.padEnd(32,"x")}),{code:"BACKFILL_CONFIG_INVALID"});
+  for(const url of ["https://example.com",`https://wrongprojectref00000.supabase.co`,`${env.SUPABASE_URL}/rest/v1`,`${env.SUPABASE_URL}?key=value`,`${env.SUPABASE_URL}#fragment`,`https://user:password@${projectRef}.supabase.co`,`http://${projectRef}.supabase.co`]){
+    assert.throws(()=>readConfig({...env,SUPABASE_URL:url}),{code:"BACKFILL_CONFIG_INVALID"});
+  }
+  assert.throws(()=>readConfig({...env,SUPABASE_PROJECT_REF:"wrongprojectref00000"}),{code:"BACKFILL_CONFIG_INVALID"});
+});
+
+test("reference secret requires canonical, high-entropy 32-byte base64 and key separation",()=>{
+  const lowEntropy=Buffer.alloc(32,65).toString("base64");
+  for(const secret of ["not-base64!",Buffer.alloc(31,3).toString("base64"),lowEntropy])assert.throws(()=>readConfig({...env,PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET:secret}),{code:"BACKFILL_CONFIG_INVALID"});
+  assert.throws(()=>readConfig({...env,PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET:key}),{code:"BACKFILL_CONFIG_INVALID"});
+  for(const name of ["SUPABASE_SERVICE_ROLE_KEY","SUPABASE_DB_PASSWORD","SUPABASE_ACCESS_TOKEN"])assert.throws(()=>readConfig({...env,[name]:referenceSecret}),{code:"BACKFILL_CONFIG_INVALID"});
+  assert.equal(readConfig(env).referenceSecret,referenceSecret);
+  let error;try{readConfig({...env,SUPABASE_DB_PASSWORD:referenceSecret});}catch(candidate){error=candidate;}
+  assert.doesNotMatch(JSON.stringify({message:error.message,code:error.code}),new RegExp(referenceSecret.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")));
 });
 
 test("operator composes server-side dependencies and always explicitly runs dry-run",async()=>{
@@ -63,11 +76,25 @@ test("valid cursor is passed opaquely and a tampered cursor fails closed",async(
   await assert.rejects(runDryRunOperator({argv:["--cursor",`${cursor}x`],env,dependencies:injected.value}),{code:"BACKFILL_CURSOR_INVALID"});
 });
 
-test("evidence is allowlisted, forces written zero, and sanitizes failures",()=>{
-  const evidence=safeEvidence({scanned:1,written:99,nextCursor:undefined,access_token:"raw-access",refresh_token:"raw-refresh",user_id:"raw-user",secret:key,failures:[{userRef:"a".repeat(64),platform:"meta",code:"TOKEN_DECRYPTION_FAILED",message:"raw database error",accessToken:"raw-access"}]},25);
+test("evidence is allowlisted and sanitizes failures without hiding writes",()=>{
+  const result={scanned:1,eligible:1,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:1,nextCursor:undefined,access_token:"raw-access",refresh_token:"raw-refresh",user_id:"raw-user",secret:key,failures:[{userRef:"a".repeat(64),platform:"meta",code:"TOKEN_DECRYPTION_FAILED",message:"raw database error",accessToken:"raw-access"}]};
+  const evidence=safeEvidence(result,25);
   assert.deepEqual(Object.keys(evidence.failures[0]),["userRef","platform","code"]);
   assert.equal(evidence.written,0);assert.equal(evidence.nextCursor,null);
-  assert.doesNotMatch(JSON.stringify(evidence),/raw-access|raw-refresh|raw-user|raw database error/);
+  assert.doesNotMatch(JSON.stringify(evidence),new RegExp(`raw-access|raw-refresh|raw-user|raw database error|${referenceSecret.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}`));
+  assert.throws(()=>safeEvidence({...result,written:99},25),{code:"BACKFILL_DRY_RUN_INVARIANT_FAILED"});
+});
+
+test("all counters must be finite non-negative integers",()=>{
+  const valid={scanned:0,eligible:0,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:0,failures:[]};
+  for(const value of [-1,1.5,NaN,Infinity,"0",undefined])assert.throws(()=>safeEvidence({...valid,scanned:value},25),{code:"BACKFILL_DRY_RUN_INVARIANT_FAILED"});
+});
+
+test("runner write or counter invariant violation fails closed with no successful evidence",async()=>{
+  for(const result of [{scanned:1,eligible:1,written:1,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:0,failures:[]},{scanned:-1,eligible:0,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:0,failures:[]}]){
+    const injected=dependencies(result);
+    await assert.rejects(runDryRunOperator({env,dependencies:injected.value}),{code:"BACKFILL_DRY_RUN_INVARIANT_FAILED"});
+  }
 });
 
 test("scan and raw runtime failures map to deterministic redacted codes",async()=>{
@@ -93,6 +120,6 @@ test("operator has no server import and package script is dry-run-only",()=>{
 
 test("example environment contains names only, not usable provider secrets",()=>{
   const example=fs.readFileSync(path.join(__dirname,"../.env.example"),"utf8");
-  for(const name of ["PROVIDER_TOKEN_ACTIVE_KEY_ID","PROVIDER_TOKEN_ENCRYPTION_KEYS","PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET"])assert.match(example,new RegExp(`^${name}=$`,"m"));
+  for(const name of ["SUPABASE_PROJECT_REF","PROVIDER_TOKEN_ACTIVE_KEY_ID","PROVIDER_TOKEN_ENCRYPTION_KEYS","PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET"])assert.match(example,new RegExp(`^${name}=$`,"m"));
   assert.doesNotMatch(example,/PROVIDER_TOKEN_(?:ENCRYPTION_KEYS|BACKFILL_REFERENCE_SECRET)=.+/);
 });

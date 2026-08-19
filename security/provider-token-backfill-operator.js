@@ -1,12 +1,14 @@
 "use strict";
 
+const crypto=require("node:crypto");
 const {createClient}=require("@supabase/supabase-js");
-const {createProviderTokenVaultFromEnv}=require("./provider-token-vault");
+const {parseKeyring,createProviderTokenVaultFromEnv}=require("./provider-token-vault");
 const {createProviderTokenStore}=require("./provider-token-store");
 const {DEFAULT_BATCH_SIZE,decodeCursor,createProviderTokenBackfill}=require("./provider-token-backfill");
 
 const CONTRACT_VERSION="v1";
-const REQUIRED_ENV=["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","PROVIDER_TOKEN_ACTIVE_KEY_ID","PROVIDER_TOKEN_ENCRYPTION_KEYS","PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET"];
+const REQUIRED_ENV=["SUPABASE_URL","SUPABASE_PROJECT_REF","SUPABASE_SERVICE_ROLE_KEY","PROVIDER_TOKEN_ACTIVE_KEY_ID","PROVIDER_TOKEN_ENCRYPTION_KEYS","PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET"];
+const COUNTERS=["scanned","eligible","written","alreadyEncrypted","rotationCandidates","empty","failed"];
 const WRITE_ARGUMENT=/^(?:--?(?:write|execute|apply)(?:=.*)?|--?dry-?run(?:=.*)?|dryRun(?:=.*)?)$/i;
 
 class BackfillOperatorError extends Error{
@@ -14,6 +16,20 @@ class BackfillOperatorError extends Error{
 }
 
 function fail(code){throw new BackfillOperatorError(code);}
+
+function sameSecret(left,right){
+  const leftHash=crypto.createHash("sha256").update(left).digest();
+  const rightHash=crypto.createHash("sha256").update(right).digest();
+  return crypto.timingSafeEqual(leftHash,rightHash);
+}
+
+function decodeReferenceSecret(value){
+  if(!/^[A-Za-z0-9+/]{43}=$/.test(value))fail("BACKFILL_CONFIG_INVALID");
+  const decoded=Buffer.from(value,"base64");
+  if(decoded.length!==32||decoded.toString("base64")!==value)fail("BACKFILL_CONFIG_INVALID");
+  if(new Set(decoded).size<16)fail("BACKFILL_CONFIG_INVALID");
+  return decoded;
+}
 
 function parseArguments(argv=[]){
   const result={batchSize:DEFAULT_BATCH_SIZE,cursor:null};
@@ -37,22 +53,28 @@ function parseArguments(argv=[]){
 function readConfig(env={}){
   if(REQUIRED_ENV.some(name=>typeof env[name]!=="string"||!env[name].trim()))fail("BACKFILL_CONFIG_MISSING");
   const referenceSecret=env.PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET;
-  if(Buffer.byteLength(referenceSecret,"utf8")<32)fail("BACKFILL_CONFIG_INVALID");
-  const forbidden=[env.SUPABASE_SERVICE_ROLE_KEY,env.SUPABASE_DB_PASSWORD,env.SUPABASE_ACCESS_TOKEN,env.PROVIDER_TOKEN_ENCRYPTION_KEYS].filter(Boolean);
-  if(forbidden.includes(referenceSecret))fail("BACKFILL_CONFIG_INVALID");
+  const referenceBytes=decodeReferenceSecret(referenceSecret);
+  const sensitiveValues=[env.SUPABASE_SERVICE_ROLE_KEY,env.SUPABASE_DB_PASSWORD,env.SUPABASE_ACCESS_TOKEN].filter(value=>typeof value==="string"&&value);
+  if(sensitiveValues.some(value=>sameSecret(referenceSecret,value)))fail("BACKFILL_CONFIG_INVALID");
+  let keyring;
+  try{keyring=parseKeyring(env);}catch{fail("BACKFILL_CONFIG_INVALID");}
+  if([...keyring.keys.values()].some(key=>key.length===referenceBytes.length&&crypto.timingSafeEqual(key,referenceBytes)))fail("BACKFILL_CONFIG_INVALID");
+  const projectRef=env.SUPABASE_PROJECT_REF.trim();
+  if(!/^[a-z0-9]{20}$/.test(projectRef))fail("BACKFILL_CONFIG_INVALID");
   let url;
   try{url=new URL(env.SUPABASE_URL);}catch{fail("BACKFILL_CONFIG_INVALID");}
-  if(url.protocol!=="https:")fail("BACKFILL_CONFIG_INVALID");
+  if(url.protocol!=="https:"||url.host!==`${projectRef}.supabase.co`||url.username||url.password||url.pathname!=="/"||url.search||url.hash)fail("BACKFILL_CONFIG_INVALID");
   return Object.freeze({supabaseUrl:env.SUPABASE_URL,serviceRoleKey:env.SUPABASE_SERVICE_ROLE_KEY,referenceSecret});
 }
 
 function safeEvidence(result,batchSize){
+  if(!result||COUNTERS.some(name=>!Number.isInteger(result[name])||result[name]<0)||result.written!==0)fail("BACKFILL_DRY_RUN_INVARIANT_FAILED");
   const failures=Array.isArray(result?.failures)?result.failures.map(item=>({
     userRef:typeof item?.userRef==="string"&&/^[a-f0-9]{64}$/.test(item.userRef)?item.userRef:"",
     platform:typeof item?.platform==="string"&&/^[a-z0-9_-]{1,32}$/i.test(item.platform)?item.platform:"unknown",
     code:typeof item?.code==="string"&&/^[A-Z][A-Z0-9_]{0,63}$/.test(item.code)?item.code:"BACKFILL_ROW_FAILED"
   })):[];
-  return {ok:true,mode:"dry-run",contractVersion:CONTRACT_VERSION,scanned:Number(result?.scanned)||0,eligible:Number(result?.eligible)||0,written:0,alreadyEncrypted:Number(result?.alreadyEncrypted)||0,rotationCandidates:Number(result?.rotationCandidates)||0,empty:Number(result?.empty)||0,failed:Number(result?.failed)||0,nextCursor:typeof result?.nextCursor==="string"?result.nextCursor:null,failures,batchSize};
+  return {ok:true,mode:"dry-run",contractVersion:CONTRACT_VERSION,scanned:result.scanned,eligible:result.eligible,written:result.written,alreadyEncrypted:result.alreadyEncrypted,rotationCandidates:result.rotationCandidates,empty:result.empty,failed:result.failed,nextCursor:typeof result.nextCursor==="string"?result.nextCursor:null,failures,batchSize};
 }
 
 async function runDryRunOperator({argv=[],env=process.env,dependencies={}}={}){
@@ -71,6 +93,7 @@ async function runDryRunOperator({argv=[],env=process.env,dependencies={}}={}){
     const result=await run({dryRun:true,batchSize:args.batchSize,cursor:args.cursor});
     return safeEvidence(result,args.batchSize);
   }catch(error){
+    if(error instanceof BackfillOperatorError)throw error;
     if(error?.code==="INVALID_CURSOR")fail("BACKFILL_CURSOR_INVALID");
     if(error?.code==="BACKFILL_SCAN_FAILED")fail("BACKFILL_SCAN_FAILED");
     if(error?.code==="TOKEN_VAULT_CONFIG_ERROR")fail("BACKFILL_CONFIG_INVALID");

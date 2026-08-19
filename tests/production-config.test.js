@@ -5,7 +5,7 @@ const {spawn}=require("node:child_process");
 const fs=require("node:fs");
 const path=require("node:path");
 const test=require("node:test");
-const {parseExplicitBoolean,isProductionRuntime,createRuntimeFlags,validateProductionConfig}=require("../security/production-config");
+const {ProductionConfigError,parseExplicitBoolean,isProductionRuntime,createRuntimeFlags,validateProductionConfig,reportProductionConfigFailure,loadProductionConfig}=require("../security/production-config");
 
 const root=path.join(__dirname,"..");
 const unsafeSource=/5252399301|5383556660|7654240828777955348|TikTok Test Advertiser|req\.query\.sandbox_access_token|\?sandbox_access_token=/;
@@ -42,6 +42,70 @@ test("unsafe production variables are reported in deterministic order",()=>{
     ()=>validateProductionConfig({NODE_ENV:"production",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true"}),
     error=>error.variables.join(",")==="GOOGLE_REVIEW_HARD_ROUTE_ENABLED,TIKTOK_SANDBOX_ACCESS_TOKEN"&&!error.message.includes("secret")
   );
+});
+
+test("safe startup does not emit a production config diagnostic",()=>{
+  const calls=[];
+  assert.equal(loadProductionConfig({NODE_ENV:"production"},{error:value=>calls.push(value)}).production,true);
+  assert.deepEqual(calls,[]);
+});
+
+test("unsafe startup emits one allowlisted, deterministic, secret-free JSON diagnostic and rethrows",()=>{
+  const secret="super-secret-value-that-must-not-appear";
+  const env={NODE_ENV:"production",TIKTOK_SANDBOX_ACCESS_TOKEN:secret,GOOGLE_TEST_CUSTOMER_ID:secret};
+  const calls=[];
+  let thrown;
+  try{loadProductionConfig(env,{error:value=>calls.push(value)});}catch(error){thrown=error;}
+  assert.ok(thrown instanceof ProductionConfigError);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].includes("\n"),false);
+  assert.equal(calls[0].includes(secret),false);
+  const diagnostic=JSON.parse(calls[0]);
+  assert.deepEqual(Object.keys(diagnostic),["event","code","variables"]);
+  assert.deepEqual(diagnostic,{
+    event:"PRODUCTION_CONFIG_REJECTED",
+    code:"UNSAFE_PRODUCTION_CONFIG",
+    variables:["GOOGLE_TEST_CUSTOMER_ID","TIKTOK_SANDBOX_ACCESS_TOKEN"]
+  });
+  assert.strictEqual(thrown.variables.join(","),diagnostic.variables.join(","));
+});
+
+test("diagnostic deduplicates known names and omits unknown names without logging the error object",()=>{
+  const error=new ProductionConfigError("message-without-sensitive-data",[
+    "TIKTOK_SANDBOX_ENABLED","UNKNOWN_SECRET_NAME","GOOGLE_TEST_CUSTOMER_ID","TIKTOK_SANDBOX_ENABLED"
+  ]);
+  error.stack="stack-that-must-not-appear";
+  error.metadata={env:{SECRET:"value-that-must-not-appear"}};
+  const calls=[];
+  assert.equal(reportProductionConfigFailure(error,{error:(...args)=>calls.push(args)}),true);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].length,1);
+  assert.equal(typeof calls[0][0],"string");
+  assert.deepEqual(JSON.parse(calls[0][0]).variables,["GOOGLE_TEST_CUSTOMER_ID","TIKTOK_SANDBOX_ENABLED"]);
+  assert.doesNotMatch(calls[0][0],/UNKNOWN|stack|metadata|value-that-must-not-appear/);
+});
+
+test("diagnostic accepts only the production config error contract",()=>{
+  const calls=[];
+  const logger={error:value=>calls.push(value)};
+  assert.equal(reportProductionConfigFailure(new Error("ordinary error"),logger),false);
+  const wrongCode=new ProductionConfigError("wrong code",["GOOGLE_TEST_CUSTOMER_ID"]);
+  wrongCode.code="OTHER_CODE";
+  assert.equal(reportProductionConfigFailure(wrongCode,logger),false);
+  assert.deepEqual(calls,[]);
+});
+
+test("logger failure cannot bypass unsafe startup fail-fast behavior",()=>{
+  const expectedSecret="not-logged-even-when-logger-fails";
+  let thrown;
+  try{
+    loadProductionConfig(
+      {NODE_ENV:"production",TIKTOK_TEST_ACCESS_TOKEN:expectedSecret},
+      {error:()=>{throw new Error("logger unavailable");}}
+    );
+  }catch(error){thrown=error;}
+  assert.ok(thrown instanceof ProductionConfigError);
+  assert.deepEqual(thrown.variables,["TIKTOK_TEST_ACCESS_TOKEN"]);
 });
 
 test("non-production review modes require complete explicit configuration",()=>{

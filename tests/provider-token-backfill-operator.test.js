@@ -77,17 +77,47 @@ test("valid cursor is passed opaquely and a tampered cursor fails closed",async(
 });
 
 test("evidence is allowlisted and sanitizes failures without hiding writes",()=>{
-  const result={scanned:1,eligible:1,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:1,nextCursor:undefined,access_token:"raw-access",refresh_token:"raw-refresh",user_id:"raw-user",secret:key,failures:[{userRef:"a".repeat(64),platform:"meta",code:"TOKEN_DECRYPTION_FAILED",message:"raw database error",accessToken:"raw-access"}]};
-  const evidence=safeEvidence(result,25);
+  const result={scanned:1,eligible:1,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:1,nextCursor:null,access_token:"raw-access",refresh_token:"raw-refresh",user_id:"raw-user",secret:key,failures:[{userRef:"a".repeat(64),platform:"meta",code:"TOKEN_DECRYPTION_FAILED",message:"raw database error",accessToken:"raw-access"}]};
+  const evidence=safeEvidence(result,25,referenceSecret);
   assert.deepEqual(Object.keys(evidence.failures[0]),["userRef","platform","code"]);
   assert.equal(evidence.written,0);assert.equal(evidence.nextCursor,null);
   assert.doesNotMatch(JSON.stringify(evidence),new RegExp(`raw-access|raw-refresh|raw-user|raw database error|${referenceSecret.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}`));
-  assert.throws(()=>safeEvidence({...result,written:99},25),{code:"BACKFILL_DRY_RUN_INVARIANT_FAILED"});
+  assert.throws(()=>safeEvidence({...result,written:99},25,referenceSecret),{code:"BACKFILL_DRY_RUN_INVARIANT_FAILED"});
 });
 
 test("all counters must be finite non-negative integers",()=>{
-  const valid={scanned:0,eligible:0,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:0,failures:[]};
-  for(const value of [-1,1.5,NaN,Infinity,"0",undefined])assert.throws(()=>safeEvidence({...valid,scanned:value},25),{code:"BACKFILL_DRY_RUN_INVARIANT_FAILED"});
+  const valid={scanned:0,eligible:0,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:0,nextCursor:null,failures:[]};
+  for(const value of [-1,1.5,NaN,Infinity,"0",undefined])assert.throws(()=>safeEvidence({...valid,scanned:value},25,referenceSecret),{code:"BACKFILL_DRY_RUN_INVARIANT_FAILED"});
+});
+
+test("runner nextCursor must be null or an authenticated cursor",()=>{
+  const valid={scanned:0,eligible:0,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:0,nextCursor:null,failures:[]};
+  assert.equal(safeEvidence(valid,25,referenceSecret).nextCursor,null);
+  const cursor=encodeCursor({userId:"private-user",platform:"meta"},referenceSecret);
+  assert.equal(safeEvidence({...valid,nextCursor:cursor},25,referenceSecret).nextCursor,cursor);
+  for(const nextCursor of [`${cursor}x`,"arbitrary-secret-token","",42,{},[],true,undefined]){
+    let error;try{safeEvidence({...valid,nextCursor},25,referenceSecret);}catch(candidate){error=candidate;}
+    assert.equal(error.code,"BACKFILL_DRY_RUN_INVARIANT_FAILED");
+    assert.doesNotMatch(JSON.stringify({message:error.message,code:error.code}),/arbitrary-secret-token|private-user/);
+  }
+});
+
+test("failed count and failure records must satisfy the safe contract",()=>{
+  const validFailure={userRef:"b".repeat(64),platform:"google_ads",code:"TOKEN_DECRYPTION_FAILED",accessToken:"sensitive-extra"};
+  const base={scanned:1,eligible:0,written:0,alreadyEncrypted:0,rotationCandidates:0,empty:0,failed:0,nextCursor:null,failures:[]};
+  assert.deepEqual(safeEvidence(base,25,referenceSecret).failures,[]);
+  assert.deepEqual(safeEvidence({...base,failed:1,failures:[validFailure]},25,referenceSecret).failures,[{userRef:validFailure.userRef,platform:validFailure.platform,code:validFailure.code}]);
+  const invalidResults=[
+    {...base,failed:1,failures:[]},{...base,failures:[validFailure]},{...base,failures:undefined},{...base,failures:{}},
+    {...base,failed:1,failures:[{...validFailure,userRef:"RAW-USER-ID"}]},
+    {...base,failed:1,failures:[{...validFailure,platform:"invalid platform/value"}]},
+    {...base,failed:1,failures:[{...validFailure,code:"unsafe-error"}]}
+  ];
+  for(const result of invalidResults){
+    let error;try{safeEvidence(result,25,referenceSecret);}catch(candidate){error=candidate;}
+    assert.equal(error.code,"BACKFILL_DRY_RUN_INVARIANT_FAILED");
+    assert.doesNotMatch(JSON.stringify({message:error.message,code:error.code}),/RAW-USER-ID|invalid platform|unsafe-error|sensitive-extra/);
+  }
 });
 
 test("runner write or counter invariant violation fails closed with no successful evidence",async()=>{

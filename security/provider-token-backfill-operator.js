@@ -67,13 +67,18 @@ function readConfig(env={}){
   return Object.freeze({supabaseUrl:env.SUPABASE_URL,serviceRoleKey:env.SUPABASE_SERVICE_ROLE_KEY,referenceSecret});
 }
 
-function safeEvidence(result,batchSize){
+function safeEvidence(result,batchSize,referenceSecret){
   if(!result||COUNTERS.some(name=>!Number.isInteger(result[name])||result[name]<0)||result.written!==0)fail("BACKFILL_DRY_RUN_INVARIANT_FAILED");
-  const failures=Array.isArray(result?.failures)?result.failures.map(item=>({
-    userRef:typeof item?.userRef==="string"&&/^[a-f0-9]{64}$/.test(item.userRef)?item.userRef:"",
-    platform:typeof item?.platform==="string"&&/^[a-z0-9_-]{1,32}$/i.test(item.platform)?item.platform:"unknown",
-    code:typeof item?.code==="string"&&/^[A-Z][A-Z0-9_]{0,63}$/.test(item.code)?item.code:"BACKFILL_ROW_FAILED"
-  })):[];
+  if(!Array.isArray(result.failures)||result.failures.length!==result.failed)fail("BACKFILL_DRY_RUN_INVARIANT_FAILED");
+  if(result.failures.some(item=>!item||typeof item!=="object"||
+    typeof item.userRef!=="string"||!/^[a-f0-9]{64}$/.test(item.userRef)||
+    typeof item.platform!=="string"||!/^[a-z0-9_-]{1,32}$/i.test(item.platform)||
+    typeof item.code!=="string"||!/^[A-Z][A-Z0-9_]{0,63}$/.test(item.code)))fail("BACKFILL_DRY_RUN_INVARIANT_FAILED");
+  if(result.nextCursor!==null){
+    if(typeof result.nextCursor!=="string"||!result.nextCursor)fail("BACKFILL_DRY_RUN_INVARIANT_FAILED");
+    try{decodeCursor(result.nextCursor,referenceSecret);}catch{fail("BACKFILL_DRY_RUN_INVARIANT_FAILED");}
+  }
+  const failures=result.failures.map(item=>({userRef:item.userRef,platform:item.platform,code:item.code}));
   return {ok:true,mode:"dry-run",contractVersion:CONTRACT_VERSION,scanned:result.scanned,eligible:result.eligible,written:result.written,alreadyEncrypted:result.alreadyEncrypted,rotationCandidates:result.rotationCandidates,empty:result.empty,failed:result.failed,nextCursor:typeof result.nextCursor==="string"?result.nextCursor:null,failures,batchSize};
 }
 
@@ -91,7 +96,7 @@ async function runDryRunOperator({argv=[],env=process.env,dependencies={}}={}){
     const tokenStore=makeStore({client,vault,legacyReadsEnabled:true});
     const run=makeBackfill({client,tokenStore,userRefSecret:config.referenceSecret});
     const result=await run({dryRun:true,batchSize:args.batchSize,cursor:args.cursor});
-    return safeEvidence(result,args.batchSize);
+    return safeEvidence(result,args.batchSize,config.referenceSecret);
   }catch(error){
     if(error instanceof BackfillOperatorError)throw error;
     if(error?.code==="INVALID_CURSOR")fail("BACKFILL_CURSOR_INVALID");

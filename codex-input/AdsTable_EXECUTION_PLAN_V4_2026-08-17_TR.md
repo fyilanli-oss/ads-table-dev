@@ -573,6 +573,7 @@ Mutabakat dışında bağımlılık yoktur.
 - Config startup testleri.
 - E1-T1 gerçekleşen evidence: `security/oauth-route-inventory.js`, `tests/oauth-security-baseline.test.js` ve `docs/security/E1_T1_OAUTH_SECURITY_BASELINE.md`.
 - E1-T2 gerçekleşen evidence: `security/oauth-access.js`, bearer/tamper/unauthenticated acceptance testleri ve `public/dashboard.html` authenticated OAuth handshake'i.
+- E1-T5 corrective evidence: Production function invocation startup sırasında `UNSAFE_PRODUCTION_CONFIG` ile durmaktadır; Vercel'in mevcut error görünümü tetikleyen variable isimlerini göstermemektedir. Bu PR guard'ı gevşetmeden yalnız allowlist ile sınırlı, secret-free structured diagnostic ekler; config sorununu çözmez, Vercel environment'ını değiştirmez ve deployment yapmaz. E1-T6 encrypted-write activation teşhis tamamlanana kadar bekler; E1-T6D cleanup sonrası `7 connected / 7 encrypted / 0 orphan / 0 missing encrypted` DB acceptance sonucu korunur.
 - E1-T3 gerçekleşen evidence: `security/oauth-transaction-store.js`, atomik transaction migration'ı ve replay/expiry/provider/redirect/PKCE testleri.
 - E1-T4 gerçekleşen evidence: session-elimination runtime/package guard'ları, pasif Pinterest redirect regresyonu ve güncellenmiş security baseline.
 

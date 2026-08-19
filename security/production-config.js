@@ -1,5 +1,19 @@
 "use strict";
 
+const PRODUCTION_CONFIG_VARIABLES=Object.freeze([
+  "GOOGLE_REVIEW_HARD_ROUTE_ENABLED",
+  "GOOGLE_TEST_CUSTOMER_ID",
+  "GOOGLE_TEST_LOGIN_CUSTOMER_ID",
+  "TIKTOK_FORCE_SANDBOX_REPORTS",
+  "TIKTOK_REVIEW_ADVERTISER_ID",
+  "TIKTOK_REVIEW_ADVERTISER_NAME",
+  "TIKTOK_REVIEW_FALLBACK_ENABLED",
+  "TIKTOK_SANDBOX_ACCESS_TOKEN",
+  "TIKTOK_SANDBOX_ENABLED",
+  "TIKTOK_TEST_ACCESS_TOKEN"
+]);
+const PRODUCTION_CONFIG_VARIABLE_SET=new Set(PRODUCTION_CONFIG_VARIABLES);
+
 class ProductionConfigError extends Error{
   constructor(message,variables=[]){
     super(message);
@@ -7,6 +21,24 @@ class ProductionConfigError extends Error{
     this.code="UNSAFE_PRODUCTION_CONFIG";
     this.variables=Object.freeze([...variables]);
   }
+}
+
+function reportProductionConfigFailure(error,logger=console){
+  if(!(error instanceof ProductionConfigError)||error.code!=="UNSAFE_PRODUCTION_CONFIG")return false;
+  const variables=Array.isArray(error.variables)
+    ?[...new Set(error.variables.filter(variable=>typeof variable==="string"&&PRODUCTION_CONFIG_VARIABLE_SET.has(variable)))].sort()
+    :[];
+  const diagnostic=JSON.stringify({
+    event:"PRODUCTION_CONFIG_REJECTED",
+    code:"UNSAFE_PRODUCTION_CONFIG",
+    variables
+  });
+  try{
+    if(logger&&typeof logger.error==="function")logger.error(diagnostic);
+  }catch{
+    // Diagnostics must never weaken the fail-closed startup guard.
+  }
+  return true;
 }
 
 function parseExplicitBoolean(value,defaultValue=false,name="configuration flag"){
@@ -69,6 +101,13 @@ function validateProductionConfig(env={}){
   return flags;
 }
 
-function loadProductionConfig(env=process.env){return validateProductionConfig(env);}
+function loadProductionConfig(env=process.env,logger=console){
+  try{
+    return validateProductionConfig(env);
+  }catch(error){
+    reportProductionConfigFailure(error,logger);
+    throw error;
+  }
+}
 
-module.exports={ProductionConfigError,parseExplicitBoolean,isProductionRuntime,createRuntimeFlags,validateProductionConfig,loadProductionConfig};
+module.exports={ProductionConfigError,parseExplicitBoolean,isProductionRuntime,createRuntimeFlags,validateProductionConfig,reportProductionConfigFailure,loadProductionConfig};

@@ -1,4 +1,7 @@
-with targets as (
+with allowed_platforms as (
+  select platform
+  from (values ('meta'::text), ('pinterest'::text)) as allowed(platform)
+), targets as (
   select pc.user_id, pc.platform
   from public.platform_connections as pc
   where pc.connected = true
@@ -9,7 +12,10 @@ with targets as (
   union all
   select 'distinct_orphan_users', null, count(distinct user_id)::bigint from targets
   union all
-  select 'orphan_connected_by_platform', platform, count(*)::bigint from targets group by platform
+  select 'orphan_connected_by_platform', allowed.platform, count(target.user_id)::bigint
+  from allowed_platforms as allowed
+  left join targets as target on target.platform = allowed.platform
+  group by allowed.platform
   union all
   select 'encrypted_target_total', null, count(*)::bigint
   from public.platform_connection_tokens as pct

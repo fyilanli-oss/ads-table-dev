@@ -1,4 +1,5 @@
--- Forward-only, fail-closed cleanup for the two accepted E1-T6D auth orphans.
+-- One-time operational cleanup for manual execution in Supabase SQL Editor.
+-- This fail-closed data operation is not a schema migration or migration-ledger entry.
 begin;
 
 lock table auth.users in share mode;

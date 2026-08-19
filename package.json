@@ -2,6 +2,7 @@
   "scripts": {
     "start": "node server.js",
     "tokens:backfill:dry-run": "node scripts/provider-token-backfill-dry-run.js",
+    "tokens:backfill:write": "node scripts/provider-token-backfill-write.js",
     "test": "node --test funnel-core/tests/*.test.js tests/*.test.js"
   },
   "dependencies": {

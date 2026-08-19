@@ -21,7 +21,9 @@ on:
         description: Accepted production dry-run run ID
         required: true
         default: "32245732566"
-        type: string
+        type: choice
+        options:
+          - "32245732566"
 
 permissions:
   contents: read
@@ -45,7 +47,7 @@ jobs:
           [[ "${GITHUB_REF}" == "refs/heads/main" ]] || exit 1
           [[ "${EXPECTED_TOTAL}" == "9" ]] || exit 1
           [[ "${CONFIRMATION}" == "E1-T6D-PRODUCTION-WRITE" ]] || exit 1
-          [[ "${DRY_RUN_EVIDENCE_ID}" =~ ^[0-9]+$ ]] || exit 1
+          [[ "${DRY_RUN_EVIDENCE_ID}" == "32245732566" ]] || exit 1
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -85,10 +87,11 @@ jobs:
         env:
           EXPECTED_TOTAL: ${{ inputs.expected_total }}
           CONFIRMATION: ${{ inputs.confirmation }}
+          DRY_RUN_EVIDENCE_ID: ${{ inputs.dry_run_evidence_id }}
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
           PROVIDER_TOKEN_ACTIVE_KEY_ID: ${{ vars.PROVIDER_TOKEN_ACTIVE_KEY_ID }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PROVIDER_TOKEN_ENCRYPTION_KEYS: ${{ secrets.PROVIDER_TOKEN_ENCRYPTION_KEYS }}
           PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET: ${{ secrets.PROVIDER_TOKEN_BACKFILL_REFERENCE_SECRET }}
-        run: node scripts/provider-token-backfill-write.js --expected-total "${EXPECTED_TOTAL}" --confirm "${CONFIRMATION}"
+        run: node scripts/provider-token-backfill-write.js --expected-total "${EXPECTED_TOTAL}" --confirm "${CONFIRMATION}" --dry-run-evidence-id "${DRY_RUN_EVIDENCE_ID}"

@@ -7,6 +7,7 @@ const {createProviderTokenBackfill}=require("./provider-token-backfill");
 const {readConfig}=require("./provider-token-backfill-operator");
 
 const CONFIRMATION="E1-T6D-PRODUCTION-WRITE";
+const ACCEPTED_DRY_RUN_EVIDENCE_ID="32245732566";
 const BATCH_SIZE=25;
 const COUNTERS=["scanned","eligible","written","alreadyEncrypted","rotationCandidates","empty","failed"];
 
@@ -16,37 +17,44 @@ class BackfillWriteError extends Error{
 function fail(code,stage,evidence){throw new BackfillWriteError(code,stage,evidence);}
 
 function parseWriteArguments(argv=[]){
-  let expectedTotal,confirmation;
+  let expectedTotal,confirmation,dryRunEvidenceId;
   for(let i=0;i<argv.length;i++){
     const argument=String(argv[i]);
     if(argument==="--expected-total"&&expectedTotal===undefined)expectedTotal=argv[++i];
     else if(argument==="--confirm"&&confirmation===undefined)confirmation=argv[++i];
+    else if(argument==="--dry-run-evidence-id"&&dryRunEvidenceId===undefined)dryRunEvidenceId=argv[++i];
     else fail("BACKFILL_WRITE_ARGUMENT_INVALID","runtime");
   }
   if(confirmation!==CONFIRMATION)fail("BACKFILL_WRITE_CONFIRMATION_REQUIRED","runtime");
+  if(dryRunEvidenceId!==ACCEPTED_DRY_RUN_EVIDENCE_ID)fail("BACKFILL_WRITE_EVIDENCE_ID_INVALID","runtime");
   if(typeof expectedTotal!=="string"||!/^\d+$/.test(expectedTotal))fail("BACKFILL_WRITE_EXPECTED_TOTAL_INVALID","runtime");
   const parsed=Number(expectedTotal);
   if(!Number.isInteger(parsed)||parsed<1||parsed>BATCH_SIZE)fail("BACKFILL_WRITE_EXPECTED_TOTAL_INVALID","runtime");
-  return Object.freeze({expectedTotal:parsed});
+  return Object.freeze({expectedTotal:parsed,dryRunEvidenceId});
 }
 
 function assertRuntime(env={}){
   if(env.GITHUB_ACTIONS!=="true"||env.GITHUB_REF!=="refs/heads/main"||!/^\d+$/.test(env.GITHUB_RUN_ID||"")||!/^[a-f0-9]{40}$/i.test(env.GITHUB_SHA||""))fail("BACKFILL_WRITE_RUNTIME_FORBIDDEN","runtime");
 }
-function validResult(result){return result&&COUNTERS.every(name=>Number.isInteger(result[name])&&result[name]>=0)&&Array.isArray(result.failures)&&result.failures.length===result.failed;}
+function validFailure(item){return item&&typeof item==="object"&&/^[a-f0-9]{64}$/.test(item.userRef||"")&&/^[a-z0-9_-]{1,32}$/i.test(item.platform||"")&&/^[A-Z][A-Z0-9_]{0,63}$/.test(item.code||"");}
+function validResult(result){return result&&COUNTERS.every(name=>Number.isInteger(result[name])&&result[name]>=0)&&Array.isArray(result.failures)&&result.failures.length===result.failed&&result.failures.every(validFailure);}
 function phaseEvidence(result){const evidence={};for(const name of COUNTERS)evidence[name]=result[name];return evidence;}
-function safeFailures(result){
-  if(!Array.isArray(result?.failures))return [];
-  return result.failures.filter(item=>item&&/^[a-f0-9]{64}$/.test(item.userRef||"")&&/^[a-z0-9_-]{1,32}$/i.test(item.platform||"")&&/^[A-Z][A-Z0-9_]{0,63}$/.test(item.code||"")).map(({userRef,platform,code})=>({userRef,platform,code}));
-}
+function safeFailures(result){return result.failures.map(({userRef,platform,code})=>({userRef,platform,code}));}
 function partialEvidence(result){return {scanned:Number.isInteger(result?.scanned)?result.scanned:0,written:Number.isInteger(result?.written)?result.written:0,alreadyEncrypted:Number.isInteger(result?.alreadyEncrypted)?result.alreadyEncrypted:0,failed:Number.isInteger(result?.failed)?result.failed:0,failures:safeFailures(result)};}
+function invalidWriteEvidence(result){const evidence={};for(const name of ["scanned","written","alreadyEncrypted","failed"])if(Number.isInteger(result?.[name])&&result[name]>=0)evidence[name]=result[name];return evidence;}
+function completedWriteEvidence(preflight,write,verification){
+  const evidence={writeCompleted:true,preflight:phaseEvidence(preflight),write:phaseEvidence(write)};
+  if(validResult(verification))evidence.verification={...phaseEvidence(verification),failures:safeFailures(verification)};
+  return evidence;
+}
 
 function assertPreflight(result,expected){
   if(!validResult(result)||result.scanned!==expected||result.written!==0||result.failed!==0||result.failures.length||result.empty!==0||result.nextCursor!==null||result.eligible+result.alreadyEncrypted!==expected)fail("BACKFILL_WRITE_PREFLIGHT_REJECTED","preflight");
 }
 function assertWrite(result,preflight,expected){
+  if(!validResult(result))fail("BACKFILL_WRITE_RESULT_INVALID","write",invalidWriteEvidence(result));
   if(result?.failed>0)fail("BACKFILL_WRITE_PARTIAL_FAILURE","write",partialEvidence(result));
-  if(!validResult(result)||result.scanned!==expected||result.failures.length||result.empty!==0||result.nextCursor!==null||result.written!==preflight.eligible||result.alreadyEncrypted!==preflight.alreadyEncrypted||result.written+result.alreadyEncrypted!==expected)fail("BACKFILL_WRITE_INVARIANT_FAILED","write",partialEvidence(result));
+  if(result.scanned!==expected||result.failures.length||result.empty!==0||result.nextCursor!==null||result.written!==preflight.eligible||result.alreadyEncrypted!==preflight.alreadyEncrypted||result.written+result.alreadyEncrypted!==expected)fail("BACKFILL_WRITE_INVARIANT_FAILED","write",partialEvidence(result));
 }
 function assertVerification(result,expected){
   if(!validResult(result)||result.scanned!==expected||result.eligible!==0||result.written!==0||result.alreadyEncrypted!==expected||result.rotationCandidates!==0||result.empty!==0||result.failed!==0||result.failures.length||result.nextCursor!==null)fail("BACKFILL_WRITE_VERIFICATION_FAILED","verification");
@@ -69,8 +77,9 @@ async function runWriteOperator({argv=[],env=process.env,dependencies={}}={}){
     const options= dryRun=>({dryRun,batchSize:BATCH_SIZE,cursor:null});
     let preflight;try{preflight=await run(options(true));}catch{fail("BACKFILL_WRITE_PREFLIGHT_FAILED","preflight");}assertPreflight(preflight,args.expectedTotal);
     let write;try{write=await run(options(false));}catch{fail("BACKFILL_WRITE_FAILED","write");}assertWrite(write,preflight,args.expectedTotal);
-    let verification;try{verification=await run(options(true));}catch{fail("BACKFILL_WRITE_VERIFICATION_FAILED","verification");}assertVerification(verification,args.expectedTotal);
-    return {ok:true,mode:"encrypted-backfill-write",contractVersion:"v1",expectedTotal:args.expectedTotal,preflight:phaseEvidence(preflight),write:phaseEvidence(write),verification:phaseEvidence(verification)};
+    let verification;try{verification=await run(options(true));}catch{fail("BACKFILL_WRITE_VERIFICATION_FAILED","verification",completedWriteEvidence(preflight,write));}
+    try{assertVerification(verification,args.expectedTotal);}catch{fail("BACKFILL_WRITE_VERIFICATION_FAILED","verification",completedWriteEvidence(preflight,write,verification));}
+    return {ok:true,mode:"encrypted-backfill-write",contractVersion:"v1",expectedTotal:args.expectedTotal,dryRunEvidenceId:args.dryRunEvidenceId,preflight:phaseEvidence(preflight),write:phaseEvidence(write),verification:phaseEvidence(verification)};
   }catch(error){
     if(error instanceof BackfillWriteError)throw error;
     if(error?.code==="TOKEN_VAULT_CONFIG_ERROR")fail("BACKFILL_CONFIG_INVALID","config");
@@ -78,4 +87,4 @@ async function runWriteOperator({argv=[],env=process.env,dependencies={}}={}){
   }
 }
 
-module.exports={CONFIRMATION,BATCH_SIZE,BackfillWriteError,parseWriteArguments,assertRuntime,runWriteOperator};
+module.exports={CONFIRMATION,ACCEPTED_DRY_RUN_EVIDENCE_ID,BATCH_SIZE,BackfillWriteError,parseWriteArguments,assertRuntime,runWriteOperator};

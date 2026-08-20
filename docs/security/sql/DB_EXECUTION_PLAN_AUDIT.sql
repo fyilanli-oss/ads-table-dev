@@ -29,8 +29,11 @@ WITH relation_base AS (
   FROM pg_catalog.pg_attribute a JOIN pg_catalog.pg_class c ON c.oid=a.attrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_type t ON t.oid=a.atttypid LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
   WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m') AND a.attnum > 0 AND NOT a.attisdropped GROUP BY c.relname
 ), constraints_json AS (
-  SELECT c.conrelid, jsonb_agg(jsonb_build_object('name',c.conname,'type',c.contype,'definition',pg_catalog.pg_get_constraintdef(c.oid,false),'referencedSchema',rn.nspname,'referencedTable',rc.relname,'validated',c.convalidated,'deferrable',c.condeferrable) ORDER BY c.conname) value
-  FROM pg_catalog.pg_constraint c LEFT JOIN pg_catalog.pg_class rc ON rc.oid=c.confrelid LEFT JOIN pg_catalog.pg_namespace rn ON rn.oid=rc.relnamespace GROUP BY c.conrelid
+  SELECT c.conrelid, jsonb_agg(jsonb_build_object('name',c.conname,'type',c.contype,'definition',pg_catalog.pg_get_constraintdef(c.oid,false),'localColumns',coalesce(lc.names,'{}'::text[]),'referencedSchema',rn.nspname,'referencedTable',rc.relname,'referencedColumns',coalesce(fc.names,'{}'::text[]),'validated',c.convalidated,'deferrable',c.condeferrable,'updateAction',CASE c.confupdtype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END,'deleteAction',CASE c.confdeltype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' END) ORDER BY c.conname) value
+  FROM pg_catalog.pg_constraint c LEFT JOIN pg_catalog.pg_class rc ON rc.oid=c.confrelid LEFT JOIN pg_catalog.pg_namespace rn ON rn.oid=rc.relnamespace
+  LEFT JOIN LATERAL (SELECT array_agg(a.attname ORDER BY k.ordinality) names FROM unnest(c.conkey) WITH ORDINALITY k(attnum,ordinality) JOIN pg_catalog.pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.attnum) lc ON true
+  LEFT JOIN LATERAL (SELECT array_agg(a.attname ORDER BY k.ordinality) names FROM unnest(c.confkey) WITH ORDINALITY k(attnum,ordinality) JOIN pg_catalog.pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.attnum) fc ON true
+  GROUP BY c.conrelid
 ), indexes_json AS (
   SELECT i.indrelid, jsonb_agg(jsonb_build_object('name',ci.relname,'unique',i.indisunique,'primary',i.indisprimary,'definition',pg_catalog.pg_get_indexdef(i.indexrelid)) ORDER BY ci.relname) value
   FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class ci ON ci.oid=i.indexrelid GROUP BY i.indrelid

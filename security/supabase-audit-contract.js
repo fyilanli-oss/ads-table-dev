@@ -36,7 +36,12 @@ function safeDefault(value) {
 function safeExpression(value) {
   const text = normalizeText(value);
   if (!text) return null;
-  if (/['"](?:[^'"]{8,})['"]|\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/i.test(text)) return "[redacted-expression]";
+  if (/postgres(?:ql)?:\/\/|\bBearer\s+|-----BEGIN|eyJ[A-Za-z0-9_-]{8,}\.|\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b|(?:provider[-_]?token|ciphertext|pkce_verifier|oauth_state)\s*[=:]/i.test(text)) return "[redacted-expression]";
+  const allowedLiterals = new Set(["meta","google","tiktok","klaviyo","paid","organic","meta_ads","google_ads","tiktok_ads","ga4","email","sms","standard","performance_max","campaign","flow","adset","adgroup","ad","asset_group","campaign_message","flow_message","real","fallback","partial","object","impression","ad_click","session","spend_value","add_to_cart","add_to_cart_value","checkout","checkout_value","purchase","purchase_value","supported","unsupported","unknown"]);
+  for (const match of text.matchAll(/'((?:''|[^'])*)'/g)) {
+    const literal = match[1].replaceAll("''", "'");
+    if (!allowedLiterals.has(literal) && literal !== "^[A-Z]{3}$") return "[redacted-expression]";
+  }
   return text;
 }
 
@@ -50,7 +55,7 @@ function sanitizeMetadata(raw) {
   const sorted = (items, key) => [...(Array.isArray(items) ? items : [])].sort((a, b) => String(a[key] ?? "").localeCompare(String(b[key] ?? "")));
   return {
     migrations: sorted(raw.migrations, "version").map(x => pick(x, ["version", "name"])),
-    relations: sorted(raw.relations, "name").map(x => ({ ...pick(x, ["name", "objectType", "owner", "rlsEnabled", "rlsForced", "estimatedRows", "columnCount", "pkCount", "fkCount", "uniqueCount", "checkCount", "indexCount", "policyCount", "triggerCount", "anonPrivileges", "authenticatedPrivileges", "serviceRolePrivileges", "auditorPrivileges"]), columns: sorted(x.columns, "ordinal").map(c => ({ ...pick(c, ["name", "ordinal", "type", "nullable"]), default: safeDefault(c.default) })), constraints: sorted(x.constraints, "name").map(c => ({ ...pick(c, ["name", "type", "referencedSchema", "referencedTable", "validated", "deferrable"]), definition: safeExpression(c.definition) })), indexes: sorted(x.indexes, "name").map(i => ({ ...pick(i, ["name", "unique", "primary"]), definition: safeExpression(i.definition) })) })),
+    relations: sorted(raw.relations, "name").map(x => ({ ...pick(x, ["name", "objectType", "owner", "rlsEnabled", "rlsForced", "estimatedRows", "columnCount", "pkCount", "fkCount", "uniqueCount", "checkCount", "indexCount", "policyCount", "triggerCount", "anonPrivileges", "authenticatedPrivileges", "serviceRolePrivileges", "auditorPrivileges"]), columns: sorted(x.columns, "ordinal").map(c => ({ ...pick(c, ["name", "ordinal", "type", "nullable"]), default: safeDefault(c.default) })), constraints: sorted(x.constraints, "name").map(c => ({ ...pick(c, ["name", "type", "localColumns", "referencedSchema", "referencedTable", "referencedColumns", "validated", "deferrable", "updateAction", "deleteAction"]), definition: safeExpression(c.definition) })), indexes: sorted(x.indexes, "name").map(i => ({ ...pick(i, ["name", "unique", "primary"]), definition: safeExpression(i.definition) })) })),
     policies: sorted(raw.policies, "identity").map(x => ({ ...pick(x, ["identity", "table", "name", "roles", "command", "permissive"]), using: safeExpression(x.using), withCheck: safeExpression(x.withCheck) })),
     functions: sorted(raw.functions, "identity").map(x => pick(x, ["identity", "owner", "securityDefiner", "volatility", "searchPathConfigured", "publicExecute", "anonExecute", "authenticatedExecute", "serviceRoleExecute"])),
     defaultPrivileges: sorted(raw.defaultPrivileges, "identity").map(x => pick(x, ["identity", "owner", "schema", "objectType", "grantee", "privileges"])),

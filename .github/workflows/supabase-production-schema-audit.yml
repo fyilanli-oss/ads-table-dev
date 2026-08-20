@@ -74,16 +74,12 @@ jobs:
           set +x
           umask 077
           raw_dir="$(mktemp -d)"
-          trap 'rm -rf "$raw_dir" "$HOME/.pg_service.conf"' EXIT
+          trap 'rm -rf "$raw_dir"' EXIT
           if [[ -z "${SUPABASE_AUDIT_DATABASE_URL:-}" ]]; then echo AUDIT_CONNECTION_FAILED >&2; exit 1; fi
-          node - <<'NODE' 2>/dev/null || { echo AUDIT_CONNECTION_FAILED >&2; exit 1; }
-          const fs = require('node:fs');
-          const u = new URL(process.env.SUPABASE_AUDIT_DATABASE_URL);
-          if (!/^postgres(?:ql)?:$/.test(u.protocol)) process.exit(1);
-          const q = value => `'${decodeURIComponent(value).replaceAll("'", "''")}'`;
-          fs.writeFileSync(`${process.env.HOME}/.pg_service.conf`, `[audit]\nhost=${q(u.hostname)}\nport=${q(u.port || '5432')}\ndbname=${q(u.pathname.slice(1))}\nuser=${q(u.username)}\npassword=${q(u.password)}\nsslmode=require\n`);
-          NODE
-          export PGSERVICE=audit
+          node security/libpq-audit-config.js "$raw_dir" 2>/dev/null || { echo AUDIT_CONNECTION_FAILED >&2; exit 1; }
+          mapfile -d '' -t pgvalues <"$raw_dir/audit.env0"
+          [[ "${#pgvalues[@]}" -eq 5 ]] || { echo AUDIT_CONNECTION_FAILED >&2; exit 1; }
+          export PGHOST="${pgvalues[0]}" PGPORT="${pgvalues[1]}" PGDATABASE="${pgvalues[2]}" PGUSER="${pgvalues[3]}" PGSSLMODE="${pgvalues[4]}" PGPASSFILE="$raw_dir/audit.pgpass"
           acceptance="$(psql -XAtq -v ON_ERROR_STOP=1 2>/dev/null <<'SQL' || { echo AUDIT_CONNECTION_FAILED >&2; exit 1; }
           SELECT json_build_object(
             'currentUser',current_user,'readOnly',current_setting('transaction_read_only')='on',

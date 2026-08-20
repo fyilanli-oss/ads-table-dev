@@ -11,7 +11,7 @@ WITH relation_base AS (
   WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm')
 ), relations AS (
   SELECT r.*,
-    (SELECT count(*) FROM information_schema.columns x WHERE x.table_schema='public' AND x.table_name=r.name) AS column_count,
+    (SELECT count(*) FROM pg_catalog.pg_attribute x WHERE x.attrelid=r.oid AND x.attnum > 0 AND NOT x.attisdropped) AS column_count,
     (SELECT count(*) FROM pg_catalog.pg_constraint x WHERE x.conrelid=r.oid AND x.contype='p') AS pk_count,
     (SELECT count(*) FROM pg_catalog.pg_constraint x WHERE x.conrelid=r.oid AND x.contype='f') AS fk_count,
     (SELECT count(*) FROM pg_catalog.pg_constraint x WHERE x.conrelid=r.oid AND x.contype='u') AS unique_count,
@@ -19,14 +19,15 @@ WITH relation_base AS (
     (SELECT count(*) FROM pg_catalog.pg_indexes x WHERE x.schemaname='public' AND x.tablename=r.name) AS index_count,
     (SELECT count(*) FROM pg_catalog.pg_policies x WHERE x.schemaname='public' AND x.tablename=r.name) AS policy_count,
     (SELECT count(*) FROM pg_catalog.pg_trigger x WHERE x.tgrelid=r.oid AND NOT x.tgisinternal) AS trigger_count,
-    ARRAY(SELECT privilege_type FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name=r.name AND grantee='anon' ORDER BY privilege_type) AS anon_privileges,
-    ARRAY(SELECT privilege_type FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name=r.name AND grantee='authenticated' ORDER BY privilege_type) AS authenticated_privileges,
-    ARRAY(SELECT privilege_type FROM information_schema.role_table_grants WHERE table_schema='public' AND table_name=r.name AND grantee='service_role' ORDER BY privilege_type) AS service_role_privileges,
-    ARRAY(SELECT p FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p WHERE has_table_privilege('codex_auditor', format('%I.%I','public',r.name),p) ORDER BY p) AS auditor_privileges
+    ARRAY(SELECT p FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p WHERE pg_catalog.has_table_privilege('anon',r.oid,p) ORDER BY p) AS anon_privileges,
+    ARRAY(SELECT p FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p WHERE pg_catalog.has_table_privilege('authenticated',r.oid,p) ORDER BY p) AS authenticated_privileges,
+    ARRAY(SELECT p FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p WHERE pg_catalog.has_table_privilege('service_role',r.oid,p) ORDER BY p) AS service_role_privileges,
+    ARRAY(SELECT p FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p WHERE pg_catalog.has_table_privilege('codex_auditor',r.oid,p) ORDER BY p) AS auditor_privileges
   FROM relation_base r
 ), columns_json AS (
-  SELECT table_name, jsonb_agg(jsonb_build_object('name',column_name,'ordinal',ordinal_position,'type',data_type,'nullable',is_nullable='YES','default',column_default) ORDER BY ordinal_position) value
-  FROM information_schema.columns WHERE table_schema='public' GROUP BY table_name
+  SELECT c.relname AS table_name, jsonb_agg(jsonb_build_object('name',a.attname,'ordinal',a.attnum,'type',pg_catalog.format_type(a.atttypid,a.atttypmod),'nullable',NOT a.attnotnull,'default',pg_catalog.pg_get_expr(d.adbin,d.adrelid,false)) ORDER BY a.attnum) value
+  FROM pg_catalog.pg_attribute a JOIN pg_catalog.pg_class c ON c.oid=a.attrelid JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace JOIN pg_catalog.pg_type t ON t.oid=a.atttypid LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+  WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m') AND a.attnum > 0 AND NOT a.attisdropped GROUP BY c.relname
 ), constraints_json AS (
   SELECT c.conrelid, jsonb_agg(jsonb_build_object('name',c.conname,'type',c.contype,'definition',pg_catalog.pg_get_constraintdef(c.oid,false),'referencedSchema',rn.nspname,'referencedTable',rc.relname,'validated',c.convalidated,'deferrable',c.condeferrable) ORDER BY c.conname) value
   FROM pg_catalog.pg_constraint c LEFT JOIN pg_catalog.pg_class rc ON rc.oid=c.confrelid LEFT JOIN pg_catalog.pg_namespace rn ON rn.oid=rc.relnamespace GROUP BY c.conrelid

@@ -1,0 +1,14 @@
+{
+  "relation": "platform_connection_tokens",
+  "auditorPrivileges": [],
+  "anonPrivileges": [],
+  "authenticatedPrivileges": [],
+  "serviceRolePrivileges": ["DELETE", "INSERT", "SELECT", "UPDATE"],
+  "columnsVisibleFromCatalog": [
+    "access_token",
+    "refresh_token",
+    "access_token_envelope",
+    "refresh_token_envelope",
+    "ciphertext"
+  ]
+}

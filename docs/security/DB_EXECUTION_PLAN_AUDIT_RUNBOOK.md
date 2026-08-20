@@ -18,6 +18,8 @@ The environment and secret do not exist as part of this PR; an administrator cre
 3. After validation and environment reviewer approval, `production-audit` verifies the role, transaction read-only setting, database connection, Dataset V2 read-only boundary, sensitive token/auth/OAuth denials, and migration-ledger access. Any mismatch stops before introspection.
 4. The job reads only catalog metadata and ledger version/name evidence, converts raw temporary output through an allowlist, validates redaction, writes a short job summary, and uploads the two redacted reports for 7 days.
 
+Connection composition decodes and validates the URI without placing it on a command line. Host, port, database, user, and mandatory SSL mode are passed separately to libpq; the escaped password is held only in a mode-`600` temporary `.pgpass` file. Catalog visibility comes from `pg_catalog` rather than the auditor's application-column grants, and fixed-role effective privileges are evaluated independently for `anon`, `authenticated`, and `service_role`.
+
 The summary reports PASS/FAIL, acceptance state, relation and ledger counts, classification counts, artifact name, run ID, and commit only. Download `db-execution-plan-drift-report.json` and `.md` from the run artifact and share only those files with the designated management reviewers. Never share the temporary raw metadata file.
 
 ## Failure and rollback

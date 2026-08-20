@@ -1,0 +1,137 @@
+name: Supabase production schema audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-schema-audit
+  cancel-in-progress: false
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main branch
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "AUDIT_MAIN_BRANCH_REQUIRED" >&2
+            exit 1
+          fi
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Setup Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "22.18.0"
+      - name: Locked install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit fixture and SQL contracts
+        run: node --test tests/supabase-schema-audit.test.js
+      - name: Workflow security contract
+        run: node --test tests/supabase-schema-audit-workflow.test.js
+      - name: Full regression suite
+        run: npm test
+
+  production-audit:
+    needs: validation
+    if: github.ref == 'refs/heads/main'
+    environment: production-db-audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Setup Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "22.18.0"
+      - name: Locked install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Ensure PostgreSQL client
+        shell: bash
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends postgresql-client >/dev/null
+          fi
+          psql --version
+      - name: Accept connection and create redacted reports
+        id: audit
+        shell: bash
+        env:
+          SUPABASE_AUDIT_DATABASE_URL: ${{ secrets.SUPABASE_AUDIT_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          raw_dir="$(mktemp -d)"
+          trap 'rm -rf "$raw_dir" "$HOME/.pg_service.conf"' EXIT
+          if [[ -z "${SUPABASE_AUDIT_DATABASE_URL:-}" ]]; then echo AUDIT_CONNECTION_FAILED >&2; exit 1; fi
+          node - <<'NODE' 2>/dev/null || { echo AUDIT_CONNECTION_FAILED >&2; exit 1; }
+          const fs = require('node:fs');
+          const u = new URL(process.env.SUPABASE_AUDIT_DATABASE_URL);
+          if (!/^postgres(?:ql)?:$/.test(u.protocol)) process.exit(1);
+          const q = value => `'${decodeURIComponent(value).replaceAll("'", "''")}'`;
+          fs.writeFileSync(`${process.env.HOME}/.pg_service.conf`, `[audit]\nhost=${q(u.hostname)}\nport=${q(u.port || '5432')}\ndbname=${q(u.pathname.slice(1))}\nuser=${q(u.username)}\npassword=${q(u.password)}\nsslmode=require\n`);
+          NODE
+          export PGSERVICE=audit
+          acceptance="$(psql -XAtq -v ON_ERROR_STOP=1 2>/dev/null <<'SQL' || { echo AUDIT_CONNECTION_FAILED >&2; exit 1; }
+          SELECT json_build_object(
+            'currentUser',current_user,'readOnly',current_setting('transaction_read_only')='on',
+            'databaseConnect',has_database_privilege(current_database(),'CONNECT'),
+            'datasetSelect',has_table_privilege('public.performance_dataset_rows_v2','SELECT'),
+            'datasetInsert',has_table_privilege('public.performance_dataset_rows_v2','INSERT'),
+            'datasetUpdate',has_table_privilege('public.performance_dataset_rows_v2','UPDATE'),
+            'datasetDelete',has_table_privilege('public.performance_dataset_rows_v2','DELETE'),
+            'datasetTruncate',has_table_privilege('public.performance_dataset_rows_v2','TRUNCATE'),
+            'tokenTableSelect',has_table_privilege('public.platform_connection_tokens','SELECT'),
+            'accessEnvelopeSelect',has_column_privilege('public.platform_connection_tokens','access_token_envelope','SELECT'),
+            'refreshEnvelopeSelect',has_column_privilege('public.platform_connection_tokens','refresh_token_envelope','SELECT'),
+            'legacyAccessSelect',has_column_privilege('public.platform_connections','access_token','SELECT'),
+            'legacyRefreshSelect',has_column_privilege('public.platform_connections','refresh_token','SELECT'),
+            'authUsersSelect',has_table_privilege('auth.users','SELECT'),
+            'oauthTransactionsSelect',has_table_privilege('public.oauth_transactions','SELECT'),
+            'migrationLedgerSelect',has_table_privilege('supabase_migrations.schema_migrations','SELECT'));
+          SQL
+          )"
+          ACCEPTANCE="$acceptance" node -e "require('./security/supabase-audit-contract').assertAcceptance(JSON.parse(process.env.ACCEPTANCE))" 2>/dev/null || { echo AUDIT_PRIVILEGE_CONTRACT_FAILED >&2; exit 1; }
+          psql -XAtq -v ON_ERROR_STOP=1 -f docs/security/sql/DB_EXECUTION_PLAN_AUDIT.sql >"$raw_dir/audit.json" 2>/dev/null || { echo AUDIT_QUERY_FAILED >&2; exit 1; }
+          node scripts/supabase-schema-audit.js report "$raw_dir/audit.json" audit-output || { echo AUDIT_REPORT_INVALID >&2; exit 1; }
+          node scripts/supabase-schema-audit.js validate audit-output/db-execution-plan-drift-report.json || { echo AUDIT_REPORT_INVALID >&2; exit 1; }
+      - name: Write safe job summary
+        shell: bash
+        env:
+          RUN_ID: ${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          node - <<'NODE' >>"$GITHUB_STEP_SUMMARY"
+          const r = require('./audit-output/db-execution-plan-drift-report.json');
+          console.log(`# Supabase schema audit: ${r.summary.status}`);
+          console.log(`- Role/read-only acceptance: ${r.databaseRole} / ${r.readOnlyVerified}`);
+          console.log(`- Relations / ledger: ${r.summary.relationCount} / ${r.summary.ledgerCount}`);
+          for (const [key, value] of Object.entries(r.summary.driftCounts)) console.log(`- ${key}: ${value}`);
+          console.log(`- Artifact: db-execution-plan-drift-report-${process.env.RUN_ID}`);
+          console.log(`- Run / commit: ${process.env.RUN_ID} / ${process.env.COMMIT_SHA}`);
+          NODE
+      - name: Upload redacted reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: db-execution-plan-drift-report-${{ github.run_id }}
+          path: |
+            audit-output/db-execution-plan-drift-report.json
+            audit-output/db-execution-plan-drift-report.md
+          retention-days: 7
+          if-no-files-found: error
+          overwrite: false
+      - name: Remove temporary reports
+        if: always()
+        run: rm -rf audit-output

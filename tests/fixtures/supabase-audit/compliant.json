@@ -1,0 +1,7 @@
+{
+  "migrations": [{"version":"20260816101220","name":"create_dataset_v2"}],
+  "relations": [{"name":"performance_dataset_rows_v2","objectType":"table","owner":"app_owner","rlsEnabled":true,"rlsForced":true,"estimatedRows":0,"columnCount":1,"pkCount":1,"fkCount":0,"uniqueCount":0,"checkCount":1,"indexCount":1,"policyCount":1,"triggerCount":0,"anonPrivileges":[],"authenticatedPrivileges":[],"serviceRolePrivileges":["SELECT"],"auditorPrivileges":["SELECT"],"columns":[{"name":"id","ordinal":1,"type":"uuid","nullable":false,"default":"gen_random_uuid()"}],"constraints":[],"indexes":[]}],
+  "policies": [],
+  "functions": [],
+  "defaultPrivileges": []
+}

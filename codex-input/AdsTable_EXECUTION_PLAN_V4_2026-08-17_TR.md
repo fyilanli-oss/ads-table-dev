@@ -1346,3 +1346,11 @@ Bu V4 plan ile:
 **Sonraki adım:** Önce DB–Execution Plan drift kontrolü, ardından E2 Dataset V2 canlı acceptance.
 
 **E1-T6D production dry-run acceptance ve write artefaktı (2026-08-19):** `production-token-backfill` GitHub Environment oluşturuldu; 3 variable ve 3 secret provision edildi. `main` üzerindeki `f97f1934a98016f129a1bc79263629c2ec8384fa` commit'i için **Provider token production dry-run** run `32245732566` genel, validation ve production dry-run sonuçları success oldu. Redacted sonuç: 9 scanned, 9 eligible, 0 written, 0 already encrypted, 0 rotation candidate, 0 empty, 0 failed ve `nextCursor=null`; dry-run acceptance tamamlandı. Daha sonraki controlled write 7 kayıt yazdı ve iki auth-orphan kayıtta fail-closed oldu; bu kayıtlar guarded cleanup ile kaldırıldı. Güncel production kabulü 7 connected/encrypted, 0 orphan ve 0 missing encrypted'dır; encrypted runtime refresh kabulü de tamamlanmıştır.
+
+### DB–Execution Plan drift kontrolü — audit artefaktı (2026-08-20)
+
+**Durum:** `artefact ready / GitHub audit environment provisioning and live read-only audit pending`
+
+E1 kapalı kalır. DB–Execution Plan drift kontrolü başlamıştır; ilk manuel inventory ledger/repository ve legacy schema drift'i bulunduğunu göstermiş, uzun SQL sonuçlarının sohbet ortamına manuel taşınması bırakılmıştır. Dedicated `codex_auditor` read-only rolü hazırlanmıştır. Codex Cloud'un doğrudan PostgreSQL bağlantısı ağ sınırı nedeniyle kullanılamadığından bu PR yalnız manual, protected GitHub audit workflow'unu ve redacted evidence üretimini hazırlar.
+
+Workflow henüz production'da çalıştırılmamıştır. `production-db-audit` GitHub Environment oluşturulmamış, audit secretı eklenmemiş ve final drift report üretilmemiştir. E2 başlamamıştır. Drift raporu yönetici incelemesinden geçmeden migration, grant veya foreign-key düzeltmesi hazırlanmayacaktır; bu kayıt drift sonuçlarını tahmin ederek yeni plan taskları oluşturmaz.

@@ -8,9 +8,13 @@ test('security workflow has safe triggers, permissions, concurrency, and pinned 
   assert.match(workflow, /^on:\n  pull_request:\n  push:\n    branches: \[main\]/m);
   assert.match(workflow, /^permissions:\n  contents: read$/m);
   assert.match(workflow, /^concurrency:/m);
-  const actions = [...workflow.matchAll(/uses: (actions\/[\w-]+)@([^\s]+)/g)];
-  assert.equal(actions.length, 2); for (const [, , revision] of actions) assert.match(revision, /^[a-f0-9]{40}$/);
-  assert.match(workflow, /persist-credentials: false/); assert.match(workflow, /node-version: "22\.18\.0"/);
+  const actions = [...workflow.matchAll(/uses: (actions\/[\w-]+)@([^\s]+)/g)].map(match => `${match[1]}@${match[2]}`);
+  assert.deepEqual(actions, [
+    'actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd',
+    'actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903'
+  ]);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /node-version: "22\.18\.0"/);
 });
 test('security workflow uses locked tests without production capabilities or credentials', () => {
   assert.match(workflow, /npm ci --ignore-scripts --no-audit --no-fund/);

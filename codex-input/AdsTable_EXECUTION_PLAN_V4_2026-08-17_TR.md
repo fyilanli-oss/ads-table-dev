@@ -1333,6 +1333,14 @@ Bu V4 plan ile:
 
 **Gerçekleşen (E1-T6E — plaintext nulling tamamlandı):** Global plaintext access token 0, plaintext refresh token 0 ve herhangi bir plaintext token 0 olarak kabul edildi. Encrypted envelope'lar korunmuştur. Fiziksel plaintext kolon drop işlemi E13 Legacy Retirement kapsamına taşındı.
 
+**Sapma:** İlk backfill'de iki auth-orphan bağlantı görüldü ve guarded cleanup ile kaldırıldı. Production config incident'ı Production scope'undaki `TIKTOK_SANDBOX_ACCESS_TOKEN` nedeniyle oluştu; PR #15 secret-free diagnostic yalnız variable ismini gösterdi ve variable kaldırıldı. Plaintext kolonların fiziksel drop işlemi T6'dan E13 Legacy Retirement kapsamına taşındı.
+
+**Kabul:** Final Production kabulü 7 connected, 7 encrypted, 0 auth-orphan, 0 connected-without-encrypted-token, 0 plaintext access ve 0 plaintext refresh sonucunu verdi. Encryption enabled = `true`, legacy read enabled = `false`; site/login başarılıdır ve legacy read kapalıyken Refresh Completed sonucu alınmıştır. Ciphertext/AAD tamper reddedilir; token veya secret log ve evidence artefaktlarına girmez.
+
+**Rollback:** Güvenli olmayan query-controlled/session-bound OAuth identity yolu geri getirilemez ve active encryption key silinemez. Gerekli eski keyler rotation/rollback süresi boyunca keyring'de korunur; encrypted envelope'lar rollback amacıyla silinmez ve plaintext tokenlar geri yüklenmez. Runtime sorunu olursa yeni bağlantı/refresh kontrollü durdurulur; plaintext identity/token yoluna dönülmez. Fiziksel kolon drop E13 stabilizasyon kapısına kadar uygulanmaz.
+
+**Evidence:** E1-T6B schema/RLS/grant acceptance tamamlandı. Production dry-run 9 eligible; controlled write 7 written / 2 auth-orphan failure verdi ve guarded orphan cleanup sonrasında final 7 connected / 7 encrypted / 0 auth-orphan / 0 missing encrypted kabulü alındı. Plaintext nulling sonrasında global plaintext access ve refresh sayıları 0 oldu. Production encryption `true`, legacy read `false` durumunda encrypted-only Refresh Completed sonucu alındı. PR #15 secret-free diagnostic production config incident'ında yalnız unsafe variable ismini raporladı. E1-T7 dedicated `test:security` komutu ve secretsiz CI kapısı security ve full regression paketlerini başarıyla çalıştırır.
+
 **E1 kapanış evidence:** Production OAuth/session güvenlik kontrolleri, fail-closed production config, encrypted-only token runtime, plaintext retirement ve CI security regression tamamlandı. Site ve login çalışıyor; legacy read kapalıyken Refresh Completed sonucu alındı. E1-T7 security suite deterministik `test:security` komutunda toplandı; CI production secret/environment kullanmadan security ve full regression paketlerini çalıştırır. E1 `Done`.
 
 **Sonraki adım:** Önce DB–Execution Plan drift kontrolü, ardından E2 Dataset V2 canlı acceptance.

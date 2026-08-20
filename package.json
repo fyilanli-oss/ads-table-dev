@@ -3,7 +3,8 @@
     "start": "node server.js",
     "tokens:backfill:dry-run": "node scripts/provider-token-backfill-dry-run.js",
     "tokens:backfill:write": "node scripts/provider-token-backfill-write.js",
-    "test": "node --test funnel-core/tests/*.test.js tests/*.test.js"
+    "test": "node --test funnel-core/tests/*.test.js tests/*.test.js",
+    "test:security": "node --test tests/oauth-security-baseline.test.js tests/oauth-transaction-store.test.js tests/oauth-authorization-contract.test.js tests/production-config.test.js tests/provider-token-vault.test.js tests/provider-token-store.test.js tests/provider-token-backfill.test.js tests/provider-token-backfill-operator.test.js tests/provider-token-backfill-write-operator.test.js tests/provider-token-backfill-workflow.test.js tests/provider-token-backfill-write-workflow.test.js tests/provider-token-schema.test.js tests/e1-t6d-auth-orphan-cleanup.test.js tests/e1-t6e-plaintext-token-nulling.test.js tests/security-regression-contract.test.js tests/security-regression-workflow.test.js"
   },
   "dependencies": {
     "express": "^4.18.3",

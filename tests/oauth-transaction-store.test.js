@@ -64,6 +64,23 @@ test('atomic consume permits one use and rejects replay', async () => {
   assert.equal(await store.consume({state: created.state, provider: 'meta', redirectUri: 'https://app/callback'}), null);
 });
 
+test('unknown or tampered state is rejected without an identity fallback', async () => {
+  const store = createOAuthTransactionStore({client: memoryClient()});
+  const created = await store.create({userId: 'user-a', provider: 'meta', redirectUri: 'https://app/callback'});
+  assert.equal(await store.consume({state: `${created.state}tampered`, provider: 'meta', redirectUri: 'https://app/callback'}), null);
+  assert.equal((await store.consume({state: created.state, provider: 'meta', redirectUri: 'https://app/callback'})).user_id, 'user-a');
+});
+
+test('consumed transaction owner remains authoritative over cross-user request input', async () => {
+  const store = createOAuthTransactionStore({client: memoryClient()});
+  const created = await store.create({userId: 'user-a', provider: 'meta', redirectUri: 'https://app/callback'});
+  const untrustedRequest = {query: {user_id: 'user-b'}, body: {owner_user_id: 'user-b'}};
+  const transaction = await store.consume({state: created.state, provider: 'meta', redirectUri: 'https://app/callback'});
+  assert.equal(transaction.user_id, 'user-a');
+  assert.notEqual(transaction.user_id, untrustedRequest.query.user_id);
+  assert.notEqual(transaction.user_id, untrustedRequest.body.owner_user_id);
+});
+
 test('provider and exact redirect URI mismatches are rejected without consuming', async () => {
   const store = createOAuthTransactionStore({client: memoryClient()});
   const created = await store.create({userId: 'user-1', provider: 'meta', redirectUri: 'https://app/callback'});

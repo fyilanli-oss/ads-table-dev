@@ -98,6 +98,20 @@ test('shared OAuth guard rejects an authenticated user without connect access', 
   assert.deepEqual(response.body, {error: 'Subscription inactive', status: 'expired'});
 });
 
+test('inactive access statuses never grant OAuth connect capability', async () => {
+  for (const status of ['expired', 'suspended', 'deleted']) {
+    const response = responseRecorder();
+    const guard = createRequireConnectAccessForOAuth({
+      requireUser: async () => ({id: 'verified-user'}),
+      getUserSubscription: async () => ({status}),
+      getAccessByStatus: () => ({blocked: status !== 'expired', connect: false})
+    });
+    assert.equal(await guard({query: {}, body: {user_id: 'untrusted-user'}}, response), null);
+    assert.equal(response.statusCode, 403);
+    assert.deepEqual(response.body, {error: 'Subscription inactive', status});
+  }
+});
+
 test('dashboard starts OAuth with a bearer-authenticated JSON handshake', () => {
   assert.match(dashboardSource, /startAuthenticatedOAuth/);
   assert.match(dashboardSource, /response_mode=json/);

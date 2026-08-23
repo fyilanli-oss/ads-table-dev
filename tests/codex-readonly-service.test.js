@@ -34,6 +34,40 @@ test("the relation boundary is a singleton allowlist disjoint from the sensitive
   }
 });
 
+test("Dataset V2 contract exposes the complete repository constraint and index inventory",async()=>{
+  const response=await createCodexReadonlyService({client:fakeClient()}).execute("dataset-v2-contract");
+  assert.deepEqual(response.expectedConstraintNames,[
+    "performance_dataset_rows_v2_pkey",
+    "performance_dataset_rows_v2_user_id_fkey",
+    "performance_dataset_rows_v2_platform_chk",
+    "performance_dataset_rows_v2_traffic_type_chk",
+    "performance_dataset_rows_v2_source_system_chk",
+    "performance_dataset_rows_v2_channel_chk",
+    "performance_dataset_rows_v2_campaign_type_chk",
+    "performance_dataset_rows_v2_root_type_chk",
+    "performance_dataset_rows_v2_parent_type_chk",
+    "performance_dataset_rows_v2_entity_type_chk",
+    "performance_dataset_rows_v2_source_confidence_chk",
+    "performance_dataset_rows_v2_source_currency_chk",
+    "performance_dataset_rows_v2_target_currency_chk",
+    "performance_dataset_rows_v2_fx_rate_chk",
+    "performance_dataset_rows_v2_metric_support_object_chk",
+    "performance_dataset_rows_v2_raw_object_chk",
+    "performance_dataset_rows_v2_synthetic_chk",
+    "performance_dataset_rows_v2_source_semantics_chk",
+    "performance_dataset_rows_v2_hierarchy_chk",
+    "performance_dataset_rows_v2_metric_support_keys_chk",
+    "performance_dataset_rows_v2_metric_value_support_chk"
+  ]);
+  assert.deepEqual(response.expectedIndexNames,[
+    "performance_dataset_rows_v2_pkey",
+    "performance_dataset_rows_v2_canonical_uidx",
+    "performance_dataset_rows_v2_user_date_idx",
+    "performance_dataset_rows_v2_account_scope_date_idx",
+    "performance_dataset_rows_v2_entity_history_idx"
+  ]);
+});
+
 test("safe count exposes only a global integer and no source rows",async()=>{
   const response=await createCodexReadonlyService({client:fakeClient({count:42,data:[{user_id:"never-exposed"}],error:null})}).execute("dataset-v2-safe-counts");
   assert.deepEqual(response,{datasetV2Rows:42});

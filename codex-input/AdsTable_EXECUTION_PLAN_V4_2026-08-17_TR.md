@@ -1345,6 +1345,42 @@ Bu V4 plan ile:
 
 **Sonraki adım:** Önce DB–Execution Plan drift kontrolü, ardından E2 Dataset V2 canlı acceptance.
 
+### E2-PRE-T1 task aynası — Kalıcı Codex–Supabase HTTPS Read-Only Gateway
+
+**Amaç:** Codex task'larının production Dataset V2 sınırına PostgreSQL/pooler veya GitHub Actions olmadan, AdsTable backend üzerinden HTTPS ve salt-okuma olarak erişebilmesi.
+
+**Mevcut durum:** PR #18 audit workflow'u operasyonel olarak park edilmiştir. Codex runtime service-role credential'ı taşımaz; production backend mevcut Supabase server client'ını kullanır.
+
+**Planlanan:** Beş sabit authenticated GET operasyonu, constant-time gateway auth, fail-closed response contract/redaction, güvenli audit log, no-store ve per-instance rate limit ile kalıcı gateway sınırı.
+
+**Planlanan durum:** Codex → authenticated HTTPS GET → AdsTable backend → server-side Supabase client → fixed Dataset V2 SELECT/count → allowlisted JSON zinciri.
+
+**Kapsam:** `health`, `dataset-v2-contract`, `dataset-v2-access-boundary`, `dataset-v2-safe-counts` ve `migration-inventory`; ayrı auth/contract/service/route modülleri, ince server composition, fake-client testleri ve runbook.
+
+**Kapsam dışı:** PostgreSQL/pooler, GitHub Actions değişikliği, migration/RPC/database role, serbest SQL, write/provider/OAuth işlemi, frontend/dashboard ve E2-T3–E2-T8 kabulü. Supabase personal access token, Management API database-query endpoint'i, CLI/npm session artefaktı ve bunlara fallback kullanımı ayrıca yasaktır.
+
+**Bağımlılıklar:** Production backend'in mevcut `SUPABASE_URL` ve `SUPABASE_SERVICE_ROLE_KEY` değerleri ile aynı `ADSTABLE_CODEX_READONLY_TOKEN` değerinin merge sonrasında Vercel Production ve Codex Environment'a eklenmesi.
+
+**Uygulama adımları:** Mevcut composition karakterize edildi; auth, contract, injected service ve route katmanları eklendi; server'a delegation kaydı yapıldı; regression/security/secret-free kontrolleri ve operasyon runbook'u hazırlandı.
+
+**Kabul kriterleri:** Repository kapısında fixed operation/auth/SELECT contract'ı, 401/404/400/429/502/503 güvenli cevapları, no-store, CORS yokluğu, fail-closed redaction ve secretsiz structured audit testlerle doğrulanır. Production kabulü health/boundary `200`, eksik/yanlış auth `401`, unknown `404` ve yeni task tekrarını gerektirir.
+
+**Test planı:** Gateway unit/integration paketi, mevcut security regression, full `npm test`, değişen JavaScript için `node --check`, `git diff --check` ve credential/private-key/URI pattern scan.
+
+**Rollback planı:** Token önce Vercel'den, sonra Codex Environment'tan kaldırılır; deploy geri alınır veya yenilenir; gerekirse route registration revert edilir. Schema/data değişmediğinden database rollback yoktur.
+
+**Gözlemlenebilirlik:** Yalnız request ID, operation, status, duration, contract version ve rate-limit sonucu loglanır; credential, URL, raw error, IP, identity veya satır verisi loglanmaz.
+
+**Güvenlik ve veri etkisi:** Yalnız fixed `head/count` SELECT çağrısı vardır; mutation/RPC yoktur. Service-role backend sınırından çıkmaz, response allowlist doğrulamasından geçer ve production verisi/schema'sı değişmez.
+
+**Gerçekleşen:** Repository düzeyinde bağımsız auth, contract, service ve route modülleri; `server.js` ince composition kaydı; fake client otomatik testleri; secretsiz environment örneği ve merge sonrası smoke/rollback runbook'u hazırlanmıştır. Production deploy ve yeni Codex task smoke acceptance henüz yapılmamıştır.
+
+**Sapmalar:** Yok. GitHub Actions, PostgreSQL/pooler, migration/RPC/database role, serbest SQL, frontend değişikliği ve service-role'ın Codex'e açılması uygulanmamıştır.
+
+**Evidence:** `tests/codex-readonly-*.test.js` auth, allowlist, fixed SELECT/count çağrı envanteri, sensitive relation/field denylist, response doğrulama, raw error sanitization, cache/CORS, rate limit, request ID, güvenli log ve route composition kontrollerini taşır. Static security guard personal access token, Management API database-query, CLI session artefaktı, mutation ve RPC kanallarının gateway runtime kaynaklarında bulunmadığını doğrular. `docs/codex-readonly-gateway-runbook.md` tam olarak iki environment girişini, production smoke komutlarını ve database rollback gerektirmeyen geri dönüş sırasını tanımlar. Full regression ve secret scan sonuçları PR evidence'ına kaydedilir.
+
+**Durum:** Başlangıç kaydı `Not started`; güncel durum `Verification` — repository uygulaması doğrulanmıştır; production deploy ve farklı yeni Codex task kabulü tamamlanmadan `Done` değildir ve E2 Dataset V2 kabulü tamamlanmış sayılmaz.
+
 **E1-T6D production dry-run acceptance ve write artefaktı (2026-08-19):** `production-token-backfill` GitHub Environment oluşturuldu; 3 variable ve 3 secret provision edildi. `main` üzerindeki `f97f1934a98016f129a1bc79263629c2ec8384fa` commit'i için **Provider token production dry-run** run `32245732566` genel, validation ve production dry-run sonuçları success oldu. Redacted sonuç: 9 scanned, 9 eligible, 0 written, 0 already encrypted, 0 rotation candidate, 0 empty, 0 failed ve `nextCursor=null`; dry-run acceptance tamamlandı. Daha sonraki controlled write 7 kayıt yazdı ve iki auth-orphan kayıtta fail-closed oldu; bu kayıtlar guarded cleanup ile kaldırıldı. Güncel production kabulü 7 connected/encrypted, 0 orphan ve 0 missing encrypted'dır; encrypted runtime refresh kabulü de tamamlanmıştır.
 
 ### DB–Execution Plan drift kontrolü — audit artefaktı (2026-08-20)

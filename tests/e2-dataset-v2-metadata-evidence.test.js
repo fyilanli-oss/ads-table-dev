@@ -90,6 +90,6 @@ test("evidence is redacted and E2 task states match the current execution plan",
  assert.match(plan,/E2-T4 — `Verification`/);
  assert.match(plan,/E2-T5 — `Verification`/);
  assert.match(plan,/E2-T6 — `Verification`/);
- assert.match(plan,/E2-T7 — `Not started`/);
+ assert.match(plan,/E2-T7 — `Verification`/);
  assert.match(plan,/E2-T8 — `Verification`/);
 });

@@ -598,7 +598,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3, E2-T4, E2-T5, E2-T6 ve E2-T8 `Verification`; E2-T7 `Not started`.
+**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3, E2-T4, E2-T5, E2-T6, E2-T7 ve E2-T8 `Verification`.
 
 ### Planlanan işler
 
@@ -608,7 +608,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T4 — `Verification`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü hazırlık paketi hazır; canlı acceptance bekliyor.
 - **E2-T5 — `Verification`:** 35 vakalı rollback-only invalid canonical-row rejection hazırlık paketi hazır; canlı preflight/transaction/postcheck bekliyor.
 - **E2-T6 — `Verification`:** Rollback-only User A/User B/anon/authenticated mutation/service-role RLS acceptance hazırlık paketi tamamlandı; canlı preflight/transaction/postcheck ve review bekliyor.
-- **E2-T7 — `Not started`:** Fixture cleanup ve V1/snapshot no-change kanıtı.
+- **E2-T7 — `Verification`:** Birleşik rollback cleanup ve V1/V2/snapshot/security no-change repository paketi hazır; canlı baseline/final evidence ve review bekliyor.
 - **E2-T8 — `Verification`:** Ledger reconciliation ve corrective migration sırası tamamlandı; immutable baseline manifest hazır. Eski 31 migration SQL body’si repository’de bulunmadığı ve fresh-project restore henüz doğrulanmadığı için restore readiness açık.
 
 ### Kabul kriterleri
@@ -1494,7 +1494,7 @@ Bu V4 plan ile:
 
 ### E2-T6 task aynası — rollback-only Dataset V2 RLS acceptance hazırlığı
 
-**Mevcut durum:** E2-T1/T2 `Done`; E2-T3/T4/T5/T6/T8 `Verification`; E2-T7 `Not started`. E2-T6 repository preparation tamamlandı, canlı acceptance yapılmadı.
+**Mevcut durum:** E2-T1/T2 `Done`; E2-T3/T4/T5/T6/T7/T8 `Verification`. E2-T6 repository preparation tamamlandı, canlı acceptance yapılmadı.
 
 **Planlanan durum:** Ayrı insan onayından sonra exact read-only preflight, iki izole eligible kullanıcıyla tek intact rollback-only User A/User B/anon/service-role transaction, redacted evidence conversion ve read-only postcheck; review tamamlanana kadar E2-T6 `Verification`.
 
@@ -1509,3 +1509,40 @@ Bu V4 plan ile:
 **Gerçekleşen:** Repository preparation tamamlandı. Canlı preflight çalıştırılmadı; canlı fixture yazılmadı; User A/User B/anon/service-role canlı matrisi çalıştırılmadı; canlı postcheck çalıştırılmadı; Management API kullanılmadı; data/schema/policy/grant/ledger/deployment değişmedi.
 
 **Durum:** `Verification` — canlı operation, postcheck ve redacted evidence insan review'ı tamamlanmadan E2-T6 `Done` değildir.
+
+
+### E2-T7 task aynası — fixture cleanup ve no-change acceptance hazırlığı
+
+**Amaç:** E2-T3–T6 outer rollback işlemleri sonrasında sıfır aggregate fixture residue ve Dataset V2/V1/snapshot ile ledger/OAuth/token/schema/RLS/policy/grant exact no-change kanıtı üretmek.
+
+**Mevcut durum:** E2-T1/T2 `Done`; E2-T3/T4/T5/T6/T7/T8 `Verification`. Repository preparation tamamlandı; canlı evidence ve insan review'ı bekleniyor.
+
+**Planlanan durum:** Ayrı insan onaylı baseline, rollback-only operation serisi, final read-only parity check ve redacted evidence review; tamamlanana kadar `Verification`.
+
+**Kapsam:** Exact T3/T4 ve escaped-prefix T5/T6 aggregate residue, V2/V1/snapshot parity, ledger/OAuth/token/schema/index/RLS/policy/grant ve persistent-object kontrolleri.
+
+**Kapsam dışı:** Canlı SQL, otomatik/ad hoc DELETE, fixture recovery, Management API, data/schema/policy/grant/ledger/environment/deployment değişikliği ve E2-T8 restore doğrulaması.
+
+**Bağımlılıklar:** Merge edilmiş E2-T3–T6 SQL/runbook'ları, metadata evidence, ledger baseline, exact approved main/checksum ve her canlı adım için ayrı insan onayı.
+
+**Uygulama adımları:** Exact source doğrula; baseline gates'i çalıştır; sayımları operator-local tut; ayrı onaylı rollback-only seriyi yürüt; üç placeholder'ı lokal doldur; final check ve converter çalıştır; insan review'ı al.
+
+**Kabul kriterleri:** Dört residue ve total sıfır; V2/V1/snapshot exact; tüm security/metadata parity PASS; persistent object sıfır; redacted evidence PASS.
+
+**Test planı:** Dedicated artifact/converter, önceki E2, metadata, ledger, full/security, syntax, SQL safety, diff ve leak taramaları. Static testler canlı kabul değildir.
+
+**Rollback planı:** Repository değişikliği commit revert ile geri alınır. Canlı acceptance'ın tek normal cleanup'ı transaction outer `ROLLBACK`tır; residue halinde STOP, cleanup yoktur.
+
+**Gözlemlenebilirlik:** Yalnız allowlisted check kodları, boolean sonuçlar ve aggregate residue; production count/row/identity committed evidence'a girmez.
+
+**Güvenlik ve veri etkisi:** Preparation-only; credential/PII/raw row yoktur. Canlı data, schema, policy, grant, ledger veya deployment etkisi oluşmadı.
+
+**Planlanan:** İnsan onaylı canlı baseline, rollback-only seri, final no-change evidence ve review.
+
+**Gerçekleşen:** Repository preparation tamamlandı. Canlı baseline, fixture cleanup ve final check çalıştırılmadı. Management API kullanılmadı. Data/schema/policy/grant/ledger/deployment değişmedi.
+
+**Sapmalar:** Yok; canlı execution bilinçli olarak ayrı onaya bırakıldı.
+
+**Evidence:** Fixture inventory, no-change contract, iki read-only SQL, redacted converter, runbook ve static regression testleri.
+
+**Durum:** `Verification` — canlı final evidence ve insan review'ı olmadan `Done` değildir.

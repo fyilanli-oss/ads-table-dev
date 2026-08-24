@@ -9,7 +9,7 @@ const files = Object.freeze([
   'tests/e1-t6d-auth-orphan-cleanup.test.js', 'tests/e1-t6e-plaintext-token-nulling.test.js',
   'tests/security-regression-contract.test.js', 'tests/security-regression-workflow.test.js',
   'tests/db-ledger-t2-artifacts.test.js', 'tests/e2-t3-roundtrip-artifacts.test.js', 'tests/e2-t4-upsert-artifacts.test.js',
-  'tests/e2-t5-rejection-artifacts.test.js', 'tests/e2-t6-rls-artifacts.test.js'
+  'tests/e2-t5-rejection-artifacts.test.js', 'tests/e2-t6-rls-artifacts.test.js', 'tests/e2-t7-cleanup-artifacts.test.js'
 ]);
 const groups = Object.freeze({
   auth: ['tests/oauth-security-baseline.test.js'], idor: ['tests/oauth-authorization-contract.test.js'],

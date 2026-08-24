@@ -9,9 +9,6 @@ const {createOAuthTransactionStore}=require("./security/oauth-transaction-store"
 const {loadProductionConfig,parseExplicitBoolean}=require("./security/production-config");
 const {createProviderTokenVaultFromEnv}=require("./security/provider-token-vault");
 const {createProviderTokenStore}=require("./security/provider-token-store");
-const {createCodexReadonlyAuth}=require("./security/codex-readonly-auth");
-const {createCodexReadonlyService}=require("./services/codex-readonly-service");
-const {createCodexReadonlyRouter}=require("./routes/codex-readonly-routes");
 const productionConfig=loadProductionConfig();
 const app=express(); const PORT=process.env.PORT||3000;
 app.set("trust proxy",1); app.use(express.json());
@@ -46,7 +43,6 @@ const providerTokenEncryptionEnabled=parseExplicitBoolean(process.env.PROVIDER_T
 const providerTokenLegacyReadsEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_LEGACY_READ_ENABLED,true,"PROVIDER_TOKEN_LEGACY_READ_ENABLED");
 const providerTokenVault=providerTokenEncryptionEnabled?createProviderTokenVaultFromEnv():null;
 const providerTokenStore=providerTokenEncryptionEnabled&&supabaseAdmin?createProviderTokenStore({client:supabaseAdmin,vault:providerTokenVault,legacyReadsEnabled:providerTokenLegacyReadsEnabled}):null;
-app.use("/api/internal/codex-readonly",createCodexReadonlyRouter({auth:createCodexReadonlyAuth(process.env.ADSTABLE_CODEX_READONLY_TOKEN),service:createCodexReadonlyService({client:supabaseAdmin})}));
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
 app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>productionConfig.tiktokTestPageEnabled?sendFile(res,"tiktok-test.html"):res.sendStatus(404));
 app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));

@@ -81,10 +81,12 @@ test("query manifest is five read-only metadata purposes with no credential or r
  assert.equal(queries.overall_result,"PASS");
 });
 
-test("evidence is redacted and E2-T3 through E2-T7 remain open",()=>{
+test("evidence is redacted and E2 task states match the current execution plan",()=>{
  const combined=[...jsonNames.map((name)=>fs.readFileSync(path.join(dir,name),"utf8")),fs.readFileSync(path.join(dir,"summary.md"),"utf8")].join("\n");
  assert.doesNotMatch(combined,/postgres(?:ql)?:\/\/|authorization\s*:|bearer\s+|-----BEGIN [A-Z ]*PRIVATE KEY-----|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/i);
  const plan=fs.readFileSync(path.join(root,"codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md"),"utf8");
- for(let n=3;n<=7;n++) assert.match(plan,new RegExp("E2-T"+n+" — `Not started`"));
- assert.match(plan,/E2-T1 — `Verification`/); assert.match(plan,/E2-T2 — `Verification`/); assert.doesNotMatch(plan,/E2-T[12] — `Done`/);
+ assert.match(plan,/E2-T1 — `Done`/); assert.match(plan,/E2-T2 — `Done`/);
+ assert.match(plan,/E2-T3 — `Verification`/);
+ for(let n=4;n<=7;n++) assert.match(plan,new RegExp("E2-T"+n+" — `Not started`"));
+ assert.match(plan,/E2-T8 — `Verification`/);
 });

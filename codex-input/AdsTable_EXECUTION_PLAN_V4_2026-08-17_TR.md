@@ -598,13 +598,13 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2 metadata evidence `Verification`; E2-T3–T7 açık; E2-T8 ledger reconciliation tamamlandı.
+**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3 round-trip paketi `Verification`; E2-T4–T7 açık; E2-T8 restore readiness `Verification`.
 
 ### Planlanan işler
 
-- **E2-T1 — `Verification`:** Canlı column/type/nullability introspection.
-- **E2-T2 — `Verification`:** Constraint, index, policy ve grant drift karşılaştırması.
-- **E2-T3 — `Not started`:** Yedi bloklu canonical envelope write→read→canonical kayıpsız round-trip.
+- **E2-T1 — `Done`:** Canlı column/type/nullability introspection.
+- **E2-T2 — `Done`:** Constraint, index, policy ve grant drift karşılaştırması.
+- **E2-T3 — `Verification`:** Yedi bloklu canonical envelope write→read→canonical kayıpsız round-trip paketi hazır; canlı operation ve postcheck bekliyor.
 - **E2-T4 — `Not started`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü.
 - **E2-T5 — `Not started`:** Invalid support/hierarchy/source/channel/synthetic rejection matrisi.
 - **E2-T6 — `Not started`:** User A/User B/anon/authenticated mutation/service-role RLS matrisi.
@@ -681,7 +681,43 @@ Mutabakat dışında bağımlılık yoktur.
 
 **Evidence:** `artifacts/dataset-v2-acceptance/20260824-metadata-acceptance/` ve `tests/e2-dataset-v2-metadata-evidence.test.js`.
 
-**Durum:** `Verification` — PR review/merge tamamlanmadan E2-T1 veya E2-T2 `Done` değildir.
+**Durum:** `Done` — E2-T1/T2 evidence PR review ve merge süreci tamamlandı.
+
+### E2-T3A task aynası — canonical round-trip hazırlığı
+
+**Amaç:** Tek bir namespaced Meta paid canonical fixture'ını Dataset V2 fiziksel sözleşmesine map eden, transaction içinde insert/read-back yapan, yedi canonical bloğu kayıpsız karşılaştıran ve zorunlu rollback ile kalıcı veri bırakmayan acceptance paketini hazırlamak.
+
+**Mevcut durum:** E2-T1/T2 metadata evidence merge edildi; Dataset V2 canlı metadata sözleşmesi kabul edildi ve canlı satır sayısı son doğrulamada sıfırdı. E2-T3 canlı write/read operation henüz çalıştırılmadı.
+
+**Planlanan durum:** Ayrı insan onayından sonra exact preflight, tek insert/read/rollback transaction ve read-only postcheck çalıştırılarak redacted round-trip evidence üretilmesi.
+
+**Kapsam:** Meta paid fixture; canonical→physical ve physical→canonical mapper; unsupported/null, supported zero ve positive metric semantiği; identity dışındaki yedi blok; internal eligible-user seçimi; Dataset V2/V1/snapshot/OAuth/token count parity; fail-closed evidence dönüştürme.
+
+**Kapsam dışı:** Canlı operation, ikinci insert/upsert, rejection matrisi, RLS kullanıcı matrisi, commit/cleanup, V1 veya snapshot mutation, runtime/UI, migration/schema/grant/policy, OAuth/token, deployment ve environment işlemleri.
+
+**Bağımlılıklar:** Merge edilmiş E2-T1/T2 evidence, ledger 37 baseline'ı, mevcut canonical validator/entity hierarchy ve Dataset V2 mapper sözleşmesi; canlı operation için ayrıca insan onayı ve uygun auth/public user.
+
+**Uygulama adımları:** Deterministik canonical ve physical fixture üretildi; read-only preflight/postcheck, tek transaction rollback operation, redacted evidence converter, runbook ve executable contract testi eklendi; production credential veya canlı bağlantı kullanılmadı.
+
+**Kabul kriterleri:** Local canonical/physical round-trip exact; tek Dataset V2 insert ve read-back guard'ları; `COMMIT` yok ve zorunlu `ROLLBACK`; korunan relation'larda mutation yok; identity/credential sızıntısı yok; canlı operation ve postcheck tamamlanmadan durum `Done` değil.
+
+**Test planı:** Dedicated E2-T3 artifact testi, full test, security regression, JavaScript syntax, diff ve secret/PII pattern kontrolleri.
+
+**Rollback:** Hazırlık database'i değiştirmez. Repository rollback yalnız E2-T3 artefakt/plan commit'inin revert edilmesidir; gelecekteki canlı operation'ın zorunlu normal sonu transaction rollback'tir.
+
+**Gözlemlenebilirlik:** Run ID, operation status, count, boolean, canonical alan adı, redacted değer ve PASS/FAIL ile sınırlıdır; gerçek identity ve raw production row yasaktır.
+
+**Güvenlik ve veri etkisi:** Bu hazırlıkta data/schema/ledger/privilege/runtime/deployment etkisi yoktur. Hazırlanan operation yalnız Dataset V2'de tek geçici satır oluşturabilir ve aynı transaction içinde rollback eder.
+
+**Planlanan:** Kontrollü production E2-T3 operation ve postcheck evidence'ı.
+
+**Gerçekleşen:** Repository paketi ve local exact mapper/round-trip doğrulaması hazırlandı; canlı SQL çalıştırılmadı ve production user seçilmedi.
+
+**Sapmalar:** Yok. E2-T4–T7 `Not started`, E2-T8 `Verification` olarak açık kalır.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t3-roundtrip/`, `docs/security/sql/E2_T3_ROUNDTRIP_*.sql`, `docs/security/E2_T3_ROUNDTRIP_RUNBOOK.md`, `scripts/e2-t3-roundtrip-evidence.js`, `tests/e2-t3-roundtrip-artifacts.test.js`.
+
+**Durum:** `Verification` — canlı operation ve postcheck review edilmeden E2-T3 `Done` değildir.
 
 ## 7. E3 — Backend modularization foundation
 

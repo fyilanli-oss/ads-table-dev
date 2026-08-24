@@ -598,7 +598,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3 ve E2-T4 acceptance paketleri `Verification`; E2-T5–T7 açık; E2-T8 restore readiness `Verification`.
+**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3, E2-T4, E2-T5 ve E2-T8 `Verification`; E2-T6/T7 `Not started`.
 
 ### Planlanan işler
 
@@ -606,7 +606,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T2 — `Done`:** Constraint, index, policy ve grant drift karşılaştırması.
 - **E2-T3 — `Verification`:** Yedi bloklu canonical envelope write→read→canonical kayıpsız round-trip paketi hazır; canlı operation ve postcheck bekliyor.
 - **E2-T4 — `Verification`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü hazırlık paketi hazır; canlı acceptance bekliyor.
-- **E2-T5 — `Not started`:** Invalid support/hierarchy/source/channel/synthetic rejection matrisi.
+- **E2-T5 — `Verification`:** 35 vakalı rollback-only invalid canonical-row rejection hazırlık paketi hazır; canlı preflight/transaction/postcheck bekliyor.
 - **E2-T6 — `Not started`:** User A/User B/anon/authenticated mutation/service-role RLS matrisi.
 - **E2-T7 — `Not started`:** Fixture cleanup ve V1/snapshot no-change kanıtı.
 - **E2-T8 — `Verification`:** Ledger reconciliation ve corrective migration sırası tamamlandı; immutable baseline manifest hazır. Eski 31 migration SQL body’si repository’de bulunmadığı ve fresh-project restore henüz doğrulanmadığı için restore readiness açık.
@@ -754,6 +754,42 @@ Mutabakat dışında bağımlılık yoktur.
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t4-upsert/`, `docs/security/sql/E2_T4_UPSERT_*.sql`, `docs/security/E2_T4_UPSERT_RUNBOOK.md`, `scripts/e2-t4-upsert-evidence.js`, `tests/e2-t4-upsert-artifacts.test.js`.
 
 **Durum:** `Verification` — repository preparation canlı acceptance yerine geçmez.
+
+### E2-T5 task aynası — rollback-only Dataset V2 rejection matrisi hazırlığı
+
+**Amaç:** Dataset V2 migration CHECK ve NOT NULL sözleşmelerinin 35 invalid canonical vaka için PostgreSQL seviyesinde fail-closed reddini, güvenli diagnostics ve zorunlu outer rollback ile kanıtlayacak preparation paketini hazırlamak.
+
+**Mevcut durum:** E2-T1/T2 `Done`; E2-T3/T4 `Verification`; canlı E2-T5 preflight, invalid insert transaction ve postcheck çalıştırılmadı.
+
+**Planlanan durum:** Ayrı insan onayından sonra exact read-only preflight, tek intact rollback-only transaction, redacted evidence conversion ve read-only scalar postcheck çalıştırılması; review tamamlanana kadar E2-T5 `Verification`.
+
+**Kapsam:** `e2_t5_rejection_v1`; 32 CHECK ve üç NOT NULL vaka; valid canonical baseline; migration-derived closed constraint sets; static inserts; nested exception subtransactions; safe SQLSTATE/constraint/column diagnostics; `pg_temp` evidence; Dataset V2/V1/snapshot/OAuth/token/ledger parity.
+
+**Kapsam dışı:** Bu taskta canlı SQL, Management API, migration/schema/ledger/RLS/policy/grant/privilege değişikliği, persistent DDL, cleanup, runtime/UI, environment, deployment, E2-T3/T4 canlı kabulü ve E2-T6/T7 uygulaması.
+
+**Bağımlılıklar:** Main `9011e237424aea351a6370632c03e091a07ce72a`; Dataset V2 create ve Klaviyo corrective migration checksum'ları; canonical validator/hierarchy/repository sözleşmeleri; gelecekteki canlı operation için ayrı insan onayı, credential ve bütün preflight stop gate'leri.
+
+**Uygulama adımları:** Baseline fixture ve exact matrix eklendi; read-only preflight/postcheck, 35 ayrı static INSERT exception bloğu taşıyan rollback-only transaction, allowlist/redaction converter, runbook ve executable test hazırlandı; manifest ve plan-status regression'ları güncellendi.
+
+**Kabul kriterleri:** Tam 35 unique vaka; SQLSTATE exact; CHECK actual constraint case-specific closed allowlist üyesi ve non-empty; NOT NULL exact column; yanlış/missing/extra/duplicate/accepted/residue/parity sonucu FAIL; tek final response; `COMMIT` yok; final `ROLLBACK`; canlı review olmadan `Done` yok.
+
+**Test planı:** Dedicated E2-T5 artifact/converter testi; E2-T3/T4, metadata ve ledger regression'ları; full/security suite; JavaScript syntax, SQL statement/mutation/diagnostic, diff ve secret/PII kontrolleri.
+
+**Rollback planı:** Repository preparation database'i değiştirmez ve commit revert edilebilir. Gelecekteki operation'ın tek yetkili normal sonu outer `ROLLBACK`tır. Unexpected accept outer transaction içinde kalıp fail sayılır ve rollback edilir. Residue halinde retry veya ad hoc cleanup yoktur.
+
+**Gözlemlenebilirlik:** Yalnız case code, expected/actual SQLSTATE, closed expected constraints, actual constraint, expected/actual column ve boolean/count parity alanları; SQLERRM/message/detail/hint/context, raw SQL, production identity/value ve credential yasaktır.
+
+**Güvenlik ve veri etkisi:** Repository preparation tamamlandı; canlı preflight, invalid INSERT, transaction ve postcheck yoktur. Management API kullanılmadı. Data/schema/ledger/privilege/deployment değişikliği yoktur.
+
+**Planlanan:** İnsan onaylı controlled E2-T5 acceptance ve redacted evidence review.
+
+**Gerçekleşen:** Yalnız repository preparation ve static/executable test artefaktları hazırlandı; canlı operation yapılmadı.
+
+**Sapmalar:** İlk tasarım exact tek constraint hedefledi; cross-field overlap nedeniyle uygulanabilir değildi. 35 vaka ve schema değişmeden korundu; SQLSTATE exact kaldı; case-specific closed `expected_constraints` kabul edildi. Constraint order kullanılmadı ve allowlist canlı sonuçtan öğrenilmedi.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t5-rejection/`, `docs/security/sql/E2_T5_REJECTION_*.sql`, `docs/security/E2_T5_REJECTION_RUNBOOK.md`, `scripts/e2-t5-rejection-evidence.js`, `tests/e2-t5-rejection-artifacts.test.js`.
+
+**Durum:** `Verification` — repository preparation ve static tests canlı PostgreSQL acceptance değildir.
 
 ## 7. E3 — Backend modularization foundation
 

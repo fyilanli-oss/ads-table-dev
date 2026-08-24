@@ -1,0 +1,52 @@
+{
+  "evidence_version": "e2-dataset-v2-metadata-v1",
+  "overall_result": "PASS",
+  "queries": [
+    {
+      "code": "Q1",
+      "credential_logged": false,
+      "mutation": false,
+      "purpose": "Column contract",
+      "result_status": "PASS",
+      "row_data_returned": false,
+      "statement_class": "SELECT"
+    },
+    {
+      "code": "Q2",
+      "credential_logged": false,
+      "mutation": false,
+      "purpose": "Constraint and index contract",
+      "result_status": "PASS",
+      "row_data_returned": false,
+      "statement_class": "WITH_SELECT"
+    },
+    {
+      "code": "Q3",
+      "credential_logged": false,
+      "mutation": false,
+      "purpose": "Constraint semantic fingerprints",
+      "result_status": "PASS",
+      "row_data_returned": false,
+      "statement_class": "SELECT"
+    },
+    {
+      "code": "Q4",
+      "credential_logged": false,
+      "mutation": false,
+      "purpose": "RLS policy and grants",
+      "result_status": "PASS",
+      "row_data_returned": false,
+      "statement_class": "WITH_SELECT"
+    },
+    {
+      "code": "Q5",
+      "credential_logged": false,
+      "mutation": false,
+      "purpose": "Ledger and safe state",
+      "result_status": "PASS",
+      "row_data_returned": false,
+      "statement_class": "WITH_SELECT"
+    }
+  ],
+  "repository_commit": "d16e87449aeb9eefdea570f5bb8eca77b67ed8ef"
+}

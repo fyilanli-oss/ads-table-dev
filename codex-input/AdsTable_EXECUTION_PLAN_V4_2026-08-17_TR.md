@@ -598,18 +598,18 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `Not started` — migration artefaktı var; production acceptance açık.
+**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3 round-trip paketi `Verification`; E2-T4–T7 açık; E2-T8 restore readiness `Verification`.
 
 ### Planlanan işler
 
-- **E2-T1:** Canlı column/type/nullability introspection.
-- **E2-T2:** Constraint, index, policy ve grant drift karşılaştırması.
-- **E2-T3:** Yedi bloklu canonical envelope write→read→canonical kayıpsız round-trip.
-- **E2-T4:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü.
-- **E2-T5:** Invalid support/hierarchy/source/channel/synthetic rejection matrisi.
-- **E2-T6:** User A/User B/anon/authenticated mutation/service-role RLS matrisi.
-- **E2-T7:** Fixture cleanup ve V1/snapshot no-change kanıtı.
-- **E2-T8:** Migration ledger, corrective migration sırası ve restore prosedürü.
+- **E2-T1 — `Done`:** Canlı column/type/nullability introspection.
+- **E2-T2 — `Done`:** Constraint, index, policy ve grant drift karşılaştırması.
+- **E2-T3 — `Verification`:** Yedi bloklu canonical envelope write→read→canonical kayıpsız round-trip paketi hazır; canlı operation ve postcheck bekliyor.
+- **E2-T4 — `Not started`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü.
+- **E2-T5 — `Not started`:** Invalid support/hierarchy/source/channel/synthetic rejection matrisi.
+- **E2-T6 — `Not started`:** User A/User B/anon/authenticated mutation/service-role RLS matrisi.
+- **E2-T7 — `Not started`:** Fixture cleanup ve V1/snapshot no-change kanıtı.
+- **E2-T8 — `Verification`:** Ledger reconciliation ve corrective migration sırası tamamlandı; immutable baseline manifest hazır. Eski 31 migration SQL body’si repository’de bulunmadığı ve fresh-project restore henüz doğrulanmadığı için restore readiness açık.
 
 ### Kabul kriterleri
 
@@ -646,6 +646,78 @@ Mutabakat dışında bağımlılık yoktur.
 ### Evidence
 
 `artifacts/dataset-v2-acceptance/<run-id>/` altında schema, constraint/index, RLS, round-trip, upsert, rejection, cleanup ve legacy-no-change kanıtları.
+
+### E2-T1/T2 task aynası — 2026-08-24 metadata acceptance
+
+**Amaç:** Canlı Dataset V2 column, constraint, index, RLS, policy ve grant sözleşmesini yalnız read-only metadata ile repository migration'larına karşı doğrulamak.
+
+**Mevcut durum:** Ledger reconciliation tamamlandı ve ledger 37 kayıtta. Dataset V2 tablosu canlıda mevcut fakat satır sayısı sıfır.
+
+**Planlanan durum:** Redacted, deterministic ve executable testlerle korunan E2-T1/T2 evidence paketinin review ve merge edilmesi.
+
+**Kapsam:** Beş allowlist SELECT/WITH SELECT amacıyla column, constraint/index, semantic fingerprint, RLS/policy/grant ve ledger/safe-state doğrulaması.
+
+**Kapsam dışı:** Dataset write, fixture, round-trip, upsert, rejection, iki kullanıcı RLS matrisi, cleanup, V1/snapshot mutation ve runtime/UI değişikliği. E2-T3–T7 açık kalır.
+
+**Bağımlılıklar:** E1 güvenlik postcondition'ları, tamamlanan ledger reconciliation ve açık E2-T8 restore-readiness takibi, Management API read-only erişimi ve repository baseline commit'i.
+
+**Uygulama adımları:** GitHub main ve migration checksum doğrulandı; canlı metadata beş read-only query amacıyla yeniden okundu; repository/live contract karşılaştırıldı; redacted evidence ve contract testi üretildi.
+
+**Kabul kriterleri:** 47 kolon; PK + user FK + 19 check; beş fiziksel index; sıfır invalid/unvalidated object; enabled/non-forced RLS; exact authenticated SELECT policy; beklenen role grant'leri; ledger 37; Dataset V2 row count sıfır.
+
+**Test planı:** Dedicated evidence contract testi, full test, security regression, JavaScript syntax, diff/secret/PII kontrolleri.
+
+**Rollback:** Database değişmedi. Repository rollback gerekirse yalnız evidence/plan commit'i revert edilir.
+
+**Gözlemlenebilirlik:** Object adı, checksum/fingerprint, count, boolean, PASS/FAIL, evidence version ve repository commit ile sınırlı.
+
+**Güvenlik ve veri etkisi:** Canlı sorgular read-only; data/schema/ledger/privilege/deployment etkisi yok; credential veya row data evidence'a alınmadı.
+
+**Planlanan:** E2-T1/T2 metadata sözleşmesinin canlı kabul evidence'ı.
+
+**Gerçekleşen:** E2-T1 ve E2-T2 metadata kontrolleri PASS. Ledger reconciliation ve production root/login smoke daha önce tamamlandı. Dataset V2 satır sayısı sıfır olduğundan persistence acceptance yapılmadı.
+
+**Sapmalar:** Yok. E2-T3–T7 özellikle uygulanmadı.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/20260824-metadata-acceptance/` ve `tests/e2-dataset-v2-metadata-evidence.test.js`.
+
+**Durum:** `Done` — E2-T1/T2 evidence PR review ve merge süreci tamamlandı.
+
+### E2-T3A task aynası — canonical round-trip hazırlığı
+
+**Amaç:** Tek bir namespaced Meta paid canonical fixture'ını Dataset V2 fiziksel sözleşmesine map eden, transaction içinde insert/read-back yapan, yedi canonical bloğu kayıpsız karşılaştıran ve zorunlu rollback ile kalıcı veri bırakmayan acceptance paketini hazırlamak.
+
+**Mevcut durum:** E2-T1/T2 metadata evidence merge edildi; Dataset V2 canlı metadata sözleşmesi kabul edildi ve canlı satır sayısı son doğrulamada sıfırdı. E2-T3 canlı write/read operation henüz çalıştırılmadı.
+
+**Planlanan durum:** Ayrı insan onayından sonra exact preflight, tek insert/read/rollback transaction ve read-only postcheck çalıştırılarak redacted round-trip evidence üretilmesi.
+
+**Kapsam:** Meta paid fixture; canonical→physical ve physical→canonical mapper; unsupported/null, supported zero ve positive metric semantiği; identity dışındaki yedi blok; internal eligible-user seçimi; Dataset V2/V1/snapshot/OAuth/token count parity; fail-closed evidence dönüştürme.
+
+**Kapsam dışı:** Canlı operation, ikinci insert/upsert, rejection matrisi, RLS kullanıcı matrisi, commit/cleanup, V1 veya snapshot mutation, runtime/UI, migration/schema/grant/policy, OAuth/token, deployment ve environment işlemleri.
+
+**Bağımlılıklar:** Merge edilmiş E2-T1/T2 evidence, ledger 37 baseline'ı, mevcut canonical validator/entity hierarchy ve Dataset V2 mapper sözleşmesi; canlı operation için ayrıca insan onayı ve uygun auth/public user.
+
+**Uygulama adımları:** Deterministik canonical ve physical fixture üretildi; read-only preflight/postcheck, tek transaction rollback operation, redacted evidence converter, runbook ve executable contract testi eklendi; production credential veya canlı bağlantı kullanılmadı.
+
+**Kabul kriterleri:** Local canonical/physical round-trip exact; tek Dataset V2 insert ve read-back guard'ları; `COMMIT` yok ve zorunlu `ROLLBACK`; korunan relation'larda mutation yok; identity/credential sızıntısı yok; canlı operation ve postcheck tamamlanmadan durum `Done` değil.
+
+**Test planı:** Dedicated E2-T3 artifact testi, full test, security regression, JavaScript syntax, diff ve secret/PII pattern kontrolleri.
+
+**Rollback:** Hazırlık database'i değiştirmez. Repository rollback yalnız E2-T3 artefakt/plan commit'inin revert edilmesidir; gelecekteki canlı operation'ın zorunlu normal sonu transaction rollback'tir.
+
+**Gözlemlenebilirlik:** Run ID, operation status, count, boolean, canonical alan adı, redacted değer ve PASS/FAIL ile sınırlıdır; gerçek identity ve raw production row yasaktır.
+
+**Güvenlik ve veri etkisi:** Bu hazırlıkta data/schema/ledger/privilege/runtime/deployment etkisi yoktur. Hazırlanan operation yalnız Dataset V2'de tek geçici satır oluşturabilir ve aynı transaction içinde rollback eder.
+
+**Planlanan:** Kontrollü production E2-T3 operation ve postcheck evidence'ı.
+
+**Gerçekleşen:** Repository paketi ve local exact mapper/round-trip doğrulaması hazırlandı; canlı SQL çalıştırılmadı ve production user seçilmedi.
+
+**Sapmalar:** Yok. E2-T4–T7 `Not started`, E2-T8 `Verification` olarak açık kalır.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t3-roundtrip/`, `docs/security/sql/E2_T3_ROUNDTRIP_*.sql`, `docs/security/E2_T3_ROUNDTRIP_RUNBOOK.md`, `scripts/e2-t3-roundtrip-evidence.js`, `tests/e2-t3-roundtrip-artifacts.test.js`.
+
+**Durum:** `Verification` — canlı operation ve postcheck review edilmeden E2-T3 `Done` değildir.
 
 ## 7. E3 — Backend modularization foundation
 

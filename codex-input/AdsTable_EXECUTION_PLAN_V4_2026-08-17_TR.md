@@ -598,7 +598,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3, E2-T4, E2-T5 ve E2-T8 `Verification`; E2-T6/T7 `Not started`.
+**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3, E2-T4, E2-T5, E2-T6 ve E2-T8 `Verification`; E2-T7 `Not started`.
 
 ### Planlanan işler
 
@@ -607,7 +607,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T3 — `Verification`:** Yedi bloklu canonical envelope write→read→canonical kayıpsız round-trip paketi hazır; canlı operation ve postcheck bekliyor.
 - **E2-T4 — `Verification`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü hazırlık paketi hazır; canlı acceptance bekliyor.
 - **E2-T5 — `Verification`:** 35 vakalı rollback-only invalid canonical-row rejection hazırlık paketi hazır; canlı preflight/transaction/postcheck bekliyor.
-- **E2-T6 — `Not started`:** User A/User B/anon/authenticated mutation/service-role RLS matrisi.
+- **E2-T6 — `Verification`:** Rollback-only User A/User B/anon/authenticated mutation/service-role RLS acceptance hazırlık paketi tamamlandı; canlı preflight/transaction/postcheck ve review bekliyor.
 - **E2-T7 — `Not started`:** Fixture cleanup ve V1/snapshot no-change kanıtı.
 - **E2-T8 — `Verification`:** Ledger reconciliation ve corrective migration sırası tamamlandı; immutable baseline manifest hazır. Eski 31 migration SQL body’si repository’de bulunmadığı ve fresh-project restore henüz doğrulanmadığı için restore readiness açık.
 
@@ -1490,3 +1490,22 @@ Bu V4 plan ile:
 **Sonraki adım:** Önce DB–Execution Plan drift kontrolü, ardından E2 Dataset V2 canlı acceptance.
 
 **E1-T6D production dry-run acceptance ve write artefaktı (2026-08-19):** `production-token-backfill` GitHub Environment oluşturuldu; 3 variable ve 3 secret provision edildi. `main` üzerindeki `f97f1934a98016f129a1bc79263629c2ec8384fa` commit'i için **Provider token production dry-run** run `32245732566` genel, validation ve production dry-run sonuçları success oldu. Redacted sonuç: 9 scanned, 9 eligible, 0 written, 0 already encrypted, 0 rotation candidate, 0 empty, 0 failed ve `nextCursor=null`; dry-run acceptance tamamlandı. Daha sonraki controlled write 7 kayıt yazdı ve iki auth-orphan kayıtta fail-closed oldu; bu kayıtlar guarded cleanup ile kaldırıldı. Güncel production kabulü 7 connected/encrypted, 0 orphan ve 0 missing encrypted'dır; encrypted runtime refresh kabulü de tamamlanmıştır.
+
+
+### E2-T6 task aynası — rollback-only Dataset V2 RLS acceptance hazırlığı
+
+**Mevcut durum:** E2-T1/T2 `Done`; E2-T3/T4/T5/T6/T8 `Verification`; E2-T7 `Not started`. E2-T6 repository preparation tamamlandı, canlı acceptance yapılmadı.
+
+**Planlanan durum:** Ayrı insan onayından sonra exact read-only preflight, iki izole eligible kullanıcıyla tek intact rollback-only User A/User B/anon/service-role transaction, redacted evidence conversion ve read-only postcheck; review tamamlanana kadar E2-T6 `Verification`.
+
+**Kapsam:** Exact 16-case RLS matrix, symbolic fixture contract, aggregate-only preflight/postcheck, transaction-local role/JWT claim emülasyonu, yalnız `pg_temp` evidence, ayrı nested authenticated mutation denial blokları, tek redacted response ve zorunlu final `ROLLBACK`.
+
+**Kapsam dışı:** Canlı SQL/RLS acceptance, Management API, migration/schema/policy/grant/ledger/data değişikliği, persistent DDL, cleanup, auth/subscription/connection mutation, environment, deployment ve E2-T7.
+
+**Test planı:** Dedicated E2-T6 artifact/converter testi; E2-T3/T4/T5, metadata ve ledger regression'ları; full/security suite; JavaScript syntax, SQL safety, allowlist ve secret/PII kontrolleri. Static testler canlı PostgreSQL acceptance değildir.
+
+**Rollback:** Repository preparation canlı sistemi değiştirmez. Gelecekteki kontrollü operation'ın koşulsuz normal sonu `ROLLBACK`; residue halinde ad hoc cleanup ve automatic retry yasaktır.
+
+**Gerçekleşen:** Repository preparation tamamlandı. Canlı preflight çalıştırılmadı; canlı fixture yazılmadı; User A/User B/anon/service-role canlı matrisi çalıştırılmadı; canlı postcheck çalıştırılmadı; Management API kullanılmadı; data/schema/policy/grant/ledger/deployment değişmedi.
+
+**Durum:** `Verification` — canlı operation, postcheck ve redacted evidence insan review'ı tamamlanmadan E2-T6 `Done` değildir.

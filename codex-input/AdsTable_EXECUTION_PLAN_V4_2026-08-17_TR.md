@@ -609,7 +609,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T5 — `Not started`:** Invalid support/hierarchy/source/channel/synthetic rejection matrisi.
 - **E2-T6 — `Not started`:** User A/User B/anon/authenticated mutation/service-role RLS matrisi.
 - **E2-T7 — `Not started`:** Fixture cleanup ve V1/snapshot no-change kanıtı.
-- **E2-T8 — `Done`:** Migration ledger reconciliation tamamlandı; immutable baseline ve restore prosedürü evidence ile kayıtlı.
+- **E2-T8 — `Verification`:** Ledger reconciliation ve corrective migration sırası tamamlandı; immutable baseline manifest hazır. Eski 31 migration SQL body’si repository’de bulunmadığı ve fresh-project restore henüz doğrulanmadığı için restore readiness açık.
 
 ### Kabul kriterleri
 
@@ -659,7 +659,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 **Kapsam dışı:** Dataset write, fixture, round-trip, upsert, rejection, iki kullanıcı RLS matrisi, cleanup, V1/snapshot mutation ve runtime/UI değişikliği. E2-T3–T7 açık kalır.
 
-**Bağımlılıklar:** E1 güvenlik postcondition'ları, tamamlanan E2-T8 ledger reconciliation, Management API read-only erişimi ve repository baseline commit'i.
+**Bağımlılıklar:** E1 güvenlik postcondition'ları, tamamlanan ledger reconciliation ve açık E2-T8 restore-readiness takibi, Management API read-only erişimi ve repository baseline commit'i.
 
 **Uygulama adımları:** GitHub main ve migration checksum doğrulandı; canlı metadata beş read-only query amacıyla yeniden okundu; repository/live contract karşılaştırıldı; redacted evidence ve contract testi üretildi.
 

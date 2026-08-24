@@ -598,14 +598,14 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3 round-trip paketi `Verification`; E2-T4–T7 açık; E2-T8 restore readiness `Verification`.
+**Durum:** `In progress` — E2-T1/T2 `Done`; E2-T3 ve E2-T4 acceptance paketleri `Verification`; E2-T5–T7 açık; E2-T8 restore readiness `Verification`.
 
 ### Planlanan işler
 
 - **E2-T1 — `Done`:** Canlı column/type/nullability introspection.
 - **E2-T2 — `Done`:** Constraint, index, policy ve grant drift karşılaştırması.
 - **E2-T3 — `Verification`:** Yedi bloklu canonical envelope write→read→canonical kayıpsız round-trip paketi hazır; canlı operation ve postcheck bekliyor.
-- **E2-T4 — `Not started`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü.
+- **E2-T4 — `Verification`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü hazırlık paketi hazır; canlı acceptance bekliyor.
 - **E2-T5 — `Not started`:** Invalid support/hierarchy/source/channel/synthetic rejection matrisi.
 - **E2-T6 — `Not started`:** User A/User B/anon/authenticated mutation/service-role RLS matrisi.
 - **E2-T7 — `Not started`:** Fixture cleanup ve V1/snapshot no-change kanıtı.
@@ -718,6 +718,42 @@ Mutabakat dışında bağımlılık yoktur.
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t3-roundtrip/`, `docs/security/sql/E2_T3_ROUNDTRIP_*.sql`, `docs/security/E2_T3_ROUNDTRIP_RUNBOOK.md`, `scripts/e2-t3-roundtrip-evidence.js`, `tests/e2-t3-roundtrip-artifacts.test.js`.
 
 **Durum:** `Verification` — canlı operation ve postcheck review edilmeden E2-T3 `Done` değildir.
+
+### E2-T4 task aynası — same-key PostgreSQL upsert hazırlığı
+
+**Amaç:** Migration-defined canonical unique key'i paylaşan initial ve updated Meta paid fixture yazımlarının gerçek PostgreSQL `ON CONFLICT DO UPDATE` ile tek satırda sonuçlanmasını, mutable değerlerin güncellenmesini ve zorunlu rollback ile kalıcı veri bırakılmamasını kanıtlayacak acceptance paketini hazırlamak.
+
+**Mevcut durum:** E2-T1/T2 `Done`; E2-T3 repository paketi merge edildi fakat credential bulunmadığından canlı E2-T3 kabulü çalıştırılmadı ve `Verification` kaldı. E2-T4 canlı acceptance henüz çalıştırılmadı.
+
+**Planlanan durum:** Ayrı insan onaylı bir operasyonda read-only preflight, initial insert, exact same-key PostgreSQL upsert, aggregate/redacted evidence, koşulsuz rollback ve read-only postcheck uygulanması.
+
+**Kapsam:** `e2_t4_same_key_v1` namespaced Meta paid A/B fixture'ları; exact canonical conflict target; initial/upsert/final count ve duplicate guard'ları; mutable metric update; identity/hierarchy ve unsupported-null/supported-zero parity; V1/snapshot/OAuth/token no-change; fail-closed evidence.
+
+**Kapsam dışı:** Bu taskta canlı SQL, E2-T3 canlı kabulü, E2-T5 rejection, E2-T6 RLS matrisi, E2-T7 cleanup, runtime/UI, migration, schema, ledger, RLS/policy/privilege, environment, deployment ve gateway işlemleri.
+
+**Bağımlılıklar:** Güncel main, Dataset V2 migration canonical unique index'i, canonical validator/hierarchy/mapper ve ilerideki canlı operation için Management API credential ile ayrı insan onayı.
+
+**Uygulama adımları:** A/B canonical fixture ve updated physical expectation üretildi; read-only preflight/postcheck, rollback-only transaction, evidence converter, runbook ve executable static/contract test eklendi; test zinciri ve security manifest güncellendi.
+
+**Kabul kriterleri:** Conflict target migration ile exact; initial/upsert operation count `1`; final fixture count `1`; duplicate/excess `0`; B mutable değerleri mevcut; identity/hierarchy ve null/zero semantiği korunmuş; korunan relation mutation'ı ve identity/credential sızıntısı yok; final statement `ROLLBACK`; canlı kabul olmadan `Done` yok.
+
+**Test planı:** E2-T4 artifact testi; E2-T3 ve metadata regression testleri; full ve security suite; JavaScript syntax; SQL statement/conflict/mutation kontrolleri; diff ve secret/PII taraması.
+
+**Rollback planı:** Repository preparation database'i değiştirmez. Gelecekteki controlled operation'ın koşulsuz normal sonu `ROLLBACK`tır; residue halinde ad hoc cleanup yetkilendirilmez. Repository rollback yalnız E2-T4 commit revert'idir.
+
+**Gözlemlenebilirlik:** Namespaced fixture alanları, count, boolean, güvenli expected/actual fixture değeri ve PASS/FAIL ile sınırlıdır; production identity, UUID, credential ve raw production row yasaktır.
+
+**Güvenlik ve veri etkisi:** Bu taskta data/schema/ledger/privilege/deployment etkisi yoktur; Management API kullanılmadı ve canlı SQL çalıştırılmadı.
+
+**Planlanan:** Kontrollü rollback-only E2-T4 canlı preflight, same-key upsert ve postcheck evidence'ı.
+
+**Gerçekleşen:** Repository preparation tamamlandı. Canlı preflight, initial insert, same-key upsert ve postcheck çalıştırılmadı. Management API erişimi bu taskta kullanılmadı. Data/schema/ledger/privilege/deployment değişikliği yapılmadı.
+
+**Sapmalar:** Yok. E2-T3 `Verification`; E2-T5–T7 `Not started`; E2-T8 `Verification` kalır.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t4-upsert/`, `docs/security/sql/E2_T4_UPSERT_*.sql`, `docs/security/E2_T4_UPSERT_RUNBOOK.md`, `scripts/e2-t4-upsert-evidence.js`, `tests/e2-t4-upsert-artifacts.test.js`.
+
+**Durum:** `Verification` — repository preparation canlı acceptance yerine geçmez.
 
 ## 7. E3 — Backend modularization foundation
 

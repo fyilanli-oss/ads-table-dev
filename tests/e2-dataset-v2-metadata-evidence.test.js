@@ -87,6 +87,7 @@ test("evidence is redacted and E2 task states match the current execution plan",
  const plan=fs.readFileSync(path.join(root,"codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md"),"utf8");
  assert.match(plan,/E2-T1 — `Done`/); assert.match(plan,/E2-T2 — `Done`/);
  assert.match(plan,/E2-T3 — `Verification`/);
- for(let n=4;n<=7;n++) assert.match(plan,new RegExp("E2-T"+n+" — `Not started`"));
+ assert.match(plan,/E2-T4 — `Verification`/);
+ for(let n=5;n<=7;n++) assert.match(plan,new RegExp("E2-T"+n+" — `Not started`"));
  assert.match(plan,/E2-T8 — `Verification`/);
 });

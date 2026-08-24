@@ -1,0 +1,393 @@
+[
+  {
+    "case_code": "INVALID_PLATFORM",
+    "category": "enum",
+    "intended_violation": "platform enum and dependent source/hierarchy semantics",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk",
+      "performance_dataset_rows_v2_platform_chk",
+      "performance_dataset_rows_v2_source_semantics_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_TRAFFIC_TYPE",
+    "category": "enum",
+    "intended_violation": "traffic type enum and dependent source/hierarchy semantics",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk",
+      "performance_dataset_rows_v2_source_semantics_chk",
+      "performance_dataset_rows_v2_traffic_type_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_SOURCE_SYSTEM",
+    "category": "enum",
+    "intended_violation": "source system enum and source semantics",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_source_semantics_chk",
+      "performance_dataset_rows_v2_source_system_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_CHANNEL_ENUM",
+    "category": "enum",
+    "intended_violation": "channel enum and source semantics",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_channel_chk",
+      "performance_dataset_rows_v2_source_semantics_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_CAMPAIGN_TYPE",
+    "category": "enum",
+    "intended_violation": "campaign type enum and hierarchy",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_campaign_type_chk",
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_ROOT_ENTITY_TYPE",
+    "category": "enum",
+    "intended_violation": "root entity type enum and hierarchy",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk",
+      "performance_dataset_rows_v2_root_type_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_PARENT_ENTITY_TYPE",
+    "category": "enum",
+    "intended_violation": "parent entity type enum and hierarchy",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk",
+      "performance_dataset_rows_v2_parent_type_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_ENTITY_TYPE",
+    "category": "enum",
+    "intended_violation": "entity type enum and hierarchy",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_entity_type_chk",
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_SOURCE_CONFIDENCE",
+    "category": "enum",
+    "intended_violation": "source confidence enum",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_source_confidence_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_SOURCE_CURRENCY",
+    "category": "currency",
+    "intended_violation": "source currency shape",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_source_currency_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_TARGET_CURRENCY",
+    "category": "currency",
+    "intended_violation": "target currency shape",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_target_currency_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "NON_POSITIVE_FX_RATE",
+    "category": "currency",
+    "intended_violation": "positive FX rate",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_fx_rate_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "METRIC_SUPPORT_NOT_OBJECT",
+    "category": "json",
+    "intended_violation": "metric support object and required keys",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_metric_support_keys_chk",
+      "performance_dataset_rows_v2_metric_support_object_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "RAW_NOT_OBJECT",
+    "category": "json",
+    "intended_violation": "raw JSON object",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_raw_object_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "SYNTHETIC_TRUE",
+    "category": "provenance",
+    "intended_violation": "non-synthetic canonical facts",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_synthetic_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "META_WRONG_SOURCE",
+    "category": "source_semantics",
+    "intended_violation": "Meta source pairing",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_source_semantics_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "PAID_WITH_GA4_PROPERTY",
+    "category": "source_semantics",
+    "intended_violation": "paid rows exclude GA4 property",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_source_semantics_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "ORGANIC_WITHOUT_GA4_PROPERTY",
+    "category": "source_semantics",
+    "intended_violation": "organic rows require GA4 property",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_source_semantics_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "KLAVIYO_PAID_WITH_NULL_CHANNEL",
+    "category": "source_semantics",
+    "intended_violation": "paid Klaviyo requires corrected non-null channel",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_source_semantics_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "KLAVIYO_PAID_WITH_INVALID_SOURCE_PAIR",
+    "category": "source_semantics",
+    "intended_violation": "paid Klaviyo source pairing",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_source_semantics_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "META_WITH_ADGROUP_PARENT",
+    "category": "hierarchy",
+    "intended_violation": "Meta requires adset parent",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "GOOGLE_STANDARD_WITHOUT_ADGROUP",
+    "category": "hierarchy",
+    "intended_violation": "Google standard requires adgroup parent",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "GOOGLE_PMAX_WITH_FAKE_PARENT",
+    "category": "hierarchy",
+    "intended_violation": "Google performance max forbids invented parent",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "TIKTOK_WITH_ADSET_PARENT",
+    "category": "hierarchy",
+    "intended_violation": "TikTok requires adgroup parent",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "KLAVIYO_CAMPAIGN_WITH_PARENT",
+    "category": "hierarchy",
+    "intended_violation": "Klaviyo campaign message forbids parent",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "KLAVIYO_FLOW_AS_CAMPAIGN",
+    "category": "hierarchy",
+    "intended_violation": "Klaviyo flow message requires flow root",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "ORGANIC_WITH_PAID_HIERARCHY",
+    "category": "hierarchy",
+    "intended_violation": "organic rows require organic hierarchy",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_hierarchy_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "MISSING_SUPPORT_KEY",
+    "category": "metric_support",
+    "intended_violation": "all support keys required",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_metric_support_keys_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "INVALID_SUPPORT_ENUM",
+    "category": "metric_support",
+    "intended_violation": "support values use closed enum",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_metric_support_keys_chk",
+      "performance_dataset_rows_v2_metric_value_support_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "SUPPORTED_METRIC_IS_NULL",
+    "category": "metric_support",
+    "intended_violation": "supported metric must be non-null",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_metric_value_support_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "UNSUPPORTED_METRIC_IS_NON_NULL",
+    "category": "metric_support",
+    "intended_violation": "unsupported metric must be null",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_metric_value_support_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "UNKNOWN_METRIC_IS_NON_NULL",
+    "category": "metric_support",
+    "intended_violation": "unknown metric must be null",
+    "expected_sqlstate": "23514",
+    "expected_constraints": [
+      "performance_dataset_rows_v2_metric_value_support_chk"
+    ],
+    "expected_column": null,
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "REQUIRED_ENTITY_ID_NULL",
+    "category": "not_null",
+    "intended_violation": "entity_id is required",
+    "expected_sqlstate": "23502",
+    "expected_constraints": [],
+    "expected_column": "entity_id",
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "REQUIRED_PLATFORM_ACCOUNT_NULL",
+    "category": "not_null",
+    "intended_violation": "platform_account_id is required",
+    "expected_sqlstate": "23502",
+    "expected_constraints": [],
+    "expected_column": "platform_account_id",
+    "expected_outcome": "REJECTED"
+  },
+  {
+    "case_code": "REQUIRED_BUSINESS_DATE_NULL",
+    "category": "not_null",
+    "intended_violation": "business_date is required",
+    "expected_sqlstate": "23502",
+    "expected_constraints": [],
+    "expected_column": "business_date",
+    "expected_outcome": "REJECTED"
+  }
+]

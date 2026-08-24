@@ -1,0 +1,124 @@
+{
+  "evidence_version": "e2-t7-no-change-v1",
+  "checks": [
+    {
+      "check_code": "DATASET_V2_BASELINE",
+      "comparison": "baseline_parity",
+      "expected_source": "operator_local",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "E2_T3_RESIDUE",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "E2_T4_RESIDUE",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "E2_T5_RESIDUE",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "E2_T6_RESIDUE",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "TOTAL_E2_RESIDUE",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "DATASET_V1_BASELINE",
+      "comparison": "baseline_parity",
+      "expected_source": "operator_local",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "SNAPSHOT_BASELINE",
+      "comparison": "baseline_parity",
+      "expected_source": "operator_local",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "LEDGER_TOTAL",
+      "comparison": "baseline_parity",
+      "expected_source": "approved_ledger",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "OAUTH_ROWS",
+      "comparison": "baseline_parity",
+      "expected_source": "security_baseline",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "CONNECTED_CONNECTIONS",
+      "comparison": "baseline_parity",
+      "expected_source": "security_baseline",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "ENCRYPTED_TOKEN_ROWS",
+      "comparison": "baseline_parity",
+      "expected_source": "security_baseline",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "MISSING_ENCRYPTED",
+      "comparison": "baseline_parity",
+      "expected_source": "security_baseline",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "PLAINTEXT_TOKENS",
+      "comparison": "baseline_parity",
+      "expected_source": "security_baseline",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "DATASET_V2_SCHEMA_STATE",
+      "comparison": "baseline_parity",
+      "expected_source": "metadata_evidence",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "DATASET_V2_RLS_POLICY_GRANT_STATE",
+      "comparison": "baseline_parity",
+      "expected_source": "metadata_evidence",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "PERSISTENT_EVIDENCE_OBJECTS",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
+      "required": true,
+      "safe_output": true
+    }
+  ]
+}

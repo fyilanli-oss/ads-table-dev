@@ -1,0 +1,23 @@
+-- E2-T3 read-only preflight. Output is aggregate-only and contains no identity.
+with constants as (
+  select 'meta:e2_t3_static_v1_account:paid:none:campaign:e2_t3_static_v1_campaign:ad:e2_t3_static_v1_ad'::text entity_key
+), checks(check_code, actual_count, expected_count, comparison) as (
+  select 'LEDGER_TOTAL', count(*), 37, 'eq' from supabase_migrations.schema_migrations
+  union all select 'DATASET_TABLE', count(*), 1, 'eq' from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and c.relkind='r'
+  union all select 'DATASET_ROWS', count(*), 0, 'eq' from public.performance_dataset_rows_v2
+  union all select 'ELIGIBLE_USERS', count(*), 1, 'gte' from public.users u where exists (select 1 from auth.users a where a.id=u.id)
+  union all select 'FIXTURE_ROWS', count(*), 0, 'eq' from public.performance_dataset_rows_v2 d cross join constants k where d.entity_key=k.entity_key
+  union all select 'V1_ROWS', count(*), count(*), 'capture' from public.performance_dataset_rows
+  union all select 'SNAPSHOT_ROWS', count(*), count(*), 'capture' from public.dashboard_snapshots
+  union all select 'OAUTH_ROWS', count(*), 0, 'eq' from public.oauth_transactions
+  union all select 'CONNECTED_CONNECTIONS', count(*), 7, 'eq' from public.platform_connections where connected=true
+  union all select 'ENCRYPTED_TOKEN_ROWS', count(*), 7, 'eq' from public.platform_connection_tokens
+  union all select 'MISSING_ENCRYPTED', count(*), 0, 'eq' from public.platform_connections pc where pc.connected=true and not exists (select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform)
+  union all select 'PLAINTEXT_TOKENS', count(*), 0, 'eq' from public.platform_connections where access_token is not null or refresh_token is not null
+  union all select 'VALID_INDEXES', count(*), 5, 'eq' from pg_catalog.pg_index i join pg_catalog.pg_class c on c.oid=i.indrelid join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and i.indisvalid and i.indisready
+  union all select 'VALIDATED_CONSTRAINTS', count(*), 21, 'eq' from pg_catalog.pg_constraint x join pg_catalog.pg_class c on c.oid=x.conrelid join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and x.convalidated
+  union all select 'RLS_STATE', count(*), 1, 'eq' from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and c.relrowsecurity and not c.relforcerowsecurity
+)
+select check_code, actual_count, expected_count,
+  case comparison when 'eq' then actual_count=expected_count when 'gte' then actual_count>=expected_count else true end passed
+from checks order by check_code;

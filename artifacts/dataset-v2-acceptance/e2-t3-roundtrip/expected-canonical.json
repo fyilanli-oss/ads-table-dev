@@ -1,0 +1,72 @@
+{
+  "identity": {
+    "user_id": "e2_t3_runtime_user",
+    "platform": "meta",
+    "traffic_type": "paid",
+    "source_system": "meta_ads",
+    "channel": null,
+    "platform_account_id": "e2_t3_static_v1_account",
+    "date": "2026-08-24"
+  },
+  "entity": {
+    "campaign_type": null,
+    "root_entity_type": "campaign",
+    "root_entity_id": "e2_t3_static_v1_campaign",
+    "root_entity_name": "E2 T3 Campaign",
+    "parent_entity_type": "adset",
+    "parent_entity_id": "e2_t3_static_v1_adset",
+    "parent_entity_name": "E2 T3 AdSet",
+    "entity_type": "ad",
+    "entity_id": "e2_t3_static_v1_ad",
+    "entity_name": "E2 T3 Ad"
+  },
+  "raw_metrics": {
+    "impression": 1250,
+    "ad_click": 125,
+    "session": null,
+    "spend_value": 250.5,
+    "add_to_cart": 0,
+    "add_to_cart_value": 0,
+    "checkout": 8,
+    "checkout_value": 360,
+    "purchase": 4,
+    "purchase_value": 240
+  },
+  "metric_support": {
+    "impression": "supported",
+    "ad_click": "supported",
+    "session": "unsupported",
+    "spend_value": "supported",
+    "add_to_cart": "supported",
+    "add_to_cart_value": "supported",
+    "checkout": "supported",
+    "checkout_value": "supported",
+    "purchase": "supported",
+    "purchase_value": "supported"
+  },
+  "currency": {
+    "source_currency": "USD",
+    "target_currency": "TRY",
+    "fx_rate": 34.25,
+    "fx_rate_date": "2026-08-24",
+    "fx_provider": "e2_t3_fixed_fx",
+    "fx_engine_version": "v1"
+  },
+  "time": {
+    "source_timezone": "Europe/Istanbul",
+    "business_date": "2026-08-24",
+    "time_engine_version": "v1"
+  },
+  "provenance": {
+    "source_system": "meta_ads",
+    "adapter_version": "e2-t3-meta-v1",
+    "source_confidence": "real",
+    "synthetic": false,
+    "ga4_property_id": null,
+    "source_job_id": null,
+    "raw_reference": {
+      "fixture_namespace": "e2_t3_static_v1",
+      "source": "repository_acceptance"
+    }
+  }
+}

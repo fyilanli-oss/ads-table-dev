@@ -1,0 +1,24 @@
+{
+  "dataset_v2_row_count": 0,
+  "duplicate_target_version_count": 0,
+  "evidence_version": "e2-dataset-v2-metadata-v1",
+  "repository_commit": "d16e87449aeb9eefdea570f5bb8eca77b67ed8ef",
+  "repository_migration_checksums": {
+    "20260816101220_create_performance_dataset_rows_v2.sql": "27cd4bf405b12a7e6928e5c9742f709440da987738fb181bf6dbf5e8da8085f2",
+    "20260816101540_fix_v2_klaviyo_channel_constraint.sql": "6402acdc9a6e426c138d797b7993462ee4bd0c5a0ca34fced7a73586dfb5d5f3"
+  },
+  "result": "PASS",
+  "targets": [
+    {
+      "expected_name": "create_performance_dataset_rows_v2",
+      "live_name": "create_performance_dataset_rows_v2",
+      "version": "20260816101220"
+    },
+    {
+      "expected_name": "fix_v2_klaviyo_channel_constraint",
+      "live_name": "fix_v2_klaviyo_channel_constraint",
+      "version": "20260816101540"
+    }
+  ],
+  "total_ledger_count": 37
+}

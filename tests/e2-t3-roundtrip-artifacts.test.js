@@ -137,6 +137,7 @@ test('execution plan keeps later E2 tasks open and E2-T8 in verification', () =>
   assert.match(plan, /E2-T3 — `Verification`/);
   assert.match(plan, /E2-T4 — `Verification`/);
   assert.match(plan, /E2-T5 — `Verification`/);
-  for (let n = 6; n <= 7; n += 1) assert.match(plan, new RegExp(`E2-T${n} — ` + '`Not started`'));
+  assert.match(plan, /E2-T6 — `Verification`/);
+  assert.match(plan, /E2-T7 — `Not started`/);
   assert.match(plan, /E2-T8 — `Verification`/);
 });

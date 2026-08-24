@@ -18,9 +18,15 @@ Capture Dataset V2, V1, and `dashboard_snapshots` aggregate counts. Put them onl
 
 ## Controlled transaction
 
-Send `E2_T4_UPSERT_TRANSACTION.sql` once, intact. Automatic retry is forbidden. It uses minimum explicit table locking, selects an eligible user internally, returns no user identity, writes initial fixture A, then writes fixture B through the exact canonical conflict target.
+Send `E2_T4_UPSERT_TRANSACTION.sql` once, intact. Automatic retry is forbidden. It selects an eligible user internally, returns no user identity, writes initial fixture A, then writes fixture B through the exact canonical conflict target.
+
+The payload deliberately uses two ordered top-level data-modification commands inside one transaction rather than two data-modifying CTEs in one statement. PostgreSQL documents that data-modifying `WITH` sub-statements share one snapshot, cannot see one another's table effects, and must communicate through `RETURNING`; attempting to modify the same row twice in one statement is not supported. Therefore a same-table initial insert followed by same-key conflict update is not modeled as sibling CTEs. The stronger `SHARE ROW EXCLUSIVE` Dataset V2 lock and `SHARE` locks on parity relations make the ordered commands and derived baseline deterministic without a temporary table or client-side select-then-update.
+
+Only the final `SELECT` produces evidence. It returns exactly one allowlisted object whose fields match the converter contract. Initial and upsert commands produce command tags, not evidence result objects. An operator must not manually merge multiple SQL result sets; only the exact final transaction response may be passed to the converter.
 
 `COMMIT` is forbidden. The unconditional final statement is `ROLLBACK` and must never be removed. Require initial/upsert counts `1`, final fixture rows `1`, duplicate groups/excess rows `0`, updated match `1`, identity/hierarchy and null/zero booleans true, and V1/snapshot/OAuth/token parity.
+
+Static repository checks validate structure and contract alignment, not live PostgreSQL execution acceptance. The live operation is outside this PR and must `STOP` when Management API credentials are unavailable.
 
 ## Postcheck and residue handling
 

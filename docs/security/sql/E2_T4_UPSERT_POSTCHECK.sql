@@ -8,11 +8,11 @@ with expected(dataset_rows,v1_rows,snapshot_rows) as (
   from public.performance_dataset_rows_v2 d cross join constants k where d.entity_key=k.entity_key
   group by user_id,platform,platform_account_id,business_date,traffic_type,entity_key
 ), checks(check_code,actual_count,expected_count) as (
-  select 'DATASET_ROWS',count(*),e.dataset_rows from public.performance_dataset_rows_v2 cross join expected e
+  select 'DATASET_ROWS',(select count(*) from public.performance_dataset_rows_v2),(select dataset_rows from expected)
   union all select 'FIXTURE_ROWS',coalesce(sum(row_count),0),0 from fixture_groups
   union all select 'DUPLICATE_GROUPS',count(*) filter(where row_count>1),0 from fixture_groups
-  union all select 'V1_ROWS',count(*),e.v1_rows from public.performance_dataset_rows cross join expected e
-  union all select 'SNAPSHOT_ROWS',count(*),e.snapshot_rows from public.dashboard_snapshots cross join expected e
+  union all select 'V1_ROWS',(select count(*) from public.performance_dataset_rows),(select v1_rows from expected)
+  union all select 'SNAPSHOT_ROWS',(select count(*) from public.dashboard_snapshots),(select snapshot_rows from expected)
   union all select 'OAUTH_ROWS',count(*),0 from public.oauth_transactions
   union all select 'CONNECTED_CONNECTIONS',count(*),7 from public.platform_connections where connected=true
   union all select 'ENCRYPTED_TOKEN_ROWS',count(*),7 from public.platform_connection_tokens

@@ -5,18 +5,25 @@ create temp table pg_temp.e2_t6_rls_evidence (
   case_code text primary key, actor_label text not null, operation text not null, expected_outcome text not null,
   actual_outcome text not null, actual_row_count bigint not null, actual_sqlstate text null, passed boolean not null
 ) on commit drop;
+create temp table pg_temp.e2_t6_rls_actors (
+  actor_label text primary key check (actor_label in ('user_a','user_b')), internal_user_id uuid not null unique
+) on commit drop;
 create temp table pg_temp.e2_t6_rls_baseline (
   dataset_v2_count bigint not null, dataset_v1_count bigint not null, snapshot_count bigint not null,
   oauth_count bigint not null, token_count bigint not null, ledger_count bigint not null
 ) on commit drop;
-grant insert, select on pg_temp.e2_t6_rls_evidence to authenticated, anon;
+grant insert, select on pg_temp.e2_t6_rls_evidence to authenticated, anon, service_role;
+grant select on pg_temp.e2_t6_rls_actors to service_role;
+insert into pg_temp.e2_t6_rls_actors (actor_label,internal_user_id)
+select case row_number() over(order by u.id) when 1 then 'user_a' else 'user_b' end,u.id
+from public.users u where exists(select 1 from auth.users a where a.id=u.id) order by u.id limit 2;
 insert into pg_temp.e2_t6_rls_baseline
 select (select count(*) from public.performance_dataset_rows_v2),(select count(*) from public.performance_dataset_rows),
   (select count(*) from public.dashboard_snapshots),(select count(*) from public.oauth_transactions),
   (select count(*) from public.platform_connection_tokens),(select count(*) from supabase_migrations.schema_migrations);
 do $guard$
 begin
-  if (select count(*) from (select u.id from public.users u where exists(select 1 from auth.users a where a.id=u.id) order by u.id limit 2) eligible) <> 2 then
+  if (select count(*)=2 and count(distinct internal_user_id)=2 and array_agg(actor_label order by actor_label)=array['user_a','user_b'] from pg_temp.e2_t6_rls_actors) is not true then
     raise exception using errcode='P0001', message='E2-T6 requires exactly two selectable eligible users; STOP';
   end if;
   if exists(select 1 from public.performance_dataset_rows_v2 where entity_key like 'e2\_t6\_rls\_v1:%' escape '\') then
@@ -24,7 +31,7 @@ begin
   end if;
 end $guard$;
 set local role service_role;
-with eligible as (select u.id,row_number() over(order by u.id) n from public.users u where exists(select 1 from auth.users a where a.id=u.id) order by u.id limit 2), inserted as (
+with inserted as (
   insert into public.performance_dataset_rows_v2 (
     user_id,platform,traffic_type,source_system,channel,platform_account_id,business_date,campaign_type,
     root_entity_type,root_entity_id,root_entity_name,parent_entity_type,parent_entity_id,parent_entity_name,
@@ -32,15 +39,15 @@ with eligible as (select u.id,row_number() over(order by u.id) n from public.use
     add_to_cart,add_to_cart_value,checkout,checkout_value,purchase,purchase_value,source_currency,target_currency,
     fx_rate,fx_rate_date,fx_provider,fx_engine_version,source_timezone,time_engine_version,canonical_contract_version,
     adapter_version,source_confidence,synthetic,ga4_property_id,source_job_id,raw)
-  select id,'meta','paid','meta_ads',null,'e2_t6_rls_v1_account_a',current_date,null,
+  select internal_user_id,'meta','paid','meta_ads',null,'e2_t6_rls_v1_account_a',current_date,null,
     'campaign','e2_t6_rls_v1_campaign_a','E2 T6 Campaign','adset','e2_t6_rls_v1_adset_a','E2 T6 AdSet',
     'ad','e2_t6_rls_v1_ad_a','E2 T6 Ad','e2_t6_rls_v1:a',
     '{"impression":"supported","ad_click":"supported","session":"unsupported","spend_value":"supported","add_to_cart":"supported","add_to_cart_value":"supported","checkout":"supported","checkout_value":"supported","purchase":"supported","purchase_value":"supported"}'::jsonb,
     1,1,null,1,0,0,0,0,0,0,'USD','TRY',1,current_date,'e2_t6_fixed_fx','v1','UTC','v1','v1','e2-t6-meta-v1','real',false,null,null,
-    '{"fixture_namespace":"e2_t6_rls_v1","actor_label":"user_a"}'::jsonb from eligible where n=1 returning 1)
+    '{"fixture_namespace":"e2_t6_rls_v1","actor_label":"user_a"}'::jsonb from pg_temp.e2_t6_rls_actors where actor_label='user_a' returning 1)
 insert into pg_temp.e2_t6_rls_evidence
 select 'SERVICE_ROLE_INSERT_A','service_role','INSERT','ALLOWED','ALLOWED',count(*),null,count(*)=1 from inserted;
-with eligible as (select u.id,row_number() over(order by u.id) n from public.users u where exists(select 1 from auth.users a where a.id=u.id) order by u.id limit 2), inserted as (
+with inserted as (
   insert into public.performance_dataset_rows_v2 (
     user_id,platform,traffic_type,source_system,channel,platform_account_id,business_date,campaign_type,
     root_entity_type,root_entity_id,root_entity_name,parent_entity_type,parent_entity_id,parent_entity_name,
@@ -48,16 +55,16 @@ with eligible as (select u.id,row_number() over(order by u.id) n from public.use
     add_to_cart,add_to_cart_value,checkout,checkout_value,purchase,purchase_value,source_currency,target_currency,
     fx_rate,fx_rate_date,fx_provider,fx_engine_version,source_timezone,time_engine_version,canonical_contract_version,
     adapter_version,source_confidence,synthetic,ga4_property_id,source_job_id,raw)
-  select id,'meta','paid','meta_ads',null,'e2_t6_rls_v1_account_b',current_date,null,
+  select internal_user_id,'meta','paid','meta_ads',null,'e2_t6_rls_v1_account_b',current_date,null,
     'campaign','e2_t6_rls_v1_campaign_b','E2 T6 Campaign','adset','e2_t6_rls_v1_adset_b','E2 T6 AdSet',
     'ad','e2_t6_rls_v1_ad_b','E2 T6 Ad','e2_t6_rls_v1:b',
     '{"impression":"supported","ad_click":"supported","session":"unsupported","spend_value":"supported","add_to_cart":"supported","add_to_cart_value":"supported","checkout":"supported","checkout_value":"supported","purchase":"supported","purchase_value":"supported"}'::jsonb,
     1,1,null,1,0,0,0,0,0,0,'USD','TRY',1,current_date,'e2_t6_fixed_fx','v1','UTC','v1','v1','e2-t6-meta-v1','real',false,null,null,
-    '{"fixture_namespace":"e2_t6_rls_v1","actor_label":"user_b"}'::jsonb from eligible where n=2 returning 1)
+    '{"fixture_namespace":"e2_t6_rls_v1","actor_label":"user_b"}'::jsonb from pg_temp.e2_t6_rls_actors where actor_label='user_b' returning 1)
 insert into pg_temp.e2_t6_rls_evidence
 select 'SERVICE_ROLE_INSERT_B','service_role','INSERT','ALLOWED','ALLOWED',count(*),null,count(*)=1 from inserted;
 reset role;
-do $claim_a$ begin perform set_config('request.jwt.claim.sub',(select u.id::text from public.users u where exists(select 1 from auth.users a where a.id=u.id) order by u.id offset 0 limit 1),true); perform set_config('request.jwt.claims',json_build_object('sub',(select u.id::text from public.users u where exists(select 1 from auth.users a where a.id=u.id) order by u.id offset 0 limit 1),'role','authenticated')::text,true); end $claim_a$;
+do $claim_a$ begin perform set_config('request.jwt.claim.sub',(select internal_user_id::text from pg_temp.e2_t6_rls_actors where actor_label='user_a'),true); perform set_config('request.jwt.claims',json_build_object('sub',(select internal_user_id::text from pg_temp.e2_t6_rls_actors where actor_label='user_a'),'role','authenticated')::text,true); end $claim_a$;
 set local role authenticated;
 with observed as (select count(*) row_count from public.performance_dataset_rows_v2 where entity_key='e2_t6_rls_v1:a')
 insert into pg_temp.e2_t6_rls_evidence select 'USER_A_READ_OWN','user_a','SELECT','ALLOWED','ALLOWED',row_count,null,row_count=1 from observed;
@@ -100,7 +107,7 @@ begin
   insert into pg_temp.e2_t6_rls_evidence values ('USER_A_DELETE_OWN','user_a','DELETE','DENIED_BY_PRIVILEGE',v_outcome,v_count,v_state,v_outcome='DENIED_BY_PRIVILEGE' and v_state='42501');
 end $case_user_a_delete_own$;
 reset role;
-do $claim_b$ begin perform set_config('request.jwt.claim.sub',(select u.id::text from public.users u where exists(select 1 from auth.users a where a.id=u.id) order by u.id offset 1 limit 1),true); perform set_config('request.jwt.claims',json_build_object('sub',(select u.id::text from public.users u where exists(select 1 from auth.users a where a.id=u.id) order by u.id offset 1 limit 1),'role','authenticated')::text,true); end $claim_b$;
+do $claim_b$ begin perform set_config('request.jwt.claim.sub',(select internal_user_id::text from pg_temp.e2_t6_rls_actors where actor_label='user_b'),true); perform set_config('request.jwt.claims',json_build_object('sub',(select internal_user_id::text from pg_temp.e2_t6_rls_actors where actor_label='user_b'),'role','authenticated')::text,true); end $claim_b$;
 set local role authenticated;
 with observed as (select count(*) row_count from public.performance_dataset_rows_v2 where entity_key='e2_t6_rls_v1:b')
 insert into pg_temp.e2_t6_rls_evidence select 'USER_B_READ_OWN','user_b','SELECT','ALLOWED','ALLOWED',row_count,null,row_count=1 from observed;
@@ -178,23 +185,28 @@ with summary as (
   select count(*) evaluated_case_count,count(*) filter(where passed) passed_case_count,count(*) filter(where not passed) failed_case_count,
     count(*) filter(where expected_outcome<>'ALLOWED' and actual_outcome='ALLOWED') unexpected_allow_count from pg_temp.e2_t6_rls_evidence
 ), residue as (select greatest(count(*)-2,0) residue_count,count(*) fixture_count from public.performance_dataset_rows_v2 where entity_key like 'e2\_t6\_rls\_v1:%' escape '\'),
+parity as (select
+  (select count(*) from public.performance_dataset_rows_v2)=b.dataset_v2_count+2 dataset_baseline_preserved,
+  (select count(*) from public.performance_dataset_rows)=b.dataset_v1_count v1_unchanged,
+  (select count(*) from public.dashboard_snapshots)=b.snapshot_count snapshots_unchanged,
+  (select count(*) from public.oauth_transactions)=b.oauth_count oauth_unchanged,
+  (select count(*) from public.platform_connection_tokens)=b.token_count token_state_unchanged,
+  (select count(*) from supabase_migrations.schema_migrations)=b.ledger_count ledger_unchanged
+  from pg_temp.e2_t6_rls_baseline b),
 payload as (select jsonb_build_object(
   'operation_code','e2_t6_rls_v1','expected_case_count',16,'evaluated_case_count',s.evaluated_case_count,
   'passed_case_count',s.passed_case_count,'failed_case_count',s.failed_case_count,'unexpected_allow_count',s.unexpected_allow_count,
   'fixture_count',r.fixture_count,'residue_count',r.residue_count,
-  'dataset_baseline_preserved',(select count(*) from public.performance_dataset_rows_v2)=b.dataset_v2_count+2,
-  'v1_unchanged',(select count(*) from public.performance_dataset_rows)=b.dataset_v1_count,
-  'snapshots_unchanged',(select count(*) from public.dashboard_snapshots)=b.snapshot_count,
-  'oauth_unchanged',(select count(*) from public.oauth_transactions)=b.oauth_count,
-  'token_state_unchanged',(select count(*) from public.platform_connection_tokens)=b.token_count,
-  'ledger_unchanged',(select count(*) from supabase_migrations.schema_migrations)=b.ledger_count,
-  'overall_passed',s.evaluated_case_count=16 and s.passed_case_count=16 and s.failed_case_count=0 and s.unexpected_allow_count=0 and r.fixture_count=2 and r.residue_count=0,
+  'dataset_baseline_preserved',p.dataset_baseline_preserved,
+  'v1_unchanged',p.v1_unchanged,'snapshots_unchanged',p.snapshots_unchanged,'oauth_unchanged',p.oauth_unchanged,
+  'token_state_unchanged',p.token_state_unchanged,'ledger_unchanged',p.ledger_unchanged,
+  'overall_passed',s.evaluated_case_count=16 and s.passed_case_count=16 and s.failed_case_count=0 and s.unexpected_allow_count=0 and r.fixture_count=2 and r.residue_count=0 and p.dataset_baseline_preserved and p.v1_unchanged and p.snapshots_unchanged and p.oauth_unchanged and p.token_state_unchanged and p.ledger_unchanged,
   'cases',(select jsonb_agg(jsonb_build_object('case_code',case_code,'actor',actor_label,'operation',operation,'target',case
       when case_code like '%READ_OWN' or case_code like '%UPDATE_OWN' or case_code like '%DELETE_OWN' or case_code like '%INSERT' then 'own'
       when case_code like '%USER_A' and actor_label='user_b' then 'user_a' when case_code like '%USER_B' and actor_label='user_a' then 'user_b'
       when case_code like '%_A' then 'user_a' else 'user_b' end,
     'expected_outcome',expected_outcome,'actual_outcome',actual_outcome,'actual_row_count',actual_row_count,'actual_sqlstate',actual_sqlstate,'passed',passed)
     order by array_position(array['USER_A_READ_OWN','USER_A_READ_USER_B','USER_B_READ_OWN','USER_B_READ_USER_A','ANON_READ_USER_A','ANON_READ_USER_B','USER_A_INSERT','USER_A_UPDATE_OWN','USER_A_DELETE_OWN','USER_B_INSERT','USER_B_UPDATE_OWN','USER_B_DELETE_OWN','SERVICE_ROLE_INSERT_A','SERVICE_ROLE_INSERT_B','SERVICE_ROLE_READ_A','SERVICE_ROLE_READ_B'],case_code))
-) evidence from summary s cross join residue r cross join pg_temp.e2_t6_rls_baseline b)
+) evidence from summary s cross join residue r cross join parity p)
 select evidence from payload;
 rollback;

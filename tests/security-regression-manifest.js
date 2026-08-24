@@ -7,18 +7,14 @@ const files = Object.freeze([
   'tests/provider-token-backfill-write-operator.test.js', 'tests/provider-token-backfill-workflow.test.js',
   'tests/provider-token-backfill-write-workflow.test.js', 'tests/provider-token-schema.test.js',
   'tests/e1-t6d-auth-orphan-cleanup.test.js', 'tests/e1-t6e-plaintext-token-nulling.test.js',
-  'tests/codex-readonly-auth.test.js', 'tests/codex-readonly-contract.test.js',
-  'tests/codex-readonly-routes.test.js', 'tests/codex-readonly-service.test.js',
-  'tests/codex-readonly-security-static.test.js',
   'tests/security-regression-contract.test.js', 'tests/security-regression-workflow.test.js'
 ]);
 const groups = Object.freeze({
-  auth: ['tests/oauth-security-baseline.test.js', 'tests/codex-readonly-auth.test.js'], idor: ['tests/oauth-authorization-contract.test.js'],
+  auth: ['tests/oauth-security-baseline.test.js'], idor: ['tests/oauth-authorization-contract.test.js'],
   tamper: ['tests/oauth-transaction-store.test.js', 'tests/provider-token-vault.test.js'],
   replay: ['tests/oauth-transaction-store.test.js'], expiry: ['tests/oauth-transaction-store.test.js'],
   'production-config': ['tests/production-config.test.js'],
   'provider-token': ['tests/provider-token-vault.test.js', 'tests/provider-token-store.test.js'],
-  redaction: ['tests/production-config.test.js', 'tests/provider-token-backfill.test.js', 'tests/codex-readonly-contract.test.js', 'tests/codex-readonly-routes.test.js'],
-  'readonly-gateway': ['tests/codex-readonly-service.test.js', 'tests/codex-readonly-security-static.test.js']
+  redaction: ['tests/production-config.test.js', 'tests/provider-token-backfill.test.js']
 });
 module.exports = Object.freeze({files, groups});

@@ -32,7 +32,11 @@ with constants as (
     '{"impression":"supported","ad_click":"supported","session":"unsupported","spend_value":"supported","add_to_cart":"supported","add_to_cart_value":"supported","checkout":"supported","checkout_value":"supported","purchase":"supported","purchase_value":"supported"}'::jsonb,
     100,10,null,25,0,0,2,40,1,30,'USD','TRY',34.5,'2026-08-25','e2_t4_fixed_fx','v1',
     'Europe/Istanbul','v1','v1','e2-t4-meta-v1-initial','real',false,null,null,
-    '{"fixture_namespace":"e2_t4_same_key_v1","revision":"initial"}'::jsonb
+    jsonb_build_object(
+      'fixture_namespace','e2_t4_same_key_v1',
+      'revision','initial',
+      'transaction_marker',pg_current_xact_id()::text
+    )
   from eligible_user u cross join constants k cross join gates g
   where g.ledger_ok and g.fixture_absent and g.user_ok and g.oauth_ok and g.connected_ok and g.encrypted_ok and g.plaintext_ok
 ;
@@ -58,7 +62,10 @@ with constants as (
     '{"fixture_namespace":"e2_t4_same_key_v1","revision":"updated"}'::jsonb
   from eligible_user u cross join constants k
   where (select count(*) from public.performance_dataset_rows_v2 d where d.user_id=u.id and d.entity_key=k.entity_key
-    and d.impressions=100 and d.sessions is null and d.add_to_cart=0 and d.adapter_version='e2-t4-meta-v1-initial')=1
+    and d.impressions=100 and d.sessions is null and d.add_to_cart=0
+    and d.adapter_version='e2-t4-meta-v1-initial'
+    and d.raw->>'revision'='initial'
+    and d.raw->>'transaction_marker'=pg_current_xact_id()::text)=1
   on conflict (user_id,platform,platform_account_id,business_date,traffic_type,entity_key) do update set
     metric_support=excluded.metric_support,impressions=excluded.impressions,ad_clicks=excluded.ad_clicks,
     sessions=excluded.sessions,spend=excluded.spend,add_to_cart=excluded.add_to_cart,

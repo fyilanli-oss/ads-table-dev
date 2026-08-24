@@ -24,6 +24,8 @@ The payload deliberately uses two ordered top-level data-modification commands i
 
 Only the final `SELECT` produces evidence. It returns exactly one allowlisted object whose fields match the converter contract. Initial and upsert commands produce command tags, not evidence result objects. An operator must not manually merge multiple SQL result sets; only the exact final transaction response may be passed to the converter.
 
+The initial fixture stores a temporary, non-identity `transaction_marker` inside its redacted `raw` object using `pg_current_xact_id()::text`. The second upsert requires the exact eligible user, entity key, initial metrics, initial adapter version, `revision=initial`, and that current-transaction marker together. A pre-existing or residue fixture cannot satisfy this binding, so false gates or a zero-row initial insert leave the second write safely ineffective. The updated payload replaces `raw` with only the namespace and `revision=updated`; it removes the marker before final inspection. Neither the marker nor transaction identity is projected into evidence or accepted by the converter.
+
 `COMMIT` is forbidden. The unconditional final statement is `ROLLBACK` and must never be removed. Require initial/upsert counts `1`, final fixture rows `1`, duplicate groups/excess rows `0`, updated match `1`, identity/hierarchy and null/zero booleans true, and V1/snapshot/OAuth/token parity.
 
 Static repository checks validate structure and contract alignment, not live PostgreSQL execution acceptance. The live operation is outside this PR and must `STOP` when Management API credentials are unavailable.

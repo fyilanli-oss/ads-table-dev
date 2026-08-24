@@ -23,3 +23,20 @@ test('converter rejects residue, baseline drift, negative and fractional counts'
 test('converter rejects credential PII UUID and raw-row patterns without echo',()=>{for(const leak of ['postgresql://host/db','person@example.invalid','123e4567-e89b-42d3-a456-426614174000','raw_row']){const b=rows(),f=rows(true);f[0].unknown=leak;let error;try{buildEvidence(b,f)}catch(e){error=e}assert(error);assert.doesNotMatch(error.message,new RegExp(leak.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));}});
 test('committed artifacts contain no secrets identities production counts or raw rows',()=>{const text=files.map(read).join('\n');assert.doesNotMatch(text,/postgres(?:ql)?:\/\/|authorization\s*:|bearer\s+|-----BEGIN [A-Z ]*PRIVATE KEY-----|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/i);});
 test('execution plan preserves E2 statuses and complete T7 mirror',()=>{for(const n of [1,2])assert.match(plan,new RegExp(`E2-T${n} — `+'`Done`'));for(const n of [3,4,5,6,7,8])assert.match(plan,new RegExp(`E2-T${n} — `+'`Verification`'));for(const heading of ['Amaç','Mevcut durum','Planlanan durum','Kapsam','Kapsam dışı','Bağımlılıklar','Uygulama adımları','Kabul kriterleri','Test planı','Rollback planı','Gözlemlenebilirlik','Güvenlik ve veri etkisi','Planlanan','Gerçekleşen','Sapmalar','Evidence','Durum'])assert.match(plan,new RegExp(`\\*\\*${heading}:`));});
+test('service role requires the exact seven independent privileges in both SQL checks',()=>{
+  const privileges=['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER'];
+  for(const sql of [baseline,finalSql]){
+    const service=sql.match(/case when\s+([\s\S]*?)\s+then 1 else 0 end service_ok/);
+    assert(service,'service_ok case must exist');
+    assert.deepEqual([...service[1].matchAll(/has_table_privilege\('service_role','public\.performance_dataset_rows_v2','([^']+)'\)/g)].map(x=>x[1]),privileges);
+    assert.equal((service[1].match(/\band\s+has_table_privilege/g)||[]).length,6);
+    assert.doesNotMatch(service[1],/has_table_privilege\('service_role','public\.performance_dataset_rows_v2','[^']*,[^']*'\)/);
+    for(const omitted of privileges){
+      const simulated=privileges.filter(value=>value!==omitted).map(()=>true);
+      assert.equal(simulated.length===privileges.length&&simulated.every(Boolean),false);
+    }
+    assert.match(sql,/case when has_table_privilege\('anon','public\.performance_dataset_rows_v2','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'\) then 0 else 1 end anon_ok/);
+    assert.match(sql,/case when has_table_privilege\('authenticated','public\.performance_dataset_rows_v2','SELECT'\) and not has_table_privilege\('authenticated','public\.performance_dataset_rows_v2','INSERT,UPDATE,DELETE,TRUNCATE'\) then 1 else 0 end authenticated_ok/);
+    assert.match(sql,/'DATASET_V2_RLS_POLICY_GRANT_STATE',[\s\S]*,5,'eq'/);
+  }
+});

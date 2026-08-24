@@ -10,7 +10,15 @@ with policy_state as (
   select
     case when has_table_privilege('anon','public.performance_dataset_rows_v2','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') then 0 else 1 end anon_ok,
     case when has_table_privilege('authenticated','public.performance_dataset_rows_v2','SELECT') and not has_table_privilege('authenticated','public.performance_dataset_rows_v2','INSERT,UPDATE,DELETE,TRUNCATE') then 1 else 0 end authenticated_ok,
-    case when has_table_privilege('service_role','public.performance_dataset_rows_v2','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') then 1 else 0 end service_ok
+    case when
+      has_table_privilege('service_role','public.performance_dataset_rows_v2','SELECT')
+      and has_table_privilege('service_role','public.performance_dataset_rows_v2','INSERT')
+      and has_table_privilege('service_role','public.performance_dataset_rows_v2','UPDATE')
+      and has_table_privilege('service_role','public.performance_dataset_rows_v2','DELETE')
+      and has_table_privilege('service_role','public.performance_dataset_rows_v2','TRUNCATE')
+      and has_table_privilege('service_role','public.performance_dataset_rows_v2','REFERENCES')
+      and has_table_privilege('service_role','public.performance_dataset_rows_v2','TRIGGER')
+    then 1 else 0 end service_ok
 ), checks(check_code,actual_count,expected_count,comparison) as (
   select 'DATASET_V2_BASELINE',(select count(*) from public.performance_dataset_rows_v2),(-1)::bigint,'eq'
   union all select 'E2_T3_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key='meta:e2_t3_static_v1_account:paid:none:campaign:e2_t3_static_v1_campaign:ad:e2_t3_static_v1_ad'),0,'eq'

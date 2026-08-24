@@ -80,8 +80,8 @@ test('all closed constraint names exist in the migration inventory', () => {
 
 test('singleton and overlap sets encode expression-derived three-valued CHECK behavior',()=>{
   const checks=matrix.filter(x=>x.expected_sqlstate==='23514');
-  assert.equal(checks.filter(x=>x.expected_constraints.length===1).length,23);
-  assert.equal(checks.filter(x=>x.expected_constraints.length>1).length,9);
+  assert.equal(checks.filter(x=>x.expected_constraints.length===1).length,22);
+  assert.equal(checks.filter(x=>x.expected_constraints.length>1).length,10);
   const expected={
     INVALID_PLATFORM:['performance_dataset_rows_v2_hierarchy_chk','performance_dataset_rows_v2_platform_chk','performance_dataset_rows_v2_source_semantics_chk'],
     INVALID_TRAFFIC_TYPE:['performance_dataset_rows_v2_hierarchy_chk','performance_dataset_rows_v2_source_semantics_chk','performance_dataset_rows_v2_traffic_type_chk'],
@@ -91,11 +91,27 @@ test('singleton and overlap sets encode expression-derived three-valued CHECK be
     INVALID_ROOT_ENTITY_TYPE:['performance_dataset_rows_v2_hierarchy_chk','performance_dataset_rows_v2_root_type_chk'],
     INVALID_PARENT_ENTITY_TYPE:['performance_dataset_rows_v2_hierarchy_chk','performance_dataset_rows_v2_parent_type_chk'],
     INVALID_ENTITY_TYPE:['performance_dataset_rows_v2_entity_type_chk','performance_dataset_rows_v2_hierarchy_chk'],
-    METRIC_SUPPORT_NOT_OBJECT:['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_support_object_chk']
+    METRIC_SUPPORT_NOT_OBJECT:['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_support_object_chk'],
+    INVALID_SUPPORT_ENUM:['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_value_support_chk']
   };
   for(const [code,set] of Object.entries(expected))assert.deepEqual(matrix.find(x=>x.case_code===code).expected_constraints,set);
   assert.deepEqual(matrix.find(x=>x.case_code==='MISSING_SUPPORT_KEY').expected_constraints,['performance_dataset_rows_v2_metric_support_keys_chk']);
-  assert.deepEqual(matrix.find(x=>x.case_code==='INVALID_SUPPORT_ENUM').expected_constraints,['performance_dataset_rows_v2_metric_support_keys_chk']);
+});
+
+test('invalid non-null impression support makes both keys and metric-value CHECK expressions false',()=>{
+  const supportKeys=['impression','ad_click','session','spend_value','add_to_cart','add_to_cart_value','checkout','checkout_value','purchase','purchase_value'];
+  const support=Object.fromEntries(supportKeys.map(key=>[key,key==='impression'?'invalid':key==='session'?'unsupported':'supported']));
+  const values={impression:100,ad_click:10,session:null,spend_value:25,add_to_cart:0,add_to_cart_value:0,checkout:2,checkout_value:40,purchase:1,purchase_value:30};
+  const allowed=new Set(['supported','unsupported','unknown']);
+  const keysExpression=supportKeys.every(key=>Object.hasOwn(support,key)&&allowed.has(support[key]));
+  const valueSupportExpression=supportKeys.every(key=>(support[key]==='supported'&&values[key]!==null)||(new Set(['unsupported','unknown']).has(support[key])&&values[key]===null));
+  assert.equal(support.impression,'invalid');assert.equal(values.impression,100);
+  assert.equal(keysExpression,false);assert.equal(valueSupportExpression,false);
+  const keysDef=migration.match(/constraint performance_dataset_rows_v2_metric_support_keys_chk\s+check \(([\s\S]*?)\n    \),/i);
+  const valuesDef=migration.match(/constraint performance_dataset_rows_v2_metric_value_support_chk\s+check \(([\s\S]*?)\n    \)\n\);/i);
+  assert(keysDef);assert(valuesDef);assert.match(keysDef[1],/metric_support->>'impression'\) in \('supported','unsupported','unknown'\)/);
+  assert.match(valuesDef[1],/metric_support->>'impression'\) = 'supported' and impressions is not null/);
+  assert.deepEqual(matrix.find(x=>x.case_code==='INVALID_SUPPORT_ENUM').expected_constraints,['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_value_support_chk']);
 });
 
 test('preflight and postcheck are one read-only WITH SELECT each with scalar baselines',()=>{
@@ -132,6 +148,12 @@ test('single final response matches converter allowlists and deterministic case 
   for(const field of TOP_LEVEL_FIELDS)assert.match(transaction,new RegExp(`'${field}'`),field);
   for(const field of CASE_FIELDS)assert.match(transaction,new RegExp(`'${field}'`),field);
   assert.match(transaction,/jsonb_agg\([\s\S]*order by array_position/i);
+});
+
+test('dataset unchanged means exact baseline parity and unexpected acceptance fails overall',()=>{
+  assert.match(transaction,/'dataset_unchanged',\(select count\(\*\) from public\.performance_dataset_rows_v2\)=s\.dataset_before,/);
+  assert.doesNotMatch(transaction,/dataset_unchanged[^\n]*\+\s*s?\.?unexpected_accept_count/i);
+  assert.match(transaction,/'overall_passed',s\.evaluated_case_count=35 and s\.passed_case_count=35 and s\.failed_case_count=0 and s\.unexpected_accept_count=0 and r\.residue_count=0\s+and \(select count\(\*\) from public\.performance_dataset_rows_v2\)=s\.dataset_before,/);
 });
 
 test('converter accepts exact evidence and fails wrong state, constraint, column, or acceptance',()=>{

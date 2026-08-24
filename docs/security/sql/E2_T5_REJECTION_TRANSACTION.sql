@@ -504,18 +504,18 @@ begin
       insert into public.performance_dataset_rows_v2 (user_id,platform,traffic_type,source_system,channel,platform_account_id,business_date,campaign_type,root_entity_type,root_entity_id,root_entity_name,parent_entity_type,parent_entity_id,parent_entity_name,entity_type,entity_id,entity_name,entity_key,metric_support,impressions,ad_clicks,sessions,spend,add_to_cart,add_to_cart_value,checkout,checkout_value,purchase,purchase_value,source_currency,target_currency,fx_rate,fx_rate_date,fx_provider,fx_engine_version,source_timezone,time_engine_version,canonical_contract_version,adapter_version,source_confidence,synthetic,ga4_property_id,source_job_id,raw)
       values (v_user_id, 'meta', 'paid', 'meta_ads', null, 'e2_t5_rejection_v1_invalid_support_enum_account', '2026-08-26', null, 'campaign', 'e2_t5_rejection_v1_invalid_support_enum_root', 'E2 T5 Root', 'adset', 'e2_t5_rejection_v1_invalid_support_enum_parent', 'E2 T5 Parent', 'ad', 'e2_t5_rejection_v1_invalid_support_enum_entity', 'E2 T5 Entity', 'e2_t5_rejection_v1:invalid_support_enum', '{"impression":"invalid","ad_click":"supported","session":"unsupported","spend_value":"supported","add_to_cart":"supported","add_to_cart_value":"supported","checkout":"supported","checkout_value":"supported","purchase":"supported","purchase_value":"supported"}'::jsonb, 100, 10, null, 25, 0, 0, 2, 40, 1, 30, 'USD', 'TRY', 34.5, '2026-08-26', 'e2_t5_fixed_fx', 'v1', 'Europe/Istanbul', 'v1', 'v1', 'e2-t5-v1', 'real', false, null, null, '{"fixture_namespace":"e2_t5_rejection_v1"}'::jsonb);
       insert into pg_temp.e2_t5_rejection_evidence(case_code,expected_sqlstate,expected_constraints,expected_column,actual_sqlstate,actual_constraint,actual_column,rejected,passed,dataset_before,v1_before,snapshots_before)
-      values ('INVALID_SUPPORT_ENUM','23514',array['performance_dataset_rows_v2_metric_support_keys_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before);
+      values ('INVALID_SUPPORT_ENUM','23514',array['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_value_support_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before);
     exception
       when check_violation or not_null_violation then
         get stacked diagnostics v_state=returned_sqlstate,v_constraint=constraint_name,v_column=column_name;
         insert into pg_temp.e2_t5_rejection_evidence(case_code,expected_sqlstate,expected_constraints,expected_column,actual_sqlstate,actual_constraint,actual_column,rejected,passed,dataset_before,v1_before,snapshots_before)
-        values ('INVALID_SUPPORT_ENUM','23514',array['performance_dataset_rows_v2_metric_support_keys_chk']::text[],null,v_state,nullif(v_constraint,''),nullif(v_column,''),true,
-          v_state='23514' and case when '23514'='23514' then nullif(v_constraint,'')=any(array['performance_dataset_rows_v2_metric_support_keys_chk']::text[]) else nullif(v_column,'')=null end,
+        values ('INVALID_SUPPORT_ENUM','23514',array['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_value_support_chk']::text[],null,v_state,nullif(v_constraint,''),nullif(v_column,''),true,
+          v_state='23514' and case when '23514'='23514' then nullif(v_constraint,'')=any(array['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_value_support_chk']::text[]) else nullif(v_column,'')=null end,
           v_dataset_before,v_v1_before,v_snapshots_before);
       when others then
         get stacked diagnostics v_state=returned_sqlstate,v_constraint=constraint_name,v_column=column_name;
         insert into pg_temp.e2_t5_rejection_evidence(case_code,expected_sqlstate,expected_constraints,expected_column,actual_sqlstate,actual_constraint,actual_column,rejected,passed,dataset_before,v1_before,snapshots_before)
-        values ('INVALID_SUPPORT_ENUM','23514',array['performance_dataset_rows_v2_metric_support_keys_chk']::text[],null,v_state,nullif(v_constraint,''),nullif(v_column,''),false,false,v_dataset_before,v_v1_before,v_snapshots_before);
+        values ('INVALID_SUPPORT_ENUM','23514',array['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_value_support_chk']::text[],null,v_state,nullif(v_constraint,''),nullif(v_column,''),false,false,v_dataset_before,v_v1_before,v_snapshots_before);
     end;
     begin
       insert into public.performance_dataset_rows_v2 (user_id,platform,traffic_type,source_system,channel,platform_account_id,business_date,campaign_type,root_entity_type,root_entity_id,root_entity_name,parent_entity_type,parent_entity_id,parent_entity_name,entity_type,entity_id,entity_name,entity_key,metric_support,impressions,ad_clicks,sessions,spend,add_to_cart,add_to_cart_value,checkout,checkout_value,purchase,purchase_value,source_currency,target_currency,fx_rate,fx_rate_date,fx_provider,fx_engine_version,source_timezone,time_engine_version,canonical_contract_version,adapter_version,source_confidence,synthetic,ga4_property_id,source_job_id,raw)
@@ -650,7 +650,7 @@ begin
       ('KLAVIYO_FLOW_AS_CAMPAIGN','23514',array['performance_dataset_rows_v2_hierarchy_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before),
       ('ORGANIC_WITH_PAID_HIERARCHY','23514',array['performance_dataset_rows_v2_hierarchy_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before),
       ('MISSING_SUPPORT_KEY','23514',array['performance_dataset_rows_v2_metric_support_keys_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before),
-      ('INVALID_SUPPORT_ENUM','23514',array['performance_dataset_rows_v2_metric_support_keys_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before),
+      ('INVALID_SUPPORT_ENUM','23514',array['performance_dataset_rows_v2_metric_support_keys_chk','performance_dataset_rows_v2_metric_value_support_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before),
       ('SUPPORTED_METRIC_IS_NULL','23514',array['performance_dataset_rows_v2_metric_value_support_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before),
       ('UNSUPPORTED_METRIC_IS_NON_NULL','23514',array['performance_dataset_rows_v2_metric_value_support_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before),
       ('UNKNOWN_METRIC_IS_NON_NULL','23514',array['performance_dataset_rows_v2_metric_value_support_chk']::text[],null,null,null,null,false,false,v_dataset_before,v_v1_before,v_snapshots_before),
@@ -673,7 +673,7 @@ with summary as (
     'operation_code','e2_t5_rejection_v1','expected_case_count',35,'evaluated_case_count',s.evaluated_case_count,
     'passed_case_count',s.passed_case_count,'failed_case_count',s.failed_case_count,
     'unexpected_accept_count',s.unexpected_accept_count,'residue_count',r.residue_count,
-    'dataset_unchanged',(select count(*) from public.performance_dataset_rows_v2)=s.dataset_before+s.unexpected_accept_count,
+    'dataset_unchanged',(select count(*) from public.performance_dataset_rows_v2)=s.dataset_before,
     'v1_unchanged',(select count(*) from public.performance_dataset_rows)=s.v1_before,
     'snapshots_unchanged',(select count(*) from public.dashboard_snapshots)=s.snapshots_before,
     'oauth_unchanged',(select count(*) from public.oauth_transactions)=0,

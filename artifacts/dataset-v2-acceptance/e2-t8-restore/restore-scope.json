@@ -47,7 +47,7 @@
     "application-owned triggers",
     "RLS state",
     "policies",
-    "explicit application grants",
+    "application table grants captured schema-only and restricted to the approved source-inventory grantee/privilege allowlist",
     "required application-owned extensions only through an explicit allowlist"
   ],
   "excluded_content": [

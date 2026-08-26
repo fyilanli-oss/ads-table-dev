@@ -16,7 +16,7 @@ WITH managed AS (
   SELECT current_setting('e2_t8.ledger_unambiguous',true)='true' AS ledger_unambiguous
 )
 SELECT managed.auth_schema AND managed.auth_uid_exact_signature AND managed.anon_role AND managed.authenticated_role AND managed.service_role_role AS managed_primitives_ok,
-       true AS target_kind_ok, identity_contract.target_identity_distinct, target_state.application_relation_count=0 AS public_allowlist_only,
+       current_setting('e2_t8.target_kind',true) IN ('disposable_supabase','official_full_local_supabase') AS target_kind_ok, identity_contract.target_identity_distinct, target_state.application_relation_count=0 AS public_allowlist_only,
        target_state.application_relation_count, ledger.ledger_unambiguous,
-       managed.auth_schema AND managed.auth_uid_exact_signature AND managed.anon_role AND managed.authenticated_role AND managed.service_role_role AND identity_contract.target_identity_distinct AND target_state.application_relation_count=0 AND ledger.ledger_unambiguous AS passed
+       current_setting('e2_t8.target_kind',true) IN ('disposable_supabase','official_full_local_supabase') AND managed.auth_schema AND managed.auth_uid_exact_signature AND managed.anon_role AND managed.authenticated_role AND managed.service_role_role AND identity_contract.target_identity_distinct AND target_state.application_relation_count=0 AND ledger.ledger_unambiguous AS passed
 FROM managed CROSS JOIN target_state CROSS JOIN identity_contract CROSS JOIN ledger;

@@ -3,11 +3,133 @@
   "baseline_cutoff_status": "pending_capture_classification",
   "historical_sql_available": false,
   "migrations": [
-    {"version":"20260816101220","filename":"20260816101220_create_performance_dataset_rows_v2.sql","sha256":"27cd4bf405b12a7e6928e5c9742f709440da987738fb181bf6dbf5e8da8085f2","objects":["public.performance_dataset_rows_v2"],"candidate_classification":"absorbed_by_current_state_baseline","final_classification_status":"pending_capture_checksum","baseline_cutoff_dependency":true,"replay_allowed":false,"reason":"Current-state overlap requires captured-object checksum classification."},
-    {"version":"20260816101540","filename":"20260816101540_fix_v2_klaviyo_channel_constraint.sql","sha256":"6402acdc9a6e426c138d797b7993462ee4bd0c5a0ca34fced7a73586dfb5d5f3","objects":["public.performance_dataset_rows_v2 channel constraint"],"candidate_classification":"absorbed_by_current_state_baseline","final_classification_status":"pending_capture_checksum","baseline_cutoff_dependency":true,"replay_allowed":false,"reason":"Current-state overlap requires captured-object checksum classification."},
-    {"version":"20260818090000","filename":"20260818090000_create_oauth_transactions.sql","sha256":"728f62d4af52eccd0fee195b0a3dedf68889e52b7434f2676bfb90a5b65ef00b","objects":["public.oauth_transactions","public.consume_oauth_transaction","public.cleanup_expired_oauth_transactions"],"candidate_classification":"absorbed_by_current_state_baseline","final_classification_status":"pending_capture_checksum","baseline_cutoff_dependency":true,"replay_allowed":false,"reason":"Current-state overlap requires captured-object checksum classification."},
-    {"version":"20260818120000","filename":"20260818120000_create_platform_connection_tokens.sql","sha256":"afada06dec7b95aca69e3d01dc432554c2599dcc1b357dbb300b3695ae8cb156","objects":["public.platform_connection_tokens"],"candidate_classification":"absorbed_by_current_state_baseline","final_classification_status":"pending_capture_checksum","baseline_cutoff_dependency":true,"replay_allowed":false,"reason":"Current-state overlap requires captured-object checksum classification."},
-    {"version":"20260819120000","filename":"20260819120000_harden_platform_connection_tokens_service_role_grants.sql","sha256":"7cd9c0dcf6b4ec8ece5c12656b974a9c02587158771404ba6e7e3735e9ca9c76","objects":["public.platform_connection_tokens grants and RLS"],"candidate_classification":"absorbed_by_current_state_baseline","final_classification_status":"pending_capture_checksum","baseline_cutoff_dependency":true,"replay_allowed":false,"reason":"Corrective state overlap requires captured-object checksum classification."},
-    {"version":"20260824120000","filename":"20260824120000_harden_oauth_transactions_service_role_grants.sql","sha256":"f73116b653c0ce77f5751e74c36ece39ac4e94aa5f745b5f80772cb6d34de32e","objects":["public.oauth_transactions grants and RLS"],"candidate_classification":"absorbed_by_current_state_baseline","final_classification_status":"pending_capture_checksum","baseline_cutoff_dependency":true,"replay_allowed":false,"reason":"Corrective state overlap requires captured-object checksum classification."}
+    {
+      "version": "20260816101220",
+      "filename": "20260816101220_create_performance_dataset_rows_v2.sql",
+      "sha256": "27cd4bf405b12a7e6928e5c9742f709440da987738fb181bf6dbf5e8da8085f2",
+      "objects": [
+        {
+          "object_key": "relation:performance_dataset_rows_v2",
+          "migration_version": "20260816101220",
+          "effect": "create",
+          "overlap_group": "performance_dataset_rows_v2",
+          "pending_capture_checksum": true
+        }
+      ],
+      "candidate_classification": "absorbed_by_current_state_baseline",
+      "final_classification_status": "pending_capture_checksum",
+      "baseline_cutoff_dependency": true,
+      "replay_allowed": false,
+      "reason": "Current-state overlap requires captured-object checksum classification."
+    },
+    {
+      "version": "20260816101540",
+      "filename": "20260816101540_fix_v2_klaviyo_channel_constraint.sql",
+      "sha256": "6402acdc9a6e426c138d797b7993462ee4bd0c5a0ca34fced7a73586dfb5d5f3",
+      "objects": [
+        {
+          "object_key": "constraint:performance_dataset_rows_v2.channel",
+          "migration_version": "20260816101540",
+          "effect": "alter",
+          "overlap_group": "performance_dataset_rows_v2",
+          "pending_capture_checksum": true
+        }
+      ],
+      "candidate_classification": "absorbed_by_current_state_baseline",
+      "final_classification_status": "pending_capture_checksum",
+      "baseline_cutoff_dependency": true,
+      "replay_allowed": false,
+      "reason": "Current-state overlap requires captured-object checksum classification."
+    },
+    {
+      "version": "20260818090000",
+      "filename": "20260818090000_create_oauth_transactions.sql",
+      "sha256": "728f62d4af52eccd0fee195b0a3dedf68889e52b7434f2676bfb90a5b65ef00b",
+      "objects": [
+        {
+          "object_key": "relation:oauth_transactions",
+          "migration_version": "20260818090000",
+          "effect": "create",
+          "overlap_group": "oauth_transactions",
+          "pending_capture_checksum": true
+        },
+        {
+          "object_key": "function:consume_oauth_transaction",
+          "migration_version": "20260818090000",
+          "effect": "create",
+          "overlap_group": "oauth_transactions",
+          "pending_capture_checksum": true
+        },
+        {
+          "object_key": "function:cleanup_expired_oauth_transactions",
+          "migration_version": "20260818090000",
+          "effect": "create",
+          "overlap_group": "oauth_transactions",
+          "pending_capture_checksum": true
+        }
+      ],
+      "candidate_classification": "absorbed_by_current_state_baseline",
+      "final_classification_status": "pending_capture_checksum",
+      "baseline_cutoff_dependency": true,
+      "replay_allowed": false,
+      "reason": "Current-state overlap requires captured-object checksum classification."
+    },
+    {
+      "version": "20260818120000",
+      "filename": "20260818120000_create_platform_connection_tokens.sql",
+      "sha256": "afada06dec7b95aca69e3d01dc432554c2599dcc1b357dbb300b3695ae8cb156",
+      "objects": [
+        {
+          "object_key": "relation:platform_connection_tokens",
+          "migration_version": "20260818120000",
+          "effect": "create",
+          "overlap_group": "platform_connection_tokens",
+          "pending_capture_checksum": true
+        }
+      ],
+      "candidate_classification": "absorbed_by_current_state_baseline",
+      "final_classification_status": "pending_capture_checksum",
+      "baseline_cutoff_dependency": true,
+      "replay_allowed": false,
+      "reason": "Current-state overlap requires captured-object checksum classification."
+    },
+    {
+      "version": "20260819120000",
+      "filename": "20260819120000_harden_platform_connection_tokens_service_role_grants.sql",
+      "sha256": "7cd9c0dcf6b4ec8ece5c12656b974a9c02587158771404ba6e7e3735e9ca9c76",
+      "objects": [
+        {
+          "object_key": "grant_state:platform_connection_tokens",
+          "migration_version": "20260819120000",
+          "effect": "harden",
+          "overlap_group": "platform_connection_tokens",
+          "pending_capture_checksum": true
+        }
+      ],
+      "candidate_classification": "absorbed_by_current_state_baseline",
+      "final_classification_status": "pending_capture_checksum",
+      "baseline_cutoff_dependency": true,
+      "replay_allowed": false,
+      "reason": "Corrective state overlap requires captured-object checksum classification."
+    },
+    {
+      "version": "20260824120000",
+      "filename": "20260824120000_harden_oauth_transactions_service_role_grants.sql",
+      "sha256": "f73116b653c0ce77f5751e74c36ece39ac4e94aa5f745b5f80772cb6d34de32e",
+      "objects": [
+        {
+          "object_key": "grant_state:oauth_transactions",
+          "migration_version": "20260824120000",
+          "effect": "harden",
+          "overlap_group": "oauth_transactions",
+          "pending_capture_checksum": true
+        }
+      ],
+      "candidate_classification": "absorbed_by_current_state_baseline",
+      "final_classification_status": "pending_capture_checksum",
+      "baseline_cutoff_dependency": true,
+      "replay_allowed": false,
+      "reason": "Corrective state overlap requires captured-object checksum classification."
+    }
   ]
 }

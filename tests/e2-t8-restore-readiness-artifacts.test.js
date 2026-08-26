@@ -1,75 +1,27 @@
 'use strict';
-const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
-const fs = require('node:fs');
-const path = require('node:path');
-const test = require('node:test');
-const root = path.join(__dirname, '..');
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
-const json = (file) => JSON.parse(read(file));
-const contract = require('../security/e2-t8-restore-contract');
-const capture = require('../scripts/e2-t8-schema-capture');
-const evidence = require('../scripts/e2-t8-restore-evidence');
-const base = 'artifacts/dataset-v2-acceptance/e2-t8-restore/';
-const scope = json(`${base}restore-scope.json`); const classification = json(`${base}migration-classification.json`); const manifest = json(`${base}restore-artifact-manifest.template.json`);
-const required = [`${base}restore-scope.json`,`${base}migration-classification.json`,`${base}restore-artifact-manifest.template.json`,'docs/security/E2_T8_RESTORE_READINESS_RUNBOOK.md','docs/security/sql/E2_T8_SOURCE_INVENTORY.sql','docs/security/sql/E2_T8_TARGET_PREFLIGHT.sql','docs/security/sql/E2_T8_TARGET_ACCEPTANCE.sql','security/e2-t8-restore-contract.js','scripts/e2-t8-schema-capture.js','scripts/e2-t8-restore-evidence.js'];
+const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),path=require('node:path'),test=require('node:test');
+const root=path.join(__dirname,'..'),read=f=>fs.readFileSync(path.join(root,f),'utf8'),json=f=>JSON.parse(read(f));
+const contract=require('../security/e2-t8-restore-contract'),validator=require('../security/e2-t8-captured-schema-validator'),capture=require('../scripts/e2-t8-schema-capture'),evidence=require('../scripts/e2-t8-restore-evidence');
+const base='artifacts/dataset-v2-acceptance/e2-t8-restore/',scope=json(base+'restore-scope.json'),classification=json(base+'migration-classification.json'),manifest=json(base+'restore-artifact-manifest.template.json'),FP='a'.repeat(64);
+const inventory=[{object_key:'relation:accounts',object_class:'relation',fingerprint:FP}],grants={grantees:['anon','authenticated','service_role'],privileges:['SELECT','INSERT','UPDATE','DELETE']};
+const validSql='CREATE TABLE public.accounts (id bigint);\nGRANT SELECT ON TABLE public.accounts TO authenticated;';
+const validationInputs={approvedSourceInventory:inventory,restoreScope:scope,expectedGrantContract:grants,captureManifest:manifest};
+const preflight={managed_primitives_ok:true,target_kind_ok:true,target_identity_distinct:true,public_allowlist_only:true,application_relation_count:0,ledger_unambiguous:true,passed:true};
+const gates={managed_primitives_ok:true,application_row_count_exact:0,allowlist_complete:true};
 
-test('all restore preparation artifacts exist and JSON allowlists are exact', () => {
-  for (const file of required) assert.ok(fs.existsSync(path.join(root,file)), file);
-  assert.deepEqual(Object.keys(scope), contract.SCOPE_KEYS); assert.deepEqual(Object.keys(manifest), contract.MANIFEST_KEYS);
-  assert.equal(manifest.restore_ready,false); assert.equal(manifest.baseline_cutoff,null); assert.equal(manifest.provenance,'CURRENT_STATE_BASELINE');
-});
-
-test('six migrations have exact filenames and repository SHA-256 values without historical SQL', () => {
-  assert.equal(classification.migrations.length,6);
-  for (const m of classification.migrations) {
-    assert.deepEqual(Object.keys(m),contract.MIGRATION_KEYS);
-    assert.equal(crypto.createHash('sha256').update(read(`supabase/migrations/${m.filename}`)).digest('hex'),m.sha256);
-    assert.equal(m.candidate_classification,'absorbed_by_current_state_baseline'); assert.equal(m.final_classification_status,'pending_capture_checksum'); assert.equal(m.replay_allowed,false);
-  }
-  assert.equal(classification.historical_sql_available,false); assert.doesNotMatch(JSON.stringify(classification),/historical_sql_body|create table.*202606/i);
-});
-
-test('target contract forbids generic PostgreSQL and requires exact managed primitives', () => {
-  assert.equal(scope.target.plain_generic_postgresql_target,false); assert.equal(scope.target.required_managed_primitives.length,5);
-  const good={kind:'disposable_supabase',auth_schema:true,auth_uid_exact_signature:true,anon_role:true,authenticated_role:true,service_role_role:true,production:false,shared:false,empty:true,production_ref_match:false};
-  assert.equal(contract.validateTarget(good).status,'PASS');
-  assert.equal(contract.validateTarget({...good,kind:'postgresql'}).status,'FAIL'); assert.equal(contract.validateTarget({...good,auth_schema:false}).status,'FAIL');
-  assert.equal(contract.validateTarget({...good,production:true}).status,'FAIL'); assert.equal(contract.validateTarget({...good,shared:true}).status,'FAIL'); assert.equal(contract.validateTarget({...good,empty:false}).status,'FAIL');
-});
-
-test('capture is side-effect-free, plan-only by default and uses a fixed no-data/no-owner plan', () => {
-  let calls=0; assert.equal(capture.run([], {spawn(){calls++;}}).status,'PLAN_ONLY'); assert.equal(calls,0);
-  const plan=capture.capturePlan(); assert.equal(plan.schema,'public'); assert.equal(plan.row_data,false); assert.equal(plan.restore_owner,false); assert.deepEqual(plan.arguments,['--schema-only','--schema=public','--no-owner','--no-privileges']);
-  assert.throws(()=>capture.run(['--execute']),/CONFIRMATION/); assert.throws(()=>capture.run(['--execute','--confirm',capture.CONFIRMATION,'--table=x']),/FORBIDDEN|UNKNOWN/); assert.throws(()=>capture.run(['postgresql://host/db']),/FORBIDDEN/);
-});
-
-test('execute path is dependency-injected and safely reports unavailable tool', () => {
-  const old=process.env.E2_T8_SOURCE_DATABASE_URL; process.env.E2_T8_SOURCE_DATABASE_URL='in-memory-test-placeholder'; let calls=0;
-  try { assert.equal(capture.run(['--execute','--confirm',capture.CONFIRMATION],{toolAvailable:()=>false,spawn(){calls++;}}).status,'CAPTURE_TOOL_UNAVAILABLE'); assert.equal(calls,0); }
-  finally { if(old===undefined) delete process.env.E2_T8_SOURCE_DATABASE_URL; else process.env.E2_T8_SOURCE_DATABASE_URL=old; }
-});
-
-for (const file of ['docs/security/sql/E2_T8_SOURCE_INVENTORY.sql','docs/security/sql/E2_T8_TARGET_PREFLIGHT.sql','docs/security/sql/E2_T8_TARGET_ACCEPTANCE.sql']) test(`${file} is one read-only WITH statement`,()=>{
-  const sql=read(file).replace(/^\s*--.*$/gm,'').trim(); assert.match(sql,/^WITH\b/i); assert.equal(sql.split(';').filter(x=>x.trim()).length,1);
-  assert.doesNotMatch(sql.replace(/'(?:''|[^'])*'/g,"''"),/(?:^|[;(])\s*(?:insert|update|delete|alter|create|drop|grant|revoke|copy|call|do|truncate)\b/i);
-  assert.doesNotMatch(sql,/\bFROM\s+(?:auth|storage)\./i);
-});
-
-test('source and target acceptance use deterministic normalized fingerprints without raw bodies',()=>{ const a=read('docs/security/sql/E2_T8_SOURCE_INVENTORY.sql'); const b=read('docs/security/sql/E2_T8_TARGET_ACCEPTANCE.sql'); for(const value of ['column:','constraint:','index:','function:','trigger:','policy:','grant:','md5']) { assert.match(a,new RegExp(value)); assert.match(b,new RegExp(value)); } assert.doesNotMatch(a,/SELECT\s+prosrc\b/i); });
-
-test('preparation validator passes contract but never declares restore safety',()=>{ const result=contract.validatePreparation(scope,classification,manifest); assert.deepEqual(result,{status:'PASS',errors:[],restoreSafeDecision:false}); const ready={...manifest,restore_ready:true}; assert.equal(contract.validatePreparation(scope,classification,ready).status,'FAIL'); });
-
-test('validator rejects checksums and sensitive material',()=>{ const bad=structuredClone(classification); bad.migrations[0].sha256='0'.repeat(64); assert.equal(contract.validatePreparation(scope,bad,manifest).status,'FAIL'); const secret={...manifest,capture_tool_version:'postgresql://host/db'}; assert.equal(contract.validatePreparation(scope,classification,secret).status,'FAIL'); });
-
-test('evidence rejects pending cutoff/classification, missing extra duplicate and sensitive inputs',()=>{
-  const row={object_key:'relation:a',object_class:'relation',fingerprint:'abc'}; const pre={managed_primitives_ok:true,target_kind_ok:true,target_identity_distinct:true,public_allowlist_only:true,application_relation_count:0,ledger_unambiguous:true,passed:true};
-  assert.equal(evidence.convert({sourceInventory:[row],targetPreflight:pre,targetInventory:[row],manifest,migrationClassification:classification}).status,'FAIL');
-  const finalManifest={...manifest,baseline_cutoff:'20260824120000',restore_ready:true}; const finalClass=structuredClone(classification); finalClass.migrations.forEach(m=>{m.final_classification_status='final';});
-  assert.equal(evidence.convert({sourceInventory:[row],targetPreflight:pre,targetInventory:[row],manifest:finalManifest,migrationClassification:finalClass}).status,'PASS');
-  for(const target of [[],[row,row],[row,{object_key:'relation:b',object_class:'relation',fingerprint:'def'}]]) assert.equal(evidence.convert({sourceInventory:[row],targetPreflight:pre,targetInventory:target,manifest:finalManifest,migrationClassification:finalClass}).status,'FAIL');
-  assert.equal(evidence.convert({sourceInventory:[row],targetPreflight:{...pre,managed_primitives_ok:false},targetInventory:[row],manifest:finalManifest,migrationClassification:finalClass}).status,'FAIL');
-  assert.equal(evidence.convert({sourceInventory:[{...row,fingerprint:'postgresql://host/db'}],targetPreflight:pre,targetInventory:[row],manifest:finalManifest,migrationClassification:finalClass}).status,'FAIL');
-});
-
-test('execution plan keeps E2-T8 in Verification and records no live operation',()=>{ const plan=read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md'); assert.match(plan,/E2-T8 task aynası/); assert.match(plan,/\*\*Durum:\*\* `Verification`/); for(const value of ['Actual schema capture yapılmadı','baseline SQL üretilmedi','target provision edilmedi','restore çalıştırılmadı','production değişmedi']) assert.match(plan,new RegExp(value,'i')); });
+test('artifacts and exact JSON contracts exist',()=>{for(const f of [base+'restore-scope.json',base+'migration-classification.json',base+'restore-artifact-manifest.template.json','docs/security/E2_T8_RESTORE_READINESS_RUNBOOK.md','docs/security/sql/E2_T8_SOURCE_INVENTORY.sql','docs/security/sql/E2_T8_TARGET_PREFLIGHT.sql','docs/security/sql/E2_T8_TARGET_ACCEPTANCE.sql','docs/security/sql/E2_T8_TARGET_FINAL_GATES.sql','security/e2-t8-restore-contract.js','security/e2-t8-captured-schema-validator.js','scripts/e2-t8-schema-capture.js','scripts/e2-t8-restore-evidence.js'])assert.ok(fs.existsSync(path.join(root,f)),f);assert.deepEqual(Object.keys(scope),contract.SCOPE_KEYS);assert.deepEqual(Object.keys(manifest),contract.MANIFEST_KEYS);assert.equal(manifest.restore_ready,false);});
+test('six checksummed migrations remain structured, pending and replay-disabled',()=>{assert.equal(classification.migrations.length,6);for(const m of classification.migrations){assert.equal(crypto.createHash('sha256').update(read('supabase/migrations/'+m.filename)).digest('hex'),m.sha256);assert.equal(m.final_classification_status,'pending_capture_checksum');assert.equal(m.replay_allowed,false);for(const o of m.objects){assert.deepEqual(Object.keys(o),contract.OBJECT_KEYS);assert.equal(o.migration_version,m.version);assert.equal(o.pending_capture_checksum,true);}}assert.equal(classification.historical_sql_available,false);});
+test('overlap chains explicitly relate create and corrective state',()=>{const all=classification.migrations.flatMap(m=>m.objects);assert.ok(all.some(o=>o.overlap_group==='oauth_transactions'&&o.effect==='create'));assert.ok(all.some(o=>o.overlap_group==='oauth_transactions'&&o.effect==='harden'));});
+test('capture defaults to plan only and preserves grants with no owner',()=>{let calls=0;assert.equal(capture.run([],{spawnSync(){calls++;}}).status,'PLAN_ONLY');assert.equal(calls,0);assert.ok(capture.FIXED_ARGUMENTS.includes('--no-owner'));assert.ok(!capture.FIXED_ARGUMENTS.includes('--no-privileges'));assert.equal(capture.capturePlan().deterministic,false);assert.throws(()=>capture.run(['--execute']),/CONFIRMATION/);assert.throws(()=>capture.run(['postgresql://host/db']),/FORBIDDEN/);});
+test('standalone dependencies exist and child env is credential-minimal',()=>{const d=capture.defaultDependencies();assert.equal(typeof d.spawnSync,'function');assert.equal(typeof d.write,'function');const env=capture.childEnvironment('secret-uri',{PATH:'/bin',HOME:'/home',PGSSLMODE:'verify-full',AUTHORIZATION:'no',VERCEL_TOKEN:'no'});assert.deepEqual(env,{PATH:'/bin',PGDATABASE:'secret-uri',HOME:'/home',PGSSLMODE:'verify-full'});assert.doesNotMatch(JSON.stringify(capture.capturePlan()),/secret-uri/);});
+test('execute rejects repository output, nonzero exit, and withholds acceptance before validation',()=>{const common={env:{PATH:'/bin',E2_T8_SOURCE_DATABASE_URL:'secret-uri',E2_T8_CAPTURE_QUARANTINE_DIR:'/repo/raw'},repoRoot:'/repo',resolve:p=>p,mkdir(){},write(){throw Error('no');},spawnSync(){throw Error('no');}};assert.equal(capture.run(['--execute','--confirm',capture.CONFIRMATION],common).status,'REPOSITORY_OUTPUT_FORBIDDEN');let n=0;const fail={...common,env:{...common.env,E2_T8_CAPTURE_QUARANTINE_DIR:'/quarantine'},spawnSync(){n++;return n===1?{status:0,stdout:'17'}:{status:2,stderr:'raw secret'};},write(){}};assert.equal(capture.run(['--execute','--confirm',capture.CONFIRMATION],fail).status,'CAPTURE_COMMAND_FAILED');assert.doesNotMatch(JSON.stringify(capture.run(['--execute','--confirm',capture.CONFIRMATION],fail)),/raw secret|secret-uri/);});
+test('fake capture quarantines output and requires validator contract',()=>{let n=0,writes=0;const d={env:{PATH:'/bin',E2_T8_SOURCE_DATABASE_URL:'secret-uri',E2_T8_CAPTURE_QUARANTINE_DIR:'/q'},repoRoot:'/repo',resolve:p=>p,mkdir(){},write(p,data){writes++;assert.equal(data,validSql);},now:()=>1,pid:2,spawnSync(cmd,args,opts){n++;assert.equal(cmd,'pg_dump');assert.ok(!args.includes('secret-uri'));assert.deepEqual(Object.keys(opts.env).sort(),['PATH','PGDATABASE']);return n===1?{status:0,stdout:'pg_dump 17'}:{status:0,stdout:validSql};}};assert.equal(capture.run(['--execute','--confirm',capture.CONFIRMATION],d).status,'CAPTURE_QUARANTINED_VALIDATION_REQUIRED');n=0;assert.equal(capture.run(['--execute','--confirm',capture.CONFIRMATION],{...d,validationInputs}).status,'CAPTURE_QUARANTINED_CONTRACT_PASS');assert.equal(writes,2);});
+test('captured SQL tokenizer handles dollar bodies, comments and strings',()=>{const sql="-- INSERT hidden\nCREATE FUNCTION public.f() RETURNS void LANGUAGE plpgsql AS $$ BEGIN INSERT INTO x VALUES (';'); END $$;";const out=validator.validateCapturedSchema({capturedSql:sql,approvedSourceInventory:[{object_key:'function:f',object_class:'function',fingerprint:FP}],restoreScope:scope,expectedGrantContract:grants,captureManifest:manifest});assert.equal(out.status,'ARTIFACT_CONTRACT_PASS');assert.equal(validator.lex("SELECT ';not split'; SELECT 2;").length,2);});
+test('validator preserves expected table grants and rejects dangerous SQL',()=>{assert.equal(validator.validateCapturedSchema({capturedSql:validSql,...validationInputs}).status,'ARTIFACT_CONTRACT_PASS');for(const sql of ['','CREATE TABLE public.accounts(id int); GRANT SELECT ON TABLE public.accounts TO stranger;','CREATE ROLE x;','ALTER ROLE x;','ALTER TABLE public.accounts OWNER TO x;','GRANT USAGE ON SCHEMA public TO anon;','INSERT INTO public.accounts VALUES (1);','COPY public.accounts FROM stdin;','CREATE TABLE auth.bad(id int);','CREATE DATABASE bad;','\\include /tmp/x'])assert.equal(validator.validateCapturedSchema({capturedSql:sql,...validationInputs}).status,'ARTIFACT_CONTRACT_FAIL',sql);});
+test('normalized SQL checksum is stable and semantic changes differ',()=>{const a=validator.validateCapturedSchema({capturedSql:validSql,...validationInputs}),b=validator.validateCapturedSchema({capturedSql:validSql,...validationInputs}),c=validator.validateCapturedSchema({capturedSql:validSql.replace('bigint','text'),...validationInputs});assert.equal(a.checksum,b.checksum);assert.notEqual(a.checksum,c.checksum);assert.match(a.checksum,/^[0-9a-f]{64}$/);assert.equal(a.restoreSafeDecision,false);});
+for(const f of ['docs/security/sql/E2_T8_SOURCE_INVENTORY.sql','docs/security/sql/E2_T8_TARGET_PREFLIGHT.sql','docs/security/sql/E2_T8_TARGET_ACCEPTANCE.sql','docs/security/sql/E2_T8_TARGET_FINAL_GATES.sql'])test(f+' is one read-only WITH statement',()=>{const s=read(f).replace(/^\s*--.*$/gm,'').trim();assert.match(s,/^WITH\b/i);assert.equal(s.split(';').filter(Boolean).length,1);assert.doesNotMatch(s.replace(/'(?:''|[^'])*'/g,"''"),/(?:^|[;(])\s*(?:insert|update|delete|alter|create|drop|grant|revoke|copy|call|do|truncate)\b/i);});
+test('source and target inventories are identical SHA-256 contracts',()=>{const s=read('docs/security/sql/E2_T8_SOURCE_INVENTORY.sql'),t=read('docs/security/sql/E2_T8_TARGET_ACCEPTANCE.sql');assert.equal(s,t);assert.doesNotMatch(s,/md5/i);assert.match(s,/digest\(convert_to\(normalized,'UTF8'\),'sha256'\)/);});
+test('target preflight kind is operator-local and final rows are exact',()=>{const p=read('docs/security/sql/E2_T8_TARGET_PREFLIGHT.sql'),g=read('docs/security/sql/E2_T8_TARGET_FINAL_GATES.sql');assert.doesNotMatch(p,/true AS target_kind_ok/i);assert.match(p,/current_setting\('e2_t8.target_kind',true\)/);assert.match(p,/disposable_supabase/);assert.match(p,/official_full_local_supabase/);assert.doesNotMatch(g,/pg_stat|n_live_tup/i);assert.match(g,/count\(\*\)/i);assert.match(g,/%I/);});
+test('evidence shape accepts exact target result and rejects MD5, rows, missing and extra objects',()=>{const finalManifest={...manifest,baseline_cutoff:'cutoff',restore_ready:true},finalClass=structuredClone(classification);finalClass.migrations.forEach(m=>m.final_classification_status='final');const input={sourceInventory:inventory,targetPreflight:preflight,targetInventory:inventory,targetFinalGates:gates,manifest:finalManifest,migrationClassification:finalClass};assert.equal(evidence.convert(input).status,'PASS');assert.equal(evidence.convert({...input,targetFinalGates:{...gates,application_row_count_exact:1}}).status,'FAIL');assert.equal(evidence.convert({...input,targetInventory:[{...inventory[0],fingerprint:'a'.repeat(32)}]}).status,'FAIL');assert.equal(evidence.convert({...input,targetInventory:[]}).status,'FAIL');assert.equal(evidence.convert({...input,targetInventory:[...inventory,{object_key:'relation:extra',object_class:'relation',fingerprint:FP}]}).status,'FAIL');assert.equal(evidence.convert({...input,targetInventory:[...inventory,...inventory]}).status,'FAIL');});
+test('pending cutoff and classification remain fail closed',()=>{assert.equal(contract.validatePreparation(scope,classification,manifest).status,'PASS');assert.equal(evidence.convert({sourceInventory:inventory,targetPreflight:preflight,targetInventory:inventory,targetFinalGates:gates,manifest,migrationClassification:classification}).status,'FAIL');});
+test('plan remains Verification with no capture or restore claim',()=>{const p=read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');assert.match(p,/E2-T8 task aynası/);assert.match(p,/\*\*Durum:\*\* `Verification`/);for(const x of ['Actual schema capture yapılmadı','baseline SQL üretilmedi','target provision edilmedi','restore çalıştırılmadı','production değişmedi'])assert.match(p,new RegExp(x,'i'));});

@@ -6,7 +6,7 @@
   "source_inventory_sha256": null,
   "capture_tool": "pg_dump",
   "capture_tool_version": null,
-  "capture_contract_version": "e2-t8-schema-capture-v1",
+  "capture_contract_version": "e2-t8-schema-capture-v2",
   "baseline_sha256": null,
   "baseline_cutoff": null,
   "schemas_included": ["public"],

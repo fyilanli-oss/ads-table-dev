@@ -22,7 +22,7 @@ Only after a separate human approval, run:
 npm run e2:t5:execute -- --confirm E2-T5-V2-LIVE
 ```
 
-Execute revalidates every binding and the capsule, records `transactionSent` before the one allowed submission, converts only the final SELECT, and records `postcheckSent` before the one mandatory postcheck. Once a transaction may have been sent, the capsule becomes consumed even when conversion or postcheck fails. There is no transaction or postcheck retry, and the same capsule cannot be reused. V2 live acceptance is authorized only after merge and separate human approval; this package itself makes no live Supabase call.
+Execute revalidates every binding and the capsule, records `transactionSent` before the one allowed submission, converts only the final SELECT, and records `postcheckSent` before the one mandatory 15-gate postcheck. If the process stops after recording/sending the transaction but before postcheck, running execute again resumes **only** the mandatory postcheck and never resends the transaction; without retained transaction evidence that recovery remains fail-closed rather than producing PASS. Once postcheck may have been sent, the capsule becomes consumed even when conversion or postcheck fails. There is no transaction or postcheck retry, and the same capsule cannot be reused. V2 live acceptance is authorized only after merge and separate human approval; this package itself makes no live Supabase call.
 
 ## Status and immutable sources
 

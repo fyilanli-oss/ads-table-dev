@@ -20,7 +20,7 @@ begin
   select count(*) into v_dataset_before from public.performance_dataset_rows_v2;
   select count(*) into v_v1_before from public.performance_dataset_rows;
   select count(*) into v_snapshots_before from public.dashboard_snapshots;
-  select count(*) into v_residue from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v1:%' escape '\';
+  select count(*) into v_residue from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v2:%' escape '\';
   if v_user_id is not null and v_residue=0
     and (select count(*) from supabase_migrations.schema_migrations)=37
     and (select count(*) from public.oauth_transactions)=0
@@ -671,7 +671,7 @@ with summary as (
     coalesce(min(snapshots_before),-1) snapshots_before
   from pg_temp.e2_t5_rejection_evidence
 ), residue as (
-  select count(*) residue_count from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v1:%' escape '\'
+  select count(*) residue_count from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v2:%' escape '\'
 ), parity as (
   select
     (select count(*) from public.performance_dataset_rows_v2)=s.dataset_before dataset_unchanged,

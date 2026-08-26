@@ -3,7 +3,7 @@ with expected(dataset_rows,v1_rows,snapshot_rows,connected_rows,encrypted_rows) 
   values ((-1)::bigint,(-1)::bigint,(-1)::bigint,(-1)::bigint,(-1)::bigint)
 ), checks(check_code,actual_count,expected_count) as (
   select 'DATASET_ROWS',(select count(*) from public.performance_dataset_rows_v2),(select dataset_rows from expected)
-  union all select 'E2_T5_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v1:%' escape '\'),0
+  union all select 'E2_T5_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v2:%' escape '\'),0
   union all select 'V1_ROWS',(select count(*) from public.performance_dataset_rows),(select v1_rows from expected)
   union all select 'SNAPSHOT_ROWS',(select count(*) from public.dashboard_snapshots),(select snapshot_rows from expected)
   union all select 'OAUTH_ROWS',(select count(*) from public.oauth_transactions),0

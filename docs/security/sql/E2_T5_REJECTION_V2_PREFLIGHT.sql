@@ -20,7 +20,7 @@ with expected_checks(name) as (
   union all select 'DATASET_ROWS',count(*),count(*),'capture' from public.performance_dataset_rows_v2
   union all select 'V1_ROWS',count(*),count(*),'capture' from public.performance_dataset_rows
   union all select 'SNAPSHOT_ROWS',count(*),count(*),'capture' from public.dashboard_snapshots
-  union all select 'E2_T5_RESIDUE',count(*),0,'eq' from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v1:%' escape '\'
+  union all select 'E2_T5_RESIDUE',count(*),0,'eq' from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v2:%' escape '\'
   union all select 'ELIGIBLE_USERS',count(*),1,'gte' from public.users u where exists(select 1 from auth.users a where a.id=u.id)
   union all select 'RLS_STATE',count(*),1,'eq' from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and c.relrowsecurity and not c.relforcerowsecurity
   union all select 'NAMED_VALIDATED_CHECKS',count(*),19,'eq' from pg_catalog.pg_constraint c join pg_catalog.pg_class t on t.oid=c.conrelid join pg_catalog.pg_namespace n on n.oid=t.relnamespace join expected_checks e on e.name=c.conname where n.nspname='public' and t.relname='performance_dataset_rows_v2' and c.contype='c' and c.convalidated

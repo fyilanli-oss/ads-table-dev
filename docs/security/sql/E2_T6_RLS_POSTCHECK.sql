@@ -1,5 +1,5 @@
--- Replace the three -1 operator-local placeholders with approved preflight Dataset V2/V1/snapshot counts.
-with expected(dataset_v2_rows,dataset_v1_rows,snapshot_rows) as (values ((-1)::bigint,(-1)::bigint,(-1)::bigint)),
+-- Replace the five -1 operator-local placeholders with approved preflight Dataset V2/V1/snapshot/connected/encrypted counts.
+with expected(dataset_v2_rows,dataset_v1_rows,snapshot_rows,connected_rows,encrypted_rows) as (values ((-1)::bigint,(-1)::bigint,(-1)::bigint,(-1)::bigint,(-1)::bigint)),
 policy_state as (
   select count(*) filter (where p.polname='performance_dataset_rows_v2_select_own' and p.polcmd='r' and p.polpermissive
     and p.polroles=array[(select oid from pg_catalog.pg_roles where rolname='authenticated')]
@@ -13,8 +13,11 @@ policy_state as (
   union all select 'E2_T6_RESIDUE',count(*),0 from public.performance_dataset_rows_v2 where entity_key like 'e2\_t6\_rls\_v1:%' escape '\'
   union all select 'LEDGER_TOTAL',count(*),37 from supabase_migrations.schema_migrations
   union all select 'OAUTH_ROWS',count(*),0 from public.oauth_transactions
-  union all select 'CONNECTED_CONNECTIONS',count(*),7 from public.platform_connections where connected=true
-  union all select 'ENCRYPTED_TOKEN_ROWS',count(*),7 from public.platform_connection_tokens
+  union all select 'CONNECTED_CONNECTIONS',count(*),(select connected_rows from expected) from public.platform_connections where connected=true
+  union all select 'ENCRYPTED_TOKEN_ROWS',count(*),(select encrypted_rows from expected) from public.platform_connection_tokens
+  union all select 'MISSING_ENCRYPTED',(select count(*) from public.platform_connections pc where pc.connected=true and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform)),0
+  union all select 'ORPHAN_ENCRYPTED',(select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected=true)),0
+  union all select 'CONNECTION_TOKEN_PARITY',case when (select count(*) from public.platform_connections where connected=true)=(select count(*) from public.platform_connection_tokens) then 1 else 0 end,1
   union all select 'PLAINTEXT_TOKENS',count(*),0 from public.platform_connections where access_token is not null or refresh_token is not null
   union all select 'RLS_ENABLED_NOT_FORCED',count(*),1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and c.relrowsecurity and not c.relforcerowsecurity
   union all select 'EXACT_OWN_SELECT_POLICY',policy_count,1 from policy_state where policy_total=1

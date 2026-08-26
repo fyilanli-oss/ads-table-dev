@@ -2,6 +2,9 @@
 begin;
 lock table public.performance_dataset_rows_v2 in share row exclusive mode;
 lock table public.performance_dataset_rows, public.dashboard_snapshots, public.oauth_transactions, public.platform_connections, public.platform_connection_tokens in share mode;
+create temp table pg_temp.e2_t5_security_baseline as select
+  (select count(*) from public.platform_connections where connected) connected_count,
+  (select count(*) from public.platform_connection_tokens) encrypted_count;
 create temp table pg_temp.e2_t5_rejection_evidence (
   case_code text primary key, expected_sqlstate text not null, expected_constraints text[] not null,
   expected_column text null, actual_sqlstate text null, actual_constraint text null, actual_column text null,
@@ -21,8 +24,9 @@ begin
   if v_user_id is not null and v_residue=0
     and (select count(*) from supabase_migrations.schema_migrations)=37
     and (select count(*) from public.oauth_transactions)=0
-    and (select count(*) from public.platform_connections where connected)=7
-    and (select count(*) from public.platform_connection_tokens)=7
+    and (select connected_count=encrypted_count from pg_temp.e2_t5_security_baseline)
+    and (select count(*) from public.platform_connections pc where pc.connected and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform))=0
+    and (select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected))=0
     and (select count(*) from public.platform_connections where access_token is not null or refresh_token is not null)=0 then
     begin
       insert into public.performance_dataset_rows_v2 (user_id,platform,traffic_type,source_system,channel,platform_account_id,business_date,campaign_type,root_entity_type,root_entity_id,root_entity_name,parent_entity_type,parent_entity_id,parent_entity_name,entity_type,entity_id,entity_name,entity_key,metric_support,impressions,ad_clicks,sessions,spend,add_to_cart,add_to_cart_value,checkout,checkout_value,purchase,purchase_value,source_currency,target_currency,fx_rate,fx_rate_date,fx_provider,fx_engine_version,source_timezone,time_engine_version,canonical_contract_version,adapter_version,source_confidence,synthetic,ga4_property_id,source_job_id,raw)
@@ -668,27 +672,44 @@ with summary as (
   from pg_temp.e2_t5_rejection_evidence
 ), residue as (
   select count(*) residue_count from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v1:%' escape '\'
+), parity as (
+  select
+    (select count(*) from public.performance_dataset_rows_v2)=s.dataset_before dataset_unchanged,
+    (select count(*) from public.performance_dataset_rows)=s.v1_before v1_unchanged,
+    (select count(*) from public.dashboard_snapshots)=s.snapshots_before snapshots_unchanged,
+    (select count(*) from public.oauth_transactions)=0 oauth_unchanged,
+    (select count(*) from public.platform_connections where connected)=(select connected_count from pg_temp.e2_t5_security_baseline) connected_unchanged,
+    (select count(*) from public.platform_connection_tokens)=(select encrypted_count from pg_temp.e2_t5_security_baseline) encrypted_unchanged,
+    (select count(*) from public.platform_connections pc where pc.connected and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform))=0 missing_encrypted_unchanged,
+    (select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected))=0 orphan_encrypted_unchanged,
+    (select count(*) from public.platform_connections where access_token is not null or refresh_token is not null)=0 plaintext_unchanged,
+    (select count(*) from supabase_migrations.schema_migrations)=37 ledger_unchanged
+  from summary s
 ), payload as (
   select jsonb_build_object(
     'operation_code','e2_t5_rejection_v1','expected_case_count',35,'evaluated_case_count',s.evaluated_case_count,
     'passed_case_count',s.passed_case_count,'failed_case_count',s.failed_case_count,
     'unexpected_accept_count',s.unexpected_accept_count,'residue_count',r.residue_count,
-    'dataset_unchanged',(select count(*) from public.performance_dataset_rows_v2)=s.dataset_before,
-    'v1_unchanged',(select count(*) from public.performance_dataset_rows)=s.v1_before,
-    'snapshots_unchanged',(select count(*) from public.dashboard_snapshots)=s.snapshots_before,
-    'oauth_unchanged',(select count(*) from public.oauth_transactions)=0,
-    'connected_unchanged',(select count(*) from public.platform_connections where connected)=7,
-    'encrypted_unchanged',(select count(*) from public.platform_connection_tokens)=7,
-    'plaintext_unchanged',(select count(*) from public.platform_connections where access_token is not null or refresh_token is not null)=0,
-    'ledger_unchanged',(select count(*) from supabase_migrations.schema_migrations)=37,
+    'dataset_unchanged',p.dataset_unchanged,
+    'v1_unchanged',p.v1_unchanged,
+    'snapshots_unchanged',p.snapshots_unchanged,
+    'oauth_unchanged',p.oauth_unchanged,
+    'connected_unchanged',p.connected_unchanged,
+    'encrypted_unchanged',p.encrypted_unchanged,
+    'missing_encrypted_unchanged',p.missing_encrypted_unchanged,
+    'orphan_encrypted_unchanged',p.orphan_encrypted_unchanged,
+    'plaintext_unchanged',p.plaintext_unchanged,
+    'ledger_unchanged',p.ledger_unchanged,
     'overall_passed',s.evaluated_case_count=35 and s.passed_case_count=35 and s.failed_case_count=0 and s.unexpected_accept_count=0 and r.residue_count=0
-      and (select count(*) from public.performance_dataset_rows_v2)=s.dataset_before,
+      and p.dataset_unchanged and p.v1_unchanged and p.snapshots_unchanged and p.oauth_unchanged
+      and p.connected_unchanged and p.encrypted_unchanged and p.missing_encrypted_unchanged
+      and p.orphan_encrypted_unchanged and p.plaintext_unchanged and p.ledger_unchanged,
     'cases',coalesce((select jsonb_agg(jsonb_build_object(
       'case_code',e.case_code,'expected_sqlstate',e.expected_sqlstate,'actual_sqlstate',e.actual_sqlstate,
       'expected_constraints',to_jsonb(e.expected_constraints),'actual_constraint',e.actual_constraint,
       'expected_column',e.expected_column,'actual_column',e.actual_column,'rejected',e.rejected,'passed',e.passed
     ) order by array_position(array['INVALID_PLATFORM','INVALID_TRAFFIC_TYPE','INVALID_SOURCE_SYSTEM','INVALID_CHANNEL_ENUM','INVALID_CAMPAIGN_TYPE','INVALID_ROOT_ENTITY_TYPE','INVALID_PARENT_ENTITY_TYPE','INVALID_ENTITY_TYPE','INVALID_SOURCE_CONFIDENCE','INVALID_SOURCE_CURRENCY','INVALID_TARGET_CURRENCY','NON_POSITIVE_FX_RATE','METRIC_SUPPORT_NOT_OBJECT','RAW_NOT_OBJECT','SYNTHETIC_TRUE','META_WRONG_SOURCE','PAID_WITH_GA4_PROPERTY','ORGANIC_WITHOUT_GA4_PROPERTY','KLAVIYO_PAID_WITH_NULL_CHANNEL','KLAVIYO_PAID_WITH_INVALID_SOURCE_PAIR','META_WITH_ADGROUP_PARENT','GOOGLE_STANDARD_WITHOUT_ADGROUP','GOOGLE_PMAX_WITH_FAKE_PARENT','TIKTOK_WITH_ADSET_PARENT','KLAVIYO_CAMPAIGN_WITH_PARENT','KLAVIYO_FLOW_AS_CAMPAIGN','ORGANIC_WITH_PAID_HIERARCHY','MISSING_SUPPORT_KEY','INVALID_SUPPORT_ENUM','SUPPORTED_METRIC_IS_NULL','UNSUPPORTED_METRIC_IS_NON_NULL','UNKNOWN_METRIC_IS_NON_NULL','REQUIRED_ENTITY_ID_NULL','REQUIRED_PLATFORM_ACCOUNT_NULL','REQUIRED_BUSINESS_DATE_NULL']::text[],e.case_code)) from pg_temp.e2_t5_rejection_evidence e),'[]'::jsonb)
-  ) evidence from summary s cross join residue r
+  ) evidence from summary s cross join residue r cross join parity p
 )
 select evidence from payload;
 rollback;

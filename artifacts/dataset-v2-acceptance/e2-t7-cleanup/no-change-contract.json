@@ -74,28 +74,42 @@
     {
       "check_code": "CONNECTED_CONNECTIONS",
       "comparison": "baseline_parity",
-      "expected_source": "security_baseline",
+      "expected_source": "operator_local",
       "required": true,
-      "safe_output": true
+      "safe_output": false
     },
     {
       "check_code": "ENCRYPTED_TOKEN_ROWS",
       "comparison": "baseline_parity",
-      "expected_source": "security_baseline",
+      "expected_source": "operator_local",
+      "required": true,
+      "safe_output": false
+    },
+    {
+      "check_code": "MISSING_ENCRYPTED",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
       "required": true,
       "safe_output": true
     },
     {
-      "check_code": "MISSING_ENCRYPTED",
-      "comparison": "baseline_parity",
-      "expected_source": "security_baseline",
+      "check_code": "ORPHAN_ENCRYPTED",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
+      "required": true,
+      "safe_output": true
+    },
+    {
+      "check_code": "CONNECTION_TOKEN_PARITY",
+      "comparison": "boolean_true",
+      "expected_source": "committed_contract",
       "required": true,
       "safe_output": true
     },
     {
       "check_code": "PLAINTEXT_TOKENS",
-      "comparison": "baseline_parity",
-      "expected_source": "security_baseline",
+      "comparison": "equals_zero",
+      "expected_source": "committed_contract",
       "required": true,
       "safe_output": true
     },

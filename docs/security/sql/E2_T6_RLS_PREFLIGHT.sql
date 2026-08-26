@@ -21,10 +21,12 @@ with policy_state as (
   union all select 'DATASET_V1_ROWS',count(*),count(*),'capture' from public.performance_dataset_rows
   union all select 'SNAPSHOT_ROWS',count(*),count(*),'capture' from public.dashboard_snapshots
   union all select 'OAUTH_ROWS',count(*),0,'eq' from public.oauth_transactions
-  union all select 'CONNECTED_CONNECTIONS',count(*),7,'eq' from public.platform_connections where connected=true
-  union all select 'ENCRYPTED_TOKEN_ROWS',count(*),7,'eq' from public.platform_connection_tokens
+  union all select 'CONNECTED_CONNECTIONS',count(*),count(*),'capture' from public.platform_connections where connected=true
+  union all select 'ENCRYPTED_TOKEN_ROWS',count(*),count(*),'capture' from public.platform_connection_tokens
   union all select 'MISSING_ENCRYPTED',count(*),0,'eq' from public.platform_connections pc where pc.connected=true and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform)
+  union all select 'ORPHAN_ENCRYPTED',count(*),0,'eq' from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected=true)
   union all select 'PLAINTEXT_TOKENS',count(*),0,'eq' from public.platform_connections where access_token is not null or refresh_token is not null
+  union all select 'CONNECTION_TOKEN_PARITY',case when (select count(*) from public.platform_connections where connected=true)=(select count(*) from public.platform_connection_tokens) then 1 else 0 end,1,'eq'
   union all select 'CONSTRAINT_INDEX_STATE',
     (select count(*) from pg_catalog.pg_constraint x join pg_catalog.pg_class t on t.oid=x.conrelid join pg_catalog.pg_namespace n on n.oid=t.relnamespace where n.nspname='public' and t.relname='performance_dataset_rows_v2' and x.convalidated)
     +(select count(*) from pg_catalog.pg_index i join pg_catalog.pg_class t on t.oid=i.indrelid join pg_catalog.pg_namespace n on n.oid=t.relnamespace where n.nspname='public' and t.relname='performance_dataset_rows_v2' and i.indisvalid),26,'eq'

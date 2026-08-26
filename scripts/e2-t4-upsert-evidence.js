@@ -11,17 +11,19 @@ const ALLOWED = Object.freeze([
   'initial_operation_count','upsert_operation_count','fixture_row_count','duplicate_group_count',
   'duplicate_excess_row_count','updated_contract_match_count','dataset_before','v1_before','v1_after',
   'snapshot_before','snapshot_after','identity_unchanged','hierarchy_unchanged','unsupported_null_preserved',
-  'supported_zero_preserved','oauth_unchanged','connected_unchanged','encrypted_unchanged','plaintext_unchanged'
+  'supported_zero_preserved','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged'
 ]);
 const BOOLEANS = Object.freeze([
   'identity_unchanged','hierarchy_unchanged','unsupported_null_preserved','supported_zero_preserved',
-  'oauth_unchanged','connected_unchanged','encrypted_unchanged','plaintext_unchanged'
+  'oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged'
 ]);
 
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function sameKeys(object, keys) { return JSON.stringify(Object.keys(object).sort()) === JSON.stringify([...keys].sort()); }
 
 function buildEvidence(result, initial, updated) {
+  assert(result && typeof result === 'object' && !Array.isArray(result), 'result must be one object');
+  assert(!Object.keys(result).some((key) => /(?:connection|token).*count|actual_count/i.test(key)), 'actual provider counts are forbidden');
   assert(result && typeof result === 'object' && !Array.isArray(result), 'result must be one redacted object');
   assert(!BLOCKED.test(JSON.stringify(result)), 'forbidden identity or credential material');
   assert(sameKeys(result, ALLOWED), 'result fields do not match allowlist');
@@ -43,6 +45,7 @@ function buildEvidence(result, initial, updated) {
     duplicate_group_count:0,duplicate_excess_row_count:0,
     canonical_key_unchanged:true,identity_unchanged:true,hierarchy_unchanged:true,
     unsupported_null_preserved:true,supported_zero_preserved:true,v1_unchanged:true,snapshot_unchanged:true,
+    connected_unchanged:true, encrypted_unchanged:true, missing_encrypted_unchanged:true, orphan_encrypted_unchanged:true, plaintext_unchanged:true,
     rollback_required:true
   });
 }

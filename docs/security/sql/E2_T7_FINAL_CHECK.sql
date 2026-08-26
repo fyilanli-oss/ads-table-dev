@@ -1,5 +1,5 @@
--- E2-T7 final read-only parity check. Replace exactly the three negative placeholders in an operator-local copy.
-with policy_state as (
+-- E2-T7 final read-only parity check. Replace exactly the five negative placeholders in an operator-local copy.
+with expected(connected_rows,encrypted_rows) as (values ((-1)::bigint,(-1)::bigint)), policy_state as (
   select count(*) filter (where p.polname='performance_dataset_rows_v2_select_own' and p.polcmd='r' and p.polpermissive
     and p.polroles=array[(select oid from pg_catalog.pg_roles where rolname='authenticated')]
     and regexp_replace(pg_catalog.pg_get_expr(p.polqual,p.polrelid),E'\\s+','','g') in ('((SELECTauth.uid()ASuid)=user_id)','(SELECTauth.uid()ASuid)=user_id','(auth.uid()=user_id)')) exact_count,
@@ -30,9 +30,11 @@ with policy_state as (
   union all select 'SNAPSHOT_BASELINE',(select count(*) from public.dashboard_snapshots),(-1)::bigint,'eq'
   union all select 'LEDGER_TOTAL',(select count(*) from supabase_migrations.schema_migrations),37,'eq'
   union all select 'OAUTH_ROWS',(select count(*) from public.oauth_transactions),0,'eq'
-  union all select 'CONNECTED_CONNECTIONS',(select count(*) from public.platform_connections where connected=true),7,'eq'
-  union all select 'ENCRYPTED_TOKEN_ROWS',(select count(*) from public.platform_connection_tokens),7,'eq'
+  union all select 'CONNECTED_CONNECTIONS',(select count(*) from public.platform_connections where connected=true),(select connected_rows from expected),'eq'
+  union all select 'ENCRYPTED_TOKEN_ROWS',(select count(*) from public.platform_connection_tokens),(select encrypted_rows from expected),'eq'
   union all select 'MISSING_ENCRYPTED',(select count(*) from public.platform_connections pc where pc.connected=true and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform)),0,'eq'
+  union all select 'ORPHAN_ENCRYPTED',(select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected=true)),0,'eq'
+  union all select 'CONNECTION_TOKEN_PARITY',case when (select count(*) from public.platform_connections where connected=true)=(select count(*) from public.platform_connection_tokens) then 1 else 0 end,1,'eq'
   union all select 'PLAINTEXT_TOKENS',(select count(*) from public.platform_connections where access_token is not null or refresh_token is not null),0,'eq'
   union all select 'DATASET_V2_SCHEMA_STATE',(select count(*) from pg_catalog.pg_constraint x join pg_catalog.pg_class t on t.oid=x.conrelid join pg_catalog.pg_namespace n on n.oid=t.relnamespace where n.nspname='public' and t.relname='performance_dataset_rows_v2' and x.convalidated)+(select count(*) from pg_catalog.pg_index i join pg_catalog.pg_class t on t.oid=i.indrelid join pg_catalog.pg_namespace n on n.oid=t.relnamespace where n.nspname='public' and t.relname='performance_dataset_rows_v2' and i.indisvalid),26,'eq'
   union all select 'DATASET_V2_RLS_POLICY_GRANT_STATE',(select count(*) from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and c.relrowsecurity and not c.relforcerowsecurity)+(select exact_count from policy_state where policy_total=1)+(select anon_ok+authenticated_ok+service_ok from privilege_state),5,'eq'

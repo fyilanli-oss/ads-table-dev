@@ -7,7 +7,7 @@ const matrix = require('../artifacts/dataset-v2-acceptance/e2-t5-rejection/rejec
 const TOP_LEVEL_FIELDS = Object.freeze([
   'operation_code','expected_case_count','evaluated_case_count','passed_case_count','failed_case_count',
   'unexpected_accept_count','residue_count','dataset_unchanged','v1_unchanged','snapshots_unchanged',
-  'oauth_unchanged','connected_unchanged','encrypted_unchanged','plaintext_unchanged','ledger_unchanged',
+  'oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged',
   'overall_passed','cases'
 ]);
 const CASE_FIELDS = Object.freeze([
@@ -26,6 +26,8 @@ function exactArray(actual, expected) {
 }
 
 function buildEvidence(result) {
+  assert(result && typeof result === 'object' && !Array.isArray(result), 'result must be one object');
+  assert(!Object.keys(result).some((key) => /(?:connection|token).*count|actual_count/i.test(key)), 'actual provider counts are forbidden');
   assert(exactKeys(result, TOP_LEVEL_FIELDS), 'result fields do not match exact top-level allowlist');
   assert(!BLOCKED.test(JSON.stringify(result)), 'forbidden identity, URI, error, or credential material');
   assert(result.operation_code === 'e2_t5_rejection_v1', 'operation_code mismatch');
@@ -58,13 +60,15 @@ function buildEvidence(result) {
   assert(result.passed_case_count === 35 && result.failed_case_count === 0, 'failed case count');
   assert(result.unexpected_accept_count === 0, 'unexpected acceptance');
   assert(result.residue_count === 0, 'fixture residue');
-  for (const field of ['dataset_unchanged','v1_unchanged','snapshots_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','plaintext_unchanged','ledger_unchanged','overall_passed']) {
+  for (const field of ['dataset_unchanged','v1_unchanged','snapshots_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged','overall_passed']) {
     assert(result[field] === true, `${field} must be true`);
   }
   return Object.freeze({
     evidence_version: 'e2-t5-rejection-v1', operation_code: 'e2_t5_rejection_v1', status: 'PASS',
     expected_case_count: 35, passed_case_count: 35, failed_case_count: 0,
-    unexpected_accept_count: 0, residue_count: 0, rollback_required: true
+    unexpected_accept_count: 0, residue_count: 0,
+    connected_unchanged:true, encrypted_unchanged:true, missing_encrypted_unchanged:true, orphan_encrypted_unchanged:true, plaintext_unchanged:true,
+    rollback_required: true
   });
 }
 

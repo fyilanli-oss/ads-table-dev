@@ -22,6 +22,8 @@ Before approval, record SHA-256 for every source and verify the repository commi
 1. Run the exact preflight as one read-only statement.
 2. Every equality/minimum check must pass. Capture the aggregate Dataset V2, V1, and snapshot counts; never capture an identity.
 3. Replace only the documented aggregate placeholders in the postcheck copy kept as operator-local evidence. Do not commit production counts.
+
+The T3 postcheck has exactly four operator-local replacements, in this order: V1, snapshot, connected, encrypted. The committed Dataset V2 zero is not a placeholder and must not be changed. Actual provider counts remain operator-local, are never shared, and are never committed.
 4. Stop if no eligible auth/public user exists, the fixture namespace exists, Dataset V2 is non-empty, ledger is not 37, or any security/schema postcondition differs.
 5. Obtain separate human approval. A failed or ambiguous operation must not be retried.
 
@@ -44,3 +46,12 @@ Rollback is the mandatory normal outcome, not an exception path. Any SQL error l
 ## Observability and privacy
 
 Evidence may contain only run ID, operation status, counts, booleans, canonical field names, redacted expected/actual values, and PASS/FAIL. It must never contain a user/account/connection/entity identifier from production, UUID, credential, raw production row, URI, or authorization material.
+
+## E2-C1 deviation / decision (corrective preparation)
+
+- İlk repository hazırlığı, E1 kapanış anındaki 7/7 provider bağlantı/token nüfusunu sabit kabul etmişti.
+- Canlı read-only E2-T3 preflight, connection/token nüfusunun değişebildiğini kanıtladı; hardcoded kontroller bu nedenle başarısız oldu.
+- Actual production sayıları evidence'a veya repository'ye alınmadı; yalnız operator-local baseline olarak tutulmalıdır.
+- Missing encrypted ve plaintext güvenlik kontrolleri geçti; corrective sözleşme ayrıca orphan encrypted kontrolünü zorunlu kılar.
+- Güvenlik contract'ı fixed population yerine captured connected/encrypted parity ile missing/orphan/plaintext zero olarak düzeltildi.
+- Bu değişiklik production data correction değildir. Bu corrective PR kapsamında canlı transaction, INSERT veya postcheck çalıştırılmadı ve production değişmedi.

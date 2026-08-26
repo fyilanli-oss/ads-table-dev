@@ -1,6 +1,7 @@
 -- Controlled E2-T3 operation. Execute once only after approved preflight. Never remove ROLLBACK.
 begin;
 lock table public.performance_dataset_rows_v2 in row exclusive mode;
+lock table public.platform_connections, public.platform_connection_tokens in share mode;
 with constants as (
   select 'meta:e2_t3_static_v1_account:paid:none:campaign:e2_t3_static_v1_campaign:ad:e2_t3_static_v1_ad'::text entity_key
 ), eligible_user as (
@@ -12,8 +13,11 @@ with constants as (
     (select count(*) from public.performance_dataset_rows_v2 d cross join constants k where d.entity_key=k.entity_key)=0 fixture_absent,
     (select count(*) from eligible_user)=1 user_ok,
     (select count(*) from public.oauth_transactions)=0 oauth_ok,
-    (select count(*) from public.platform_connections where connected)=7 connected_ok,
-    (select count(*) from public.platform_connection_tokens)=7 encrypted_ok,
+    (select count(*) from public.platform_connections where connected) connected_before,
+    (select count(*) from public.platform_connection_tokens) encrypted_before,
+    (select count(*) from public.platform_connections pc where pc.connected and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform))=0 missing_ok,
+    (select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected))=0 orphan_ok,
+    (select count(*) from public.platform_connections where access_token is not null or refresh_token is not null)=0 plaintext_ok,
     (select count(*) from public.performance_dataset_rows) v1_before,
     (select count(*) from public.dashboard_snapshots) snapshot_before
 ), inserted as (
@@ -33,7 +37,7 @@ with constants as (
     'Europe/Istanbul','v1','v1','e2-t3-meta-v1','real',false,null,null,
     '{"fixture_namespace":"e2_t3_static_v1","source":"repository_acceptance"}'::jsonb
   from eligible_user u cross join constants k cross join baseline b
-  where b.ledger_ok and b.dataset_ok and b.fixture_absent and b.user_ok and b.oauth_ok and b.connected_ok and b.encrypted_ok
+  where b.ledger_ok and b.dataset_ok and b.fixture_absent and b.user_ok and b.oauth_ok and b.connected_before=b.encrypted_before and b.missing_ok and b.orphan_ok and b.plaintext_ok
   returning platform,traffic_type,source_system,channel,platform_account_id,business_date,campaign_type,
     root_entity_type,root_entity_id,root_entity_name,parent_entity_type,parent_entity_id,parent_entity_name,
     entity_type,entity_id,entity_name,entity_key,metric_support,impressions,ad_clicks,sessions,spend,
@@ -55,15 +59,19 @@ with constants as (
   select b.*, (select count(*) from public.performance_dataset_rows)=b.v1_before v1_unchanged,
     (select count(*) from public.dashboard_snapshots)=b.snapshot_before snapshot_unchanged,
     (select count(*) from public.oauth_transactions)=0 oauth_unchanged,
-    (select count(*) from public.platform_connection_tokens)=7 tokens_unchanged
+    (select count(*) from public.platform_connections where connected)=b.connected_before connected_unchanged,
+    (select count(*) from public.platform_connection_tokens)=b.encrypted_before encrypted_unchanged,
+    (select count(*) from public.platform_connections pc where pc.connected and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform))=0 missing_encrypted_unchanged,
+    (select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected))=0 orphan_encrypted_unchanged,
+    (select count(*) from public.platform_connections where access_token is not null or refresh_token is not null)=0 plaintext_unchanged
   from baseline b
 )
 select 'E2_T3_TRANSACTION' operation_code, e.inserted_count, e.contract_match_count,
   (select count(*) from public.performance_dataset_rows_v2 d cross join constants k where d.entity_key=k.entity_key) read_back_count,
-  p.v1_unchanged, p.snapshot_unchanged, p.oauth_unchanged, p.tokens_unchanged,
+  p.v1_unchanged, p.snapshot_unchanged, p.oauth_unchanged, p.connected_unchanged, p.encrypted_unchanged, p.missing_encrypted_unchanged, p.orphan_encrypted_unchanged, p.plaintext_unchanged,
   e.inserted_count=1 and e.contract_match_count=1
     and (select count(*) from public.performance_dataset_rows_v2 d cross join constants k where d.entity_key=k.entity_key)=1
-    and p.v1_unchanged and p.snapshot_unchanged and p.oauth_unchanged and p.tokens_unchanged as passed,
+    and p.v1_unchanged and p.snapshot_unchanged and p.oauth_unchanged and p.connected_unchanged and p.encrypted_unchanged and p.missing_encrypted_unchanged and p.orphan_encrypted_unchanged and p.plaintext_unchanged as passed,
   e.redacted_physical
 from evidence e cross join parity p;
 rollback;

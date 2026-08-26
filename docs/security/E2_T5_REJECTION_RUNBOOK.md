@@ -28,13 +28,22 @@ Only `RETURNED_SQLSTATE`, `CONSTRAINT_NAME`, and `COLUMN_NAME` are collected wit
 1. Review the exact source checksums, matrix closed sets, SQL, converter, and static tests.
 2. Obtain separate human approval and operator credential; otherwise STOP.
 3. Run the preflight once. On any failed gate, STOP with no retry.
-4. Capture the three count baselines only in the operator-local record; never commit production counts.
+4. Capture exactly five count baselines only in the operator-local record, in this order: Dataset V2, V1, snapshot, connected, encrypted. Actual provider counts are never shared or committed.
 5. Submit the transaction as one intact payload. Do not split it or manually merge result sets.
 6. Preserve only its single final response and validate it with `scripts/e2-t5-rejection-evidence.js`.
 7. Confirm the final statement executed was `ROLLBACK`; a missing result or uncertain rollback is a STOP.
-8. Replace only the three `-1` scalar placeholders in an operator-local postcheck copy and run that single read-only query.
+8. Replace exactly five `-1` scalar placeholders in an operator-local postcheck copy, in this order: Dataset V2, V1, snapshot, connected, encrypted; then run that single read-only query.
 9. Any residue or parity failure is a STOP; ad hoc cleanup and retry are not authorized.
 
 The response proves exact case count/state/constraint/column matching, zero unexpected acceptance/residue, and Dataset V2, V1, dashboard snapshots, OAuth, encrypted-token, plaintext-token, and ledger no-change. It contains no production identity. Static repository tests validate structure and fail-closed conversion; they are **not live PostgreSQL acceptance**.
 
 No live Supabase query, invalid insert, transaction, postcheck, application-data change, schema change, ledger change, privilege change, or deployment has been performed by this preparation task.
+
+## E2-C1 deviation / decision (corrective preparation)
+
+- İlk repository hazırlığı, E1 kapanış anındaki 7/7 provider bağlantı/token nüfusunu sabit kabul etmişti.
+- Canlı read-only E2-T3 preflight, connection/token nüfusunun değişebildiğini kanıtladı; hardcoded kontroller bu nedenle başarısız oldu.
+- Actual production sayıları evidence'a veya repository'ye alınmadı; yalnız operator-local baseline olarak tutulmalıdır.
+- Missing encrypted ve plaintext güvenlik kontrolleri geçti; corrective sözleşme ayrıca orphan encrypted kontrolünü zorunlu kılar.
+- Güvenlik contract'ı fixed population yerine captured connected/encrypted parity ile missing/orphan/plaintext zero olarak düzeltildi.
+- Bu değişiklik production data correction değildir. Bu corrective PR kapsamında canlı transaction, INSERT veya postcheck çalıştırılmadı ve production değişmedi.

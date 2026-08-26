@@ -45,7 +45,7 @@ function sample() {
   return {
     operation_code:'e2_t5_rejection_v1',expected_case_count:35,evaluated_case_count:35,passed_case_count:35,
     failed_case_count:0,unexpected_accept_count:0,residue_count:0,dataset_unchanged:true,v1_unchanged:true,
-    snapshots_unchanged:true,oauth_unchanged:true,connected_unchanged:true,encrypted_unchanged:true,
+    snapshots_unchanged:true,oauth_unchanged:true,connected_unchanged:true,encrypted_unchanged:true,missing_encrypted_unchanged:true,orphan_encrypted_unchanged:true,
     plaintext_unchanged:true,ledger_unchanged:true,overall_passed:true,cases
   };
 }
@@ -116,7 +116,7 @@ test('invalid non-null impression support makes both keys and metric-value CHECK
 
 test('preflight and postcheck are one read-only WITH SELECT each with scalar baselines',()=>{
   for(const sql of [preflight,postcheck]){const clean=strip(sql);assert.match(clean,/^with\b/i);assert.equal((clean.match(/;/g)||[]).length,1);assert.doesNotMatch(clean,/\b(?:insert|update|delete|alter|create|drop|grant|revoke|truncate|call|do|begin|commit|rollback)\b/i);}
-  assert.match(postcheck,/values \(\(-1\)::bigint,\(-1\)::bigint,\(-1\)::bigint\)/);
+  assert.match(postcheck,/values \(\(-1\)::bigint,\(-1\)::bigint,\(-1\)::bigint,\(-1\)::bigint,\(-1\)::bigint\)/);
   assert.doesNotMatch(postcheck,/select\s+'(?:DATASET_ROWS|V1_ROWS|SNAPSHOT_ROWS)'\s*,\s*count\(\*\)\s*,\s*e\./i);
   for(const gate of ['LEDGER_TOTAL','DATASET_TABLE','RLS_STATE','NAMED_VALIDATED_CHECKS','REQUIRED_NOT_NULL_COLUMNS','KLAVIYO_CORRECTIVE_SEMANTICS','E2_T5_RESIDUE','ELIGIBLE_USERS','DATASET_ROWS','V1_ROWS','SNAPSHOT_ROWS','OAUTH_ROWS','CONNECTED_CONNECTIONS','ENCRYPTED_TOKEN_ROWS','MISSING_ENCRYPTED','PLAINTEXT_TOKENS'])assert.match(preflight,new RegExp(`'${gate}'`));
 });
@@ -124,7 +124,7 @@ test('preflight and postcheck are one read-only WITH SELECT each with scalar bas
 test('transaction has one outer BEGIN/ROLLBACK, no COMMIT, and only pg_temp DDL',()=>{
   const clean=strip(transaction);assert.match(clean,/^begin\s*;/i);assert.match(clean,/rollback\s*;$/i);
   assert.equal((clean.match(/^begin\s*;/gim)||[]).length,1);assert.equal((clean.match(/^rollback\s*;/gim)||[]).length,1);assert.doesNotMatch(clean,/^commit\s*;/im);
-  assert.equal((clean.match(/create\s+temp\s+table/gi)||[]).length,1);assert.match(clean,/create temp table pg_temp\.e2_t5_rejection_evidence/i);
+  assert.equal((clean.match(/create\s+temp\s+table/gi)||[]).length,2);assert.match(clean,/create temp table pg_temp\.e2_t5_rejection_evidence/i);
   assert.doesNotMatch(clean,/^(?:create(?!\s+temp\s+table)|alter|drop|grant|revoke)\b/im);
 });
 
@@ -151,9 +151,11 @@ test('single final response matches converter allowlists and deterministic case 
 });
 
 test('dataset unchanged means exact baseline parity and unexpected acceptance fails overall',()=>{
-  assert.match(transaction,/'dataset_unchanged',\(select count\(\*\) from public\.performance_dataset_rows_v2\)=s\.dataset_before,/);
+  assert.match(transaction,/\(select count\(\*\) from public\.performance_dataset_rows_v2\)=s\.dataset_before dataset_unchanged,/);
   assert.doesNotMatch(transaction,/dataset_unchanged[^\n]*\+\s*s?\.?unexpected_accept_count/i);
-  assert.match(transaction,/'overall_passed',s\.evaluated_case_count=35 and s\.passed_case_count=35 and s\.failed_case_count=0 and s\.unexpected_accept_count=0 and r\.residue_count=0\s+and \(select count\(\*\) from public\.performance_dataset_rows_v2\)=s\.dataset_before,/);
+  const gates=['dataset_unchanged','v1_unchanged','snapshots_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged'];
+  for(const gate of gates){assert.match(transaction,new RegExp(`\\b${gate}\\b`));assert.match(transaction,new RegExp(`'overall_passed'[\\s\\S]*p\\.${gate}\\b`));}
+  assert.match(transaction,/'overall_passed',s\.evaluated_case_count=35 and s\.passed_case_count=35 and s\.failed_case_count=0 and s\.unexpected_accept_count=0 and r\.residue_count=0/);
 });
 
 test('converter accepts exact evidence and fails wrong state, constraint, column, or acceptance',()=>{
@@ -171,7 +173,7 @@ test('converter fails missing, extra, duplicate, unknown fields, residue, and pa
   const unknown=sample();unknown.extra=true;assert.throws(()=>buildEvidence(unknown),/allowlist/);
   const raw=sample();raw.cases[0].error='raw';assert.throws(()=>buildEvidence(raw),/allowlist/);
   const residue=sample();residue.residue_count=1;assert.throws(()=>buildEvidence(residue),/residue/);
-  for(const field of ['dataset_unchanged','v1_unchanged','snapshots_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','plaintext_unchanged','ledger_unchanged','overall_passed']){const value=sample();value[field]=false;assert.throws(()=>buildEvidence(value),new RegExp(field));}
+  for(const field of ['dataset_unchanged','v1_unchanged','snapshots_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged','overall_passed']){const value=sample();value[field]=false;assert.throws(()=>buildEvidence(value),new RegExp(field));}
 });
 
 test('artifacts contain no UUID, email, connection URI, JWT, private key, or authorization value',()=>{
@@ -185,3 +187,7 @@ test('execution plan preserves exact E2 statuses and E2-T5 deviation record',()=
   assert.match(plan,/E2-T6 — `Verification`/);assert.match(plan,/E2-T7 — `Verification`/);
   assert.match(plan,/İlk tasarım exact tek constraint hedefledi/);assert.match(plan,/allowlist canlı sonuçtan öğrenilmedi/);
 });
+
+test('E2-C1 captured provider-token parity is fail-closed',()=>{for(const sql of [preflight,transaction,postcheck])assert.doesNotMatch(sql,/(?:CONNECTED_CONNECTIONS|ENCRYPTED_TOKEN_ROWS)[^\n]*,\s*7\b/);for(const code of ['MISSING_ENCRYPTED','ORPHAN_ENCRYPTED','PLAINTEXT_TOKENS','CONNECTION_TOKEN_PARITY'])assert.match(preflight,new RegExp(`'${code}'`));assert.match(preflight,/'CONNECTED_CONNECTIONS'[^\n]*'capture'/);assert.match(transaction,/connected_count[\s\S]*encrypted_count/);for(const field of ['connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged'])assert.match(transaction,new RegExp(`'${field}'`));assert.match(postcheck,/connected_rows/);assert.match(postcheck,/encrypted_rows/);assert.match(transaction,/rollback;\s*$/i);assert.throws(()=>buildEvidence({...sample(),actual_token_count:1}),/counts are forbidden/);});
+
+test('T5 postcheck/runbook use five ordered baselines and overall requires all fifteen gates',()=>{assert.equal((postcheck.match(/\(-1\)::bigint/g)||[]).length,5);const runbook=read('docs/security/E2_T5_REJECTION_RUNBOOK.md');assert.match(runbook,/exactly five count baselines[\s\S]*in this order: Dataset V2, V1, snapshot, connected, encrypted/);assert.match(runbook,/exactly five `-1` scalar placeholders[\s\S]*in this order: Dataset V2, V1, snapshot, connected, encrypted/);assert.match(runbook,/Actual provider counts are never shared or committed/);const overall=transaction.slice(transaction.indexOf("'overall_passed'"),transaction.indexOf("'cases'"));for(const gate of ['s.evaluated_case_count=35','s.passed_case_count=35','s.failed_case_count=0','s.unexpected_accept_count=0','r.residue_count=0','p.dataset_unchanged','p.v1_unchanged','p.snapshots_unchanged','p.oauth_unchanged','p.connected_unchanged','p.encrypted_unchanged','p.missing_encrypted_unchanged','p.orphan_encrypted_unchanged','p.plaintext_unchanged','p.ledger_unchanged'])assert.match(overall,new RegExp(gate.replaceAll('.','\\.')));});

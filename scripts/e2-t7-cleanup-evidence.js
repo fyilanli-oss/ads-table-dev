@@ -22,6 +22,16 @@ function validateRows(value, label) {
     seen.set(row.check_code, row);
   }
   for (const code of CODES) if (!seen.has(code)) fail(`${label}_MISSING`);
+  for (const code of ['CONNECTED_CONNECTIONS','ENCRYPTED_TOKEN_ROWS']) {
+    const row = seen.get(code);
+    if (row.comparison !== (label === 'BASELINE' ? 'capture' : 'eq')) fail(`${label}_PROVIDER_BASELINE_MODE`);
+  }
+  for (const code of ['MISSING_ENCRYPTED','ORPHAN_ENCRYPTED','PLAINTEXT_TOKENS']) {
+    const row = seen.get(code);
+    if (row.comparison !== 'eq' || row.actual_count !== 0 || row.expected_count !== 0 || row.passed !== true) fail(`${label}_TOKEN_INTEGRITY`);
+  }
+  const parity = seen.get('CONNECTION_TOKEN_PARITY');
+  if (parity.comparison !== 'eq' || parity.actual_count !== 1 || parity.expected_count !== 1 || parity.passed !== true) fail(`${label}_PROVIDER_PARITY`);
   return seen;
 }
 function buildEvidence(baselineInput, finalInput) {

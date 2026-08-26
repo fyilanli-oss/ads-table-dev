@@ -17,12 +17,18 @@
     "existing_shared_development_project_target": false,
     "unique_empty_target_required": true,
     "target_teardown_requires_separate_approval": true,
-    "required_managed_primitives": ["auth schema", "auth.uid() exact signature", "anon role", "authenticated role", "service_role role"],
+    "required_managed_primitives": [
+      "auth schema",
+      "auth.uid() exact signature",
+      "anon role",
+      "authenticated role",
+      "service_role role"
+    ],
     "public_schema_state": "empty or explicit managed-object allowlist only",
     "production_project_ref_match": false
   },
   "included_schemas": [
-    "public (application-owned objects only; every object requires ownership classification)"
+    "public (application_owned objects only; managed_extension_owned and excluded_managed objects remain platform-managed)"
   ],
   "excluded_schemas": [
     "auth",
@@ -48,7 +54,8 @@
     "RLS state",
     "policies",
     "application table grants captured schema-only and restricted to the approved source-inventory grantee/privilege allowlist",
-    "required application-owned extensions only through an explicit allowlist"
+    "required application-owned extensions only through an explicit allowlist",
+    "restore ownership classification: application_owned only; managed_extension_owned and excluded_managed are parity-only exclusions"
   ],
   "excluded_content": [
     "table row data",

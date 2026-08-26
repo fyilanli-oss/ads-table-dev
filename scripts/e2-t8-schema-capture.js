@@ -32,5 +32,6 @@ function run(argv=[],injected={}){
   const validation=validateCapturedSchema({capturedSql:result.stdout||'',...injected.validationInputs});
   return {status:validation.status==='ARTIFACT_CONTRACT_PASS'?'CAPTURE_QUARANTINED_CONTRACT_PASS':'CAPTURE_QUARANTINED_CONTRACT_FAIL',artifact_checksum:validation.checksum,plan};
 }
-module.exports={CONFIRMATION,FIXED_ARGUMENTS,parseArguments,capturePlan,childEnvironment,defaultDependencies,run};
-if(require.main===module){try{const r=run(process.argv.slice(2));process.stdout.write(`${JSON.stringify(r)}\n`);if(/FAILED|FORBIDDEN|UNAVAILABLE/.test(r.status))process.exitCode=1;}catch(e){process.stderr.write(`${e.message}\n`);process.exitCode=1;}}
+function exitCodeForStatus(status){return new Set(['PLAN_ONLY','CAPTURE_QUARANTINED_CONTRACT_PASS']).has(status)?0:1;}
+module.exports={CONFIRMATION,FIXED_ARGUMENTS,parseArguments,capturePlan,childEnvironment,defaultDependencies,run,exitCodeForStatus};
+if(require.main===module){try{const r=run(process.argv.slice(2));process.stdout.write(`${JSON.stringify(r)}\n`);process.exitCode=exitCodeForStatus(r.status);}catch(e){process.stderr.write(`${e.message}\n`);process.exitCode=1;}}

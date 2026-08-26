@@ -22,11 +22,28 @@ function lex(sql){
   if(state!=='code'&&state!=='line')throw new Error('UNTERMINATED_SQL_TOKEN');push();return statements;
 }
 function normalize(sql){return lex(sql).map(s=>s.raw.replace(/^\s*--.*$/gm,'').replace(/\s+/g,' ').trim()).filter(Boolean).join('\n');}
-function objectKeys(code){const keys=[];for(const m of code.matchAll(/\bCREATE\s+(?:OR\s+REPLACE\s+)?(TABLE|FUNCTION|INDEX|TRIGGER|POLICY|SEQUENCE|VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"?public"?\.)?"?([A-Za-z_][\w$]*)"?/gi))keys.push(`${({table:'relation',sequence:'sequence',view:'view',function:'function',index:'index',trigger:'trigger',policy:'policy'})[m[1].toLowerCase()]}:${m[2].toLowerCase()}`);return keys;}
+const ident='(?:"(?:""|[^"])+"|[A-Za-z_][\\w$]*)';
+const cleanIdent=value=>value.startsWith('"')?value.slice(1,-1).replace(/""/g,'"'):value.toLowerCase();
+function qualified(value){const parts=value.split(/\s*\.\s*/);return {schema:parts.length===2?cleanIdent(parts[0]):'public',name:cleanIdent(parts.at(-1))};}
+function splitArguments(value){const out=[];let part='',depth=0,quoted=false;for(let i=0;i<value.length;i++){const c=value[i];if(c==='"')quoted=!quoted;if(!quoted&&c==='(')depth++;if(!quoted&&c===')')depth--;if(!quoted&&c===','&&depth===0){out.push(part);part='';}else part+=c;}if(part.trim())out.push(part);return out;}
+function identityArguments(value){return splitArguments(value).map(x=>x.replace(/\bDEFAULT\b[\s\S]*$/i,'').replace(/\s*=\s*[\s\S]*$/,'').trim()).filter(x=>!/^OUT\b/i.test(x)).map(x=>x.replace(/^(?:IN|INOUT|VARIADIC)\s+/i,'').replace(/\s+/g,' ')).join(', ');}
+function objectKeys(code){
+  const keys=[];let m;
+  const basic=new RegExp(`\\bCREATE\\s+(TABLE|INDEX|SEQUENCE|VIEW|MATERIALIZED\\s+VIEW)\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(${ident}(?:\\s*\\.\\s*${ident})?)`,'gi');
+  while((m=basic.exec(code))){const q=qualified(m[2]),kind=/SEQUENCE/i.test(m[1])?'sequence':/VIEW/i.test(m[1])?'view':/INDEX/i.test(m[1])?'index':'relation';if(q.schema==='public')keys.push(`${kind}:${q.name}`);}
+  const fn=new RegExp(`\\bCREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+(${ident}(?:\\s*\\.\\s*${ident})?)\\s*\\(([^)]*(?:\\([^)]*\\)[^)]*)*)\\)`,'gi');
+  while((m=fn.exec(code))){const q=qualified(m[1]);if(q.schema==='public')keys.push(`function:${q.name}(${identityArguments(m[2])})`);}
+  const trigger=new RegExp(`\\bCREATE\\s+TRIGGER\\s+(${ident})[\\s\\S]*?\\bON\\s+(${ident}(?:\\s*\\.\\s*${ident})?)`,'gi');
+  while((m=trigger.exec(code))){const q=qualified(m[2]);if(q.schema==='public')keys.push(`trigger:${q.name}.${cleanIdent(m[1])}`);}
+  const policy=new RegExp(`\\bCREATE\\s+POLICY\\s+(${ident})\\s+ON\\s+(${ident}(?:\\s*\\.\\s*${ident})?)`,'gi');
+  while((m=policy.exec(code))){const q=qualified(m[2]);if(q.schema==='public')keys.push(`policy:public.${q.name}.${cleanIdent(m[1])}`);}
+  return keys;
+}
 function validateCapturedSchema({capturedSql,approvedSourceInventory,restoreScope,expectedGrantContract,captureManifest}){
   const errors=[];if(typeof capturedSql!=='string'||!capturedSql.trim())errors.push('EMPTY_ARTIFACT');let statements=[];try{statements=lex(capturedSql||'');}catch{errors.push('TOKENIZER_ERROR');}
   if(SENSITIVE.test(capturedSql||''))errors.push('SENSITIVE_PATTERN'); const seen=new Set();
-  const approved=new Set((approvedSourceInventory||[]).map(x=>x.object_key)); const excluded=new Set(restoreScope?.excluded_schemas||[]); const grantees=new Set(expectedGrantContract?.grantees||[]); const privileges=new Set(expectedGrantContract?.privileges||[]);
+  const applicationInventory=(approvedSourceInventory||[]).filter(x=>x.ownership_class==='application_owned');
+  const approved=new Set(applicationInventory.map(x=>x.object_key)); const excluded=new Set(restoreScope?.excluded_schemas||[]); const grantees=new Set(expectedGrantContract?.grantees||[]); const privileges=new Set(expectedGrantContract?.privileges||[]);
   for(const {code} of statements){
     if(/^\s*\\/m.test(code))errors.push('PSQL_METACOMMAND');
     if(/\b(?:COPY\b[\s\S]*\bFROM|INSERT\s+INTO|UPDATE\s+|DELETE\s+FROM|MERGE\s+INTO|TRUNCATE\b)/i.test(code))errors.push('ROW_DATA_STATEMENT');

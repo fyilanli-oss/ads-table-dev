@@ -1594,3 +1594,11 @@ Bu V4 plan ile:
 **Evidence:** Paylaşılabilir response yalnız captured-baseline parity sonuçlarını ve `missing_encrypted_unchanged`, `orphan_encrypted_unchanged`, `plaintext_unchanged` boolean sonuçlarını taşır. Operator-local connected/encrypted baseline source control'a alınmaz.
 
 **Durum:** E2-T1/T2 `Done`; E2-T3–T8 `Verification` olarak korunur.
+
+### E2-C2 — E2-T3 ordered read-back v2 corrective preparation
+
+**Durum:** E2-T3 `Verification`; E2-T4–T8 durumları değişmedi.
+
+**Gerçekleşen (safe/redacted):** Management API transport HTTP 201 ve updated preflight 17/17 PASS oldu. v1 transaction HTTP 201 döndü; insert/contract PASS, read-back/overall FAIL oldu. PostgreSQL same-statement snapshot semantiği nedeniyle v1 read-back tasarımı geçersizdi. v1 postcheck invalid aggregate projection nedeniyle HTTP 400 döndürdü. v1 transaction retry edilmedi. Ayrı insan-onaylı recovery sorgusu HTTP 201 ve 13/13 PASS verdi; fixture residue zero ve production no-change doğrulandı. Actual count/identity paylaşılmadı.
+
+**Corrective hazırlık:** `e2_t3_static_v2` yeni namespace'i ve `E2_T3_TRANSACTION_V2` operation code'u kullanılır. Tek intact transaction payload'ı ordered top-level temp baseline, INSERT ve ayrı target-table read-back statement'ları ile zorunlu final `ROLLBACK` taşır. Postcheck scalar actual/expected sorgularına çevrildi. v2 eski operation'ın retry'ı değildir; yeni preflight ve ayrı insan onayı zorunludur. Bu corrective task canlı SQL çalıştırmaz; static testler live PostgreSQL acceptance yerine geçmez.

@@ -1,57 +1,32 @@
-# E2-T3 Canonical Round-Trip Runbook
+# E2-T3 Canonical Round-Trip Runbook — ordered v2
 
-## Status and boundary
+**Status: `Verification`.** This corrective repository package performs no live SQL or Management API call. Static tests do not replace live PostgreSQL acceptance.
 
-This package is **preparation only**. No production SQL has been executed. E2-T3 remains `Verification` until a separately approved operation and postcheck pass.
+## Safely recorded v1 outcome
 
-The controlled operation is limited to one namespaced Meta paid Dataset V2 insert, one read-back, semantic assertions, and mandatory transaction rollback. It must never commit. It must not write V1, snapshots, auth, OAuth, token, ledger, schema, grants, RLS, policies, functions, or migrations.
+The `e2_t3_static_v1` operation was executed live exactly once. Management API transport returned HTTP 201; insert and canonical contract assertions passed, but read-back and overall assertions failed because a target-table scan in the same statement cannot observe a sibling data-modifying CTE under PostgreSQL statement-snapshot semantics. The mandatory final `ROLLBACK` remained intact. The v1 transaction was not retried.
 
-## Immutable sources
+The v1 postcheck returned HTTP 400 because it projected an aggregate with a cross-joined expected value without a valid aggregate grouping. A separately human-approved, read-only recovery query returned HTTP 201 and 13/13 checks passed. It proved zero fixture residue, Dataset V2 zero, and unchanged V1, snapshot, OAuth, provider security, ledger, and schema state. Actual production counts and identities were not shared.
 
-- `artifacts/dataset-v2-acceptance/e2-t3-roundtrip/expected-canonical.json`
-- `artifacts/dataset-v2-acceptance/e2-t3-roundtrip/expected-physical.json`
-- `docs/security/sql/E2_T3_ROUNDTRIP_PREFLIGHT.sql`
-- `docs/security/sql/E2_T3_ROUNDTRIP_TRANSACTION.sql`
-- `docs/security/sql/E2_T3_ROUNDTRIP_POSTCHECK.sql`
-- `scripts/e2-t3-roundtrip-evidence.js`
+## v2 corrective design
 
-Before approval, record SHA-256 for every source and verify the repository commit. Never edit SQL during the operation.
+Version 2 uses namespace `e2_t3_static_v2`, operation code `E2_T3_TRANSACTION_V2`, evidence version `e2-t3-roundtrip-v2`, and adapter version `e2-t3-meta-v2`. It is a new operation, not a retry of v1.
 
-## Stop gates
+Send `docs/security/sql/E2_T3_ROUNDTRIP_TRANSACTION.sql` only as one intact payload. Its ordered top-level statements are:
 
-1. Run the exact preflight as one read-only statement.
-2. Every equality/minimum check must pass. Capture the aggregate Dataset V2, V1, and snapshot counts; never capture an identity.
-3. Replace only the documented aggregate placeholders in the postcheck copy kept as operator-local evidence. Do not commit production counts.
+1. `BEGIN`;
+2. deterministic locks, including `SHARE ROW EXCLUSIVE` on Dataset V2 and `SHARE` on parity relations;
+3. `pg_temp.e2_t3_v2_baseline` created `ON COMMIT DROP` with aggregate-only gates;
+4. one top-level Dataset V2 `INSERT` gated by that baseline;
+5. a separate top-level read-back/evidence `SELECT` that scans the v2 fixture from Dataset V2;
+6. unconditional final `ROLLBACK`.
 
-The T3 postcheck has exactly four operator-local replacements, in this order: V1, snapshot, connected, encrypted. The committed Dataset V2 zero is not a placeholder and must not be changed. Actual provider counts remain operator-local, are never shared, and are never committed.
-4. Stop if no eligible auth/public user exists, the fixture namespace exists, Dataset V2 is non-empty, ledger is not 37, or any security/schema postcondition differs.
-5. Obtain separate human approval. A failed or ambiguous operation must not be retried.
+Never split statements, detach rollback, add commit, retry an ambiguous outcome, or expose the eligible user. The redacted evidence row excludes runtime user and timestamp fields.
 
-## Controlled operation
+## Preflight, evidence, and postcheck
 
-Send `E2_T3_ROUNDTRIP_TRANSACTION.sql` once as one intact payload. The eligible user is selected internally and is never returned. The only mutation is the single Dataset V2 `INSERT`; the returned projection excludes the user identifier. The final statement is always `ROLLBACK`, and `COMMIT` is forbidden.
+A new v2 read-only preflight and separate human approval are mandatory. Validate the exact approved main SHA and artifact checksums before any request. Capture the four operator-local baselines, then make exactly four operator-local replacements, in this order: V1, snapshot, connected, encrypted. The committed Dataset V2 zero is not a placeholder and must not be changed. Actual provider counts remain operator-local, are never shared, and are never committed.
 
-The operator must require: inserted count `1`, read-back count `1`, contract-match count `1`, all parity booleans `true`, and overall `passed=true`. Feed only that allowlisted response to the evidence converter. The converter rejects UUIDs, unknown fields, extra/missing canonical fields, `null`/zero drift, and semantic mismatch.
+The converter accepts only the exact v2 result allowlist, one redacted fixture row, passing write/read/contract assertions, and all parity booleans. The postcheck is one read-only scalar-query `WITH ... SELECT` with 13 exact checks and no aggregate cross-join projection.
 
-## Postcheck and completion
-
-After the transaction response, run the exact read-only postcheck once with approved aggregate baselines. Require Dataset V2 and namespaced fixture counts to return to zero/baseline, V1/snapshot parity, unchanged OAuth/token counts, ledger `37`, and unchanged schema state.
-
-E2-T3 can move beyond `Verification` only after the operation evidence and postcheck are reviewed. E2-T4 through E2-T8 are not completed by this runbook.
-
-## Rollback
-
-Rollback is the mandatory normal outcome, not an exception path. Any SQL error leaves the transaction unsuccessful and the intact payload ends with `ROLLBACK`. No cleanup write is authorized. If postcheck finds a fixture, stop and escalate; do not run ad hoc cleanup.
-
-## Observability and privacy
-
-Evidence may contain only run ID, operation status, counts, booleans, canonical field names, redacted expected/actual values, and PASS/FAIL. It must never contain a user/account/connection/entity identifier from production, UUID, credential, raw production row, URI, or authorization material.
-
-## E2-C1 deviation / decision (corrective preparation)
-
-- İlk repository hazırlığı, E1 kapanış anındaki 7/7 provider bağlantı/token nüfusunu sabit kabul etmişti.
-- Canlı read-only E2-T3 preflight, connection/token nüfusunun değişebildiğini kanıtladı; hardcoded kontroller bu nedenle başarısız oldu.
-- Actual production sayıları evidence'a veya repository'ye alınmadı; yalnız operator-local baseline olarak tutulmalıdır.
-- Missing encrypted ve plaintext güvenlik kontrolleri geçti; corrective sözleşme ayrıca orphan encrypted kontrolünü zorunlu kılar.
-- Güvenlik contract'ı fixed population yerine captured connected/encrypted parity ile missing/orphan/plaintext zero olarak düzeltildi.
-- Bu değişiklik production data correction değildir. Bu corrective PR kapsamında canlı transaction, INSERT veya postcheck çalıştırılmadı ve production değişmedi.
+E2-T3 remains `Verification` until the newly approved v2 preflight, intact transaction, converter, rollback postcheck, and human review all pass. E2-T4 through E2-T8 are not started or completed by this corrective package.

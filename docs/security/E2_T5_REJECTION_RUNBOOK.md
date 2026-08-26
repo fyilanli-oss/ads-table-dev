@@ -1,4 +1,28 @@
-# E2-T5 Dataset V2 Rejection Matrix
+# E2-T5 Dataset V2 Rejection Matrix and V2 Operator
+
+## V2 live-acceptance operator (preparation only)
+
+The v1 transaction was submitted exactly once and **must never be retried**. Its response could not be converted into exact evidence because the operator-local baseline was lost before postcheck. A later read-only recovery returned HTTP 201 with 11/11 PASS, zero fixture residue, and production no-change. E2-T5 therefore remains `Verification`.
+
+V2 uses the new `e2_t5_rejection_v2` namespace and operation, and evidence version `e2-t5-rejection-v2`. It retains the exact 35-case (32 CHECK + 3 NOT NULL) matrix, mandatory final `ROLLBACK`, temporary-only objects, and no cleanup. The repository is bound to approved main `032573b0d16bb8be83b525a54b10ac6bec2062e9` and checksums the V2 SQL, converter, and matrix before either phase.
+
+The reusable operator consists of a no-retry, timeout-bounded Management API client; deterministic final-SELECT response normalization; an atomic external state capsule (directory `0700`, file `0600`); and a fail-closed lifecycle. It never prints a token, URL, project ref, raw response, production count, or error body. The default capsule is outside the repository at `~/.local/state/ads-table/e2-t5-v2.json` and may be redirected with `ADS_TABLE_OPERATOR_STATE`, but repository paths are rejected.
+
+Run preparation after supplying credentials only through the process environment:
+
+```sh
+npm run e2:t5:preflight
+```
+
+This verifies approved ancestry and artifact checksums, runs the full local test suite, sends only the read-only preflight, requires 18/18 PASS, captures exactly five baselines, re-reads the capsule, and reports `APPROVAL_READY`. It never sends the transaction.
+
+Only after a separate human approval, run:
+
+```sh
+npm run e2:t5:execute -- --confirm E2-T5-V2-LIVE
+```
+
+Execute revalidates every binding and the capsule, records `transactionSent` before the one allowed submission, converts only the final SELECT, and records `postcheckSent` before the one mandatory postcheck. Once a transaction may have been sent, the capsule becomes consumed even when conversion or postcheck fails. There is no transaction or postcheck retry, and the same capsule cannot be reused. V2 live acceptance is authorized only after merge and separate human approval; this package itself makes no live Supabase call.
 
 ## Status and immutable sources
 

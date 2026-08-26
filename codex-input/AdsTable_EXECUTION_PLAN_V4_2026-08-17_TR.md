@@ -598,18 +598,18 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2/T3 `Done`; E2-T4, E2-T5, E2-T6, E2-T7 ve E2-T8 `Verification`.
+**Durum:** `In progress` — E2-T1/T2/T3/T4 `Done`; E2-T5 `Verification`; E2-T6/T7/T8 `Not started`.
 
 ### Planlanan işler
 
 - **E2-T1 — `Done`:** Canlı column/type/nullability introspection.
 - **E2-T2 — `Done`:** Constraint, index, policy ve grant drift karşılaştırması.
 - **E2-T3 — `Done`:** Canlı canonical round-trip acceptance yönetim sonucu tamamlandı.
-- **E2-T4 — `Verification`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü hazırlık paketi hazır; canlı acceptance bekliyor.
-- **E2-T5 — `Verification`:** 35 vakalı rollback-only invalid canonical-row rejection hazırlık paketi hazır; canlı preflight/transaction/postcheck bekliyor.
-- **E2-T6 — `Verification`:** Rollback-only User A/User B/anon/authenticated mutation/service-role RLS acceptance hazırlık paketi tamamlandı; canlı preflight/transaction/postcheck ve review bekliyor.
-- **E2-T7 — `Verification`:** Birleşik rollback cleanup ve V1/V2/snapshot/security no-change repository paketi hazır; canlı baseline/final evidence ve review bekliyor.
-- **E2-T8 — `Verification`:** Ledger reconciliation ve corrective migration sırası tamamlandı; immutable baseline manifest hazır. Eski 31 migration SQL body’si repository’de bulunmadığı ve fresh-project restore henüz doğrulanmadığı için restore readiness açık.
+- **E2-T4 — `Done`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü tamamlandı.
+- **E2-T5 — `Verification`:** V1 recovery 11/11 PASS ve production no-change; V2 operator paketi hazır, merge sonrası ayrı insan onayı bekliyor.
+- **E2-T6 — `Not started`:** Canlı operation başlamadı; ortak operator altyapısı ileride yeniden kullanılabilir.
+- **E2-T7 — `Not started`:** Canlı operation başlamadı; V2 fixture selector'ları gelecekteki envanterle uyumludur.
+- **E2-T8 — `Not started`:** Canlı operation başlamadı.
 
 #### E2-T8 task aynası — fresh-project restore readiness
 

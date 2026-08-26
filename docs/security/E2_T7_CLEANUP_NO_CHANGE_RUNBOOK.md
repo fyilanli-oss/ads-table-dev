@@ -30,3 +30,12 @@ The final check proves exact V2/V1/snapshot parity, zero fixture residue, unchan
 ## STOP and review
 
 A failed check, missing/extra/duplicate check, unknown field, unsafe value, sensitive pattern, non-zero residue, or parity difference is a STOP. Do not reveal raw input, retry an ambiguous operation, or improvise cleanup. Record only safe check codes and aggregate residue counts, then obtain separate human review and recovery authorization. E2-T7 remains `Verification` until approved live final evidence exists.
+
+## E2-C1 deviation / decision (corrective preparation)
+
+- İlk repository hazırlığı, E1 kapanış anındaki 7/7 provider bağlantı/token nüfusunu sabit kabul etmişti.
+- Canlı read-only E2-T3 preflight, connection/token nüfusunun değişebildiğini kanıtladı; hardcoded kontroller bu nedenle başarısız oldu.
+- Actual production sayıları evidence'a veya repository'ye alınmadı; yalnız operator-local baseline olarak tutulmalıdır.
+- Missing encrypted ve plaintext güvenlik kontrolleri geçti; corrective sözleşme ayrıca orphan encrypted kontrolünü zorunlu kılar.
+- Güvenlik contract'ı fixed population yerine captured connected/encrypted parity ile missing/orphan/plaintext zero olarak düzeltildi.
+- Bu değişiklik production data correction değildir. Bu corrective PR kapsamında canlı transaction, INSERT veya postcheck çalıştırılmadı ve production değişmedi.

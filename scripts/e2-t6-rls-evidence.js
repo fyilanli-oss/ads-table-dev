@@ -4,13 +4,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const matrix = require('../artifacts/dataset-v2-acceptance/e2-t6-rls/rls-matrix.json');
 
-const TOP_LEVEL_FIELDS = Object.freeze(['operation_code','expected_case_count','evaluated_case_count','passed_case_count','failed_case_count','unexpected_allow_count','fixture_count','residue_count','dataset_baseline_preserved','v1_unchanged','snapshots_unchanged','oauth_unchanged','token_state_unchanged','ledger_unchanged','overall_passed','cases']);
+const TOP_LEVEL_FIELDS = Object.freeze(['operation_code','expected_case_count','evaluated_case_count','passed_case_count','failed_case_count','unexpected_allow_count','fixture_count','residue_count','dataset_baseline_preserved','v1_unchanged','snapshots_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged','overall_passed','cases']);
 const CASE_FIELDS = Object.freeze(['case_code','actor','operation','target','expected_outcome','actual_outcome','actual_row_count','actual_sqlstate','passed']);
 const BLOCKED = /postgres(?:ql)?:\/\/|https?:\/\/|authorization\s*:|bearer\s+|-----BEGIN [A-Z ]*PRIVATE KEY-----|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b(?:password|credential|access_token|refresh_token|service_role_key|secret|user_id|jwt|error|message|detail|hint|context)\b/i;
 const exactKeys = (value, fields) => value && typeof value === 'object' && !Array.isArray(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...fields].sort());
 function assert(ok, message) { if (!ok) throw new Error(message); }
 
 function buildEvidence(result) {
+  assert(result && typeof result === 'object' && !Array.isArray(result), 'result must be one object');
+  assert(!Object.keys(result).some((key) => /(?:connection|token).*count|actual_count/i.test(key)), 'actual provider counts are forbidden');
   assert(exactKeys(result, TOP_LEVEL_FIELDS), 'top-level allowlist mismatch');
   assert(!BLOCKED.test(JSON.stringify(result)), 'forbidden sensitive or raw material');
   assert(result.operation_code === 'e2_t6_rls_v1', 'operation mismatch');
@@ -36,7 +38,7 @@ function buildEvidence(result) {
   assert(result.passed_case_count === 16 && result.failed_case_count === 0, 'failed cases');
   assert(result.unexpected_allow_count === 0, 'unexpected allow');
   assert(result.fixture_count === 2 && result.residue_count === 0, 'fixture boundary failed');
-  for (const field of ['dataset_baseline_preserved','v1_unchanged','snapshots_unchanged','oauth_unchanged','token_state_unchanged','ledger_unchanged','overall_passed']) assert(result[field] === true, `${field} must be true`);
+  for (const field of ['dataset_baseline_preserved','v1_unchanged','snapshots_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged','overall_passed']) assert(result[field] === true, `${field} must be true`);
   return Object.freeze({ evidence_version:'e2-t6-rls-v1', operation_code:'e2_t6_rls_v1', status:'PASS', expected_case_count:16, passed_case_count:16, failed_case_count:0, unexpected_allow_count:0, residue_count:0, rollback_required:true });
 }
 function main(argv) { assert(argv.length === 1, 'usage: evidence converter requires one redacted result file'); const result=JSON.parse(fs.readFileSync(path.resolve(argv[0]),'utf8')); process.stdout.write(`${JSON.stringify(buildEvidence(result),null,2)}\n`); }

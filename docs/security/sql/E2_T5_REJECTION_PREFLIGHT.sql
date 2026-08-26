@@ -27,9 +27,11 @@ with expected_checks(name) as (
   union all select 'REQUIRED_NOT_NULL_COLUMNS',count(*),3,'eq' from pg_catalog.pg_attribute a join pg_catalog.pg_class t on t.oid=a.attrelid join pg_catalog.pg_namespace n on n.oid=t.relnamespace join required_columns r on r.name=a.attname where n.nspname='public' and t.relname='performance_dataset_rows_v2' and a.attnotnull and not a.attisdropped
   union all select 'KLAVIYO_CORRECTIVE_SEMANTICS',count(*),1,'eq' from pg_catalog.pg_constraint c join pg_catalog.pg_class t on t.oid=c.conrelid join pg_catalog.pg_namespace n on n.oid=t.relnamespace where n.nspname='public' and t.relname='performance_dataset_rows_v2' and c.conname='performance_dataset_rows_v2_source_semantics_chk' and c.convalidated and pg_get_constraintdef(c.oid) ilike '%platform = ''klaviyo''%' and pg_get_constraintdef(c.oid) ilike '%channel IS NOT NULL%'
   union all select 'OAUTH_ROWS',count(*),0,'eq' from public.oauth_transactions
-  union all select 'CONNECTED_CONNECTIONS',count(*),7,'eq' from public.platform_connections where connected=true
-  union all select 'ENCRYPTED_TOKEN_ROWS',count(*),7,'eq' from public.platform_connection_tokens
+  union all select 'CONNECTED_CONNECTIONS',count(*),count(*),'capture' from public.platform_connections where connected=true
+  union all select 'ENCRYPTED_TOKEN_ROWS',count(*),count(*),'capture' from public.platform_connection_tokens
   union all select 'MISSING_ENCRYPTED',count(*),0,'eq' from public.platform_connections pc where pc.connected=true and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform)
+  union all select 'ORPHAN_ENCRYPTED',count(*),0,'eq' from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected=true)
+  union all select 'CONNECTION_TOKEN_PARITY',case when (select count(*) from public.platform_connections where connected=true)=(select count(*) from public.platform_connection_tokens) then 1 else 0 end,1,'eq'
   union all select 'PLAINTEXT_TOKENS',count(*),0,'eq' from public.platform_connections where access_token is not null or refresh_token is not null
 )
 select check_code,actual_count,expected_count,

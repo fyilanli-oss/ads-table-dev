@@ -36,3 +36,12 @@ The payload contains no `COMMIT`; its unconditional normal end is `ROLLBACK`. Re
 The closed 16-case matrix covers User A and User B own/cross-user reads, anon reads, both authenticated users' INSERT/UPDATE/DELETE privilege denials, and service-role fixture inserts/reads. Cross-user SELECT is a zero-row `DENIED_BY_RLS`; anon and authenticated mutation denials are SQLSTATE-class-42 `DENIED_BY_PRIVILEGE`. Service and own reads must each produce one row. The converter rejects missing, extra, duplicate, reordered-contract, unknown-field, identity-bearing, leaking, unexpectedly allowed, residue-bearing, or parity-false evidence.
 
 This package does not execute E2-T6. Completion requires later, separately authorized live preflight, intact rollback-only transaction, postcheck, redacted evidence review, and human acceptance. E2-T6 must not be marked `Done` before that review.
+
+## E2-C1 deviation / decision (corrective preparation)
+
+- İlk repository hazırlığı, E1 kapanış anındaki 7/7 provider bağlantı/token nüfusunu sabit kabul etmişti.
+- Canlı read-only E2-T3 preflight, connection/token nüfusunun değişebildiğini kanıtladı; hardcoded kontroller bu nedenle başarısız oldu.
+- Actual production sayıları evidence'a veya repository'ye alınmadı; yalnız operator-local baseline olarak tutulmalıdır.
+- Missing encrypted ve plaintext güvenlik kontrolleri geçti; corrective sözleşme ayrıca orphan encrypted kontrolünü zorunlu kılar.
+- Güvenlik contract'ı fixed population yerine captured connected/encrypted parity ile missing/orphan/plaintext zero olarak düzeltildi.
+- Bu değişiklik production data correction değildir. Bu corrective PR kapsamında canlı transaction, INSERT veya postcheck çalıştırılmadı ve production değişmedi.

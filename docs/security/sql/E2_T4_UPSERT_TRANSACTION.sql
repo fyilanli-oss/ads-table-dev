@@ -2,6 +2,9 @@
 begin;
 lock table public.performance_dataset_rows_v2 in share row exclusive mode;
 lock table public.performance_dataset_rows, public.dashboard_snapshots, public.oauth_transactions, public.platform_connections, public.platform_connection_tokens in share mode;
+create temp table pg_temp.e2_t4_security_baseline as select
+  (select count(*) from public.platform_connections where connected) connected_count,
+  (select count(*) from public.platform_connection_tokens) encrypted_count;
 with constants as (
   select 'meta:e2_t4_same_key_v1_account:paid:none:campaign:e2_t4_same_key_v1_campaign:ad:e2_t4_same_key_v1_ad'::text entity_key
 ), eligible_user as (
@@ -11,8 +14,9 @@ with constants as (
     (select count(*) from public.performance_dataset_rows_v2 d cross join constants k where d.entity_key=k.entity_key)=0 fixture_absent,
     (select count(*) from eligible_user)=1 user_ok,
     (select count(*) from public.oauth_transactions)=0 oauth_ok,
-    (select count(*) from public.platform_connections where connected)=7 connected_ok,
-    (select count(*) from public.platform_connection_tokens)=7 encrypted_ok,
+    (select connected_count=encrypted_count from pg_temp.e2_t4_security_baseline) population_parity_ok,
+    (select count(*) from public.platform_connections pc where pc.connected and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform))=0 missing_ok,
+    (select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected))=0 orphan_ok,
     (select count(*) from public.platform_connections where access_token is not null or refresh_token is not null)=0 plaintext_ok,
     (select count(*) from public.performance_dataset_rows_v2) dataset_before,
     (select count(*) from public.performance_dataset_rows) v1_before,
@@ -38,7 +42,7 @@ with constants as (
       'transaction_marker',pg_current_xact_id()::text
     )
   from eligible_user u cross join constants k cross join gates g
-  where g.ledger_ok and g.fixture_absent and g.user_ok and g.oauth_ok and g.connected_ok and g.encrypted_ok and g.plaintext_ok
+  where g.ledger_ok and g.fixture_absent and g.user_ok and g.oauth_ok and g.population_parity_ok and g.missing_ok and g.orphan_ok and g.plaintext_ok
 ;
 with constants as (
   select 'meta:e2_t4_same_key_v1_account:paid:none:campaign:e2_t4_same_key_v1_campaign:ad:e2_t4_same_key_v1_ad'::text entity_key
@@ -110,8 +114,10 @@ select
   (select count(*)=1 from fixture where sessions is null and metric_support->>'session'='unsupported') unsupported_null_preserved,
   (select count(*)=1 from fixture where add_to_cart=0 and metric_support->>'add_to_cart'='supported') supported_zero_preserved,
   (select count(*)=0 from public.oauth_transactions) oauth_unchanged,
-  (select count(*)=7 from public.platform_connections where connected) connected_unchanged,
-  (select count(*)=7 from public.platform_connection_tokens) encrypted_unchanged,
+  (select count(*)=(select connected_count from pg_temp.e2_t4_security_baseline) from public.platform_connections where connected) connected_unchanged,
+  (select count(*)=(select encrypted_count from pg_temp.e2_t4_security_baseline) from public.platform_connection_tokens) encrypted_unchanged,
+  (select count(*)=0 from public.platform_connections pc where pc.connected and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform)) missing_encrypted_unchanged,
+  (select count(*)=0 from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected)) orphan_encrypted_unchanged,
   (select count(*)=0 from public.platform_connections where access_token is not null or refresh_token is not null) plaintext_unchanged
 from state s;
 rollback;

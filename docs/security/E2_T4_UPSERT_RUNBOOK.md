@@ -41,3 +41,12 @@ If any fixture residue appears, stop and escalate. This runbook authorizes no ad
 Only namespaced fixture values, counts, booleans, safe expected/actual fixture metrics, and PASS/FAIL may be retained. Credentials, authorization material, connection strings, UUIDs, emails, production identities, and raw production rows are forbidden.
 
 The prepared operation cannot mutate V1, snapshots, OAuth, token, ledger, schema, RLS, policy, or privileges. Repository preparation does not complete E2-T4 live acceptance.
+
+## E2-C1 deviation / decision (corrective preparation)
+
+- İlk repository hazırlığı, E1 kapanış anındaki 7/7 provider bağlantı/token nüfusunu sabit kabul etmişti.
+- Canlı read-only E2-T3 preflight, connection/token nüfusunun değişebildiğini kanıtladı; hardcoded kontroller bu nedenle başarısız oldu.
+- Actual production sayıları evidence'a veya repository'ye alınmadı; yalnız operator-local baseline olarak tutulmalıdır.
+- Missing encrypted ve plaintext güvenlik kontrolleri geçti; corrective sözleşme ayrıca orphan encrypted kontrolünü zorunlu kılar.
+- Güvenlik contract'ı fixed population yerine captured connected/encrypted parity ile missing/orphan/plaintext zero olarak düzeltildi.
+- Bu değişiklik production data correction değildir. Bu corrective PR kapsamında canlı transaction, INSERT veya postcheck çalıştırılmadı ve production değişmedi.

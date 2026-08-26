@@ -1,6 +1,6 @@
 -- E2-T4 read-only postcheck. Replace only -1 baseline placeholders in an operator-local copy.
-with expected(dataset_rows,v1_rows,snapshot_rows) as (
-  values ((-1)::bigint,(-1)::bigint,(-1)::bigint)
+with expected(dataset_rows,v1_rows,snapshot_rows,connected_rows,encrypted_rows) as (
+  values ((-1)::bigint,(-1)::bigint,(-1)::bigint,(-1)::bigint,(-1)::bigint)
 ), constants as (
   select 'meta:e2_t4_same_key_v1_account:paid:none:campaign:e2_t4_same_key_v1_campaign:ad:e2_t4_same_key_v1_ad'::text entity_key
 ), fixture_groups as (
@@ -14,9 +14,11 @@ with expected(dataset_rows,v1_rows,snapshot_rows) as (
   union all select 'V1_ROWS',(select count(*) from public.performance_dataset_rows),(select v1_rows from expected)
   union all select 'SNAPSHOT_ROWS',(select count(*) from public.dashboard_snapshots),(select snapshot_rows from expected)
   union all select 'OAUTH_ROWS',count(*),0 from public.oauth_transactions
-  union all select 'CONNECTED_CONNECTIONS',count(*),7 from public.platform_connections where connected=true
-  union all select 'ENCRYPTED_TOKEN_ROWS',count(*),7 from public.platform_connection_tokens
+  union all select 'CONNECTED_CONNECTIONS',count(*),(select connected_rows from expected) from public.platform_connections where connected=true
+  union all select 'ENCRYPTED_TOKEN_ROWS',count(*),(select encrypted_rows from expected) from public.platform_connection_tokens
   union all select 'MISSING_ENCRYPTED',count(*),0 from public.platform_connections pc where pc.connected=true and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform)
+  union all select 'ORPHAN_ENCRYPTED',(select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected=true)),0
+  union all select 'CONNECTION_TOKEN_PARITY',case when (select count(*) from public.platform_connections where connected=true)=(select count(*) from public.platform_connection_tokens) then 1 else 0 end,1
   union all select 'PLAINTEXT_TOKENS',count(*),0 from public.platform_connections where access_token is not null or refresh_token is not null
   union all select 'LEDGER_TOTAL',count(*),37 from supabase_migrations.schema_migrations
   union all select 'SCHEMA_RLS_INDEX_STATE',count(*),1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and c.relrowsecurity and not c.relforcerowsecurity and (select count(*) from pg_catalog.pg_index i where i.indrelid=c.oid and i.indisvalid and i.indisready)=5

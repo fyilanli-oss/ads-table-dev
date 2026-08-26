@@ -1582,3 +1582,15 @@ Bu V4 plan ile:
 **Evidence:** Fixture inventory, no-change contract, iki read-only SQL, redacted converter, runbook ve static regression testleri.
 
 **Durum:** `Verification` — canlı final evidence ve insan review'ı olmadan `Done` değildir.
+
+### E2-C1 — Captured provider-token security parity corrective kararı
+
+**Planlanan:** E2-T3–T7 acceptance artefaktlarındaki E1 kapanış anından kalan hardcoded 7/7 provider nüfusunu, production sayısı disclosure etmeden operator-local capture ve exact parity ile değiştirmek; missing/orphan/plaintext kontrollerini zero tutmak.
+
+**Gerçekleşen:** Management API bağlantısı HTTP 201 ile doğrulandı. E2-T3 read-only preflight çalıştı. `CONNECTED_CONNECTIONS` ve `ENCRYPTED_TOKEN_ROWS` hardcoded 7 beklentileri başarısız oldu. Diğer preflight güvenlik/schema kapıları geçti. Actual production sayıları evidence'a veya repository'ye alınmadı.
+
+**Sapmalar:** Değişebilir production provider nüfusu nedeniyle fixed population kabulü güvenlik sözleşmesinden çıkarıldı. Bu corrective paket production data correction değildir; transaction, INSERT ve postcheck çalıştırılmadı, production değişmedi.
+
+**Evidence:** Paylaşılabilir response yalnız captured-baseline parity sonuçlarını ve `missing_encrypted_unchanged`, `orphan_encrypted_unchanged`, `plaintext_unchanged` boolean sonuçlarını taşır. Operator-local connected/encrypted baseline source control'a alınmaz.
+
+**Durum:** E2-T1/T2 `Done`; E2-T3–T8 `Verification` olarak korunur.

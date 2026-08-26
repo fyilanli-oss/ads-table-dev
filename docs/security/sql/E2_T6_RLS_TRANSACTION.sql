@@ -10,7 +10,7 @@ create temp table pg_temp.e2_t6_rls_actors (
 ) on commit drop;
 create temp table pg_temp.e2_t6_rls_baseline (
   dataset_v2_count bigint not null, dataset_v1_count bigint not null, snapshot_count bigint not null,
-  oauth_count bigint not null, token_count bigint not null, ledger_count bigint not null
+  oauth_count bigint not null, connected_count bigint not null, encrypted_count bigint not null, ledger_count bigint not null
 ) on commit drop;
 grant insert, select on pg_temp.e2_t6_rls_evidence to authenticated, anon, service_role;
 grant select on pg_temp.e2_t6_rls_actors to service_role;
@@ -20,11 +20,14 @@ from public.users u where exists(select 1 from auth.users a where a.id=u.id) ord
 insert into pg_temp.e2_t6_rls_baseline
 select (select count(*) from public.performance_dataset_rows_v2),(select count(*) from public.performance_dataset_rows),
   (select count(*) from public.dashboard_snapshots),(select count(*) from public.oauth_transactions),
-  (select count(*) from public.platform_connection_tokens),(select count(*) from supabase_migrations.schema_migrations);
+  (select count(*) from public.platform_connections where connected),(select count(*) from public.platform_connection_tokens),(select count(*) from supabase_migrations.schema_migrations);
 do $guard$
 begin
   if (select count(*)=2 and count(distinct internal_user_id)=2 and array_agg(actor_label order by actor_label)=array['user_a','user_b'] from pg_temp.e2_t6_rls_actors) is not true then
     raise exception using errcode='P0001', message='E2-T6 requires exactly two selectable eligible users; STOP';
+  end if;
+  if (select connected_count<>encrypted_count from pg_temp.e2_t6_rls_baseline) or exists(select 1 from public.platform_connections pc where pc.connected and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform)) or exists(select 1 from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected)) or exists(select 1 from public.platform_connections where access_token is not null or refresh_token is not null) then
+    raise exception using errcode='P0001', message='E2-T6 provider token invariant failed; STOP';
   end if;
   if exists(select 1 from public.performance_dataset_rows_v2 where entity_key like 'e2\_t6\_rls\_v1:%' escape '\') then
     raise exception using errcode='P0001', message='E2-T6 namespace residue; STOP';
@@ -190,7 +193,11 @@ parity as (select
   (select count(*) from public.performance_dataset_rows)=b.dataset_v1_count v1_unchanged,
   (select count(*) from public.dashboard_snapshots)=b.snapshot_count snapshots_unchanged,
   (select count(*) from public.oauth_transactions)=b.oauth_count oauth_unchanged,
-  (select count(*) from public.platform_connection_tokens)=b.token_count token_state_unchanged,
+  (select count(*) from public.platform_connections where connected)=b.connected_count connected_unchanged,
+  (select count(*) from public.platform_connection_tokens)=b.encrypted_count encrypted_unchanged,
+  (select count(*) from public.platform_connections pc where pc.connected and not exists(select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform))=0 missing_encrypted_unchanged,
+  (select count(*) from public.platform_connection_tokens pt where not exists(select 1 from public.platform_connections pc where pc.user_id=pt.user_id and pc.platform=pt.platform and pc.connected))=0 orphan_encrypted_unchanged,
+  (select count(*) from public.platform_connections where access_token is not null or refresh_token is not null)=0 plaintext_unchanged,
   (select count(*) from supabase_migrations.schema_migrations)=b.ledger_count ledger_unchanged
   from pg_temp.e2_t6_rls_baseline b),
 payload as (select jsonb_build_object(
@@ -199,8 +206,8 @@ payload as (select jsonb_build_object(
   'fixture_count',r.fixture_count,'residue_count',r.residue_count,
   'dataset_baseline_preserved',p.dataset_baseline_preserved,
   'v1_unchanged',p.v1_unchanged,'snapshots_unchanged',p.snapshots_unchanged,'oauth_unchanged',p.oauth_unchanged,
-  'token_state_unchanged',p.token_state_unchanged,'ledger_unchanged',p.ledger_unchanged,
-  'overall_passed',s.evaluated_case_count=16 and s.passed_case_count=16 and s.failed_case_count=0 and s.unexpected_allow_count=0 and r.fixture_count=2 and r.residue_count=0 and p.dataset_baseline_preserved and p.v1_unchanged and p.snapshots_unchanged and p.oauth_unchanged and p.token_state_unchanged and p.ledger_unchanged,
+  'connected_unchanged',p.connected_unchanged,'encrypted_unchanged',p.encrypted_unchanged,'missing_encrypted_unchanged',p.missing_encrypted_unchanged,'orphan_encrypted_unchanged',p.orphan_encrypted_unchanged,'plaintext_unchanged',p.plaintext_unchanged,'ledger_unchanged',p.ledger_unchanged,
+  'overall_passed',s.evaluated_case_count=16 and s.passed_case_count=16 and s.failed_case_count=0 and s.unexpected_allow_count=0 and r.fixture_count=2 and r.residue_count=0 and p.dataset_baseline_preserved and p.v1_unchanged and p.snapshots_unchanged and p.oauth_unchanged and p.connected_unchanged and p.encrypted_unchanged and p.missing_encrypted_unchanged and p.orphan_encrypted_unchanged and p.plaintext_unchanged and p.ledger_unchanged,
   'cases',(select jsonb_agg(jsonb_build_object('case_code',case_code,'actor',actor_label,'operation',operation,'target',case
       when case_code like '%READ_OWN' or case_code like '%UPDATE_OWN' or case_code like '%DELETE_OWN' or case_code like '%INSERT' then 'own'
       when case_code like '%USER_A' and actor_label='user_b' then 'user_a' when case_code like '%USER_B' and actor_label='user_a' then 'user_b'

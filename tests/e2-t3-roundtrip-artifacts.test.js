@@ -40,7 +40,7 @@ function operationResult() {
   return {
     operation_code: 'E2_T3_TRANSACTION', inserted_count: 1, contract_match_count: 1,
     read_back_count: 1, v1_unchanged: true, snapshot_unchanged: true,
-    oauth_unchanged: true, tokens_unchanged: true, passed: true,
+    oauth_unchanged: true, connected_unchanged: true, encrypted_unchanged: true, missing_encrypted_unchanged: true, orphan_encrypted_unchanged: true, plaintext_unchanged: true, passed: true,
     redacted_physical: [row]
   };
 }
@@ -140,4 +140,14 @@ test('execution plan keeps later E2 tasks open and E2-T8 in verification', () =>
   assert.match(plan, /E2-T6 — `Verification`/);
   assert.match(plan, /E2-T7 — `Verification`/);
   assert.match(plan, /E2-T8 — `Verification`/);
+});
+
+test('E2-C1 captured provider-token parity is fail-closed', () => {
+  for (const sql of [preflight, transaction, postcheck]) assert.doesNotMatch(sql, /(?:CONNECTED_CONNECTIONS|ENCRYPTED_TOKEN_ROWS)[^\n]*,\s*7\b/);
+  for (const code of ['MISSING_ENCRYPTED','ORPHAN_ENCRYPTED','PLAINTEXT_TOKENS','CONNECTION_TOKEN_PARITY']) assert.match(preflight, new RegExp(`'${code}'`));
+  assert.match(preflight, /'CONNECTED_CONNECTIONS'[^\n]*'capture'/); assert.match(preflight, /'ENCRYPTED_TOKEN_ROWS'[^\n]*'capture'/);
+  for (const field of ['connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged']) assert.match(transaction, new RegExp(`\\b${field}\\b`));
+  assert.match(postcheck, /connected_rows/); assert.match(postcheck, /encrypted_rows/); assert.match(transaction, /rollback;\s*$/i);
+  assert.throws(() => buildEvidence({...operationResult(), connection_count: 1}, canonical), /counts are forbidden/);
+  for (const field of ['connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged']) { const value=operationResult(); value[field]=false; assert.throws(()=>buildEvidence(value,canonical),new RegExp(field)); }
 });

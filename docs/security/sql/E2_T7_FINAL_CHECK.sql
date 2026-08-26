@@ -22,10 +22,10 @@ with expected(connected_rows,encrypted_rows) as (values ((-1)::bigint,(-1)::bigi
 ), checks(check_code,actual_count,expected_count,comparison) as (
   select 'DATASET_V2_BASELINE',(select count(*) from public.performance_dataset_rows_v2),(-1)::bigint,'eq'
   union all select 'E2_T3_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key='meta:e2_t3_static_v2_account:paid:none:campaign:e2_t3_static_v2_campaign:ad:e2_t3_static_v2_ad'),0,'eq'
-  union all select 'E2_T4_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key='meta:e2_t4_same_key_v1_account:paid:none:campaign:e2_t4_same_key_v1_campaign:ad:e2_t4_same_key_v1_ad'),0,'eq'
+  union all select 'E2_T4_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key='meta:e2_t4_same_key_v2_account:paid:none:campaign:e2_t4_same_key_v2_campaign:ad:e2_t4_same_key_v2_ad'),0,'eq'
   union all select 'E2_T5_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key like 'e2\_t5\_rejection\_v1:%' escape '\'),0,'eq'
   union all select 'E2_T6_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key like 'e2\_t6\_rls\_v1:%' escape '\'),0,'eq'
-  union all select 'TOTAL_E2_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key in ('meta:e2_t3_static_v2_account:paid:none:campaign:e2_t3_static_v2_campaign:ad:e2_t3_static_v2_ad','meta:e2_t4_same_key_v1_account:paid:none:campaign:e2_t4_same_key_v1_campaign:ad:e2_t4_same_key_v1_ad') or entity_key like 'e2\_t5\_rejection\_v1:%' escape '\' or entity_key like 'e2\_t6\_rls\_v1:%' escape '\'),0,'eq'
+  union all select 'TOTAL_E2_RESIDUE',(select count(*) from public.performance_dataset_rows_v2 where entity_key in ('meta:e2_t3_static_v2_account:paid:none:campaign:e2_t3_static_v2_campaign:ad:e2_t3_static_v2_ad','meta:e2_t4_same_key_v2_account:paid:none:campaign:e2_t4_same_key_v2_campaign:ad:e2_t4_same_key_v2_ad') or entity_key like 'e2\_t5\_rejection\_v1:%' escape '\' or entity_key like 'e2\_t6\_rls\_v1:%' escape '\'),0,'eq'
   union all select 'DATASET_V1_BASELINE',(select count(*) from public.performance_dataset_rows),(-1)::bigint,'eq'
   union all select 'SNAPSHOT_BASELINE',(select count(*) from public.dashboard_snapshots),(-1)::bigint,'eq'
   union all select 'LEDGER_TOTAL',(select count(*) from supabase_migrations.schema_migrations),37,'eq'

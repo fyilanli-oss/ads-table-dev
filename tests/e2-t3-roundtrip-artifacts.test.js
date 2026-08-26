@@ -134,7 +134,7 @@ test('execution plan keeps later E2 tasks open and E2-T8 in verification', () =>
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
   assert.match(plan, /E2-T1 — `Done`/);
   assert.match(plan, /E2-T2 — `Done`/);
-  assert.match(plan, /E2-T3 — `Verification`/);
+  assert.match(plan, /E2-T3 — `Done`/);
   assert.match(plan, /E2-T4 — `Verification`/);
   assert.match(plan, /E2-T5 — `Verification`/);
   assert.match(plan, /E2-T6 — `Verification`/);
@@ -236,7 +236,7 @@ test('T7 inventory follows the exact E2-T3 v2 fixture key', () => {
   }
 });
 
-test('execution plan records recovery and keeps E2-T3 in Verification', () => {
+test('execution plan records recovery and records E2-T3 Done', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
   assert.match(plan, /E2-C2 — E2-T3 ordered read-back v2 corrective preparation/);
   assert.match(plan, /recovery sorgusu HTTP 201 ve 13\/13 PASS/);

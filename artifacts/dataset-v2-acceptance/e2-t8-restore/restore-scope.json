@@ -1,0 +1,157 @@
+{
+  "contract_version": "e2-t8-restore-scope-v1",
+  "status": "preparation",
+  "source": {
+    "repository_main_sha": "e3aca83d6a5ba65b601190b37b7547d97ea7a475",
+    "db_ledger_baseline_manifest": "docs/security/evidence/DB_LEDGER_T2_BASELINE_MANIFEST.json",
+    "application_schema_baseline_source": "future sanitized schema-only capture",
+    "historical_ledger_count": 31,
+    "repository_forward_migration_count": 6,
+    "live_ledger_reconciled_total": 37,
+    "production_row_data_source": false
+  },
+  "target": {
+    "kind": "disposable isolated Supabase project or official full local Supabase stack with exact managed primitives verified",
+    "plain_generic_postgresql_target": false,
+    "production_target": false,
+    "existing_shared_development_project_target": false,
+    "unique_empty_target_required": true,
+    "target_teardown_requires_separate_approval": true,
+    "required_managed_primitives": [
+      "auth schema",
+      "auth.uid() exact signature",
+      "anon role",
+      "authenticated role",
+      "service_role role"
+    ],
+    "public_schema_state": "empty or explicit managed-object allowlist only",
+    "production_project_ref_match": false
+  },
+  "included_schemas": [
+    "public (application_owned objects only; managed_extension_owned and excluded_managed objects remain platform-managed)"
+  ],
+  "excluded_schemas": [
+    "auth",
+    "storage",
+    "realtime",
+    "extensions",
+    "graphql",
+    "graphql_public",
+    "net",
+    "pgsodium",
+    "pgsodium_masks",
+    "supabase_functions",
+    "supabase_migrations",
+    "vault"
+  ],
+  "included_object_classes": [
+    "application-owned tables",
+    "application-owned columns/defaults",
+    "primary/foreign/unique/check constraints",
+    "application-owned indexes",
+    "application-owned functions",
+    "application-owned triggers",
+    "RLS state",
+    "policies",
+    "application table grants captured schema-only and restricted to the approved source-inventory grantee/privilege allowlist",
+    "required application-owned extensions only through an explicit allowlist",
+    "restore ownership classification: application_owned only; managed_extension_owned and excluded_managed are parity-only exclusions"
+  ],
+  "excluded_content": [
+    "table row data",
+    "auth users",
+    "storage objects",
+    "provider tokens",
+    "encrypted token envelopes",
+    "OAuth transactions",
+    "secrets",
+    "credentials",
+    "connection URIs",
+    "PII",
+    "production identities",
+    "migration ledger rows as application data",
+    "ownership values tied to managed production roles",
+    "database-level settings",
+    "project-specific secrets",
+    "backup/PITR data"
+  ],
+  "historical_migration_policy": {
+    "historical_ledger_sql_bodies_invented": false,
+    "historical_sql_available": false,
+    "infer_ddl_from_historical_migration_names": false,
+    "baseline_source": "current production application schema captured as a versioned immutable squashed baseline",
+    "baseline_provenance": "CURRENT_STATE_BASELINE",
+    "claims_historical_migrations_were_executed": false,
+    "automatic_historical_ledger_row_insertion_during_preparation": false,
+    "ledger_bootstrap": "requires a separate explicit decision and acceptance"
+  },
+  "forward_migration_policy": {
+    "baseline_cutoff_status": "pending_capture_classification",
+    "exact_cutoff_must_be_recorded": true,
+    "replay_migration_already_absorbed_by_baseline": false,
+    "post_cutoff_order": "deterministic",
+    "duplicate_baseline_migration_object_creation": false,
+    "normal_db_push_before_contract_validation": false,
+    "required_repository_migration_classifications": [
+      "absorbed_by_baseline",
+      "applied_after_baseline",
+      "reconciliation_metadata_only",
+      "excluded_with_reason"
+    ],
+    "classification_scope": "all six repository migrations, object by object"
+  },
+  "restore_sequence": [
+    "Verify immutable sources and checksums.",
+    "Provision empty disposable target.",
+    "Verify target identity and emptiness.",
+    "Allow Supabase-managed target bootstrap to remain managed.",
+    "Apply sanitized application-schema baseline.",
+    "Apply only explicitly post-cutoff forward migrations.",
+    "Apply explicit application grants/RLS/policies in controlled order.",
+    "Run read-only restore acceptance.",
+    "Compare normalized object contract with approved source manifest.",
+    "Produce redacted evidence.",
+    "Obtain human review.",
+    "Teardown only with separate approval."
+  ],
+  "stop_gates": [
+    "source checksum mismatch",
+    "unknown schema ownership",
+    "target is production",
+    "target is shared/non-empty",
+    "row data present in dump",
+    "auth/storage/managed schema DDL present",
+    "secret/credential/URI/PII pattern present",
+    "unclassified object",
+    "duplicate baseline/migration object ownership",
+    "missing historical provenance disclosure",
+    "unsupported extension",
+    "restore statement outside allowlist",
+    "target object drift",
+    "acceptance mismatch",
+    "ledger bootstrap ambiguity"
+  ],
+  "acceptance_required": [
+    "object inventory parity",
+    "column/type/nullability/default parity",
+    "constraint/index parity",
+    "function signature/body fingerprint parity",
+    "trigger parity",
+    "RLS/policy/grant parity",
+    "no production row data",
+    "no auth/storage object mutation",
+    "no secret/PII",
+    "migration classification complete",
+    "rollback/teardown procedure reviewed",
+    "fresh-project restore actually executed later",
+    "evidence reviewed by human"
+  ],
+  "production_effect": {
+    "production_connected": false,
+    "production_data_changed": false,
+    "production_schema_changed": false,
+    "production_ledger_changed": false,
+    "production_privileges_changed": false,
+    "deployment_changed": false
+  }
+}

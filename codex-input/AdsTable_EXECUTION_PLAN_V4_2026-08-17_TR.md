@@ -611,6 +611,42 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T7 — `Verification`:** Birleşik rollback cleanup ve V1/V2/snapshot/security no-change repository paketi hazır; canlı baseline/final evidence ve review bekliyor.
 - **E2-T8 — `Verification`:** Ledger reconciliation ve corrective migration sırası tamamlandı; immutable baseline manifest hazır. Eski 31 migration SQL body’si repository’de bulunmadığı ve fresh-project restore henüz doğrulanmadığı için restore readiness açık.
 
+#### E2-T8 task aynası — fresh-project restore readiness
+
+**Amaç:** Eksik historical SQL’i uydurmadan application-owned current-state baseline capture, disposable Supabase restore ve normalized acceptance için fail-closed repository hazırlığı sağlamak.
+
+**Mevcut durum:** E2-T1/T2 `Done`; E2-T3–T7 ve E2-T8 `Verification`. Ledger 37 olarak reconciled; 31 historical SQL body mevcut değil; altı repository migration’ı bulunuyor; fresh restore doğrulanmadı.
+
+**Planlanan durum:** Ayrı insan onaylı capture ve disposable Supabase restore sonrasında normalized parity evidence’ının review edilmesi; o zamana kadar `Verification`.
+
+**Kapsam:** Scope contract, altı migration classification manifest’i, schema-only capture planı, artifact validator, source inventory, target preflight/acceptance, redacted evidence converter ve executable contract testleri.
+
+**Kapsam dışı:** Supabase/Management API bağlantısı; production schema veya row capture; baseline SQL; target provisioning; restore operatorü/çalıştırması; migration replay; `db push`; deployment ve secret/environment değişikliği.
+
+**Bağımlılıklar:** Onaylı main/checksum, DB ledger baseline manifest, object-by-object capture classification, ayrı capture/restore insan onayları, environment-only credential ve managed primitives doğrulanmış disposable Supabase target.
+
+**Uygulama adımları:** Contract’ı doğrula; fixed schema-only capture planını review et; gelecekte sanitize capture al; validator ve insan review’dan geçir; cutoff ve migration classification’ı kesinleştir; target preflight yap; ayrı restore operatorünü ancak accepted baseline sonrasında hazırla; restore ve read-only acceptance evidence’ını review et.
+
+**Kabul kriterleri:** Exact inventory/checksum; sıfır row/secret/managed DDL; final migration classification ve cutoff; managed primitive preflight; normalized object parity; sıfır application row; human-reviewed redacted evidence ve gerçek fresh-project restore.
+
+**Test planı:** Node artifact/validator/converter unit testleri, tek-statement read-only SQL static kontrolleri, previous E2 regresyonları, full `npm test` ve security suite.
+
+**Rollback:** Bu preparation yalnız repository değişikliğidir ve commit revert ile geri alınır. Gelecekte disposable target failure’ı production’a yönlendirilmez; teardown ayrı onay gerektirir.
+
+**Gözlemlenebilirlik:** Redacted PASS/FAIL, counts ve SHA-256 evidence; raw SQL, project ref, URI, identity veya credential yok.
+
+**Güvenlik/veri etkisi:** Production bağlantısı ve data/schema/ledger/privilege/deployment etkisi yok; actual capture ve restore yok.
+
+**Planlanan:** Scope review, ardından ayrı onaylı capture/classification/cutoff/restore/acceptance zinciri.
+
+**Gerçekleşen:** Scope contract ve capture operator/validator/inventory/acceptance preparation hazır. Actual schema capture yapılmadı; baseline SQL üretilmedi; cutoff kesinleşmedi; target provision edilmedi; restore çalıştırılmadı; fresh restore doğrulanmadı; production değişmedi.
+
+**Sapmalar:** Actual baseline olmadan restore operatorü hazırlanmadı. Altı migration bilinçli olarak `pending_capture_checksum` ve replay-disabled kaldı.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t8-restore/`, `docs/security/E2_T8_RESTORE_READINESS_RUNBOOK.md`, `docs/security/sql/E2_T8_*.sql`, `security/e2-t8-restore-contract.js`, `scripts/e2-t8-*.js`, `tests/e2-t8-restore-readiness-artifacts.test.js`.
+
+**Durum:** `Verification` — actual capture, final cutoff/classification, disposable restore ve human-reviewed acceptance tamamlanmadan E2-T8 `Done` değildir.
+
 ### Kabul kriterleri
 
 - Canlı DDL migration sözleşmesiyle uyumludur veya drift kapatılmıştır.

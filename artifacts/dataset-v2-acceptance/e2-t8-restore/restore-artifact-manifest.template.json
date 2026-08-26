@@ -1,0 +1,22 @@
+{
+  "manifest_version": "e2-t8-restore-artifact-v1",
+  "status": "template",
+  "provenance": "CURRENT_STATE_BASELINE",
+  "source_repository_sha": "e3aca83d6a5ba65b601190b37b7547d97ea7a475",
+  "source_inventory_sha256": null,
+  "capture_tool": "pg_dump",
+  "capture_tool_version": null,
+  "capture_contract_version": "e2-t8-schema-capture-v2",
+  "baseline_sha256": null,
+  "baseline_cutoff": null,
+  "schemas_included": ["public"],
+  "schemas_excluded": ["auth", "storage", "realtime", "extensions", "graphql", "graphql_public", "net", "pgsodium", "pgsodium_masks", "supabase_functions", "supabase_migrations", "vault"],
+  "row_data_included": false,
+  "managed_schema_ddl_included": false,
+  "owner_restore_included": false,
+  "secrets_or_pii_included": false,
+  "migration_classification_sha256": null,
+  "human_review_status": "pending",
+  "restore_ready": false,
+  "fresh_restore_verified": false
+}

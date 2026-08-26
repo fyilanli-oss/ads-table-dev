@@ -14,7 +14,7 @@ select
   (select count(*) from public.platform_connections where connected) connected_before,
   (select count(*) from public.platform_connection_tokens) encrypted_before,
   (select count(*) from supabase_migrations.schema_migrations) ledger_before,
-  (select count(*) from public.users u where exists (select 1 from auth.users a where a.id=u.id))=1 eligible_user_ok,
+  exists (select 1 from public.users u where exists (select 1 from auth.users a where a.id=u.id)) eligible_user_ok,
   (select count(*) from public.platform_connections pc where pc.connected and not exists (
     select 1 from public.platform_connection_tokens pt where pt.user_id=pc.user_id and pt.platform=pc.platform))=0 missing_ok,
   (select count(*) from public.platform_connection_tokens pt where not exists (
@@ -57,12 +57,12 @@ with fixture as (
       and business_date='2026-08-24' and source_timezone='Europe/Istanbul' and source_confidence='real'
       and synthetic=false and canonical_contract_version='v1' and adapter_version='e2-t3-meta-v2'
       and raw->>'fixture_namespace'='e2_t3_static_v2') contract_match_count,
-    coalesce(jsonb_agg(to_jsonb(fixture) - 'user_id' - 'updated_at' order by entity_key),'[]'::jsonb) redacted_physical
+    coalesce(jsonb_agg(to_jsonb(fixture) - 'id' - 'user_id' - 'created_at' - 'updated_at' order by entity_key),'[]'::jsonb) redacted_physical
   from fixture
 ), result as (
   select b.*, e.*,
     e.read_back_count-b.fixture_before inserted_count,
-    (select count(*) from public.performance_dataset_rows_v2)=b.dataset_before+1 dataset_unchanged,
+    (select count(*) from public.performance_dataset_rows_v2)=b.dataset_before+1 dataset_transaction_delta_ok,
     (select count(*) from public.performance_dataset_rows)=b.v1_before v1_unchanged,
     (select count(*) from public.dashboard_snapshots)=b.snapshot_before snapshot_unchanged,
     (select count(*) from public.oauth_transactions)=b.oauth_before oauth_unchanged,
@@ -77,12 +77,12 @@ with fixture as (
   from pg_temp.e2_t3_v2_baseline b cross join evidence e
 )
 select 'E2_T3_TRANSACTION_V2' operation_code, inserted_count, contract_match_count, read_back_count,
-  dataset_unchanged, v1_unchanged, snapshot_unchanged, oauth_unchanged, connected_unchanged, encrypted_unchanged,
+  dataset_transaction_delta_ok, v1_unchanged, snapshot_unchanged, oauth_unchanged, connected_unchanged, encrypted_unchanged,
   missing_encrypted_unchanged, orphan_encrypted_unchanged, plaintext_unchanged, ledger_unchanged,
   fixture_before=0 and inserted_count=1 and read_back_count=1 and contract_match_count=1
     and ledger_before=37 and dataset_before=0 and eligible_user_ok and oauth_before=0
     and connected_before=encrypted_before and missing_ok and orphan_ok and plaintext_ok
-    and dataset_unchanged and v1_unchanged and snapshot_unchanged and oauth_unchanged
+    and dataset_transaction_delta_ok and v1_unchanged and snapshot_unchanged and oauth_unchanged
     and connected_unchanged and encrypted_unchanged and missing_encrypted_unchanged
     and orphan_encrypted_unchanged and plaintext_unchanged and ledger_unchanged as passed,
   redacted_physical

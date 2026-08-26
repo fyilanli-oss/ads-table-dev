@@ -21,7 +21,9 @@ Send `docs/security/sql/E2_T3_ROUNDTRIP_TRANSACTION.sql` only as one intact payl
 5. a separate top-level read-back/evidence `SELECT` that scans the v2 fixture from Dataset V2;
 6. unconditional final `ROLLBACK`.
 
-Never split statements, detach rollback, add commit, retry an ambiguous outcome, or expose the eligible user. The redacted evidence row excludes runtime user and timestamp fields.
+Never split statements, detach rollback, add commit, retry an ambiguous outcome, or expose the eligible user. The redacted evidence row removes the exact runtime-only fields `id`, `user_id`, `created_at`, and `updated_at` before evidence conversion.
+
+Dataset V2 is temporarily `+1` inside the transaction. The `dataset_transaction_delta_ok` boolean proves only that transaction-local expected delta (`current count = dataset_before + 1`); it is not a persistent no-change claim. Permanent Dataset V2 zero/no-change is proved only by the separate postcheck after the final `ROLLBACK`.
 
 ## Preflight, evidence, and postcheck
 

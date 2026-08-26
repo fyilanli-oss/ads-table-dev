@@ -10,7 +10,7 @@ const physical = require(path.join(artifactDir, 'expected-physical.json'));
 const { validateCanonicalRow, RAW_METRICS } = require('../funnel-core/canonical-contract');
 const { validateEntityHierarchy } = require('../funnel-core/entity-hierarchy');
 const { canonicalToDbRow, dbToCanonicalRow } = require('../funnel-core/supabase-dataset-repository');
-const { buildEvidence, canonicalBlocks } = require('../scripts/e2-t3-roundtrip-evidence');
+const { buildEvidence, canonicalBlocks, ALLOWED_RESULT_KEYS, ALLOWED_REDACTED_PHYSICAL_KEYS, RUNTIME_PHYSICAL_KEYS } = require('../scripts/e2-t3-roundtrip-evidence');
 const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 const files = [
   'artifacts/dataset-v2-acceptance/e2-t3-roundtrip/expected-canonical.json',
@@ -39,7 +39,7 @@ function operationResult() {
   delete row.updated_at;
   return {
     operation_code: 'E2_T3_TRANSACTION_V2', inserted_count: 1, contract_match_count: 1,
-    read_back_count: 1, dataset_unchanged: true, v1_unchanged: true, snapshot_unchanged: true,
+    read_back_count: 1, dataset_transaction_delta_ok: true, v1_unchanged: true, snapshot_unchanged: true,
     oauth_unchanged: true, connected_unchanged: true, encrypted_unchanged: true, missing_encrypted_unchanged: true, orphan_encrypted_unchanged: true, plaintext_unchanged: true, ledger_unchanged: true, passed: true,
     redacted_physical: [row]
   };
@@ -146,10 +146,10 @@ test('E2-C1 captured provider-token parity is fail-closed', () => {
   for (const sql of [preflight, transaction, postcheck]) assert.doesNotMatch(sql, /(?:CONNECTED_CONNECTIONS|ENCRYPTED_TOKEN_ROWS)[^\n]*,\s*7\b/);
   for (const code of ['MISSING_ENCRYPTED','ORPHAN_ENCRYPTED','PLAINTEXT_TOKENS','CONNECTION_TOKEN_PARITY']) assert.match(preflight, new RegExp(`'${code}'`));
   assert.match(preflight, /'CONNECTED_CONNECTIONS'[^\n]*'capture'/); assert.match(preflight, /'ENCRYPTED_TOKEN_ROWS'[^\n]*'capture'/);
-  for (const field of ['dataset_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged']) assert.match(transaction, new RegExp(`\\b${field}\\b`));
+  for (const field of ['dataset_transaction_delta_ok','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged']) assert.match(transaction, new RegExp(`\\b${field}\\b`));
   assert.match(postcheck, /connected_rows/); assert.match(postcheck, /encrypted_rows/); assert.match(transaction, /rollback;\s*$/i);
   assert.throws(() => buildEvidence({...operationResult(), connection_count: 1}, canonical), /counts are forbidden/);
-  for (const field of ['dataset_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged']) { const value=operationResult(); value[field]=false; assert.throws(()=>buildEvidence(value,canonical),new RegExp(field)); }
+  for (const field of ['dataset_transaction_delta_ok','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged']) { const value=operationResult(); value[field]=false; assert.throws(()=>buildEvidence(value,canonical),new RegExp(field)); }
 });
 
 test('T3 postcheck and runbook define exactly four operator-local replacements', () => {
@@ -204,9 +204,9 @@ test('transaction temp baseline and locks are deterministic and non-persistent',
 
 test('final v2 evidence gates counts, baseline gates, and every parity boolean', () => {
   const finalProjection = transaction.slice(transaction.lastIndexOf("select 'E2_T3_TRANSACTION_V2'"));
-  for (const assertion of ['fixture_before=0','inserted_count=1','read_back_count=1','contract_match_count=1','ledger_before=37','dataset_before=0','eligible_user_ok','connected_before=encrypted_before','missing_ok','orphan_ok','plaintext_ok','dataset_unchanged','v1_unchanged','snapshot_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged']) assert.match(finalProjection, new RegExp(`\\b${assertion.replace(/[=]/g, '\\s*=\\s*')}\\b`));
+  for (const assertion of ['fixture_before=0','inserted_count=1','read_back_count=1','contract_match_count=1','ledger_before=37','dataset_before=0','eligible_user_ok','connected_before=encrypted_before','missing_ok','orphan_ok','plaintext_ok','dataset_transaction_delta_ok','v1_unchanged','snapshot_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged']) assert.match(finalProjection, new RegExp(`\\b${assertion.replace(/[=]/g, '\\s*=\\s*')}\\b`));
   assert.match(transaction, /read_back_count-b\.fixture_before inserted_count/);
-  assert.match(transaction, /jsonb_agg\(to_jsonb\(fixture\) - 'user_id' - 'updated_at'/);
+  assert.match(transaction, /jsonb_agg\(to_jsonb\(fixture\) - 'id' - 'user_id' - 'created_at' - 'updated_at'/);
 });
 
 test('postcheck uses scalar actual and expected queries with exact contract', () => {
@@ -220,7 +220,7 @@ test('postcheck uses scalar actual and expected queries with exact contract', ()
 
 test('converter rejects wrong counts, false parity, unknown fields, and forbidden material', () => {
   for (const field of ['inserted_count','contract_match_count','read_back_count']) assert.throws(() => buildEvidence({ ...operationResult(), [field]: 2 }, canonical));
-  for (const field of ['dataset_unchanged','v1_unchanged','snapshot_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged']) assert.throws(() => buildEvidence({ ...operationResult(), [field]: false }, canonical), new RegExp(field));
+  for (const field of ['dataset_transaction_delta_ok','v1_unchanged','snapshot_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged']) assert.throws(() => buildEvidence({ ...operationResult(), [field]: false }, canonical), new RegExp(field));
   assert.throws(() => buildEvidence({ ...operationResult(), unknown: true }, canonical), /allowlist/);
   const leaked = operationResult(); leaked.redacted_physical[0].user_id = 'forbidden';
   assert.throws(() => buildEvidence(leaked, canonical), /identity or credential/);
@@ -242,4 +242,74 @@ test('execution plan records recovery and keeps E2-T3 in Verification', () => {
   assert.match(plan, /recovery sorgusu HTTP 201 ve 13\/13 PASS/);
   assert.match(plan, /fixture residue zero ve production no-change/);
   assert.match(plan, /E2-T3 `Verification`/);
+});
+
+test('eligible-user gates accept one or more users and retain deterministic selection', () => {
+  assert.match(preflight, /'ELIGIBLE_USERS',\s*count\(\*\),\s*1,\s*'gte'/);
+  assert.match(transaction, /exists\s*\(select 1 from public\.users u where exists \(select 1 from auth\.users a where a\.id=u\.id\)\) eligible_user_ok/i);
+  assert.match(transaction, /from \(select u\.id from public\.users u[\s\S]*order by u\.id limit 1\) u/i);
+  const eligibleGate = (populationCount) => populationCount >= 1;
+  assert.equal(eligibleGate(0), false);
+  assert.equal(eligibleGate(1), true);
+  assert.equal(eligibleGate(2), true);
+  assert.equal(eligibleGate(100), true);
+});
+
+test('SQL and converter enforce exact runtime-row redaction', () => {
+  assert.deepEqual(RUNTIME_PHYSICAL_KEYS, ['id', 'user_id', 'created_at', 'updated_at']);
+  assert.match(transaction, /to_jsonb\(fixture\)\s*- 'id'\s*- 'user_id'\s*- 'created_at'\s*- 'updated_at'/);
+
+  const realisticDatabaseRow = {
+    ...physical,
+    id: '123e4567-e89b-42d3-a456-426614174000',
+    user_id: '123e4567-e89b-42d3-a456-426614174001',
+    created_at: '2026-08-26T12:00:00.000Z',
+    updated_at: '2026-08-26T12:00:01.000Z'
+  };
+  const sqlRedactedRow = { ...realisticDatabaseRow };
+  for (const field of RUNTIME_PHYSICAL_KEYS) delete sqlRedactedRow[field];
+  assert.deepEqual(Object.keys(sqlRedactedRow).sort(), [...ALLOWED_REDACTED_PHYSICAL_KEYS]);
+  assert.equal(buildEvidence({ ...operationResult(), redacted_physical: [sqlRedactedRow] }, canonical).operation_status, 'PASS');
+
+  const runtimeValues = {
+    id: realisticDatabaseRow.id,
+    user_id: realisticDatabaseRow.user_id,
+    created_at: realisticDatabaseRow.created_at,
+    updated_at: realisticDatabaseRow.updated_at
+  };
+  for (const [field, value] of Object.entries(runtimeValues)) {
+    const result = operationResult();
+    result.redacted_physical[0][field] = value;
+    assert.throws(() => buildEvidence(result, canonical));
+  }
+  const unknown = operationResult();
+  unknown.redacted_physical[0].unknown_row_field = 'forbidden';
+  assert.throws(() => buildEvidence(unknown, canonical), /physical fields.*allowlist/);
+  const uuid = operationResult();
+  uuid.redacted_physical[0].entity_name = '123e4567-e89b-42d3-a456-426614174002';
+  assert.throws(() => buildEvidence(uuid, canonical), /identity material/);
+});
+
+test('dataset transaction delta has exact semantics and rejects the old no-change field', () => {
+  assert.ok(ALLOWED_RESULT_KEYS.includes('dataset_transaction_delta_ok'));
+  assert.ok(!ALLOWED_RESULT_KEYS.includes('dataset_unchanged'));
+  assert.match(transaction, /\(select count\(\*\) from public\.performance_dataset_rows_v2\)=b\.dataset_before\+1 dataset_transaction_delta_ok/);
+  const finalProjection = transaction.slice(transaction.lastIndexOf("select 'E2_T3_TRANSACTION_V2'"));
+  assert.match(finalProjection, /and dataset_transaction_delta_ok/);
+  assert.doesNotMatch(transaction, /\bdataset_unchanged\b/);
+  const oldField = operationResult();
+  oldField.dataset_unchanged = oldField.dataset_transaction_delta_ok;
+  delete oldField.dataset_transaction_delta_ok;
+  assert.throws(() => buildEvidence(oldField, canonical), /result fields.*allowlist/);
+  const evidence = buildEvidence(operationResult(), canonical);
+  assert.equal(evidence.dataset_transaction_delta_ok, true);
+  assert.equal(Object.hasOwn(evidence, 'dataset_unchanged'), false);
+});
+
+test('runbook distinguishes transaction-local delta from post-rollback no-change', () => {
+  const runbook = read('docs/security/E2_T3_ROUNDTRIP_RUNBOOK.md');
+  assert.match(runbook, /temporarily `\+1` inside the transaction/);
+  assert.match(runbook, /`dataset_transaction_delta_ok` boolean proves only that transaction-local expected delta/);
+  assert.match(runbook, /not a persistent no-change claim/);
+  assert.match(runbook, /Permanent Dataset V2 zero\/no-change is proved only by the separate postcheck after the final `ROLLBACK`/);
 });

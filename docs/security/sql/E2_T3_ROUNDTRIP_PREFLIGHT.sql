@@ -5,7 +5,7 @@ with constants as (
   select 'LEDGER_TOTAL', count(*), 37, 'eq' from supabase_migrations.schema_migrations
   union all select 'DATASET_TABLE', count(*), 1, 'eq' from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and c.relkind='r'
   union all select 'DATASET_ROWS', count(*), 0, 'eq' from public.performance_dataset_rows_v2
-  union all select 'ELIGIBLE_USERS', count(*), 1, 'eq' from public.users u where exists (select 1 from auth.users a where a.id=u.id)
+  union all select 'ELIGIBLE_USERS', count(*), 1, 'gte' from public.users u where exists (select 1 from auth.users a where a.id=u.id)
   union all select 'FIXTURE_ROWS', count(*), 0, 'eq' from public.performance_dataset_rows_v2 d cross join constants k where d.entity_key=k.entity_key
   union all select 'V1_ROWS', count(*), count(*), 'capture' from public.performance_dataset_rows
   union all select 'SNAPSHOT_ROWS', count(*), count(*), 'capture' from public.dashboard_snapshots

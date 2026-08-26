@@ -1,6 +1,6 @@
 -- E2-T3 read-only preflight. Output is aggregate-only and contains no identity.
 with constants as (
-  select 'meta:e2_t3_static_v1_account:paid:none:campaign:e2_t3_static_v1_campaign:ad:e2_t3_static_v1_ad'::text entity_key
+  select 'meta:e2_t3_static_v2_account:paid:none:campaign:e2_t3_static_v2_campaign:ad:e2_t3_static_v2_ad'::text entity_key
 ), checks(check_code, actual_count, expected_count, comparison) as (
   select 'LEDGER_TOTAL', count(*), 37, 'eq' from supabase_migrations.schema_migrations
   union all select 'DATASET_TABLE', count(*), 1, 'eq' from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname='performance_dataset_rows_v2' and c.relkind='r'

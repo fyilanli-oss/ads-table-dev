@@ -29,7 +29,7 @@ function splitArguments(value){const out=[];let part='',depth=0,quoted=false;for
 function identityArguments(value){return splitArguments(value).map(x=>x.replace(/\bDEFAULT\b[\s\S]*$/i,'').replace(/\s*=\s*[\s\S]*$/,'').trim()).filter(x=>!/^OUT\b/i.test(x)).map(x=>x.replace(/^(?:IN|INOUT|VARIADIC)\s+/i,'').replace(/\s+/g,' ')).join(', ');}
 function objectKeys(code){
   const keys=[];let m;
-  const basic=new RegExp(`\\bCREATE\\s+(TABLE|INDEX|SEQUENCE|VIEW|MATERIALIZED\\s+VIEW)\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(${ident}(?:\\s*\\.\\s*${ident})?)`,'gi');
+  const basic=new RegExp(`\\bCREATE\\s+(TABLE|(?:UNIQUE\\s+)?INDEX|SEQUENCE|VIEW|MATERIALIZED\\s+VIEW)\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(${ident}(?:\\s*\\.\\s*${ident})?)`,'gi');
   while((m=basic.exec(code))){const q=qualified(m[2]),kind=/SEQUENCE/i.test(m[1])?'sequence':/VIEW/i.test(m[1])?'view':/INDEX/i.test(m[1])?'index':'relation';if(q.schema==='public')keys.push(`${kind}:${q.name}`);}
   const fn=new RegExp(`\\bCREATE\\s+(?:OR\\s+REPLACE\\s+)?FUNCTION\\s+(${ident}(?:\\s*\\.\\s*${ident})?)\\s*\\(([^)]*(?:\\([^)]*\\)[^)]*)*)\\)`,'gi');
   while((m=fn.exec(code))){const q=qualified(m[1]);if(q.schema==='public')keys.push(`function:${q.name}(${identityArguments(m[2])})`);}
@@ -41,6 +41,7 @@ function objectKeys(code){
 }
 function validateCapturedSchema({capturedSql,approvedSourceInventory,restoreScope,expectedGrantContract,captureManifest}){
   const errors=[];if(typeof capturedSql!=='string'||!capturedSql.trim())errors.push('EMPTY_ARTIFACT');let statements=[];try{statements=lex(capturedSql||'');}catch{errors.push('TOKENIZER_ERROR');}
+  if((approvedSourceInventory||[]).some(x=>x.ownership_class==='unclassified'))errors.push('UNCLASSIFIED_OWNERSHIP');
   if(SENSITIVE.test(capturedSql||''))errors.push('SENSITIVE_PATTERN'); const seen=new Set();
   const applicationInventory=(approvedSourceInventory||[]).filter(x=>x.ownership_class==='application_owned');
   const approved=new Set(applicationInventory.map(x=>x.object_key)); const excluded=new Set(restoreScope?.excluded_schemas||[]); const grantees=new Set(expectedGrantContract?.grantees||[]); const privileges=new Set(expectedGrantContract?.privileges||[]);
@@ -50,7 +51,7 @@ function validateCapturedSchema({capturedSql,approvedSourceInventory,restoreScop
     if(/\b(?:CREATE|ALTER|DROP)\s+ROLE\b|\b(?:CREATE|ALTER)\s+DATABASE\b/i.test(code))errors.push('ROLE_OR_DATABASE_DDL');
     if(/\bOWNER\s+TO\b|\bSET\s+SESSION\s+AUTHORIZATION\b/i.test(code))errors.push('OWNER_RESTORE');
     for(const schema of excluded)if(new RegExp(`(?:^|[^A-Za-z0-9_])"?${schema}"?\\s*\\.`,'i').test(code))errors.push('MANAGED_SCHEMA_DDL');
-    for(const m of code.matchAll(/\b(?:CREATE|ALTER|DROP)\s+(?:TABLE|FUNCTION|INDEX|TRIGGER|POLICY|SEQUENCE|VIEW)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?"?([A-Za-z_][\w$]*)"?\s*\./gi))if(m[1].toLowerCase()!=='public')errors.push('UNKNOWN_SCHEMA');
+    for(const m of code.matchAll(/\b(?:CREATE|ALTER|DROP)\s+(?:TABLE|FUNCTION|(?:UNIQUE\s+)?INDEX|TRIGGER|POLICY|SEQUENCE|VIEW)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?"?([A-Za-z_][\w$]*)"?\s*\./gi))if(m[1].toLowerCase()!=='public')errors.push('UNKNOWN_SCHEMA');
     if(/\bCREATE\s+EXTENSION\b/i.test(code))errors.push('UNSUPPORTED_EXTENSION');
     for(const key of objectKeys(code)){seen.add(key);if(!approved.has(key))errors.push('UNKNOWN_OBJECT');}
     for(const m of code.matchAll(/\b(?:ALTER|DROP)\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:"?public"?\.)?"?([A-Za-z_][\w$]*)"?/gi))if(!approved.has(`relation:${m[1].toLowerCase()}`))errors.push('UNKNOWN_OBJECT');

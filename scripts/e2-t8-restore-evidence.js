@@ -9,6 +9,7 @@ const FINGERPRINT = /^[0-9a-f]{64}$/;
 const digest = (value) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function convert({ sourceInventory, targetPreflight, targetInventory, targetFinalGates, manifest, migrationClassification }) {
   const errors = [];
+  if(sourceInventory.some(x=>x.ownership_class==='unclassified')||targetInventory.some(x=>x.ownership_class==='unclassified'))errors.push('UNCLASSIFIED_OWNERSHIP');
   if (SENSITIVE.test(JSON.stringify(arguments[0]))) errors.push('SENSITIVE_INPUT');
   if (JSON.stringify(Object.keys(targetPreflight)) !== JSON.stringify(PREFLIGHT_KEYS)) errors.push('PREFLIGHT_ALLOWLIST');
   if (!targetPreflight.managed_primitives_ok) errors.push('MANAGED_PRIMITIVE_MISSING');

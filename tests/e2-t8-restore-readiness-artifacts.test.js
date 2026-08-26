@@ -64,3 +64,38 @@ test('CLI status allowlist makes every non-accepted status fail',()=>{
   assert.equal(cp.spawnSync(process.execPath,[cli],{env:{PATH:process.env.PATH},encoding:'utf8'}).status,0);
   assert.equal(cp.spawnSync(process.execPath,[cli,'--execute','--confirm',capture.CONFIRMATION],{env:{PATH:process.env.PATH},encoding:'utf8'}).status,1);
 });
+
+test('SQL ownership provenance is explicit, owner-independent, inherited, and fail-closed',()=>{
+  const sql=read('docs/security/sql/E2_T8_SOURCE_INVENTORY.sql');
+  for(const relation of ['dashboard_snapshots','fx_rates_daily','oauth_transactions','performance_dataset_rows','performance_dataset_rows_v2','platform_account_ownerships','platform_ad_accounts','platform_connection_tokens','platform_connections','snapshot_jobs','snapshot_schedules','users'])assert.match(sql,new RegExp(`\\('${relation}'\\)`));
+  assert.doesNotMatch(sql,/c\.relowner|supabase_admin|rolname IN \('postgres'/i);
+  assert.match(sql,/e\.objid IS NOT NULL THEN 'managed_extension_owned'[\s\S]*a\.relname IS NOT NULL THEN 'application_owned'[\s\S]*m\.relname IS NOT NULL THEN 'excluded_managed'[\s\S]*ELSE 'unclassified'/);
+  for(const objectClass of ['column:','constraint:','index:','trigger:','policy:','grant:'])assert.match(sql,new RegExp(objectClass));
+  assert.ok((sql.match(/o\.ownership_class/g)||[]).length>=7);
+  assert.match(sql,/VALUES \('spatial_ref_sys'\)/);
+});
+
+test('postgres or supabase_admin ownership cannot override explicit application provenance',()=>{
+  const classify=({extension=false,application=false,managed=false})=>extension?'managed_extension_owned':application?'application_owned':managed?'excluded_managed':'unclassified';
+  assert.equal(classify({application:true,owner:'postgres'}),'application_owned');
+  assert.equal(classify({application:true,owner:'supabase_admin'}),'application_owned');
+  assert.equal(classify({extension:true,application:true}),'managed_extension_owned');
+  assert.equal(classify({managed:true}),'excluded_managed');
+  assert.equal(classify({}),'unclassified');
+});
+
+test('unclassified source ownership stops captured contract and evidence',()=>{
+  const unknown=[{object_key:'relation:unknown',object_class:'relation',ownership_class:'unclassified',fingerprint:FP}];
+  assert.equal(validator.validateCapturedSchema({capturedSql:'SET statement_timeout=0;',approvedSourceInventory:unknown,restoreScope:scope,expectedGrantContract:grants,captureManifest:manifest}).status,'ARTIFACT_CONTRACT_FAIL');
+});
+
+test('regular and unique index identities match exact inventory keys',()=>{
+  const relation={object_key:'relation:performance_dataset_rows_v2',object_class:'relation',ownership_class:'application_owned',fingerprint:FP};
+  const check=(statement,key)=>validator.validateCapturedSchema({capturedSql:`CREATE TABLE public.performance_dataset_rows_v2(id bigint); ${statement}`,approvedSourceInventory:[relation,{object_key:key,object_class:'index',ownership_class:'application_owned',fingerprint:FP}],restoreScope:scope,expectedGrantContract:grants,captureManifest:manifest}).status;
+  const unique='CREATE UNIQUE INDEX performance_dataset_rows_v2_canonical_uidx ON public.performance_dataset_rows_v2 (id);';
+  assert.equal(check(unique,'index:performance_dataset_rows_v2_canonical_uidx'),'ARTIFACT_CONTRACT_PASS');
+  assert.equal(check(unique,'index:wrong_name'),'ARTIFACT_CONTRACT_FAIL');
+  assert.equal(check('CREATE INDEX performance_dataset_rows_v2_idx ON public.performance_dataset_rows_v2(id);','index:performance_dataset_rows_v2_idx'),'ARTIFACT_CONTRACT_PASS');
+  assert.equal(check('CREATE UNIQUE INDEX "Canonical UIdx" ON public.performance_dataset_rows_v2(id);','index:Canonical UIdx'),'ARTIFACT_CONTRACT_PASS');
+  assert.equal(check('CREATE UNIQUE INDEX private.performance_dataset_rows_v2_canonical_uidx ON public.performance_dataset_rows_v2(id);','index:performance_dataset_rows_v2_canonical_uidx'),'ARTIFACT_CONTRACT_FAIL');
+});

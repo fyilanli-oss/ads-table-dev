@@ -22,6 +22,8 @@ Before approval, record SHA-256 for every source and verify the repository commi
 1. Run the exact preflight as one read-only statement.
 2. Every equality/minimum check must pass. Capture the aggregate Dataset V2, V1, and snapshot counts; never capture an identity.
 3. Replace only the documented aggregate placeholders in the postcheck copy kept as operator-local evidence. Do not commit production counts.
+
+The T3 postcheck has exactly four operator-local replacements, in this order: V1, snapshot, connected, encrypted. The committed Dataset V2 zero is not a placeholder and must not be changed. Actual provider counts remain operator-local, are never shared, and are never committed.
 4. Stop if no eligible auth/public user exists, the fixture namespace exists, Dataset V2 is non-empty, ledger is not 37, or any security/schema postcondition differs.
 5. Obtain separate human approval. A failed or ambiguous operation must not be retried.
 

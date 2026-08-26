@@ -151,3 +151,11 @@ test('E2-C1 captured provider-token parity is fail-closed', () => {
   assert.throws(() => buildEvidence({...operationResult(), connection_count: 1}, canonical), /counts are forbidden/);
   for (const field of ['connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged']) { const value=operationResult(); value[field]=false; assert.throws(()=>buildEvidence(value,canonical),new RegExp(field)); }
 });
+
+test('T3 postcheck and runbook define exactly four operator-local replacements', () => {
+  assert.equal((postcheck.match(/\(-1\)::bigint/g) || []).length, 4);
+  const runbook = read('docs/security/E2_T3_ROUNDTRIP_RUNBOOK.md');
+  assert.match(runbook, /exactly four operator-local replacements, in this order: V1, snapshot, connected, encrypted/);
+  assert.match(runbook, /committed Dataset V2 zero is not a placeholder and must not be changed/);
+  assert.match(runbook, /Actual provider counts remain operator-local, are never shared, and are never committed/);
+});

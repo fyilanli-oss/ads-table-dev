@@ -20,9 +20,9 @@ Broad wildcard matching is prohibited.
 ## Human-approved operation order
 
 1. With separately approved credentials, copy `E2_T7_BASELINE.sql`, verify its checksum, and execute it first under the approved read-only procedure. Without credentials, **STOP**; this PR supplies none.
-2. Require every baseline gate to pass. Store the three captured Dataset V2, Dataset V1, and `dashboard_snapshots` counts only in operator-local evidence; never commit them. Any residue or security/metadata gate failure stops the entire later E2 series.
+2. Require every baseline gate to pass. Capture exactly five baselines in this order: Dataset V2, V1, snapshot, connected, encrypted. Store them only in operator-local evidence. Actual provider counts are never shared or committed. Any residue or security/metadata gate failure stops the entire later E2 series.
 3. Run each E2-T3–T6 live operation only under its own separate human approval and intact outer rollback. Never retry an operation whose outcome is ambiguous.
-4. Only after all approved operations, make an operator-local copy of `E2_T7_FINAL_CHECK.sql`; replace its three explicit negative placeholders, in order, with the locally captured Dataset V2, Dataset V1, and snapshot counts. Verify the edited copy locally and execute only through the approved read-only procedure.
+4. Only after all approved operations, make an operator-local copy of `E2_T7_FINAL_CHECK.sql`; replace its exactly five explicit negative placeholders, in this order: Dataset V2, V1, snapshot, connected, encrypted. Verify the edited copy locally and execute only through the approved read-only procedure.
 5. Pass the separate baseline and final result arrays directly to `buildEvidence`. No manual result merge is required. Retain only its redacted allowlisted summary for review.
 
 The final check proves exact V2/V1/snapshot parity, zero fixture residue, unchanged ledger/OAuth/encrypted-token/plaintext-token postconditions, unchanged Dataset V2 constraint/index/RLS/policy/grant state, and zero persistent evidence objects. Neither SQL emits identities or production rows. Production counts remain operator-local.

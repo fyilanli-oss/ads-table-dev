@@ -14,13 +14,13 @@ Before any operation, verify the exact GitHub main SHA and record SHA-256 for th
 
 Run `E2_T4_UPSERT_PREFLIGHT.sql` once as one read-only payload. Require every equality/minimum check to pass, including ledger, table/RLS, absent namespace, eligible user, OAuth/token/plaintext postconditions, and the valid/ready canonical unique index with exact ordered columns.
 
-Capture Dataset V2, V1, and `dashboard_snapshots` aggregate counts. Put them only into the documented `-1` placeholders in an operator-local postcheck copy; never commit production counts. Obtain separate human approval after preflight.
+Capture the five postcheck baselines in this exact order: Dataset V2, V1, snapshot, connected, encrypted. Put them only into the five documented `-1` placeholders in an operator-local postcheck copy. Actual provider counts remain operator-local, are never shared, and are never committed. Obtain separate human approval after preflight.
 
 ## Controlled transaction
 
 Send `E2_T4_UPSERT_TRANSACTION.sql` once, intact. Automatic retry is forbidden. It selects an eligible user internally, returns no user identity, writes initial fixture A, then writes fixture B through the exact canonical conflict target.
 
-The payload deliberately uses two ordered top-level data-modification commands inside one transaction rather than two data-modifying CTEs in one statement. PostgreSQL documents that data-modifying `WITH` sub-statements share one snapshot, cannot see one another's table effects, and must communicate through `RETURNING`; attempting to modify the same row twice in one statement is not supported. Therefore a same-table initial insert followed by same-key conflict update is not modeled as sibling CTEs. The stronger `SHARE ROW EXCLUSIVE` Dataset V2 lock and `SHARE` locks on parity relations make the ordered commands and derived baseline deterministic without a temporary table or client-side select-then-update.
+The payload deliberately uses two ordered top-level data-modification commands inside one transaction rather than two data-modifying CTEs in one statement. PostgreSQL documents that data-modifying `WITH` sub-statements share one snapshot, cannot see one another's table effects, and must communicate through `RETURNING`; attempting to modify the same row twice in one statement is not supported. Therefore a same-table initial insert followed by same-key conflict update is not modeled as sibling CTEs. The stronger `SHARE ROW EXCLUSIVE` Dataset V2 lock and `SHARE` locks on parity relations make the ordered commands deterministic without client-side select-then-update. The transaction captures provider counts in `pg_temp.e2_t4_security_baseline`; the mandatory final `ROLLBACK` removes that transaction-local temporary table.
 
 Only the final `SELECT` produces evidence. It returns exactly one allowlisted object whose fields match the converter contract. Initial and upsert commands produce command tags, not evidence result objects. An operator must not manually merge multiple SQL result sets; only the exact final transaction response may be passed to the converter.
 

@@ -17,11 +17,11 @@ The migration and committed metadata establish the contract: RLS enabled and not
 
 A separate human approval and an operator-held database credential are mandatory. Missing credentials, checksum drift, a failed preflight gate, fewer than two distinct users present in both `auth.users` and `public.users`, namespace residue, or inability to preserve deterministic transaction-local role/JWT and temporary-evidence access means **STOP**. Never automatically retry.
 
-1. Run `docs/security/sql/E2_T6_RLS_PREFLIGHT.sql` as one read-only statement. Record the three operator-local Dataset V2, V1, and snapshot baselines without recording identities.
+1. Run `docs/security/sql/E2_T6_RLS_PREFLIGHT.sql` as one read-only statement. Record exactly five operator-local baselines in this order: Dataset V2, V1, snapshot, connected, encrypted. Actual provider counts are never shared or committed; record no identities.
 2. Review every stop gate and obtain separate human approval.
 3. Submit `docs/security/sql/E2_T6_RLS_TRANSACTION.sql` once as one intact payload. Do not split, edit, or manually combine result sets.
 4. Preserve its single final redacted response for offline conversion with `scripts/e2-t6-rls-evidence.js`.
-5. Confirm the final statement was the mandatory `ROLLBACK`, then replace the three `-1` placeholders in `docs/security/sql/E2_T6_RLS_POSTCHECK.sql` with the approved operator-local counts and run that one read-only statement.
+5. Confirm the final statement was the mandatory `ROLLBACK`, then replace exactly five `-1` placeholders in `docs/security/sql/E2_T6_RLS_POSTCHECK.sql`, in this order: Dataset V2, V1, snapshot, connected, encrypted; run that one read-only statement.
 
 ## Transaction safety model
 

@@ -1,4 +1,4 @@
--- E2-T3 read-only postcheck. Replace the five captured-count literals only from approved preflight evidence.
+-- E2-T3 read-only postcheck. Keep committed dataset_rows=0; replace exactly four negative placeholders with operator-local v1/snapshot/connected/encrypted baselines.
 with expected(dataset_rows, v1_rows, snapshot_rows, connected_rows, encrypted_rows) as (
   values (0::bigint, (-1)::bigint, (-1)::bigint, (-1)::bigint, (-1)::bigint)
 ), constants as (

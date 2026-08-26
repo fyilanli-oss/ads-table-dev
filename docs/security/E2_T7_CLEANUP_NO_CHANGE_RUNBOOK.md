@@ -11,7 +11,7 @@ The mandatory normal cleanup for every E2-T3–T6 acceptance transaction is its 
 Before use, an operator must verify the exact approved `main` commit and checksums of this runbook, both SQL files, both contracts, the converter, and the merged E2-T3–T6 source SQL. Fixture selectors are taken verbatim from those merged artifacts:
 
 - E2-T3 exact equality: `meta:e2_t3_static_v2_account:paid:none:campaign:e2_t3_static_v2_campaign:ad:e2_t3_static_v2_ad`
-- E2-T4 exact equality: `meta:e2_t4_same_key_v1_account:paid:none:campaign:e2_t4_same_key_v1_campaign:ad:e2_t4_same_key_v1_ad`
+- E2-T4 exact equality: `meta:e2_t4_same_key_v2_account:paid:none:campaign:e2_t4_same_key_v2_campaign:ad:e2_t4_same_key_v2_ad`
 - E2-T5 escaped literal prefix: `e2\_t5\_rejection\_v1:`
 - E2-T6 escaped literal prefix: `e2\_t6\_rls\_v1:`
 

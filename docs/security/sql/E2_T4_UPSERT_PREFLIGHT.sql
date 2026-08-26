@@ -1,6 +1,6 @@
 -- E2-T4 read-only preflight. Aggregate-only; no identity or row data is returned.
 with constants as (
-  select 'meta:e2_t4_same_key_v1_account:paid:none:campaign:e2_t4_same_key_v1_campaign:ad:e2_t4_same_key_v1_ad'::text entity_key
+  select 'meta:e2_t4_same_key_v2_account:paid:none:campaign:e2_t4_same_key_v2_campaign:ad:e2_t4_same_key_v2_ad'::text entity_key
 ), index_state as (
   select i.indisvalid, i.indisready,
     array_agg(a.attname order by key.ordinality) as columns

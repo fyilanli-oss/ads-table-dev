@@ -2,7 +2,7 @@
   "evidence_version": "e2-t7-fixture-inventory-v1",
   "namespaces": [
     {"task":"E2-T3","match_mode":"exact","exact_entity_key":"meta:e2_t3_static_v2_account:paid:none:campaign:e2_t3_static_v2_campaign:ad:e2_t3_static_v2_ad","escaped_prefix":null,"expected_final_count":0,"normal_cleanup":"transaction_rollback","cleanup_statement_allowed":false},
-    {"task":"E2-T4","match_mode":"exact","exact_entity_key":"meta:e2_t4_same_key_v1_account:paid:none:campaign:e2_t4_same_key_v1_campaign:ad:e2_t4_same_key_v1_ad","escaped_prefix":null,"expected_final_count":0,"normal_cleanup":"transaction_rollback","cleanup_statement_allowed":false},
+    {"task":"E2-T4","match_mode":"exact","exact_entity_key":"meta:e2_t4_same_key_v2_account:paid:none:campaign:e2_t4_same_key_v2_campaign:ad:e2_t4_same_key_v2_ad","escaped_prefix":null,"expected_final_count":0,"normal_cleanup":"transaction_rollback","cleanup_statement_allowed":false},
     {"task":"E2-T5","match_mode":"escaped_prefix","exact_entity_key":null,"escaped_prefix":"e2\\_t5\\_rejection\\_v1:","expected_final_count":0,"normal_cleanup":"transaction_rollback","cleanup_statement_allowed":false},
     {"task":"E2-T6","match_mode":"escaped_prefix","exact_entity_key":null,"escaped_prefix":"e2\\_t6\\_rls\\_v1:","expected_final_count":0,"normal_cleanup":"transaction_rollback","cleanup_statement_allowed":false}
   ]

@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This is a **preparation-only** repository package. This PR executes no live SQL and does not replace live acceptance. E2-T4 remains `Verification`. E2-T3 live acceptance remains incomplete; E2-T5, E2-T6, and E2-T7 are outside this package.
+This is a **preparation-only** repository package. This PR executes no live SQL and does not replace live acceptance. E2-T4 remains `Verification`. E2-T3 live acceptance is `Done`; E2-T5, E2-T6, and E2-T7 are outside this package.
 
 The proposed operation proves that two writes sharing the exact migration-defined canonical key produce one row, with the second payload updating mutable fields through PostgreSQL `INSERT ... ON CONFLICT ... DO UPDATE`. It never uses client-side select-then-update emulation.
 
@@ -50,3 +50,11 @@ The prepared operation cannot mutate V1, snapshots, OAuth, token, ledger, schema
 - Missing encrypted ve plaintext güvenlik kontrolleri geçti; corrective sözleşme ayrıca orphan encrypted kontrolünü zorunlu kılar.
 - Güvenlik contract'ı fixed population yerine captured connected/encrypted parity ile missing/orphan/plaintext zero olarak düzeltildi.
 - Bu değişiklik production data correction değildir. Bu corrective PR kapsamında canlı transaction, INSERT veya postcheck çalıştırılmadı ve production değişmedi.
+
+## V1 live finding and V2 corrective preparation
+
+E2-T4 remains **`Verification`**. The v1 preflight returned HTTP 201 with **16/16 PASS**. The v1 transaction returned **HTTP 201**: initial write, same-key upsert, final fixture row, updated contract, and duplicate-group checks passed, while the **duplicate-excess evidence contract was FAIL**. The mandatory final statement was `ROLLBACK`; transaction retry: **no**. The v1 postcheck returned **HTTP 400** and was not retried.
+
+The subsequent read-only recovery returned **HTTP 201** with **11/11 PASS**: fixture residue zero, Dataset V2 zero, and production no-change. Actual production counts and identities were not shared or committed.
+
+This **v2 corrective preparation** uses operation code `E2_T4_TRANSACTION_V2`, namespace `e2_t4_same_key_v2`, and evidence version `e2-t4-upsert-v2`. It binds duplicate excess to explicit PostgreSQL `bigint` and replaces the postcheck with independent scalar actual/expected expressions. This repository task ran no live SQL and made no production change.

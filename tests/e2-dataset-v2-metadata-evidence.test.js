@@ -86,7 +86,7 @@ test("evidence is redacted and E2 task states match the current execution plan",
  assert.doesNotMatch(combined,/postgres(?:ql)?:\/\/|authorization\s*:|bearer\s+|-----BEGIN [A-Z ]*PRIVATE KEY-----|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b|[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/i);
  const plan=fs.readFileSync(path.join(root,"codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md"),"utf8");
  assert.match(plan,/E2-T1 — `Done`/); assert.match(plan,/E2-T2 — `Done`/);
- assert.match(plan,/E2-T3 — `Verification`/);
+ assert.match(plan,/E2-T3 — `Done`/);
  assert.match(plan,/E2-T4 — `Verification`/);
  assert.match(plan,/E2-T5 — `Verification`/);
  assert.match(plan,/E2-T6 — `Verification`/);

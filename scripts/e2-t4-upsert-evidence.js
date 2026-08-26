@@ -33,14 +33,15 @@ function buildEvidence(result, initial, updated) {
   assert(JSON.stringify(initial.identity) === JSON.stringify(updated.identity), 'fixture identity differs');
   assert(JSON.stringify(initial.entity) === JSON.stringify(updated.entity), 'fixture hierarchy differs');
   for (const key of ['initial_operation_count','upsert_operation_count','fixture_row_count','updated_contract_match_count']) assert(result[key] === 1, `${key} must equal one`);
-  for (const key of ['duplicate_group_count','duplicate_excess_row_count']) assert(result[key] === 0, `${key} must equal zero`);
+  assert(Number.isSafeInteger(result.duplicate_excess_row_count) && result.duplicate_excess_row_count === 0, 'duplicate_excess_row_count must be safe integer zero');
+  assert(result.duplicate_group_count === 0, 'duplicate_group_count must equal zero');
   for (const key of BOOLEANS) assert(result[key] === true, `${key} must be true`);
   assert(result.v1_before === result.v1_after, 'V1 count parity failed');
   assert(result.snapshot_before === result.snapshot_after, 'snapshot count parity failed');
   assert(initial.raw_metrics.session === null && updated.raw_metrics.session === null, 'unsupported null drift');
   assert(initial.raw_metrics.add_to_cart === 0 && updated.raw_metrics.add_to_cart === 0, 'supported zero drift');
   return Object.freeze({
-    evidence_version:'e2-t4-upsert-v1',namespace:'e2_t4_same_key_v1',status:'PASS',
+    evidence_version:'e2-t4-upsert-v2',namespace:'e2_t4_same_key_v2',status:'PASS',
     initial_operation_count:1,upsert_operation_count:1,final_fixture_row_count:1,
     duplicate_group_count:0,duplicate_excess_row_count:0,
     canonical_key_unchanged:true,identity_unchanged:true,hierarchy_unchanged:true,

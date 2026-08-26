@@ -11,11 +11,15 @@
     "production_row_data_source": false
   },
   "target": {
-    "kind": "disposable isolated Supabase/PostgreSQL-compatible project",
+    "kind": "disposable isolated Supabase project or official full local Supabase stack with exact managed primitives verified",
+    "plain_generic_postgresql_target": false,
     "production_target": false,
     "existing_shared_development_project_target": false,
     "unique_empty_target_required": true,
-    "target_teardown_requires_separate_approval": true
+    "target_teardown_requires_separate_approval": true,
+    "required_managed_primitives": ["auth schema", "auth.uid() exact signature", "anon role", "authenticated role", "service_role role"],
+    "public_schema_state": "empty or explicit managed-object allowlist only",
+    "production_project_ref_match": false
   },
   "included_schemas": [
     "public (application-owned objects only; every object requires ownership classification)"

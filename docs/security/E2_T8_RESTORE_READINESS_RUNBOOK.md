@@ -52,7 +52,7 @@ No cutoff is guessed. During a later implementation stage, an object-by-object m
 
 ## 9. Disposable target contract
 
-The only permitted future target is a uniquely identified, isolated, empty, disposable Supabase/PostgreSQL-compatible project. It must not be production or an existing shared development project. Target identity and emptiness require independent verification before any statement. Provisioning and restore require separate human approval; teardown requires another separate approval.
+The only permitted future target is a uniquely identified, isolated, empty, disposable Supabase project, or the official full local Supabase stack after exact managed primitives are verified. A plain or generic PostgreSQL-compatible database is forbidden, as are production, shared development, and data-bearing targets. Preflight must prove the `auth` schema, the exact `auth.uid()` signature, and the `anon`, `authenticated`, and `service_role` roles exist; `public` must be empty or contain only explicitly allowlisted managed objects; and operator-supplied safe source/target project-ref fingerprints must differ. Any missing primitive or uncertain identity stops before restore. Provisioning and restore require separate human approval; teardown requires another separate approval.
 
 ## 10. Stop gates
 
@@ -85,3 +85,15 @@ In this stage, do not connect to Supabase; call its Management API; run or insta
 ## 17. Remaining work before E2-T8 Done
 
 Review and approve this contract; prepare the later same-PR capture operator, validator, object classification manifest, and acceptance artifacts; authorize and perform sanitized capture; set an evidenced cutoff; classify all six migrations object by object; approve a disposable target; execute restore and read-only acceptance; resolve every mismatch; review redacted evidence; and approve teardown. Until all are complete, E2-T8 is not Done.
+
+### Capture operator and fixed arguments
+
+`scripts/e2-t8-schema-capture.js` is plan-only by default. Future execution requires both `--execute` and `--confirm E2_T8_SCHEMA_ONLY_CAPTURE`, plus an environment-only source credential. It exposes no URI, password, arbitrary argument, table filter, or data mode. Its fixed plan selects only `public`, schema-only content, no rows, no ownership restoration, and deterministic output. Tool absence returns `CAPTURE_TOOL_UNAVAILABLE`. Import is side-effect free and this PR does not execute capture.
+
+### Raw artifact handling and validator order
+
+Raw capture output is quarantined outside the repository and is never directly committed. First verify the fixed capture plan and source inventory allowlist; then managed-schema exclusions and object classification; then manifest/checksums and statement/sensitive deny scans; then human review; finally target preflight and acceptance. Regex alone never establishes safety. The validator reports artifact-contract PASS/FAIL only, never “safe to restore.”
+
+### Classification, cutoff, target, and evidence gates
+
+All six migrations remain `pending_capture_checksum` and non-replayable until captured-object overlap analysis completes. The cutoff remains pending. Provisioning is outside this PR and limited to the target contract above. `E2_T8_TARGET_PREFLIGHT.sql` must pass before any future restore. There is no restore operator in this PR: it cannot be prepared until an accepted baseline exists. Actual capture and restore each require credentials where applicable and separate human approval. The offline evidence converter accepts exact allowlisted normalized inputs and emits only redacted status, counts, and checksums. E2-T8 remains `Verification` until capture, classification, cutoff, disposable restore, acceptance, evidence review, and teardown review are complete.

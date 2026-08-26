@@ -39,7 +39,7 @@ function buildEvidence(result) {
   assert(result.unexpected_allow_count === 0, 'unexpected allow');
   assert(result.fixture_count === 2 && result.residue_count === 0, 'fixture boundary failed');
   for (const field of ['dataset_baseline_preserved','v1_unchanged','snapshots_unchanged','oauth_unchanged','connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged','ledger_unchanged','overall_passed']) assert(result[field] === true, `${field} must be true`);
-  return Object.freeze({ evidence_version:'e2-t6-rls-v1', operation_code:'e2_t6_rls_v1', status:'PASS', expected_case_count:16, passed_case_count:16, failed_case_count:0, unexpected_allow_count:0, residue_count:0, rollback_required:true });
+  return Object.freeze({ evidence_version:'e2-t6-rls-v1', operation_code:'e2_t6_rls_v1', status:'PASS', expected_case_count:16, passed_case_count:16, failed_case_count:0, unexpected_allow_count:0, residue_count:0, connected_unchanged:true, encrypted_unchanged:true, missing_encrypted_unchanged:true, orphan_encrypted_unchanged:true, plaintext_unchanged:true, rollback_required:true });
 }
 function main(argv) { assert(argv.length === 1, 'usage: evidence converter requires one redacted result file'); const result=JSON.parse(fs.readFileSync(path.resolve(argv[0]),'utf8')); process.stdout.write(`${JSON.stringify(buildEvidence(result),null,2)}\n`); }
 if (require.main === module) { try { main(process.argv.slice(2)); } catch (_) { process.stderr.write('E2-T6 evidence validation failed\n'); process.exitCode=1; } }

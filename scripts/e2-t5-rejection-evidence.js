@@ -66,7 +66,9 @@ function buildEvidence(result) {
   return Object.freeze({
     evidence_version: 'e2-t5-rejection-v1', operation_code: 'e2_t5_rejection_v1', status: 'PASS',
     expected_case_count: 35, passed_case_count: 35, failed_case_count: 0,
-    unexpected_accept_count: 0, residue_count: 0, rollback_required: true
+    unexpected_accept_count: 0, residue_count: 0,
+    connected_unchanged:true, encrypted_unchanged:true, missing_encrypted_unchanged:true, orphan_encrypted_unchanged:true, plaintext_unchanged:true,
+    rollback_required: true
   });
 }
 

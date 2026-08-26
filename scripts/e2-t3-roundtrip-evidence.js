@@ -59,6 +59,7 @@ function buildEvidence(operationResult, expectedCanonical) {
     inserted_count: 1,
     read_back_count: 1,
     rollback_required: true,
+    connected_unchanged:true, encrypted_unchanged:true, missing_encrypted_unchanged:true, orphan_encrypted_unchanged:true, plaintext_unchanged:true,
     blocks: BLOCKS.map((field) => ({ field, result: 'PASS' }))
   };
 }

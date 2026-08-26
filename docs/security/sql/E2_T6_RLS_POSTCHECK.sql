@@ -1,4 +1,4 @@
--- Replace the three -1 operator-local placeholders with approved preflight Dataset V2/V1/snapshot counts.
+-- Replace the five -1 operator-local placeholders with approved preflight Dataset V2/V1/snapshot/connected/encrypted counts.
 with expected(dataset_v2_rows,dataset_v1_rows,snapshot_rows,connected_rows,encrypted_rows) as (values ((-1)::bigint,(-1)::bigint,(-1)::bigint,(-1)::bigint,(-1)::bigint)),
 policy_state as (
   select count(*) filter (where p.polname='performance_dataset_rows_v2_select_own' and p.polcmd='r' and p.polpermissive

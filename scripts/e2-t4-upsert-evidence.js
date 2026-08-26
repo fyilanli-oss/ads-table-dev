@@ -45,6 +45,7 @@ function buildEvidence(result, initial, updated) {
     duplicate_group_count:0,duplicate_excess_row_count:0,
     canonical_key_unchanged:true,identity_unchanged:true,hierarchy_unchanged:true,
     unsupported_null_preserved:true,supported_zero_preserved:true,v1_unchanged:true,snapshot_unchanged:true,
+    connected_unchanged:true, encrypted_unchanged:true, missing_encrypted_unchanged:true, orphan_encrypted_unchanged:true, plaintext_unchanged:true,
     rollback_required:true
   });
 }

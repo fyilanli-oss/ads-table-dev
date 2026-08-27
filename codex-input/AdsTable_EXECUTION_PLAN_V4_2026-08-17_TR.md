@@ -1654,3 +1654,15 @@ Bu V4 plan ile:
 **Karar:** Production retry yasağı korunur. Yeni bir namespace/operation hazırlanmasından önce canonical anahtarlı düzeltme ve disposable PostgreSQL ortamında transaction/postcheck reproduksiyonu zorunludur. Bu taskta SQL, Management API, production data, schema, policy, grant, ledger, environment veya deployment değişikliği yapılmadı.
 
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/static-root-cause-v1.json` ve `tests/e2-t6-static-root-cause.test.js`.
+
+### E2-C7 — E2-T6 disposable PostgreSQL root-cause reproduction
+
+**Durum:** Repository/disposable reproduction `Done`; E2-T6 production acceptance hâlâ `Verification`.
+
+**Gerçekleşen:** PostgreSQL 16 disposable şeması historical V2 transaction'ı gerçek parser, role switching, RLS ve nested exception davranışıyla yeniden çalıştırdı. V2 final payload SQL'inde `jsonb_build_object` kapanış parantezinin ve case aggregate'in `pg_temp.e2_t6_rls_evidence` source ifadesinin eksik olduğu doğrulandı. C6'daki canonical `entity_key` ihlali de yeni V3 disposable fixture'larında düzeltildi. Corrected V3 disposable transaction 16/16 case PASS, zero unexpected allow, overall PASS ve final outer `ROLLBACK` verdi.
+
+**Reproduction kapısı:** Redacted runner PostgreSQL 16 ile yerel/disposable ortamda çalıştırıldı; executable schema ve runner repository'de tutulur. Disposable şema yalnız sembolik iki kullanıcı ve boş korunan tablolar içerir; production credential, identity, count veya bağlantı kullanmaz.
+
+**Karar:** Repository/static ve disposable root-cause şartı tamamlandı. Bu sonuç production acceptance değildir. Yeni production preflight/transaction operatörü hazırlanması ve çalıştırılması ayrı task, yeni namespace, review ve açık insan production onayına tabidir.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/disposable-reproduction-v1.json`, `tests/fixtures/e2-t6-disposable-schema.sql` ve `scripts/e2-t6-disposable-reproduction.js`.

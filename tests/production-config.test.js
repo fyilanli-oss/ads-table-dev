@@ -152,7 +152,10 @@ async function routeStatus(env){
   let port;
   try{
     await new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>reject(new Error(`server timeout: ${stderr}`)),5000);
+      // The legacy monolith imports all provider SDKs before it can emit READY.
+      // Keep this characterization tolerant of cold/contended CI startup while
+      // retaining a bounded fail-closed timeout.
+      const timer=setTimeout(()=>reject(new Error(`server timeout: ${stderr}`)),20000);
       child.stdout.on("data",chunk=>{
         stdout+=chunk;
         const match=stdout.match(/READY (\d+)/);

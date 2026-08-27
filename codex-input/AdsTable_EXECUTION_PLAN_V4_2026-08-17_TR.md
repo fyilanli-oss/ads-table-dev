@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1 kritik V1 route characterization baseline'ı PR #47 ile merge edilmiş ve `Done` olmuştur; E3-T2–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1 `Done`; E3-T2 composition-root ayrımı `Verification`; E3-T3–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -855,7 +855,7 @@ src/
 ### Planlanan işler
 
 - **E3-T1 — `Done` — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
-- **E3-T2 — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
+- **E3-T2 — `Verification` — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
 - **E3-T3 — Config boundary:** Environment doğrulama ve typed config sınırı kur.
 - **E3-T4 — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
 - **E3-T5 — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1 `Done`; E3-T2–E3-T10 `Not started`; sıradaki plan adayı E3-T2'dir ancak E2 ana production kabul hattının yerine geçmez.
+- Güncel E3 özeti: E3-T1 `Done`; E3-T2 `Verification`; E3-T3–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -1732,5 +1732,41 @@ Bu V4 plan ile:
 **Evidence:** `tests/e3-t1-critical-route-characterization.test.js`, `docs/architecture/e3-t1-characterization-baseline.md`, full/security test çıktıları ve PR CI.
 
 **Durum:** `Done` — PR #47 merge commit `8728f5934005b01c0605ed7f60253127a3e4d3c2`; characterization, full/security CI ve review kapıları tamamlandı.
+
+### E3-T2 task aynası — composition root
+
+**Amaç:** Express application oluşturma ve process listener başlatma sorumluluklarını kök monolitten test edilebilir bir composition sınırına taşımak.
+
+**Mevcut durum:** E3-T1 `Done`. Kök `server.js` Express instance, base middleware/static yüzey ve `listen()` lifecycle'ını doğrudan kuruyordu.
+
+**Planlanan durum:** `src/app.js` port dinlemeden application oluşturur; listener yalnız explicit `startApplication` sınırıyla açılır; kök entrypoint mevcut route registration davranışını koruyarak bu sınıra delegation yapar.
+
+**Kapsam:** Express app creation, trust proxy, JSON middleware, disabled TikTok static guard, public static middleware, listener başlangıcı, dependency validation ve lifecycle testleri.
+
+**Kapsam dışı:** Route extraction, shared Supabase/provider client extraction, OAuth/job business logic taşıma, response contract, environment, deployment, database ve production işlemleri.
+
+**Bağımlılıklar:** E3-T1 characterization baseline ve E1 production configuration guard.
+
+**Uygulama adımları:** Application/listener factory eklendi; kök server delegation'a geçirildi; app-without-listener, explicit listener ve missing dependency negatif testleri security/full regression kapsamına alındı.
+
+**Kabul kriterleri:** App port açmadan oluşturulabilir; yalnız explicit start listener açar; mevcut base middleware sırası ve kritik V1 characterization değişmez; invalid composition input fail-closed olur; full/security CI PASS.
+
+**Test planı:** Dedicated E3-T2 lifecycle testi, E3-T1 characterization, full suite, security suite, JavaScript syntax ve diff kontrolü.
+
+**Rollback planı:** `src/app.js` delegation commit'i revert edilerek önceki kök app/listener kurulumu geri alınır; data veya schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Listener başlangıç mesajı ve test lifecycle sonucu; request body, credential, identity veya provider payload loglanmaz.
+
+**Güvenlik ve veri etkisi:** Repository/runtime composition refactor; production request, data/schema/policy/grant/token veya deployment değişikliği yoktur.
+
+**Planlanan:** E3-T2 composition-root sınırı ve executable lifecycle evidence.
+
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/merge bekleniyor.
+
+**Sapmalar:** Shared Supabase/provider client construction E3-T4 kapsamı olarak yerinde bırakıldı; E3-T2 route/business logic taşımadı.
+
+**Evidence:** `src/app.js`, `tests/e3-t2-composition-root.test.js`, E3-T1/full/security test çıktıları ve PR CI.
+
+**Durum:** `Verification` — review, CI ve merge tamamlanmadan `Done` değildir.
 
 **Canlı sınır:** PR #46 merge/review tamamlanmıştır. Revize read-only diagnostic preflight ancak yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.

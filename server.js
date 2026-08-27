@@ -1,13 +1,10 @@
 const path=require("path");
 const crypto=require("crypto");
 const {google}=require("googleapis");
-const {createClient}=require("@supabase/supabase-js");
 const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
-const {createOAuthTransactionStore}=require("./security/oauth-transaction-store");
 const {parseExplicitBoolean}=require("./security/production-config");
-const {createProviderTokenVaultFromEnv}=require("./security/provider-token-vault");
-const {createProviderTokenStore}=require("./security/provider-token-store");
 const {createApplication,startApplication}=require("./src/app");
+const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
 const productionConfig=runtimeConfig.production;
@@ -35,12 +32,9 @@ const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
 const TIKTOK_REVIEW_ADVERTISER_ID=process.env.TIKTOK_REVIEW_ADVERTISER_ID||"";
 const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
-const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
-const oauthTransactionStore=supabaseAdmin?createOAuthTransactionStore({client:supabaseAdmin}):null;
 const providerTokenEncryptionEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_ENCRYPTION_ENABLED,false,"PROVIDER_TOKEN_ENCRYPTION_ENABLED");
 const providerTokenLegacyReadsEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_LEGACY_READ_ENABLED,true,"PROVIDER_TOKEN_LEGACY_READ_ENABLED");
-const providerTokenVault=providerTokenEncryptionEnabled?createProviderTokenVaultFromEnv():null;
-const providerTokenStore=providerTokenEncryptionEnabled&&supabaseAdmin?createProviderTokenStore({client:supabaseAdmin,vault:providerTokenVault,legacyReadsEnabled:providerTokenLegacyReadsEnabled}):null;
+const {supabaseAdmin,oauthTransactionStore,providerTokenStore}=createSharedClients({env:process.env,providerTokenEncryptionEnabled,providerTokenLegacyReadsEnabled});
 function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
 app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>productionConfig.tiktokTestPageEnabled?sendFile(res,"tiktok-test.html"):res.sendStatus(404));
 app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));

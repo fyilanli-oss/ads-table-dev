@@ -2,11 +2,11 @@
 
 ## Status and boundary
 
-**E2-T6: `Verification`.** This is a repository-preparation package only. No live SQL, Supabase query, fixture write, RLS matrix, postcheck, Management API operation, deployment, or data/schema/policy/grant/ledger/environment change was performed. Static tests are not live PostgreSQL acceptance. E2-T3, E2-T4, and E2-T5 remain `Verification`; E2-T7 is out of scope and `Not started`.
+**E2-T6: `Verification`.** This is a repository-preparation package only. No live SQL, Supabase query, fixture write, RLS matrix, postcheck, Management API operation, deployment, or data/schema/policy/grant/ledger/environment change was performed. Static tests are not live PostgreSQL acceptance. E2-T1–T5 are `Done`; E2-T7 is out of scope and `Not started`.
 
 ## Immutable review inputs
 
-Before any separately approved operation, verify the exact approved main/base SHA `c6c2b88ad4c19b2f01b77b63ca84c5fc359db558` and these source checksums:
+The fail-closed operator binds preparation to approved main/base SHA `5a9a450a3615a9edeb8101164fc91abe074708be` and checksums its executable runtime, SQL, converter, fixture contract, and matrix before both phases.
 
 - `supabase/migrations/20260816101220_create_performance_dataset_rows_v2.sql`: SHA-256 `27cd4bf405b12a7e6928e5c9742f709440da987738fb181bf6dbf5e8da8085f2`
 - `artifacts/dataset-v2-acceptance/20260824-metadata-acceptance/rls-grants.json`: SHA-256 `95de1cab3ea95595a2c9eba2e9b0c5ed3bc0a16cc498df273ec8b6d98245ab51`
@@ -17,11 +17,11 @@ The migration and committed metadata establish the contract: RLS enabled and not
 
 A separate human approval and an operator-held database credential are mandatory. Missing credentials, checksum drift, a failed preflight gate, fewer than two distinct users present in both `auth.users` and `public.users`, namespace residue, or inability to preserve deterministic transaction-local role/JWT and temporary-evidence access means **STOP**. Never automatically retry.
 
-1. Run `docs/security/sql/E2_T6_RLS_PREFLIGHT.sql` as one read-only statement. Record exactly five operator-local baselines in this order: Dataset V2, V1, snapshot, connected, encrypted. Actual provider counts are never shared or committed; record no identities.
+1. Run `NODE_USE_ENV_PROXY=1 npm run e2:t6:preflight`. The operator runs the full regression suite, verifies the approved Git base and artifact checksum, submits `docs/security/sql/E2_T6_RLS_PREFLIGHT.sql` once, and stores exactly five operator-local baselines in this order: Dataset V2, V1, snapshot, connected, encrypted. The capsule remains outside the repository. Actual provider counts are never shared or committed; record no identities.
 2. Review every stop gate and obtain separate human approval.
-3. Submit `docs/security/sql/E2_T6_RLS_TRANSACTION.sql` once as one intact payload. Do not split, edit, or manually combine result sets.
-4. Preserve its single final redacted response for offline conversion with `scripts/e2-t6-rls-evidence.js`.
-5. Confirm the final statement was the mandatory `ROLLBACK`, then replace exactly five `-1` placeholders in `docs/security/sql/E2_T6_RLS_POSTCHECK.sql`, in this order: Dataset V2, V1, snapshot, connected, encrypted; run that one read-only statement.
+3. Run `NODE_USE_ENV_PROXY=1 npm run e2:t6:execute -- --confirm E2-T6-V1-LIVE`. The exact confirmation is accepted only after explicit human production approval and an approval-ready capsule.
+4. The operator persists transaction intent before submitting `docs/security/sql/E2_T6_RLS_TRANSACTION.sql` once, validates its single final redacted response with `scripts/e2-t6-rls-evidence.js`, and never retries the transaction.
+5. The operator will replace exactly five `-1` placeholders in `docs/security/sql/E2_T6_RLS_POSTCHECK.sql`, in this order: Dataset V2, V1, snapshot, connected, encrypted. It submits the result once even when transaction transport/evidence fails, validates all 19 gates, and consumes the capsule. Never manually substitute or submit either payload.
 
 ## Transaction safety model
 

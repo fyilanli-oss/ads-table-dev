@@ -1,5 +1,4 @@
 
-const express=require("express");
 const path=require("path");
 const crypto=require("crypto");
 const {google}=require("googleapis");
@@ -9,11 +8,10 @@ const {createOAuthTransactionStore}=require("./security/oauth-transaction-store"
 const {loadProductionConfig,parseExplicitBoolean}=require("./security/production-config");
 const {createProviderTokenVaultFromEnv}=require("./security/provider-token-vault");
 const {createProviderTokenStore}=require("./security/provider-token-store");
+const {createApplication,startApplication}=require("./src/app");
 const productionConfig=loadProductionConfig();
-const app=express(); const PORT=process.env.PORT||3000;
-app.set("trust proxy",1); app.use(express.json());
-app.use((req,res,next)=>req.path==="/tiktok-test.html"&&!productionConfig.tiktokTestPageEnabled?res.sendStatus(404):next());
-app.use(express.static(path.join(__dirname,"public")));
+const PORT=process.env.PORT||3000;
+const app=createApplication({publicDirectory:path.join(__dirname,"public"),tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled});
 const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
 const KLAVIYO_API_BASE="https://a.klaviyo.com";
@@ -5781,5 +5779,5 @@ async function runKlaviyoAutoRefreshForSchedule(schedule){
 
 // ===== END TIKTOK READ LAYER =====
 
-if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));
+if(process.env.VERCEL!=="1")startApplication(app,{port:PORT});
 module.exports=app;

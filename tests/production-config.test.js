@@ -143,16 +143,21 @@ test("TikTok endpoints reject the sandbox token query parameter before reading a
 });
 
 async function routeStatus(env){
-  const port=32000+Math.floor(Math.random()*10000);
-  const child=spawn(process.execPath,["-e",`const app=require('./server');app.listen(${port},()=>console.log('READY'))`],{
+  const child=spawn(process.execPath,["-e",`const app=require('./server');const server=app.listen(0,'127.0.0.1',()=>console.log('READY '+server.address().port))`],{
     cwd:root,env:{...process.env,VERCEL:"1",...env},stdio:["ignore","pipe","pipe"]
   });
   let stderr="";
+  let stdout="";
   child.stderr.on("data",chunk=>{stderr+=chunk});
+  let port;
   try{
     await new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>reject(new Error(`server timeout: ${stderr}`)),5000);
-      child.stdout.on("data",chunk=>{if(chunk.toString().includes("READY")){clearTimeout(timer);resolve();}});
+      child.stdout.on("data",chunk=>{
+        stdout+=chunk;
+        const match=stdout.match(/READY (\d+)/);
+        if(match){port=Number(match[1]);clearTimeout(timer);resolve();}
+      });
       child.once("exit",code=>{clearTimeout(timer);reject(new Error(`server exited ${code}: ${stderr}`));});
     });
     const route=(await fetch(`http://127.0.0.1:${port}/tiktok-test`)).status;

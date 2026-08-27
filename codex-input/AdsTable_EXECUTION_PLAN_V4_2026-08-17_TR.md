@@ -1626,3 +1626,11 @@ Bu V4 plan ile:
 **Sapma:** v1 CLI güvenli kategorik terminal sonucu kalıcılaştırmadığı için transaction evidence failure ile original mandatory postcheck failure birbirinden sonradan ayrıştırılamadı. Recovery production no-change kanıtıdır; 16-case RLS acceptance PASS yerine geçmez. v1 transaction tekrar edilemez. Yeni canlı deneme ancak ayrı namespace/version, düzeltilmiş terminal observability, yeni preflight ve ayrı production onayıyla yapılabilir.
 
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/recovery-v1.json`.
+
+### E2-C4 — E2-T6 corrective v2 terminal observability hazırlığı
+
+**Durum:** Repository preparation; E2-T6 `Verification`, canlı işlem yapılmadı.
+
+**Corrective kapsam:** `e2_t6_rls_v2` ayrı namespace/version; checksum-bound 21-gate preflight, intact rollback-only 16-case transaction ve 19-gate postcheck. V2, transaction evidence ve postcheck sonuçlarını `PASS`, `TRANSACTION_EVIDENCE_FAILED_POSTCHECK_PASS`, `POSTCHECK_FAILED` veya `TRANSACTION_AND_POSTCHECK_FAILED` kapalı safe-code sözleşmesiyle ayrı outcome sidecar'ında kalıcılaştırır. Sidecar repository dışındadır, `0600` modundadır ve raw hata/identity/count içermez. v1 capsule veya namespace tekrar kullanılamaz.
+
+**Canlı sınır:** V2 preparation SQL, Management API veya production işlemi çalıştırmaz. Yeni preflight ve transaction ayrı production onaylarına tabidir.

@@ -14,7 +14,16 @@ const SQL = Object.freeze({
   transaction: 'docs/security/sql/E2_T5_REJECTION_V2_TRANSACTION.sql',
   postcheck: 'docs/security/sql/E2_T5_REJECTION_V2_POSTCHECK.sql'
 });
-const ARTIFACTS = Object.freeze([...Object.values(SQL), 'scripts/e2-t5-v2-evidence.js', 'artifacts/dataset-v2-acceptance/e2-t5-rejection/rejection-matrix.json', 'artifacts/dataset-v2-acceptance/e2-t7-cleanup/fixture-inventory.json']);
+const ARTIFACTS = Object.freeze([
+  ...Object.values(SQL),
+  'operator/e2-t5-v2.js',
+  'operator/management-api.js',
+  'operator/state-store.js',
+  'scripts/e2-t5-operator.js',
+  'scripts/e2-t5-v2-evidence.js',
+  'artifacts/dataset-v2-acceptance/e2-t5-rejection/rejection-matrix.json',
+  'artifacts/dataset-v2-acceptance/e2-t7-cleanup/fixture-inventory.json'
+]);
 const PREFLIGHT_CODES = Object.freeze(['CONNECTED_CONNECTIONS','CONNECTION_TOKEN_PARITY','DATASET_ROWS','DATASET_TABLE','E2_T5_RESIDUE','ELIGIBLE_USERS','ENCRYPTED_TOKEN_ROWS','KLAVIYO_CORRECTIVE_SEMANTICS','LEDGER_TOTAL','MISSING_ENCRYPTED','NAMED_VALIDATED_CHECKS','OAUTH_ROWS','ORPHAN_ENCRYPTED','PLAINTEXT_TOKENS','REQUIRED_NOT_NULL_COLUMNS','RLS_STATE','SNAPSHOT_ROWS','V1_ROWS']);
 const POSTCHECK_CODES = Object.freeze(['CONNECTED_CONNECTIONS','CONNECTION_TOKEN_PARITY','DATASET_ROWS','E2_T5_RESIDUE','ENCRYPTED_TOKEN_ROWS','LEDGER_TOTAL','MISSING_ENCRYPTED','OAUTH_ROWS','ORPHAN_ENCRYPTED','PERSISTENT_EVIDENCE_OBJECT','PLAINTEXT_TOKENS','RLS_STATE','SNAPSHOT_ROWS','V1_ROWS','VALIDATED_CHECKS']);
 function checksum(repo) { const hash = crypto.createHash('sha256'); for (const file of ARTIFACTS) hash.update(file).update('\0').update(fs.readFileSync(path.join(repo, file))).update('\0'); return hash.digest('hex'); }
@@ -37,6 +46,8 @@ function validatePreflight(rows) {
   return baselines;
 }
 function postcheckSql(template, baselines) {
+  const placeholders = template.match(/\(-1\)::bigint/g) || [];
+  if (placeholders.length !== BASELINES.length) throw new Error('Postcheck must contain exactly five baseline placeholders');
   let sql = template;
   for (const key of BASELINES) sql = sql.replace('(-1)::bigint', `(${baselines[key]})::bigint`);
   if (sql.includes('(-1)::bigint')) throw new Error('Postcheck baseline substitution failed');
@@ -49,7 +60,9 @@ function validateGateRows(rows, expectedCodes, label) {
   if (!Array.isArray(rows) || rows.length !== expectedCodes.length) throw new Error(`${label} must return exactly ${expectedCodes.length} gates`);
   const codes = rows.map((row) => row && row.check_code).sort();
   if (JSON.stringify(codes) !== JSON.stringify(expectedCodes)) throw new Error(`${label} gate allowlist mismatch`);
-  if (rows.some((row) => row.passed !== true || !Number.isSafeInteger(row.actual_count) || !Number.isSafeInteger(row.expected_count))) throw new Error(`${label} gate failed`);
+  if (rows.some((row) => row.passed !== true
+    || !Number.isSafeInteger(row.actual_count) || row.actual_count < 0
+    || !Number.isSafeInteger(row.expected_count) || row.expected_count < 0)) throw new Error(`${label} gate failed`);
 }
 async function preflight({ repo, stateFile, client, runTests = () => cp.execFileSync('npm', ['test'], { cwd: repo, stdio: 'inherit' }), verifyRepository = verifyGit }) {
   verifyRepository(repo);
@@ -86,4 +99,4 @@ async function execute({ repo, stateFile, client, confirmation, verifyRepository
   if (postcheckError) throw new Error('Mandatory postcheck failed');
   return Object.freeze({ operation:OPERATION, status:'PASS', evidenceVersion:evidence.evidence_version, transactionRequests, transactionRetries:0, postcheck:'15/15 PASS', postcheckRequests:1, postcheckRetries:0, state:'CONSUMED' });
 }
-module.exports = Object.freeze({ APPROVED_MAIN_SHA, OPERATION, VERSION, SQL, PREFLIGHT_CODES, POSTCHECK_CODES, binding, checksum, execute, postcheckSql, preflight, validatePostcheck, validatePreflight, verifyGit });
+module.exports = Object.freeze({ APPROVED_MAIN_SHA, OPERATION, VERSION, SQL, ARTIFACTS, PREFLIGHT_CODES, POSTCHECK_CODES, binding, checksum, execute, postcheckSql, preflight, validatePostcheck, validatePreflight, verifyGit });

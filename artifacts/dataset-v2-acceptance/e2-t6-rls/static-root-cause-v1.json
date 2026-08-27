@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "operation": "e2_t6_rls_v2",
+  "audit": "repository_static_root_cause",
+  "production_operation_run": false,
+  "confirmed_findings": [
+    {
+      "check_code": "FIXTURE_ENTITY_KEY_NOT_CANONICAL",
+      "affected_fixture_count": 2,
+      "impact": "transaction fixture identity violates the frozen canonical entity-key contract"
+    }
+  ],
+  "unresolved_findings": [
+    {
+      "check_code": "TERMINAL_FAILURE_CAUSE_UNCLASSIFIED",
+      "reason": "safe terminal sidecar intentionally contains no raw database or transport error"
+    },
+    {
+      "check_code": "POSTCHECK_FAILURE_CAUSE_UNCLASSIFIED",
+      "reason": "recovery proves no-change but cannot reconstruct the consumed postcheck failure"
+    }
+  ],
+  "decision": "no production retry; require corrected new namespace plus disposable PostgreSQL reproduction before any approval request"
+}

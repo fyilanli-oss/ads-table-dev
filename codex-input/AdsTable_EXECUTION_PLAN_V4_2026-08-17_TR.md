@@ -1644,3 +1644,13 @@ Bu V4 plan ile:
 **Karar:** Recovery production no-change kanıtıdır ve 16-case acceptance PASS yerine geçmez. E2-T7 inventory ve read-only selector'ları v1/v2 T6 namespace'lerini ayrı izler. Yeni canlı deneme hazırlanmayacaktır; transaction SQL root cause repository/static ve disposable ortamda çözülmeden production E2-T6 tekrarına izin verilmez.
 
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/recovery-v2.json`.
+
+### E2-C6 — E2-T6 repository/static root-cause audit
+
+**Durum:** `Verification`; production retry hazırlığı veya canlı PASS iddiası değildir.
+
+**Gerçekleşen:** V2 transaction içindeki iki fixture'ın `entity_key` değerlerinin frozen canonical hierarchy üzerinden üretilmesi gereken anahtarlarla eşleşmediği repository/static olarak doğrulandı. Bu bulgu iki fixture'ı da etkiler ve transaction tasarımında kesin bir contract ihlalidir. Güvenli terminal sidecar ham database/transport hatası taşımadığından tüketilmiş transaction ile postcheck'in terminal hata nedeni geriye dönük olarak kesinleştirilemez; recovery yalnız production no-change durumunu kanıtlar.
+
+**Karar:** Production retry yasağı korunur. Yeni bir namespace/operation hazırlanmasından önce canonical anahtarlı düzeltme ve disposable PostgreSQL ortamında transaction/postcheck reproduksiyonu zorunludur. Bu taskta SQL, Management API, production data, schema, policy, grant, ledger, environment veya deployment değişikliği yapılmadı.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/static-root-cause-v1.json` ve `tests/e2-t6-static-root-cause.test.js`.

@@ -1,0 +1,21 @@
+{
+  "operation_code": "e2_t6_rls_v3",
+  "fixture_count": 2,
+  "actors": ["user_a", "user_b"],
+  "selection": {
+    "source": "intersection of auth.users and public.users",
+    "ordering": "database-local stable identifier order",
+    "required_distinct_count": 2,
+    "identity_output": false
+  },
+  "fixture": {
+    "platform": "meta",
+    "traffic_type": "paid",
+    "source_system": "meta_ads",
+    "namespace": "e2_t6_rls_v3",
+    "business_date": "operator_transaction_date",
+    "synthetic": false
+  },
+  "lifecycle": "transaction-only; mandatory outer rollback",
+  "persistent_cleanup": false
+}

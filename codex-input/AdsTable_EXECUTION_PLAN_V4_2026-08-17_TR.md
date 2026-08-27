@@ -1666,3 +1666,13 @@ Bu V4 plan ile:
 **Karar:** Repository/static ve disposable root-cause şartı tamamlandı. Bu sonuç production acceptance değildir. Yeni production preflight/transaction operatörü hazırlanması ve çalıştırılması ayrı task, yeni namespace, review ve açık insan production onayına tabidir.
 
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/disposable-reproduction-v1.json`, `tests/fixtures/e2-t6-disposable-schema.sql` ve `scripts/e2-t6-disposable-reproduction.js`.
+
+### E2-C8 — E2-T6 V3 production operator preparation
+
+**Durum:** Repository preparation; E2-T6 production acceptance `Verification`, canlı işlem yapılmadı.
+
+**Kapsam:** Disposable ortamda doğrulanan canonical V3 transaction; yeni `e2_t6_rls_v3` namespace'i; checksum-bound 21-gate preflight; 16-case rollback-only transaction; 19-gate postcheck; tek kullanımlık `0600` state/outcome sidecar; exact confirmation ve fail-closed terminal outcome sözleşmesi.
+
+**Gerçekleşen:** V3 preflight/transaction/postcheck, fixture contract, evidence converter, operator/CLI ve regression testleri repository'de hazırlandı. Approved-main binding PR #44 merge commit'ine sabitlendi. Bu taskta Management API, production SQL, credential, data, schema, policy, grant, ledger, environment veya deployment değişikliği yapılmadı.
+
+**Canlı sınır:** Preflight dahil hiçbir production isteği review ve açık insan production onayı olmadan çalıştırılamaz. Repository testleri ve disposable PASS production acceptance yerine geçmez.

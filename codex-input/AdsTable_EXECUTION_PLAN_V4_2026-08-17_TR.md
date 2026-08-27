@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `Not started`
+**Durum:** `In progress` — E3-T1 kritik V1 route characterization baseline'ı repository'de hazırlanmıştır; review/merge sonrası `Done` olur.
 
 ### Hedef yapı
 
@@ -1684,5 +1684,41 @@ Bu V4 plan ile:
 **Bulgu:** İnsan onaylı V3 read-only production preflight tek istek sonrasında genel `STOPPED_FAIL_CLOSED` ile durdu. Approval-ready state ve outcome sidecar oluşmadı; transaction/postcheck gönderilmedi ve production mutation olmadı. Genel kod query/transport-response aşaması ile 21-gate validation aşamasını ayırmadığı için kör retry yasaklandı.
 
 **Düzeltme:** V3 preflight, raw hata/count/identity taşımayan kapalı safe-code sözleşmesiyle `PREFLIGHT_QUERY_FAILED` ve `PREFLIGHT_GATES_FAILED` aşamalarını ayırır. Her iki hata state/outcome oluşturmadan durur. Bu repository taskında Management API veya production isteği çalıştırılmadı.
+
+### E3-T1 task aynası — kritik V1 route characterization baseline
+
+**Amaç:** E3 extraction başlamadan önce kritik public, config, auth ve fail-closed HTTP davranışlarını executable baseline ile sabitlemek.
+
+**Mevcut durum:** Kök `server.js` app creation, dependency construction, route registration, provider/job orchestration, listener ve export sorumluluklarını birlikte taşır; seçili V1 HTTP sözleşmeleri için dedicated characterization testi yoktu.
+
+**Planlanan durum:** Ephemeral loopback listener üzerinden production/provider/Supabase çağrısı yapmadan kritik status, content-type ve response shape sözleşmelerini koruyan test ve responsibility map.
+
+**Kapsam:** Landing/login, public config, unauthenticated account status, disabled TikTok test yüzeyi, unknown API 404 ve mevcut sorumluluk envanteri.
+
+**Kapsam dışı:** Route extraction, composition root, canlı HTTP/provider/DB isteği, environment/deployment, business logic, response contract değişikliği ve production mutation.
+
+**Bağımlılıklar:** E0 mimari sınırları, tamamlanmış E1 güvenlik baseline'ı ve mevcut V1 entrypoint.
+
+**Uygulama adımları:** Kritik yüzeyler seçildi; exported Express app `VERCEL=1` altında ephemeral loopback porta bağlandı; public/auth/fail-closed assertions ve extraction guard dokümante edildi; test full/security CI kapsamına alındı.
+
+**Kabul kriterleri:** Seçili route status/body/content-type sözleşmeleri deterministik PASS; harici servis çağrısı yok; listener test sonunda kapanır; full ve security regression PASS.
+
+**Test planı:** Dedicated E3-T1 testi, full suite, security suite, JavaScript syntax ve diff kontrolü.
+
+**Rollback planı:** Test/doküman/package script commit'i revert edilir; runtime ve production state değişmediği için data rollback yoktur.
+
+**Gözlemlenebilirlik:** Yalnız route adı, HTTP status ve public response shape; credential, gerçek user/account identity veya provider payload yok.
+
+**Güvenlik ve veri etkisi:** Read-only local characterization; production, database, OAuth/token, schema, policy, grant ve deployment etkisi yok.
+
+**Planlanan:** E3-T1 characterization baseline ve responsibility map.
+
+**Gerçekleşen:** Repository artefaktları ve CI entegrasyonu hazırlandı; review/merge bekleniyor.
+
+**Sapmalar:** E2-T6 production acceptance açık insan onayı gerektirdiği için üretim işlemi yapılmadı; E1'e doğrudan bağlı uygulanabilir repository işi E3-T1 seçildi.
+
+**Evidence:** `tests/e3-t1-critical-route-characterization.test.js`, `docs/architecture/e3-t1-characterization-baseline.md`, full/security test çıktıları ve PR CI.
+
+**Durum:** `Verification` — review, CI ve merge tamamlanmadan `Done` değildir.
 
 **Canlı sınır:** Revize read-only diagnostic preflight ancak merge/review ve yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.

@@ -1685,6 +1685,10 @@ Bu V4 plan ile:
 
 **Düzeltme:** V3 preflight, raw hata/count/identity taşımayan kapalı safe-code sözleşmesiyle `PREFLIGHT_QUERY_FAILED` ve `PREFLIGHT_GATES_FAILED` aşamalarını ayırır. Her iki hata state/outcome oluşturmadan durur. Bu repository taskında Management API veya production isteği çalıştırılmadı.
 
+**Merge sonrası yürütme sırası:** PR #46 `main` üzerine merge edilmiştir. Bu merge E2-T6 kabulünü tamamlamaz; yalnız bir sonraki read-only production preflight'in hata aşamasını güvenli biçimde ayırt edebilecek operator revizyonunu hazırlar. E2 ana iş hattındaki sıradaki karar kapısı, yeni V3 diagnostic production preflight için açık insan production onayıdır. Onay verilmeden preflight gönderilmez; preflight PASS olmadan transaction/postcheck aşamasına geçilmez; transaction/postcheck PASS ve evidence review olmadan E2-T6 `Done` olmaz; E2-T6 tamamlanmadan E2-T7 final no-change kabulü kapatılamaz.
+
+**Paralel iş ayrımı:** E3-T1 repository characterization hazırlığı E0+E1'e bağlı bağımsız bir koruma işidir. E2-T6 veya E2-T7'nin yerine geçmez, bu iki taskın durumunu değiştirmez ve E2 ana iş hattında yeni bir aşama tamamlandığı anlamına gelmez.
+
 ### E3-T1 task aynası — kritik V1 route characterization baseline
 
 **Amaç:** E3 extraction başlamadan önce kritik public, config, auth ve fail-closed HTTP davranışlarını executable baseline ile sabitlemek.
@@ -1715,10 +1719,10 @@ Bu V4 plan ile:
 
 **Gerçekleşen:** Repository artefaktları ve CI entegrasyonu hazırlandı; review/merge bekleniyor.
 
-**Sapmalar:** E2-T6 production acceptance açık insan onayı gerektirdiği için üretim işlemi yapılmadı; E1'e doğrudan bağlı uygulanabilir repository işi E3-T1 seçildi.
+**Sapmalar:** E2-T6 production acceptance açık insan onayı gerektirdiği için üretim işlemi yapılmadı. E3-T1 yalnız bağımsız/paralel repository hazırlığı olarak yürütüldü; E2 ana iş hattının sıradaki adımı veya E2 kabulünün ikamesi değildir.
 
 **Evidence:** `tests/e3-t1-critical-route-characterization.test.js`, `docs/architecture/e3-t1-characterization-baseline.md`, full/security test çıktıları ve PR CI.
 
 **Durum:** `Verification` — review, CI ve merge tamamlanmadan `Done` değildir.
 
-**Canlı sınır:** Revize read-only diagnostic preflight ancak merge/review ve yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.
+**Canlı sınır:** PR #46 merge/review tamamlanmıştır. Revize read-only diagnostic preflight ancak yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.

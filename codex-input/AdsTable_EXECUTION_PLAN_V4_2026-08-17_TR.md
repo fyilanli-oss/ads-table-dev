@@ -598,7 +598,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2/T3/T4 `Done`; E2-T5 `Verification`; E2-T6/T7/T8 `Not started`.
+**Durum:** `In progress` — E2-T1/T2/T3/T4/T5 `Done`; E2-T6/T7/T8 `Not started`.
 
 ### Planlanan işler
 
@@ -606,7 +606,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T2 — `Done`:** Constraint, index, policy ve grant drift karşılaştırması.
 - **E2-T3 — `Done`:** Canlı canonical round-trip acceptance yönetim sonucu tamamlandı.
 - **E2-T4 — `Done`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü tamamlandı.
-- **E2-T5 — `Verification`:** V1 recovery 11/11 PASS ve production no-change; V2 operator paketi hazır, merge sonrası ayrı insan onayı bekliyor.
+- **E2-T5 — `Done`:** V2 preflight 18/18 PASS; 35 vakalı rollback-only canlı rejection acceptance PASS; mandatory postcheck 15/15 PASS; transaction ve postcheck retry edilmedi, production no-change korundu.
 - **E2-T6 — `Not started`:** Canlı operation başlamadı; ortak operator altyapısı ileride yeniden kullanılabilir.
 - **E2-T7 — `Not started`:** Canlı operation başlamadı; V2 fixture selector'ları gelecekteki envanterle uyumludur.
 - **E2-T8 — `Not started`:** Canlı operation başlamadı.
@@ -795,19 +795,23 @@ Mutabakat dışında bağımlılık yoktur.
 
 **Amaç:** Dataset V2 migration CHECK ve NOT NULL sözleşmelerinin 35 invalid canonical vaka için PostgreSQL seviyesinde fail-closed reddini, güvenli diagnostics ve zorunlu outer rollback ile kanıtlayacak preparation paketini hazırlamak.
 
-**Mevcut durum:** E2-T1/T2 `Done`; E2-T3/T4 `Verification`; canlı E2-T5 preflight, invalid insert transaction ve postcheck çalıştırılmadı.
+**Mevcut durum:** E2-T1–T5 `Done`; E2-T5 V2 canlı acceptance tamamlandı ve approval capsule tüketildi.
 
-**Planlanan durum:** Ayrı insan onayından sonra exact read-only preflight, tek intact rollback-only transaction, redacted evidence conversion ve read-only scalar postcheck çalıştırılması; review tamamlanana kadar E2-T5 `Verification`.
+**Planlanan durum:** Tamamlandı — exact read-only preflight, tek intact rollback-only transaction, redacted evidence conversion ve read-only scalar postcheck kabul edildi.
 
-**Kapsam:** `e2_t5_rejection_v1`; 32 CHECK ve üç NOT NULL vaka; valid canonical baseline; migration-derived closed constraint sets; static inserts; nested exception subtransactions; safe SQLSTATE/constraint/column diagnostics; `pg_temp` evidence; Dataset V2/V1/snapshot/OAuth/token/ledger parity.
+**Kapsam:** `e2_t5_rejection_v2`; 32 CHECK ve üç NOT NULL vaka; valid canonical baseline; migration-derived closed constraint sets; static inserts; nested exception subtransactions; safe SQLSTATE/constraint/column diagnostics; `pg_temp` evidence; Dataset V2/V1/snapshot/OAuth/token/ledger parity.
 
-**Kapsam dışı:** Bu taskta canlı SQL, Management API, migration/schema/ledger/RLS/policy/grant/privilege değişikliği, persistent DDL, cleanup, runtime/UI, environment, deployment, E2-T3/T4 canlı kabulü ve E2-T6/T7 uygulaması.
+**Kapsam dışı:** Migration/schema/ledger/RLS/policy/grant/privilege değişikliği, persistent DDL, cleanup, runtime/UI, environment, deployment ve E2-T6/T7 uygulaması. Canlı operation yalnız onaylı rollback-only E2-T5 V2 acceptance ile sınırlıydı.
 
-**Bağımlılıklar:** Main `9011e237424aea351a6370632c03e091a07ce72a`; Dataset V2 create ve Klaviyo corrective migration checksum'ları; canonical validator/hierarchy/repository sözleşmeleri; gelecekteki canlı operation için ayrı insan onayı, credential ve bütün preflight stop gate'leri.
+**Eski kapsam dışı kaydı:** Management API ve canlı SQL preparation aşamasında kapsam dışıydı; kabul aşamasında ayrı production onayıyla kullanıldı.
 
-**Uygulama adımları:** Baseline fixture ve exact matrix eklendi; read-only preflight/postcheck, 35 ayrı static INSERT exception bloğu taşıyan rollback-only transaction, allowlist/redaction converter, runbook ve executable test hazırlandı; manifest ve plan-status regression'ları güncellendi.
+**Korunan sınırlar:** E2-T3/T4 tekrar edilmedi; E2-T6/T7 uygulanmadı; schema, ledger, RLS, policy, grant, privilege, runtime, UI, environment ve deployment değiştirilmedi.
 
-**Kabul kriterleri:** Tam 35 unique vaka; SQLSTATE exact; CHECK actual constraint case-specific closed allowlist üyesi ve non-empty; NOT NULL exact column; yanlış/missing/extra/duplicate/accepted/residue/parity sonucu FAIL; tek final response; `COMMIT` yok; final `ROLLBACK`; canlı review olmadan `Done` yok.
+**Bağımlılıklar:** Onaylı main `135c9e880dd6db22059175977a3c2850ebe079fa`; Dataset V2 create ve Klaviyo corrective migration checksum'ları; canonical validator/hierarchy/repository sözleşmeleri; tamamlanan ayrı insan onayı, environment-only credential ve bütün preflight stop gate'leri.
+
+**Uygulama adımları:** Repository paketi merge edildi; full regression 320/320 PASS oldu; read-only preflight 18/18 PASS verdi; repository dışı approval capsule oluşturuldu; açık production onayıyla 35 ayrı exception bloğu taşıyan transaction bir kez gönderildi; final `ROLLBACK` uygulandı; mandatory postcheck 15/15 PASS verdi; capsule tüketildi.
+
+**Kabul kriterleri:** Tam 35 unique vaka; SQLSTATE exact; CHECK actual constraint case-specific closed allowlist üyesi ve non-empty; NOT NULL exact column; yanlış/missing/extra/duplicate/accepted/residue/parity sonucu FAIL; tek final response; `COMMIT` yok; final `ROLLBACK`; canlı evidence review tamamlandı.
 
 **Test planı:** Dedicated E2-T5 artifact/converter testi; E2-T3/T4, metadata ve ledger regression'ları; full/security suite; JavaScript syntax, SQL statement/mutation/diagnostic, diff ve secret/PII kontrolleri.
 
@@ -815,17 +819,17 @@ Mutabakat dışında bağımlılık yoktur.
 
 **Gözlemlenebilirlik:** Yalnız case code, expected/actual SQLSTATE, closed expected constraints, actual constraint, expected/actual column ve boolean/count parity alanları; SQLERRM/message/detail/hint/context, raw SQL, production identity/value ve credential yasaktır.
 
-**Güvenlik ve veri etkisi:** Repository preparation tamamlandı; canlı preflight, invalid INSERT, transaction ve postcheck yoktur. Management API kullanılmadı. Data/schema/ledger/privilege/deployment değişikliği yoktur.
+**Güvenlik ve veri etkisi:** Management API yalnız onaylı preflight, rollback-only transaction ve read-only postcheck için kullanıldı. Transaction request 1, retry 0; postcheck request 1, retry 0. Kalıcı data, schema, ledger, privilege veya deployment değişikliği oluşmadı; production count, identity, credential ve raw row commit edilmedi.
 
-**Planlanan:** İnsan onaylı controlled E2-T5 acceptance ve redacted evidence review.
+**Planlanan:** Tamamlandı — insan onaylı controlled E2-T5 V2 acceptance ve redacted evidence review.
 
-**Gerçekleşen:** Yalnız repository preparation ve static/executable test artefaktları hazırlandı; canlı operation yapılmadı.
+**Gerçekleşen:** Preflight 18/18 PASS; 35-vaka rejection transaction PASS; mandatory postcheck 15/15 PASS; final state `CONSUMED`. Transaction ve postcheck retry edilmedi. Fixture residue ve unexpected acceptance sıfır; korunan parity kapıları PASS.
 
 **Sapmalar:** İlk tasarım exact tek constraint hedefledi; cross-field overlap nedeniyle uygulanabilir değildi. 35 vaka ve schema değişmeden korundu; SQLSTATE exact kaldı; case-specific closed `expected_constraints` kabul edildi. Constraint order kullanılmadı ve allowlist canlı sonuçtan öğrenilmedi.
 
-**Evidence:** `artifacts/dataset-v2-acceptance/e2-t5-rejection/`, `docs/security/sql/E2_T5_REJECTION_*.sql`, `docs/security/E2_T5_REJECTION_RUNBOOK.md`, `scripts/e2-t5-rejection-evidence.js`, `tests/e2-t5-rejection-artifacts.test.js`.
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t5-rejection/live-acceptance-v2.json`, `artifacts/dataset-v2-acceptance/e2-t5-rejection/`, `docs/security/sql/E2_T5_REJECTION_*.sql`, `docs/security/E2_T5_REJECTION_RUNBOOK.md`, `scripts/e2-t5-rejection-evidence.js`, `tests/e2-t5-rejection-artifacts.test.js`.
 
-**Durum:** `Verification` — repository preparation ve static tests canlı PostgreSQL acceptance değildir.
+**Durum:** `Done` — canlı V2 rejection acceptance, mandatory postcheck, redacted evidence review ve production no-change kabul edildi.
 
 ## 7. E3 — Backend modularization foundation
 

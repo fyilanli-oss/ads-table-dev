@@ -598,7 +598,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2/T3/T4/T5 `Done`; E2-T6/T7/T8 `Not started`.
+**Durum:** `In progress` — E2-T1/T2/T3/T4/T5 `Done`; E2-T6/T7/T8 `Verification`.
 
 ### Planlanan işler
 
@@ -607,9 +607,9 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T3 — `Done`:** Canlı canonical round-trip acceptance yönetim sonucu tamamlandı.
 - **E2-T4 — `Done`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü tamamlandı.
 - **E2-T5 — `Done`:** V2 preflight 18/18 PASS; 35 vakalı rollback-only canlı rejection acceptance PASS; mandatory postcheck 15/15 PASS; transaction ve postcheck retry edilmedi, production no-change korundu.
-- **E2-T6 — `Not started`:** Canlı operation başlamadı; ortak operator altyapısı ileride yeniden kullanılabilir.
-- **E2-T7 — `Not started`:** Canlı operation başlamadı; V2 fixture selector'ları gelecekteki envanterle uyumludur.
-- **E2-T8 — `Not started`:** Canlı operation başlamadı.
+- **E2-T6 — `Verification`:** V1/V2 fail-closed recovery'leri ve V3 diagnostic operator hazırlığı tamamlandı; production acceptance PASS değildir ve yeni read-only diagnostic preflight açık insan production onayı bekler.
+- **E2-T7 — `Verification`:** Final no-change artefaktları hazırdır; E2-T6 kabulü ve ayrı canlı evidence/review tamamlanmadan `Done` değildir.
+- **E2-T8 — `Verification`:** Restore-readiness repository hazırlığı tamamlandı; actual capture, disposable restore ve human-reviewed acceptance beklenir.
 
 #### E2-T8 task aynası — fresh-project restore readiness
 

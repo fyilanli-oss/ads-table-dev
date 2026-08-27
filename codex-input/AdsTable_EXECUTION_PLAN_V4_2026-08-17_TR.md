@@ -1676,3 +1676,13 @@ Bu V4 plan ile:
 **Gerçekleşen:** V3 preflight/transaction/postcheck, fixture contract, evidence converter, operator/CLI ve regression testleri repository'de hazırlandı. Approved-main binding PR #44 merge commit'ine sabitlendi. Bu taskta Management API, production SQL, credential, data, schema, policy, grant, ledger, environment veya deployment değişikliği yapılmadı.
 
 **Canlı sınır:** Preflight dahil hiçbir production isteği review ve açık insan production onayı olmadan çalıştırılamaz. Repository testleri ve disposable PASS production acceptance yerine geçmez.
+
+### E2-C9 — E2-T6 V3 preflight fail-closed diagnostic revizyonu
+
+**Durum:** Repository revision; production preflight retry edilmedi, E2-T6 `Verification`.
+
+**Bulgu:** İnsan onaylı V3 read-only production preflight tek istek sonrasında genel `STOPPED_FAIL_CLOSED` ile durdu. Approval-ready state ve outcome sidecar oluşmadı; transaction/postcheck gönderilmedi ve production mutation olmadı. Genel kod query/transport-response aşaması ile 21-gate validation aşamasını ayırmadığı için kör retry yasaklandı.
+
+**Düzeltme:** V3 preflight, raw hata/count/identity taşımayan kapalı safe-code sözleşmesiyle `PREFLIGHT_QUERY_FAILED` ve `PREFLIGHT_GATES_FAILED` aşamalarını ayırır. Her iki hata state/outcome oluşturmadan durur. Bu repository taskında Management API veya production isteği çalıştırılmadı.
+
+**Canlı sınır:** Revize read-only diagnostic preflight ancak merge/review ve yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.

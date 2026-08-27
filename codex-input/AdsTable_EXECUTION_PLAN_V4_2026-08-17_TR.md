@@ -598,7 +598,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2/T3/T4/T5 `Done`; E2-T6/T7/T8 `Not started`.
+**Durum:** `In progress` — E2-T1/T2/T3/T4/T5 `Done`; E2-T6/T7/T8 `Verification`.
 
 ### Planlanan işler
 
@@ -607,9 +607,9 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T3 — `Done`:** Canlı canonical round-trip acceptance yönetim sonucu tamamlandı.
 - **E2-T4 — `Done`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü tamamlandı.
 - **E2-T5 — `Done`:** V2 preflight 18/18 PASS; 35 vakalı rollback-only canlı rejection acceptance PASS; mandatory postcheck 15/15 PASS; transaction ve postcheck retry edilmedi, production no-change korundu.
-- **E2-T6 — `Not started`:** Canlı operation başlamadı; ortak operator altyapısı ileride yeniden kullanılabilir.
-- **E2-T7 — `Not started`:** Canlı operation başlamadı; V2 fixture selector'ları gelecekteki envanterle uyumludur.
-- **E2-T8 — `Not started`:** Canlı operation başlamadı.
+- **E2-T6 — `Verification`:** V1/V2 fail-closed recovery'leri ve V3 diagnostic operator hazırlığı tamamlandı; production acceptance PASS değildir ve yeni read-only diagnostic preflight açık insan production onayı bekler.
+- **E2-T7 — `Verification`:** Final no-change artefaktları hazırdır; E2-T6 kabulü ve ayrı canlı evidence/review tamamlanmadan `Done` değildir.
+- **E2-T8 — `Verification`:** Restore-readiness repository hazırlığı tamamlandı; actual capture, disposable restore ve human-reviewed acceptance beklenir.
 
 #### E2-T8 task aynası — fresh-project restore readiness
 
@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `Not started`
+**Durum:** `In progress` — E3-T1 kritik V1 route characterization baseline'ı repository'de hazırlanmıştır; review/merge sonrası `Done` olur.
 
 ### Hedef yapı
 
@@ -1685,4 +1685,44 @@ Bu V4 plan ile:
 
 **Düzeltme:** V3 preflight, raw hata/count/identity taşımayan kapalı safe-code sözleşmesiyle `PREFLIGHT_QUERY_FAILED` ve `PREFLIGHT_GATES_FAILED` aşamalarını ayırır. Her iki hata state/outcome oluşturmadan durur. Bu repository taskında Management API veya production isteği çalıştırılmadı.
 
-**Canlı sınır:** Revize read-only diagnostic preflight ancak merge/review ve yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.
+**Merge sonrası yürütme sırası:** PR #46 `main` üzerine merge edilmiştir. Bu merge E2-T6 kabulünü tamamlamaz; yalnız bir sonraki read-only production preflight'in hata aşamasını güvenli biçimde ayırt edebilecek operator revizyonunu hazırlar. E2 ana iş hattındaki sıradaki karar kapısı, yeni V3 diagnostic production preflight için açık insan production onayıdır. Onay verilmeden preflight gönderilmez; preflight PASS olmadan transaction/postcheck aşamasına geçilmez; transaction/postcheck PASS ve evidence review olmadan E2-T6 `Done` olmaz; E2-T6 tamamlanmadan E2-T7 final no-change kabulü kapatılamaz.
+
+**Paralel iş ayrımı:** E3-T1 repository characterization hazırlığı E0+E1'e bağlı bağımsız bir koruma işidir. E2-T6 veya E2-T7'nin yerine geçmez, bu iki taskın durumunu değiştirmez ve E2 ana iş hattında yeni bir aşama tamamlandığı anlamına gelmez.
+
+### E3-T1 task aynası — kritik V1 route characterization baseline
+
+**Amaç:** E3 extraction başlamadan önce kritik public, config, auth ve fail-closed HTTP davranışlarını executable baseline ile sabitlemek.
+
+**Mevcut durum:** Kök `server.js` app creation, dependency construction, route registration, provider/job orchestration, listener ve export sorumluluklarını birlikte taşır; seçili V1 HTTP sözleşmeleri için dedicated characterization testi yoktu.
+
+**Planlanan durum:** Ephemeral loopback listener üzerinden production/provider/Supabase çağrısı yapmadan kritik status, content-type ve response shape sözleşmelerini koruyan test ve responsibility map.
+
+**Kapsam:** Landing/login, public config, unauthenticated account status, disabled TikTok test yüzeyi, unknown API 404 ve mevcut sorumluluk envanteri.
+
+**Kapsam dışı:** Route extraction, composition root, canlı HTTP/provider/DB isteği, environment/deployment, business logic, response contract değişikliği ve production mutation.
+
+**Bağımlılıklar:** E0 mimari sınırları, tamamlanmış E1 güvenlik baseline'ı ve mevcut V1 entrypoint.
+
+**Uygulama adımları:** Kritik yüzeyler seçildi; exported Express app `VERCEL=1` altında ephemeral loopback porta bağlandı; public/auth/fail-closed assertions ve extraction guard dokümante edildi; test full/security CI kapsamına alındı.
+
+**Kabul kriterleri:** Seçili route status/body/content-type sözleşmeleri deterministik PASS; harici servis çağrısı yok; listener test sonunda kapanır; full ve security regression PASS.
+
+**Test planı:** Dedicated E3-T1 testi, full suite, security suite, JavaScript syntax ve diff kontrolü.
+
+**Rollback planı:** Test/doküman/package script commit'i revert edilir; runtime ve production state değişmediği için data rollback yoktur.
+
+**Gözlemlenebilirlik:** Yalnız route adı, HTTP status ve public response shape; credential, gerçek user/account identity veya provider payload yok.
+
+**Güvenlik ve veri etkisi:** Read-only local characterization; production, database, OAuth/token, schema, policy, grant ve deployment etkisi yok.
+
+**Planlanan:** E3-T1 characterization baseline ve responsibility map.
+
+**Gerçekleşen:** Repository artefaktları ve CI entegrasyonu hazırlandı; review/merge bekleniyor.
+
+**Sapmalar:** E2-T6 production acceptance açık insan onayı gerektirdiği için üretim işlemi yapılmadı. E3-T1 yalnız bağımsız/paralel repository hazırlığı olarak yürütüldü; E2 ana iş hattının sıradaki adımı veya E2 kabulünün ikamesi değildir.
+
+**Evidence:** `tests/e3-t1-critical-route-characterization.test.js`, `docs/architecture/e3-t1-characterization-baseline.md`, full/security test çıktıları ve PR CI.
+
+**Durum:** `Verification` — review, CI ve merge tamamlanmadan `Done` değildir.
+
+**Canlı sınır:** PR #46 merge/review tamamlanmıştır. Revize read-only diagnostic preflight ancak yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.

@@ -182,9 +182,8 @@ test('artifacts contain no UUID, email, connection URI, JWT, private key, or aut
 });
 
 test('execution plan preserves exact E2 statuses and E2-T5 deviation record',()=>{
-  for(const n of [1,2])assert.match(plan,new RegExp(`E2-T${n} — `+'`Done`'));
-  assert.match(plan,/E2-T3 — `Done`/);for(const n of [4,5,7,8])assert.match(plan,new RegExp(`E2-T${n} — `+'`Verification`'));
-  assert.match(plan,/E2-T6 — `Verification`/);assert.match(plan,/E2-T7 — `Verification`/);
+  for(const n of [1,2,3,4])assert.match(plan,new RegExp(`E2-T${n} — `+'`Done`'));
+  assert.match(plan,/E2-T5 — `Verification`/);for(const n of [6,7,8])assert.match(plan,new RegExp(`E2-T${n} — `+'`Not started`'));
   assert.match(plan,/İlk tasarım exact tek constraint hedefledi/);assert.match(plan,/allowlist canlı sonuçtan öğrenilmedi/);
 });
 

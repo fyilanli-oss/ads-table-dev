@@ -1634,3 +1634,13 @@ Bu V4 plan ile:
 **Corrective kapsam:** `e2_t6_rls_v2` ayrı namespace/version; checksum-bound 21-gate preflight, intact rollback-only 16-case transaction ve 19-gate postcheck. V2, transaction evidence ve postcheck sonuçlarını `PASS`, `TRANSACTION_EVIDENCE_FAILED_POSTCHECK_PASS`, `POSTCHECK_FAILED` veya `TRANSACTION_AND_POSTCHECK_FAILED` kapalı safe-code sözleşmesiyle ayrı outcome sidecar'ında kalıcılaştırır. Sidecar repository dışındadır, `0600` modundadır ve raw hata/identity/count içermez. v1 capsule veya namespace tekrar kullanılamaz.
 
 **Canlı sınır:** V2 preparation SQL, Management API veya production işlemi çalıştırmaz. Yeni preflight ve transaction ayrı production onaylarına tabidir.
+
+### E2-C5 — E2-T6 v2 fail-closed recovery kaydı
+
+**Durum:** E2-T6 `Verification`; canlı PASS iddiası yoktur.
+
+**Gerçekleşen:** İnsan onaylı v2 transaction ve mandatory postcheck birer kez gönderildi; terminal outcome `TRANSACTION_AND_POSTCHECK_FAILED` olarak güvenli sidecar'a yazıldı. İkisi de retry edilmedi. Ayrı insan onaylı distinct read-only recovery 19/19 PASS verdi; v2/total residue ve persistent evidence object sıfır, korunan baseline ve RLS/policy/grant kapıları değişmedi.
+
+**Karar:** Recovery production no-change kanıtıdır ve 16-case acceptance PASS yerine geçmez. E2-T7 inventory ve read-only selector'ları v1/v2 T6 namespace'lerini ayrı izler. Yeni canlı deneme hazırlanmayacaktır; transaction SQL root cause repository/static ve disposable ortamda çözülmeden production E2-T6 tekrarına izin verilmez.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/recovery-v2.json`.

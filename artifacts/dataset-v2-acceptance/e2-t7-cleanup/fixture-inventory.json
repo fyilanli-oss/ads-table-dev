@@ -45,6 +45,15 @@
       "expected_final_count": 0,
       "normal_cleanup": "transaction_rollback",
       "cleanup_statement_allowed": false
+    },
+    {
+      "task": "E2-T6-V2",
+      "match_mode": "escaped_prefix",
+      "exact_entity_key": null,
+      "escaped_prefix": "e2\\_t6\\_rls\\_v2:",
+      "expected_final_count": 0,
+      "normal_cleanup": "transaction_rollback",
+      "cleanup_statement_allowed": false
     }
   ]
 }

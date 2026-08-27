@@ -1,17 +1,17 @@
-
 const path=require("path");
 const crypto=require("crypto");
 const {google}=require("googleapis");
 const {createClient}=require("@supabase/supabase-js");
 const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
 const {createOAuthTransactionStore}=require("./security/oauth-transaction-store");
-const {loadProductionConfig,parseExplicitBoolean}=require("./security/production-config");
+const {parseExplicitBoolean}=require("./security/production-config");
 const {createProviderTokenVaultFromEnv}=require("./security/provider-token-vault");
 const {createProviderTokenStore}=require("./security/provider-token-store");
 const {createApplication,startApplication}=require("./src/app");
-const productionConfig=loadProductionConfig();
-const PORT=process.env.PORT||3000;
-const app=createApplication({publicDirectory:path.join(__dirname,"public"),tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled});
+const {loadRuntimeConfig}=require("./src/config/runtime-config");
+const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
+const productionConfig=runtimeConfig.production;
+const app=createApplication({publicDirectory:runtimeConfig.publicDirectory,tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled});
 const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
 const KLAVIYO_API_BASE="https://a.klaviyo.com";
@@ -5779,5 +5779,5 @@ async function runKlaviyoAutoRefreshForSchedule(schedule){
 
 // ===== END TIKTOK READ LAYER =====
 
-if(process.env.VERCEL!=="1")startApplication(app,{port:PORT});
+if(process.env.VERCEL!=="1")startApplication(app,{port:runtimeConfig.port});
 module.exports=app;

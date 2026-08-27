@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1 `Done`; E3-T2 composition-root ayrımı `Verification`; E3-T3–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1/T2 `Done`; E3-T3 runtime config boundary `Verification`; E3-T4–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -855,8 +855,8 @@ src/
 ### Planlanan işler
 
 - **E3-T1 — `Done` — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
-- **E3-T2 — `Verification` — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
-- **E3-T3 — Config boundary:** Environment doğrulama ve typed config sınırı kur.
+- **E3-T2 — `Done` — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
+- **E3-T3 — `Verification` — Config boundary:** Environment doğrulama ve typed config sınırı kur.
 - **E3-T4 — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
 - **E3-T5 — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
 - **E3-T6 — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1 `Done`; E3-T2 `Verification`; E3-T3–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1/T2 `Done`; E3-T3 `Verification`; E3-T4–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -1761,11 +1761,47 @@ Bu V4 plan ile:
 
 **Planlanan:** E3-T2 composition-root sınırı ve executable lifecycle evidence.
 
-**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/merge bekleniyor.
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu PR #49 ile review edilmiş, bütün kontrolleri geçmiş ve `main` üzerine merge edilmiştir.
 
 **Sapmalar:** Shared Supabase/provider client construction E3-T4 kapsamı olarak yerinde bırakıldı; E3-T2 route/business logic taşımadı.
 
 **Evidence:** `src/app.js`, `tests/e3-t2-composition-root.test.js`, E3-T1/full/security test çıktıları ve PR CI.
+
+**Durum:** `Done` — PR #49 merge commit `ea4f6f8233dfb6aabe7d082881c15d7c74cf19d9`; composition-root, characterization, full/security CI ve review kapıları tamamlandı.
+
+### E3-T3 task aynası — runtime config boundary
+
+**Amaç:** App boot için gereken environment/configuration değerlerini tek, immutable ve fail-closed runtime sınırında toplamak.
+
+**Mevcut durum:** E3-T1/T2 `Done`. Port, public path ve production security flags kök `server.js` içinde ayrı ayrı kuruluyordu; production güvenlik doğrulaması zaten `security/production-config.js` içinde korunuyordu.
+
+**Planlanan durum:** `src/config/runtime-config.js` port, public directory ve mevcut production security contract'ını tek typed/immutable nesne olarak üretir; kök entrypoint yalnız bu nesneyi tüketir.
+
+**Kapsam:** PORT default/normalization/range validation, absolute root/public path, production config delegation, immutable runtime object ve root composition delegation.
+
+**Kapsam dışı:** Provider credential okumalarının tamamını taşıma, shared client creation, feature flag redesign, route/OAuth/job extraction, environment/deployment veya production değişikliği.
+
+**Bağımlılıklar:** E3-T2 composition root ve E1 fail-closed production config contract'ı.
+
+**Uygulama adımları:** Runtime config loader ve port parser eklendi; server boot yeni immutable config'e geçirildi; default/valid/invalid/unsafe-production testleri full/security suite'e bağlandı.
+
+**Kabul kriterleri:** Runtime config immutable; default port deterministik; malformed/out-of-range port ve invalid dependency fail-closed; absolute public path deterministik; E1 unsafe-production rejection korunur; E3-T1/T2 ve full/security CI PASS.
+
+**Test planı:** Dedicated E3-T3 config testi, production-config regression, E3-T1/T2 testleri, full/security suite, syntax ve diff kontrolü.
+
+**Rollback planı:** Runtime config delegation commit'i revert edilerek E3-T2 sonrası server boot kurulumu geri alınır; data/schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Yalnız güvenli config error code/variable name ve test sonucu; environment value, credential veya identity loglanmaz.
+
+**Güvenlik ve veri etkisi:** Fail-closed startup doğrulamasını merkezileştirir; production request, database/provider, data/schema/policy/grant/token veya deployment etkisi yoktur.
+
+**Planlanan:** E3-T3 immutable runtime config ve executable validation evidence.
+
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/merge bekleniyor.
+
+**Sapmalar:** Provider-specific URL/version/account değerleri bu küçük extraction'da taşınmadı; shared/provider config kapsamı sonraki kontrollü tasklarda ele alınacaktır.
+
+**Evidence:** `src/config/runtime-config.js`, `tests/e3-t3-runtime-config.test.js`, production-config/E3/full/security test çıktıları ve PR CI.
 
 **Durum:** `Verification` — review, CI ve merge tamamlanmadan `Done` değildir.
 

@@ -1,4 +1,15 @@
 {
+  "rewrites": [
+    { "source": "/", "destination": "/landing.html" },
+    { "source": "/login", "destination": "/login.html" },
+    { "source": "/signup", "destination": "/signup.html" },
+    { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/dashboard-demo", "destination": "/dashboard-demo.html" },
+    { "source": "/demo", "destination": "/dashboard-demo.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/data-deletion", "destination": "/data-deletion.html" }
+  ],
   "crons": [
     {
       "path": "/api/cron/auto-refresh",

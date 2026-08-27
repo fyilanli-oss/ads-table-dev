@@ -7,6 +7,7 @@ const root = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const matrix = require('../artifacts/dataset-v2-acceptance/e2-t5-rejection/rejection-matrix.json');
 const baseline = require('../artifacts/dataset-v2-acceptance/e2-t5-rejection/valid-baseline-canonical.json');
+const liveAcceptance = require('../artifacts/dataset-v2-acceptance/e2-t5-rejection/live-acceptance-v2.json');
 const { validateCanonicalRow } = require('../funnel-core/canonical-contract');
 const { validateEntityHierarchy } = require('../funnel-core/entity-hierarchy');
 const { TOP_LEVEL_FIELDS, CASE_FIELDS, buildEvidence } = require('../scripts/e2-t5-rejection-evidence');
@@ -19,6 +20,7 @@ const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
 const files = [
   'artifacts/dataset-v2-acceptance/e2-t5-rejection/valid-baseline-canonical.json',
   'artifacts/dataset-v2-acceptance/e2-t5-rejection/rejection-matrix.json',
+  'artifacts/dataset-v2-acceptance/e2-t5-rejection/live-acceptance-v2.json',
   'docs/security/E2_T5_REJECTION_RUNBOOK.md','docs/security/sql/E2_T5_REJECTION_PREFLIGHT.sql',
   'docs/security/sql/E2_T5_REJECTION_TRANSACTION.sql','docs/security/sql/E2_T5_REJECTION_POSTCHECK.sql',
   'scripts/e2-t5-rejection-evidence.js'
@@ -182,9 +184,20 @@ test('artifacts contain no UUID, email, connection URI, JWT, private key, or aut
 });
 
 test('execution plan preserves exact E2 statuses and E2-T5 deviation record',()=>{
-  for(const n of [1,2,3,4])assert.match(plan,new RegExp(`E2-T${n} — `+'`Done`'));
-  assert.match(plan,/E2-T5 — `Verification`/);for(const n of [6,7,8])assert.match(plan,new RegExp(`E2-T${n} — `+'`Not started`'));
+  for(const n of [1,2,3,4,5])assert.match(plan,new RegExp(`E2-T${n} — `+'`Done`'));
+  for(const n of [6,7,8])assert.match(plan,new RegExp(`E2-T${n} — `+'`Not started`'));
   assert.match(plan,/İlk tasarım exact tek constraint hedefledi/);assert.match(plan,/allowlist canlı sonuçtan öğrenilmedi/);
+});
+
+test('live V2 acceptance evidence is redacted, exact, and retry-free',()=>{
+  assert.deepEqual(liveAcceptance,{
+    evidence_version:'e2-t5-rejection-v2-live-acceptance',operation:'e2_t5_rejection_v2',
+    approved_main_sha:'135c9e880dd6db22059175977a3c2850ebe079fa',accepted_at_utc:'2026-08-27T09:05:00Z',
+    preflight:'18/18 PASS',expected_case_count:35,evaluated_case_count:35,passed_case_count:35,
+    failed_case_count:0,unexpected_accept_count:0,residue_count:0,transaction_requests:1,
+    transaction_retries:0,postcheck:'15/15 PASS',postcheck_requests:1,postcheck_retries:0,
+    state:'CONSUMED',production_no_change:true,contains_production_counts:false,contains_identity_or_row_data:false
+  });
 });
 
 test('E2-C1 captured provider-token parity is fail-closed',()=>{for(const sql of [preflight,transaction,postcheck])assert.doesNotMatch(sql,/(?:CONNECTED_CONNECTIONS|ENCRYPTED_TOKEN_ROWS)[^\n]*,\s*7\b/);for(const code of ['MISSING_ENCRYPTED','ORPHAN_ENCRYPTED','PLAINTEXT_TOKENS','CONNECTION_TOKEN_PARITY'])assert.match(preflight,new RegExp(`'${code}'`));assert.match(preflight,/'CONNECTED_CONNECTIONS'[^\n]*'capture'/);assert.match(transaction,/connected_count[\s\S]*encrypted_count/);for(const field of ['connected_unchanged','encrypted_unchanged','missing_encrypted_unchanged','orphan_encrypted_unchanged','plaintext_unchanged'])assert.match(transaction,new RegExp(`'${field}'`));assert.match(postcheck,/connected_rows/);assert.match(postcheck,/encrypted_rows/);assert.match(transaction,/rollback;\s*$/i);assert.throws(()=>buildEvidence({...sample(),actual_token_count:1}),/counts are forbidden/);});

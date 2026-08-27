@@ -75,8 +75,12 @@ async function preflight({ repo, stateFile, client, runTests = () => cp.execFile
   if (fs.existsSync(stateFile) || fs.existsSync(`${stateFile}.outcome.json`)) throw new Error('Operator state already exists and cannot be replaced');
   runTests();
   const currentBinding = binding(repo);
-  const result = await client.query(readSql(repo, 'preflight'));
-  const baselines = validatePreflight(result.rows);
+  let result;
+  try { result = await client.query(readSql(repo, 'preflight')); }
+  catch (_) { throw terminalError('PREFLIGHT_QUERY_FAILED'); }
+  let baselines;
+  try { baselines = validatePreflight(result.rows); }
+  catch (_) { throw terminalError('PREFLIGHT_GATES_FAILED'); }
   const state = { schemaVersion:1, operation:OPERATION, version:VERSION, approvedMainSha:APPROVED_MAIN_SHA, artifactChecksum:currentBinding.artifactChecksum, baselines, phase:'approval-ready', transactionSent:false, postcheckSent:false, consumed:false };
   writeState(stateFile, state, currentBinding, repo, { create:true }); readState(stateFile, currentBinding, repo);
   return Object.freeze({ operation:OPERATION, status:'APPROVAL_READY', preflight:'21/21 PASS', baselineCount:5, transactionRequests:0 });

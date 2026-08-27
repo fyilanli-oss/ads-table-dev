@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1 kritik V1 route characterization baseline'ı repository'de hazırlanmıştır; review/merge sonrası `Done` olur.
+**Durum:** `In progress` — E3-T1 kritik V1 route characterization baseline'ı PR #47 ile merge edilmiş ve `Done` olmuştur; E3-T2–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -854,7 +854,7 @@ src/
 
 ### Planlanan işler
 
-- **E3-T1 — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
+- **E3-T1 — `Done` — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
 - **E3-T2 — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
 - **E3-T3 — Config boundary:** Environment doğrulama ve typed config sınırı kur.
 - **E3-T4 — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
@@ -864,6 +864,14 @@ src/
 - **E3-T8 — Job boundary:** Refresh/snapshot orchestration için test edilebilir job sınırı kur.
 - **E3-T9 — Architecture guard:** Yeni business logic'in kök monolite eklenmesini CI kontrolüyle engelle.
 - **E3-T10 — Canonical boundary guard:** Provider-specific DTO'nun canonical validator'ı atlayarak repository, Formula Engine veya Funnel API sınırına geçmesini engelle.
+
+### E3 ilerleme raporlama kuralı
+
+- Her koordinasyon özetinde E3 için son tamamlanan iş, devam eden iş ve sıradaki aday ayrı maddeler halinde yazılır.
+- Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
+- Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
+- Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
+- Güncel E3 özeti: E3-T1 `Done`; E3-T2–E3-T10 `Not started`; sıradaki plan adayı E3-T2'dir ancak E2 ana production kabul hattının yerine geçmez.
 
 ### Kabul kriterleri
 
@@ -1717,12 +1725,12 @@ Bu V4 plan ile:
 
 **Planlanan:** E3-T1 characterization baseline ve responsibility map.
 
-**Gerçekleşen:** Repository artefaktları ve CI entegrasyonu hazırlandı; review/merge bekleniyor.
+**Gerçekleşen:** Repository artefaktları ve CI entegrasyonu PR #47 ile review edilmiş, bütün kontrolleri geçmiş ve `main` üzerine merge edilmiştir.
 
 **Sapmalar:** E2-T6 production acceptance açık insan onayı gerektirdiği için üretim işlemi yapılmadı. E3-T1 yalnız bağımsız/paralel repository hazırlığı olarak yürütüldü; E2 ana iş hattının sıradaki adımı veya E2 kabulünün ikamesi değildir.
 
 **Evidence:** `tests/e3-t1-critical-route-characterization.test.js`, `docs/architecture/e3-t1-characterization-baseline.md`, full/security test çıktıları ve PR CI.
 
-**Durum:** `Verification` — review, CI ve merge tamamlanmadan `Done` değildir.
+**Durum:** `Done` — PR #47 merge commit `8728f5934005b01c0605ed7f60253127a3e4d3c2`; characterization, full/security CI ve review kapıları tamamlandı.
 
 **Canlı sınır:** PR #46 merge/review tamamlanmıştır. Revize read-only diagnostic preflight ancak yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.

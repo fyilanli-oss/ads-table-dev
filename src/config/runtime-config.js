@@ -19,6 +19,9 @@ function loadRuntimeConfig({
   logger = console,
   loadSecurityConfig = loadProductionConfig,
 } = {}) {
+  if (!env || typeof env !== "object" || Array.isArray(env)) {
+    throw new TypeError("env must be an object");
+  }
   if (!rootDirectory || !path.isAbsolute(rootDirectory)) {
     throw new TypeError("rootDirectory must be an absolute path");
   }
@@ -26,12 +29,18 @@ function loadRuntimeConfig({
     throw new TypeError("loadSecurityConfig must be a function");
   }
 
+  const production = loadSecurityConfig(env, logger);
+  if (!production || typeof production !== "object" || Array.isArray(production)) {
+    throw new TypeError("loadSecurityConfig must return an object");
+  }
+
   return Object.freeze({
     port: parsePort(env.PORT),
     publicDirectory: path.join(rootDirectory, "public"),
-    production: loadSecurityConfig(env, logger),
+    production: Object.isFrozen(production)
+      ? production
+      : Object.freeze({ ...production }),
   });
 }
 
 module.exports = { loadRuntimeConfig, parsePort };
-

@@ -45,6 +45,10 @@ test("rejects invalid runtime configuration before app construction", () => {
   }
   assert.throws(() => loadRuntimeConfig(), /rootDirectory must be an absolute path/);
   assert.throws(
+    () => loadRuntimeConfig({ env: null, rootDirectory }),
+    /env must be an object/,
+  );
+  assert.throws(
     () => loadRuntimeConfig({ rootDirectory: "." }),
     /rootDirectory must be an absolute path/,
   );
@@ -52,6 +56,23 @@ test("rejects invalid runtime configuration before app construction", () => {
     () => loadRuntimeConfig({ rootDirectory, loadSecurityConfig: null }),
     /loadSecurityConfig must be a function/,
   );
+  assert.throws(
+    () => loadRuntimeConfig({ rootDirectory, loadSecurityConfig: () => null }),
+    /loadSecurityConfig must return an object/,
+  );
+});
+
+test("does not expose mutable security config through the runtime boundary", () => {
+  const production = { production: false, tiktokTestPageEnabled: false };
+  const config = loadRuntimeConfig({
+    env: {},
+    rootDirectory,
+    loadSecurityConfig: () => production,
+  });
+
+  assert.notEqual(config.production, production);
+  assert.deepEqual(config.production, production);
+  assert.equal(Object.isFrozen(config.production), true);
 });
 
 test("preserves the existing production security validator", () => {
@@ -65,4 +86,3 @@ test("preserves the existing production security validator", () => {
     (error) => error && error.code === "UNSAFE_PRODUCTION_CONFIG",
   );
 });
-

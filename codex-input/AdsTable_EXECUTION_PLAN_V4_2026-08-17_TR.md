@@ -1616,3 +1616,13 @@ Bu V4 plan ile:
 **Recovery:** read-only recovery HTTP 201 ve recovery 11/11 PASS; fixture residue zero, Dataset V2 zero ve production no-change. Actual production counts and identities were not shared.
 
 **Corrective kapsam:** v2 corrective preparation; `E2_T4_TRANSACTION_V2`, `e2_t4_same_key_v2` ve `e2-t4-upsert-v2`; duplicate excess explicit bigint ve postcheck tamamen scalar actual/expected bigint sözleşmesi. Bu repository taskında canlı SQL veya Management API çalıştırılmadı. E2-T4 `Verification` kalır.
+
+### E2-C3 — E2-T6 fail-closed recovery kaydı
+
+**Durum:** E2-T6 `Verification`; canlı PASS iddiası yoktur.
+
+**Gerçekleşen:** İnsan onaylı E2-T6 v1 transaction bir kez gönderildi; CLI fail-closed durdu. Capsule `CONSUMED`, transaction intent ve postcheck intent kayıtlıdır; ikisi de retry edilmedi. Ayrı insan onaylı distinct read-only recovery sorgusu 19/19 PASS verdi. E2-T6 residue, total E2 residue ve persistent evidence object sıfır; Dataset V2/V1/snapshot, OAuth/token/ledger ve RLS/policy/grant korunan baseline kapıları değişmedi. Production count ve identity paylaşılmadı.
+
+**Sapma:** v1 CLI güvenli kategorik terminal sonucu kalıcılaştırmadığı için transaction evidence failure ile original mandatory postcheck failure birbirinden sonradan ayrıştırılamadı. Recovery production no-change kanıtıdır; 16-case RLS acceptance PASS yerine geçmez. v1 transaction tekrar edilemez. Yeni canlı deneme ancak ayrı namespace/version, düzeltilmiş terminal observability, yeni preflight ve ayrı production onayıyla yapılabilir.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/recovery-v1.json`.

@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1–E3-T3 `Done`; E3-T4 incident corrective `Verification`; E3-T5-A HTTP middleware boundary `Verification`; E3-T5-B ve E3-T6–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1–E3-T4 ve E3-T5-A `Done`; E3-T5-B access boundary `Verification`; E3-T6–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -857,7 +857,7 @@ src/
 - **E3-T1 — `Done` — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
 - **E3-T2 — `Done` — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
 - **E3-T3 — `Done` — Config boundary:** Environment doğrulama ve typed config sınırı kur.
-- **E3-T4 — `Verification` — Shared clients + static entrypoint incident corrective:** Supabase/provider client creation'ı merkezi dependency yap.
+- **E3-T4 — `Done` — Shared clients + static entrypoint incident corrective:** Supabase/provider client creation'ı merkezi dependency yap.
 - **E3-T5 — `In progress` — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
 - **E3-T6 — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
 - **E3-T7 — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1–E3-T3 `Done`; E3-T4 incident corrective `Verification`; E3-T5-A `Verification`; E3-T5-B ve E3-T6–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T4 ve E3-T5-A `Done`; E3-T5-B `Verification`; E3-T6–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -1839,13 +1839,13 @@ Bu V4 plan ile:
 
 **Evidence:** `src/clients/shared-clients.js`, `tests/e3-t4-shared-clients.test.js`, E3/full/security test çıktıları ve PR CI.
 
-**Durum:** `Verification` — PR #51 merge commit `b4b1a19082c084c0e5a458259cddbfd1d13a36da` CI/deployment status kapıları geçmiş olsa da insan canlı gözlemi `FUNCTION_INVOCATION_FAILED` hatasının sürdüğünü kanıtladı. Kök neden, rewrite hedeflerinin zero-config Express deployment içinde yine function üzerinden çözülmesidir. PR #52 aynı branch üzerinde public dosyaları `@vercel/static`, API/OAuth yüzeylerini `@vercel/node` olarak fiziksel biçimde ayıran corrective revizyonu taşır; merge ve insan canlı smoke PASS olmadan E3-T4 tekrar `Done` olmaz.
+**Durum:** `Done` — PR #52 merge commit `29ae299f228f10a1b3026c4c9da843ffc502a1dc`; post-merge Security Regression ve Vercel production deployment PASS, ardından insan canlı smoke kontrolü `dev.adstable.app` landing sayfasının açıldığını doğruladı. Public static yüzey Express function boot failure'ından fiziksel olarak ayrılmıştır.
 
 ### E3-T5-A task aynası — HTTP middleware boundary
 
 **Amaç:** E3-T5 middleware extraction işinin ilk kontrollü parçasında request correlation, metadata-only HTTP logging ve uncaught error normalization için tek canonical sınır kurmak.
 
-**Mevcut durum:** E3-T1–E3-T3 `Done`; E3-T4 canlı incident corrective `Verification`. Express base middleware composition sınırındadır; request ID/correlation ve merkezi uncaught error contract yoktur. Auth/access/ownership helper'ları kök monolitte kalmaktadır.
+**Mevcut durum:** E3-T1–E3-T4 `Done`; E3-T5-A merge/CI ve canlı incident kabulü sonrası `Done`. Express base middleware composition sınırındadır; request ID/correlation ve merkezi uncaught error contract yoktur. Auth/access/ownership helper'ları kök monolitte kalmaktadır.
 
 **Planlanan durum:** `src/middleware/http-boundary.js` güvenli request ID üretim/iletimini, hassas query/body/header taşımayan tamamlanma logunu ve internal mesaj sızdırmayan standart error response'unu dependency injection ile sağlar.
 
@@ -1869,11 +1869,47 @@ Bu V4 plan ile:
 
 **Planlanan:** E3-T5-A canonical HTTP middleware boundary.
 
-**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/CI/merge bekleniyor.
+**Gerçekleşen:** Repository implementasyonu PR #52 ile review edilmiş ve `main` üzerine merge edilmiştir. Security Regression, Vercel production deployment ve insan landing-page smoke kontrolü PASS olmuştur.
 
 **Sapmalar:** E3-T5 parent yalnız E3-T5-B auth/access/ownership extraction tamamlandıktan sonra `Done` olabilir.
 
 **Evidence:** `src/middleware/http-boundary.js`, `tests/e3-t5a-http-middleware-boundary.test.js`, E3/full/security çıktıları ve PR CI.
+
+**Durum:** `Done` — PR #52 merge commit `29ae299f228f10a1b3026c4c9da843ffc502a1dc`; full/security CI, production deployment ve insan canlı smoke kapıları tamamlandı.
+
+### E3-T5-B task aynası — auth, access ve ownership boundary
+
+**Amaç:** Kimlik doğrulama, subscription/lifecycle capability, provider connection ve platform-account ownership enforcement uygulamalarını tek injectable canonical sınırda toplamak.
+
+**Mevcut durum:** E3-T5-A `Done`. Aynı enforcement davranışları kök `server.js` içinde dağınık helper fonksiyonları olarak bulunuyordu.
+
+**Planlanan durum:** `src/middleware/access-boundary.js`, doğrulanmış bearer user kimliğini esas alan ve caller-controlled identity kabul etmeyen immutable bir enforcement graph üretir.
+
+**Kapsam:** User authentication, subscription access, lifecycle access, provider connection, manual refresh connection ve active ownership enforcement; mevcut status/body contract parity; dependency injection ve negatif testler.
+
+**Kapsam dışı:** Route registration/extraction (E3-T6), policy değerlerinin redesign edilmesi, OAuth/provider business logic, schema/data veya production işlemi.
+
+**Bağımlılıklar:** E3-T5-A HTTP boundary, E1 OAuth/IDOR contract'ları ve E3-T4 shared clients.
+
+**Uygulama adımları:** Canonical access factory eklendi; altı enforcement helper'ı kök monolitten kaldırılıp immutable boundary sonucuna bağlandı; auth/capability/connection/ownership negatif testleri security/full suite'e eklendi.
+
+**Kabul kriterleri:** Kimlik yalnız doğrulanmış request user'dan gelir; inactive capability 403; eksik connection 404; ownership user/account/status ile fail-closed; response parity korunur; invalid dependency boot sırasında reddedilir; full/security CI PASS.
+
+**Test planı:** Dedicated E3-T5-B testi, OAuth/IDOR ve E3 characterization, full/security suite, syntax ve diff kontrolü.
+
+**Rollback planı:** Factory delegation commit'i revert edilerek önceki kök helper uygulamaları geri alınır; data/schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Yalnız HTTP boundary güvenli metadata'sı; bearer token, user/account identity, connection veya provider payload loglanmaz.
+
+**Güvenlik ve veri etkisi:** Mevcut fail-closed enforcement'ın repository refactor'ıdır; production/provider/database çağrısı veya mutation yoktur.
+
+**Planlanan:** E3-T5-B canonical access enforcement boundary.
+
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/CI/merge bekleniyor.
+
+**Sapmalar:** Policy hesaplayıcıları bu küçük extraction'da yerinde bırakılmış, yalnız enforcement tekilleştirilmiştir. E3-T5 parent PR merge edilmeden `Done` değildir.
+
+**Evidence:** `src/middleware/access-boundary.js`, `tests/e3-t5b-access-boundary.test.js`, OAuth/IDOR/E3/full/security çıktıları ve PR CI.
 
 **Durum:** `Verification` — commit/push/PR review ve CI tamamlanmadan `Done` değildir.
 

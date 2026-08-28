@@ -6,6 +6,7 @@ const path = require('node:path');
 const test = require('node:test');
 
 const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+const accessBoundarySource = fs.readFileSync(path.join(__dirname, '..', 'src/middleware/access-boundary.js'), 'utf8');
 const ROUTE_DECLARATION = /app\.(?:get|post|put|patch|delete)\("[^"]+"/g;
 const CALLER_IDENTITY = /req\.(?:body|query)(?:\?|)\.(?:user_id|owner_user_id)|req\.(?:body|query)\[['"](?:user_id|owner_user_id)['"]\]/;
 
@@ -56,9 +57,10 @@ function assertDisconnectRoute(route) {
 }
 
 test('provider ownership binds active ownership to authenticated user', () => {
-  const body = functionBody(serverSource, 'requireActiveOwnership', 'disconnectPlatformLifecycle');
-  assert.match(body, /ownership\.owner_user_id!==userId/);
-  assert.match(body, /activeOwnershipStatuses\(\)\.includes\(ownership\.status\)/);
+  assert.match(accessBoundarySource, /ownership\.owner_user_id !== userId/);
+  assert.match(accessBoundarySource, /activeOwnershipStatuses\(\)\.includes\(ownership\.status\)/);
+  assert.equal((accessBoundarySource.match(/async function requireActiveOwnership\(/g) || []).length, 1);
+  assert.doesNotMatch(serverSource, /async function requireActiveOwnership\(/);
 });
 
 test('disconnect lifecycle is exactly function-bounded and authenticated-user scoped', () => {

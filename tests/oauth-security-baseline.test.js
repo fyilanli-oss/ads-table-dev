@@ -10,6 +10,7 @@ const {createRequireConnectAccessForOAuth} = require('../security/oauth-access')
 const SERVER_PATH = path.join(__dirname, '..', 'server.js');
 const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
 const metaHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/meta-handlers.js'), 'utf8');
+const googleHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/google-ads-handlers.js'), 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 const dashboardSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'dashboard.html'), 'utf8');
 
@@ -37,6 +38,7 @@ test('OAuth inventory covers every registered /auth route', () => {
 test('every active OAuth start route uses the shared connection guard', () => {
   for (const route of ROUTES.filter(item => item.active)) {
     if (route.provider === 'meta') { assert.match(metaHandlerSource, /requireConnectAccess\(req, res\)/); continue; }
+    if (route.provider === 'google_ads') { assert.match(googleHandlerSource, /requireConnectAccess\(req,res\)/); continue; }
     const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
     const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=', start) : serverSource.indexOf(`app.get("${route.callback}"`, start);
     assert.notEqual(start, -1, `${route.provider} start route must exist`);
@@ -124,6 +126,7 @@ test('dashboard starts OAuth with a bearer-authenticated JSON handshake', () => 
 test('every active OAuth start and callback uses the transaction store', () => {
   for (const route of ROUTES.filter(item => item.active)) {
     if (route.provider === 'meta') { assert.match(metaHandlerSource, /createTransaction\(access\.userId, "meta"/); assert.match(metaHandlerSource, /consumeTransaction\(state, "meta"/); assert.match(metaHandlerSource, /transaction\.user_id/); continue; }
+    if (route.provider === 'google_ads') { assert.match(googleHandlerSource, /createTransaction\(access\.userId,"google_ads"/); assert.match(googleHandlerSource, /consumeTransaction\(state,"google_ads"/); assert.match(googleHandlerSource, /transaction\.user_id/); continue; }
     const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
     const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=') : serverSource.indexOf(`app.get("${route.callback}"`);
     assert.notEqual(start, -1, `${route.provider} start route must exist`);

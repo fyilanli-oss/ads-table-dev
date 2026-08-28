@@ -2058,7 +2058,7 @@ Bu V4 plan ile:
 
 **Evidence:** `src/oauth/organic-handlers.js`, `src/oauth/klaviyo-handlers.js`, `src/oauth/tiktok-handlers.js`, `tests/e3-t7b3b2-provider-oauth-handlers.test.js` ve CI çıktıları.
 
-**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan `Done` değildir. E3-T7 parent aynı kapıya bağlıdır.
+**Durum:** `Done` — PR #61 merge commit `d849fe53cd0e6ad430e79139a0b5dcb33a4a271f`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapıları tamamlandı. E3-T7 parent kapanmıştır.
 
 
 ### E3-T8-A task aynası — refresh job lifecycle boundary

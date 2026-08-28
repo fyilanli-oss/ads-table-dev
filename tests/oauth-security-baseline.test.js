@@ -12,6 +12,10 @@ const serverSource = fs.readFileSync(SERVER_PATH, 'utf8');
 const metaHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/meta-handlers.js'), 'utf8');
 const googleHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/google-ads-handlers.js'), 'utf8');
 const sheetsHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/google-sheets-handlers.js'), 'utf8');
+const organicHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/organic-handlers.js'), 'utf8');
+const klaviyoHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/klaviyo-handlers.js'), 'utf8');
+const tiktokHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/tiktok-handlers.js'), 'utf8');
+const extractedHandlerSources = {ga4_organic: organicHandlerSource, klaviyo: klaviyoHandlerSource, tiktok: tiktokHandlerSource};
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 const dashboardSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'dashboard.html'), 'utf8');
 
@@ -41,6 +45,7 @@ test('every active OAuth start route uses the shared connection guard', () => {
     if (route.provider === 'meta') { assert.match(metaHandlerSource, /requireConnectAccess\(req, res\)/); continue; }
     if (route.provider === 'google_ads') { assert.match(googleHandlerSource, /requireConnectAccess\(req,res\)/); continue; }
     if (route.provider === 'google_sheets') { assert.match(sheetsHandlerSource, /requireConnectAccess\(req,res\)/); continue; }
+    if (extractedHandlerSources[route.provider]) { assert.match(extractedHandlerSources[route.provider], /requireConnectAccess\(req,res\)/); continue; }
     const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
     const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=', start) : serverSource.indexOf(`app.get("${route.callback}"`, start);
     assert.notEqual(start, -1, `${route.provider} start route must exist`);
@@ -130,6 +135,7 @@ test('every active OAuth start and callback uses the transaction store', () => {
     if (route.provider === 'meta') { assert.match(metaHandlerSource, /createTransaction\(access\.userId, "meta"/); assert.match(metaHandlerSource, /consumeTransaction\(state, "meta"/); assert.match(metaHandlerSource, /transaction\.user_id/); continue; }
     if (route.provider === 'google_ads') { assert.match(googleHandlerSource, /createTransaction\(access\.userId,"google_ads"/); assert.match(googleHandlerSource, /consumeTransaction\(state,"google_ads"/); assert.match(googleHandlerSource, /transaction\.user_id/); continue; }
     if (route.provider === 'google_sheets') { assert.match(sheetsHandlerSource, /createTransaction\(access\.userId,"google_sheets"/); assert.match(sheetsHandlerSource, /consumeTransaction\(state,"google_sheets"/); assert.match(sheetsHandlerSource, /transaction\.user_id/); continue; }
+    if (extractedHandlerSources[route.provider]) { const source=extractedHandlerSources[route.provider]; assert.match(source, /createTransaction\(access\.userId,/); assert.match(source, /consumeTransaction\(state,/); assert.match(source, /transaction\.user_id/); continue; }
     const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
     const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=') : serverSource.indexOf(`app.get("${route.callback}"`);
     assert.notEqual(start, -1, `${route.provider} start route must exist`);
@@ -144,10 +150,8 @@ test('every active OAuth start and callback uses the transaction store', () => {
 });
 
 test('Klaviyo callback reads its PKCE verifier from the consumed transaction', () => {
-  const callback = serverSource.indexOf('app.get("/auth/klaviyo/callback"');
-  const nextRoute = serverSource.indexOf('\napp.', callback + 1);
-  const body = serverSource.slice(callback, nextRoute);
-  assert.match(body, /const verifier=transaction\.pkce_verifier/);
+  assert.match(klaviyoHandlerSource, /transaction\.pkce_verifier/);
+  assert.match(klaviyoHandlerSource, /verifier:transaction\.pkce_verifier/);
 });
 
 test('Express session infrastructure is absent from runtime and dependencies', () => {
@@ -164,7 +168,7 @@ test('Pinterest start and callback remain passive legacy dashboard redirects wit
   for (const route of ROUTES.filter(item => !item.active)) {
     const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
     const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=', start) : serverSource.indexOf(`app.get("${route.callback}"`, start);
-    const nextRoute = serverSource.indexOf('\napp.', callback + 1);
+    const nextRoute = serverSource.indexOf('\n});', callback + 1) + 4;
     const startBody = serverSource.slice(start, callback);
     const callbackBody = serverSource.slice(callback, nextRoute);
     for (const body of [startBody, callbackBody]) {

@@ -10,6 +10,7 @@ const {registerPublicRoutes}=require("./src/routes/public-routes");
 const {registerAccountStatusRoutes}=require("./src/routes/account-status-routes");
 const {createOAuthTransactionBoundary}=require("./src/oauth/transaction-boundary");
 const {registerOAuthProviderRoutes}=require("./src/oauth/provider-routes");
+const {createMetaOAuthHandlers}=require("./src/oauth/meta-handlers");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -1092,20 +1093,19 @@ async function setRefreshJobStatus(jobId,status,extra={}){
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
-const handleMetaOAuthStart=async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.META_APP_ID||!process.env.META_REDIRECT_URI)throw new Error("Missing Meta env");const {state}=await createOAuthTransaction(userId,"meta",process.env.META_REDIRECT_URI);const p=new URLSearchParams({client_id:process.env.META_APP_ID,redirect_uri:process.env.META_REDIRECT_URI,state,response_type:"code",scope:"ads_read"});sendOAuthAuthorizationResponse(req,res,`https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${p}`)}catch(e){res.status(500).send(e.message)}};
-const handleMetaOAuthCallback=async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");const transaction=await consumeOAuthTransaction(state,"meta",process.env.META_REDIRECT_URI);if(!transaction)return res.redirect("/dashboard?meta_error=invalid_state");const userId=transaction.user_id;const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});
-
-const metaConnAfterReconnect=await getConnection(userId,"meta");
-if(metaConnAfterReconnect){
-  try{
-    const accountsData=await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},data.access_token);
-    for(const account of accountsData.data||[])await upsertAdAccount(userId,"meta",account);
-    await saveConnection(userId,"meta",{metadata:{accountSelectionRequired:true,availableAccountCount:(accountsData.data||[]).length,accountSelectionGuardVersion:"v1"}});
-  }catch(discoveryError){
-    await saveConnection(userId,"meta",{metadata:{accountSelectionRequired:true,accountDiscoveryError:discoveryError.message,accountSelectionGuardVersion:"v1"}});
-  }
-}
-res.redirect("/dashboard?meta_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}};
+const {start:handleMetaOAuthStart,callback:handleMetaOAuthCallback}=createMetaOAuthHandlers({
+  config:{appId:process.env.META_APP_ID,appSecret:process.env.META_APP_SECRET,redirectUri:process.env.META_REDIRECT_URI,graphVersion:META_GRAPH_VERSION},
+  requireConnectAccess:requireConnectAccessForOAuth,
+  createTransaction:createOAuthTransaction,
+  consumeTransaction:consumeOAuthTransaction,
+  sendAuthorizationResponse:sendOAuthAuthorizationResponse,
+  exchangeToken:async({code,appId,appSecret,redirectUri,graphVersion})=>{const url=new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`);url.searchParams.set("client_id",appId);url.searchParams.set("redirect_uri",redirectUri);url.searchParams.set("client_secret",appSecret);url.searchParams.set("code",code);const response=await fetch(url);const data=await response.json();if(!response.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");return data},
+  saveConnection,
+  getConnection,
+  discoverAccounts:async token=>(await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},token)).data||[],
+  upsertAdAccount,
+  parseExpiry
+});
 registerOAuthProviderRoutes({app,provider:"meta",startHandler:handleMetaOAuthStart,callbackHandler:handleMetaOAuthCallback});
 app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const {state}=await createOAuthTransaction(userId,"google_ads",process.env.GOOGLE_REDIRECT_URI);const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});sendOAuthAuthorizationResponse(req,res,url)}catch(e){res.status(500).send(e.message)}});
 app.get("/auth/google/callback",async(req,res)=>{try{

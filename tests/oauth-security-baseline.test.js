@@ -13,9 +13,10 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'packa
 const dashboardSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'dashboard.html'), 'utf8');
 
 function registeredAuthRoutes(source) {
-  return [...source.matchAll(/app\.(?:get|post)\("(\/auth\/[^\"]+)"/g)]
-    .map(match => match[1])
-    .sort();
+  const direct = [...source.matchAll(/app\.(?:get|post)\("(\/auth\/[^\"]+)"/g)].map(match => match[1]);
+  const extracted = [...source.matchAll(/registerOAuthProviderRoutes\(\{app,provider:"([^"]+)"/g)]
+    .flatMap(match => [`/auth/${match[1]}`, `/auth/${match[1]}/callback`]);
+  return [...direct, ...extracted].sort();
 }
 
 function responseRecorder() {
@@ -34,8 +35,8 @@ test('OAuth inventory covers every registered /auth route', () => {
 
 test('every active OAuth start route uses the shared connection guard', () => {
   for (const route of ROUTES.filter(item => item.active)) {
-    const start = serverSource.indexOf(`app.get("${route.start}"`);
-    const callback = serverSource.indexOf(`app.get("${route.callback}"`, start);
+    const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
+    const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=', start) : serverSource.indexOf(`app.get("${route.callback}"`, start);
     assert.notEqual(start, -1, `${route.provider} start route must exist`);
     assert.notEqual(callback, -1, `${route.provider} callback route must exist`);
     assert.match(
@@ -120,8 +121,8 @@ test('dashboard starts OAuth with a bearer-authenticated JSON handshake', () => 
 
 test('every active OAuth start and callback uses the transaction store', () => {
   for (const route of ROUTES.filter(item => item.active)) {
-    const start = serverSource.indexOf(`app.get("${route.start}"`);
-    const callback = serverSource.indexOf(`app.get("${route.callback}"`);
+    const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
+    const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=') : serverSource.indexOf(`app.get("${route.callback}"`);
     assert.notEqual(start, -1, `${route.provider} start route must exist`);
     assert.notEqual(callback, -1, `${route.provider} callback route must exist`);
     const nextRoute = serverSource.indexOf('\napp.', callback + 1);
@@ -152,8 +153,8 @@ test('Express session infrastructure is absent from runtime and dependencies', (
 
 test('Pinterest start and callback remain passive legacy dashboard redirects without session access', () => {
   for (const route of ROUTES.filter(item => !item.active)) {
-    const start = serverSource.indexOf(`app.get("${route.start}"`);
-    const callback = serverSource.indexOf(`app.get("${route.callback}"`, start);
+    const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
+    const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=', start) : serverSource.indexOf(`app.get("${route.callback}"`, start);
     const nextRoute = serverSource.indexOf('\napp.', callback + 1);
     const startBody = serverSource.slice(start, callback);
     const callbackBody = serverSource.slice(callback, nextRoute);

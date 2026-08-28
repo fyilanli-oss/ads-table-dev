@@ -8,6 +8,7 @@ const {installErrorBoundary}=require("./src/middleware/http-boundary");
 const {createAccessBoundary}=require("./src/middleware/access-boundary");
 const {registerPublicRoutes}=require("./src/routes/public-routes");
 const {registerAccountStatusRoutes}=require("./src/routes/account-status-routes");
+const {createOAuthTransactionBoundary}=require("./src/oauth/transaction-boundary");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -46,16 +47,7 @@ async function getUserSubscription(userId){await expireTrialsIfNeeded();const{da
 function getAccessByStatus(status){const full=["trial","active"].includes(status);const readonly=status==="expired";const blocked=["suspended","deleted"].includes(status);return{dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
 const {requireUser,requireAccess,requireLifecycleAccess,requireConnection,requireRefreshConnection,requireActiveOwnership}=createAccessBoundary({getUserFromRequest,getUserSubscription,getSubscriptionForLifecycle,getAccessByStatus,getLifecycleAccess,getConnection,getOwnership,activeOwnershipStatuses});
 const requireConnectAccessForOAuth=createRequireConnectAccessForOAuth({requireUser,getUserSubscription,getAccessByStatus});
-async function createOAuthTransaction(userId,provider,redirectUri,pkceVerifier=null){
-  if(!oauthTransactionStore)throw new Error("OAuth transaction store is not configured");
-  await oauthTransactionStore.cleanupExpired();
-  return oauthTransactionStore.create({userId,provider,redirectUri,pkceVerifier});
-}
-async function consumeOAuthTransaction(state,provider,redirectUri){
-  if(!oauthTransactionStore||!state)return null;
-  return oauthTransactionStore.consume({state:String(state),provider,redirectUri});
-}
-function sendOAuthAuthorizationResponse(req,res,authorizationUrl){if(req.query.response_mode==="json")return res.json({authorization_url:authorizationUrl});return res.redirect(authorizationUrl)}
+const {createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse}=createOAuthTransactionBoundary({transactionStore:oauthTransactionStore});
 function parseExpiry(s){return s?new Date(Date.now()+Number(s)*1000).toISOString():null}
 async function saveConnection(userId,platform,payload){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");

@@ -1,14 +1,25 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/landing.html" },
-    { "source": "/login", "destination": "/login.html" },
-    { "source": "/signup", "destination": "/signup.html" },
-    { "source": "/dashboard", "destination": "/dashboard.html" },
-    { "source": "/dashboard-demo", "destination": "/dashboard-demo.html" },
-    { "source": "/demo", "destination": "/dashboard-demo.html" },
-    { "source": "/privacy", "destination": "/privacy.html" },
-    { "source": "/terms", "destination": "/terms.html" },
-    { "source": "/data-deletion", "destination": "/data-deletion.html" }
+  "version": 2,
+  "builds": [
+    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "server.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/", "dest": "/public/landing.html" },
+    { "src": "/login", "dest": "/public/login.html" },
+    { "src": "/signup", "dest": "/public/signup.html" },
+    { "src": "/dashboard", "dest": "/public/dashboard.html" },
+    { "src": "/dashboard-demo", "dest": "/public/dashboard-demo.html" },
+    { "src": "/demo", "dest": "/public/dashboard-demo.html" },
+    { "src": "/privacy", "dest": "/public/privacy.html" },
+    { "src": "/terms", "dest": "/public/terms.html" },
+    { "src": "/data-deletion", "dest": "/public/data-deletion.html" },
+    { "src": "/auth/tiktok/(.*\\.txt)", "dest": "/public/auth/tiktok/$1" },
+    { "src": "/(.*\\.txt)", "dest": "/public/$1" },
+    { "src": "/(.*\\.html)", "dest": "/public/$1" },
+    { "src": "/api/(.*)", "dest": "/server.js" },
+    { "src": "/auth/(.*)", "dest": "/server.js" },
+    { "src": "/(.*)", "dest": "/server.js" }
   ],
   "crons": [
     {

@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1–E3-T4 `Done`; E3-T5-A HTTP middleware boundary `Verification`; E3-T5-B ve E3-T6–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1–E3-T3 `Done`; E3-T4 incident corrective `Verification`; E3-T5-A HTTP middleware boundary `Verification`; E3-T5-B ve E3-T6–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -857,7 +857,7 @@ src/
 - **E3-T1 — `Done` — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
 - **E3-T2 — `Done` — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
 - **E3-T3 — `Done` — Config boundary:** Environment doğrulama ve typed config sınırı kur.
-- **E3-T4 — `Done` — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
+- **E3-T4 — `Verification` — Shared clients + static entrypoint incident corrective:** Supabase/provider client creation'ı merkezi dependency yap.
 - **E3-T5 — `In progress` — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
 - **E3-T6 — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
 - **E3-T7 — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1–E3-T4 `Done`; E3-T5-A `Verification`; E3-T5-B ve E3-T6–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T3 `Done`; E3-T4 incident corrective `Verification`; E3-T5-A `Verification`; E3-T5-B ve E3-T6–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -1839,13 +1839,13 @@ Bu V4 plan ile:
 
 **Evidence:** `src/clients/shared-clients.js`, `tests/e3-t4-shared-clients.test.js`, E3/full/security test çıktıları ve PR CI.
 
-**Durum:** `Done` — PR #51 merge commit `b4b1a19082c084c0e5a458259cddbfd1d13a36da`; shared-client, static-entrypoint, full/security CI ve Vercel deployment status kapıları tamamlandı. Koordinatör ortamının dış HTTPS proxy kısıtı nedeniyle canlı sayfa içerik smoke kontrolü ayrı gözlem sınırıdır.
+**Durum:** `Verification` — PR #51 merge commit `b4b1a19082c084c0e5a458259cddbfd1d13a36da` CI/deployment status kapıları geçmiş olsa da insan canlı gözlemi `FUNCTION_INVOCATION_FAILED` hatasının sürdüğünü kanıtladı. Kök neden, rewrite hedeflerinin zero-config Express deployment içinde yine function üzerinden çözülmesidir. PR #52 aynı branch üzerinde public dosyaları `@vercel/static`, API/OAuth yüzeylerini `@vercel/node` olarak fiziksel biçimde ayıran corrective revizyonu taşır; merge ve insan canlı smoke PASS olmadan E3-T4 tekrar `Done` olmaz.
 
 ### E3-T5-A task aynası — HTTP middleware boundary
 
 **Amaç:** E3-T5 middleware extraction işinin ilk kontrollü parçasında request correlation, metadata-only HTTP logging ve uncaught error normalization için tek canonical sınır kurmak.
 
-**Mevcut durum:** E3-T1–E3-T4 `Done`. Express base middleware composition sınırındadır; request ID/correlation ve merkezi uncaught error contract yoktur. Auth/access/ownership helper'ları kök monolitte kalmaktadır.
+**Mevcut durum:** E3-T1–E3-T3 `Done`; E3-T4 canlı incident corrective `Verification`. Express base middleware composition sınırındadır; request ID/correlation ve merkezi uncaught error contract yoktur. Auth/access/ownership helper'ları kök monolitte kalmaktadır.
 
 **Planlanan durum:** `src/middleware/http-boundary.js` güvenli request ID üretim/iletimini, hassas query/body/header taşımayan tamamlanma logunu ve internal mesaj sızdırmayan standart error response'unu dependency injection ile sağlar.
 

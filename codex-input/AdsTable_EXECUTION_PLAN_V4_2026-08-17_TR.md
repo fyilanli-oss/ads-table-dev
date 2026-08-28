@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1–E3-T5 `Done`; E3-T6-A public route registration `Verification`; E3-T6-B ve E3-T7–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1–E3-T5 ve E3-T6-A `Done`; E3-T6-B authenticated route registration `Verification`; E3-T7–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1–E3-T5 `Done`; E3-T6-A `Verification`; E3-T6-B ve E3-T7–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T5 ve E3-T6-A `Done`; E3-T6-B `Verification`; E3-T7–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -1941,11 +1941,47 @@ Bu V4 plan ile:
 
 **Planlanan:** E3-T6-A public route registration boundary.
 
-**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/CI/merge bekleniyor.
+**Gerçekleşen:** Repository implementasyonu PR #54 ile review edilmiş, full/security CI ve Vercel kontrolleri geçmiş ve `main` üzerine merge edilmiştir.
 
 **Sapmalar:** Authenticated API route'ları kontrollü E3-T6-B kapsamına bırakılmıştır; parent E3-T6 henüz `Done` değildir.
 
 **Evidence:** `src/routes/public-routes.js`, `tests/e3-t6a-public-route-registration.test.js`, E3 characterization/Vercel/full/security çıktıları ve PR CI.
+
+**Durum:** `Done` — PR #54 merge commit `82e1dc68feebd51cd3678436a0614a3eb08a92ca`; characterization, full/security CI ve Vercel deployment status kapıları tamamlandı.
+
+### E3-T6-B task aynası — authenticated API route registration
+
+**Amaç:** E3-T6'nın authenticated yüzeyinde route→authorization→service/policy akışını ince, injectable ve merkezi error boundary'ye delege eden bir referans registration ile kurmak.
+
+**Mevcut durum:** E3-T6-A `Done`. Kritik `/api/account/status` route'u authentication, subscription lookup, lifecycle policy ve response/error handling'i inline kök handler içinde birleştiriyordu.
+
+**Planlanan durum:** `src/routes/account-status-routes.js` yalnız explicit dependency'lerle route'u kaydeder; verified user authorization önce çalışır, service/policy dependency'leri sırayla çağrılır ve hatalar canonical error boundary'ye iletilir.
+
+**Kapsam:** `/api/account/status`, dependency validation, auth-before-service ordering, response parity ve error forwarding.
+
+**Kapsam dışı:** Bütün legacy API route'larının toplu taşınması, OAuth extraction (E3-T7), service/repository business logic redesign, schema/data veya production işlemi.
+
+**Bağımlılıklar:** E3-T6-A registrar, E3-T5 access/error boundary ve E3-T1 critical characterization.
+
+**Uygulama adımları:** Authenticated account-status registrar eklendi; inline kök route kaldırıldı; auth ordering, response parity, error forwarding ve missing dependency testleri full/security suite'e bağlandı.
+
+**Kabul kriterleri:** Authentication subscription erişiminden önce; unauthenticated contract 401 parity; başarılı response shape değişmez; async hata response yazmadan `next(error)` ile canonical boundary'ye gider; invalid dependency fail-closed; full/security CI PASS.
+
+**Test planı:** Dedicated E3-T6-B testi, E3-T1 characterization, access/error boundary, full/security suite, syntax ve diff kontrolü.
+
+**Rollback planı:** Registrar delegation commit'i revert edilerek inline account-status route'u geri alınır; data/schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Canonical HTTP request/error metadata'sı; bearer token, user/subscription identity veya payload loglanmaz.
+
+**Güvenlik ve veri etkisi:** Repository/runtime route registration refactor; production/provider/database çağrısı veya mutation yoktur.
+
+**Planlanan:** E3-T6-B authenticated route registration reference flow.
+
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/CI/merge bekleniyor.
+
+**Sapmalar:** Legacy route'lar risk kontrollü sonraki epic extraction'larında aynı registrar pattern'ine taşınacaktır; E3-T6 parent merge tamamlanmadan `Done` değildir.
+
+**Evidence:** `src/routes/account-status-routes.js`, `tests/e3-t6b-authenticated-route-registration.test.js`, E3 characterization/access/error/full/security çıktıları ve PR CI.
 
 **Durum:** `Verification` — commit/push/PR review ve CI tamamlanmadan `Done` değildir.
 

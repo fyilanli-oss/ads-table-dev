@@ -1,12 +1,14 @@
 "use strict";
 
 const express = require("express");
+const { createRequestBoundary } = require("./middleware/http-boundary");
 
-function createApplication({ publicDirectory, tiktokTestPageEnabled = false } = {}) {
+function createApplication({ publicDirectory, tiktokTestPageEnabled = false, logger = console } = {}) {
   if (!publicDirectory) throw new TypeError("publicDirectory is required");
 
   const app = express();
   app.set("trust proxy", 1);
+  app.use(createRequestBoundary({ logger }));
   app.use(express.json());
   app.use((req, res, next) =>
     req.path === "/tiktok-test.html" && !tiktokTestPageEnabled

@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1/T2/T3 `Done`; E3-T4 shared clients `Verification`; E3-T5–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1–E3-T4 `Done`; E3-T5-A HTTP middleware boundary `Verification`; E3-T5-B ve E3-T6–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -857,8 +857,8 @@ src/
 - **E3-T1 — `Done` — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
 - **E3-T2 — `Done` — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
 - **E3-T3 — `Done` — Config boundary:** Environment doğrulama ve typed config sınırı kur.
-- **E3-T4 — `Verification` — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
-- **E3-T5 — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
+- **E3-T4 — `Done` — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
+- **E3-T5 — `In progress` — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
 - **E3-T6 — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
 - **E3-T7 — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
 - **E3-T8 — Job boundary:** Refresh/snapshot orchestration için test edilebilir job sınırı kur.
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1/T2/T3 `Done`; E3-T4 `Verification`; E3-T5–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T4 `Done`; E3-T5-A `Verification`; E3-T5-B ve E3-T6–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -1833,12 +1833,48 @@ Bu V4 plan ile:
 
 **Planlanan:** E3-T4 immutable shared dependency graph ve executable wiring evidence.
 
-**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/merge bekleniyor.
+**Gerçekleşen:** Repository implementasyonu PR #51 ile review edilmiş, PR ve merge sonrası security/Vercel kontrolleri geçmiş ve `main` üzerine merge edilmiştir. Public entrypoint incident düzeltmesi aynı PR üzerinde tamamlanmıştır.
 
 **Sapmalar:** Google/provider request client'ları kullanım noktalarında bırakıldı; E3-T4 yalnız gerçekten shared server-side data/security dependency'lerini merkezileştirir.
 
 **Evidence:** `src/clients/shared-clients.js`, `tests/e3-t4-shared-clients.test.js`, E3/full/security test çıktıları ve PR CI.
 
-**Durum:** `Verification` — review, CI ve merge tamamlanmadan `Done` değildir.
+**Durum:** `Done` — PR #51 merge commit `b4b1a19082c084c0e5a458259cddbfd1d13a36da`; shared-client, static-entrypoint, full/security CI ve Vercel deployment status kapıları tamamlandı. Koordinatör ortamının dış HTTPS proxy kısıtı nedeniyle canlı sayfa içerik smoke kontrolü ayrı gözlem sınırıdır.
+
+### E3-T5-A task aynası — HTTP middleware boundary
+
+**Amaç:** E3-T5 middleware extraction işinin ilk kontrollü parçasında request correlation, metadata-only HTTP logging ve uncaught error normalization için tek canonical sınır kurmak.
+
+**Mevcut durum:** E3-T1–E3-T4 `Done`. Express base middleware composition sınırındadır; request ID/correlation ve merkezi uncaught error contract yoktur. Auth/access/ownership helper'ları kök monolitte kalmaktadır.
+
+**Planlanan durum:** `src/middleware/http-boundary.js` güvenli request ID üretim/iletimini, hassas query/body/header taşımayan tamamlanma logunu ve internal mesaj sızdırmayan standart error response'unu dependency injection ile sağlar.
+
+**Kapsam:** Request ID validation/generation/response header, completion metadata, error metadata, 4xx/exposed ve 5xx message policy, composition/error-handler registration ve executable testler.
+
+**Kapsam dışı:** Auth/access/ownership extraction (E3-T5-B), route registration (E3-T6), mevcut route-local catch bloklarının toplu dönüşümü, response/business contract, production request veya deployment.
+
+**Bağımlılıklar:** E3-T4 shared clients ve E3-T2 composition root.
+
+**Uygulama adımları:** Request/error boundary factory'leri eklendi; request boundary app creation sırasında, terminal error boundary route registration sonrasında kuruldu; correlation, redaction, fail-closed dependency ve error normalization testleri security/full suite kapsamına alındı.
+
+**Kabul kriterleri:** Güvenli client request ID korunur, malformed ID yansıtılmaz, response correlation header taşır, query/body/header loglanmaz, beklenmeyen 5xx mesajı maskelenir, request ID error response/log ile eşleşir ve E3 characterization/full/security CI PASS.
+
+**Test planı:** Dedicated E3-T5-A testi, E3 characterization, full/security suite, JavaScript syntax ve diff kontrolü.
+
+**Rollback planı:** Middleware registration ve modül commit'i revert edilir; data/schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Event, request ID, method, path, status, duration ve güvenli error code; query string, body, headers, token, credential, identity veya provider payload yok.
+
+**Güvenlik ve veri etkisi:** Repository/runtime HTTP boundary refactor; production request, provider/database çağrısı, data/schema/policy/grant/token mutation veya canlı deployment yapılmaz.
+
+**Planlanan:** E3-T5-A canonical HTTP middleware boundary.
+
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/CI/merge bekleniyor.
+
+**Sapmalar:** E3-T5 parent yalnız E3-T5-B auth/access/ownership extraction tamamlandıktan sonra `Done` olabilir.
+
+**Evidence:** `src/middleware/http-boundary.js`, `tests/e3-t5a-http-middleware-boundary.test.js`, E3/full/security çıktıları ve PR CI.
+
+**Durum:** `Verification` — commit/push/PR review ve CI tamamlanmadan `Done` değildir.
 
 **Canlı sınır:** PR #46 merge/review tamamlanmıştır. Revize read-only diagnostic preflight ancak yeni açık insan production onayından sonra tek istek olarak çalıştırılabilir.

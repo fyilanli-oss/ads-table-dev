@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Verification`; E3-T8-B2-B ve E3-T9–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Verification`; E3-T8-B2-B2 ve E3-T9–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1–E3-T7 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Verification`; E3-T8-B2-B ve E3-T9–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T7 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Verification`; E3-T8-B2-B2 ve E3-T9–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -2169,4 +2169,41 @@ Bu V4 plan ile:
 
 **Evidence:** `src/jobs/automation-snapshot-orchestrator.js`, `tests/e3-t8b2a-automation-snapshot-orchestrator.test.js`, full/security çıktıları ve PR CI.
 
-**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan E3-T8-B2-A `Done` değildir.
+**Durum:** `Done` — PR #64 merge commit `eb25e9effc1c198960e85fdf2bb5f29cba616dc3`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapıları tamamlandı.
+
+
+### E3-T8-B2-B1 task aynası — Organic automation orchestration
+
+**Amaç:** Organic automation primary/recovery job zincirini canonical automation orchestrator'a taşırken ownership, timezone ve time-engine diagnostic metadata parity'sini korumak.
+
+**Mevcut durum:** E3-T8-B2-A PR #64 ile merge ve post-merge CI kapılarını tamamladı. Organic aynı lifecycle zincirini ek time diagnostics ile inline yönetiyordu.
+
+**Planlanan durum:** Automation orchestrator provider-specific primary/recovery metadata extension portları taşır; pairing alanı caller metadata tarafından override edilemez.
+
+**Kapsam:** Organic automation delegation, primary time diagnostics, recovery engine version, paired recovery, schedule update ve response parity.
+
+**Kapsam dışı:** Meta/Google özel lifecycle/diagnostic akışları (E3-T8-B2-B2), policy/time-engine redesign, schema/data veya production işlem.
+
+**Bağımlılıklar:** E3-T8-B2-A automation orchestrator.
+
+**Uygulama adımları:** Orchestrator'a controlled metadata extension eklendi; Organic inline lifecycle kaldırıldı; pairing override negatif testi eklendi.
+
+**Kabul kriterleri:** Organic prerequisite/skip parity korunur; primary diagnostic metadata kayıpsızdır; recovery engine version taşır; caller pairing override edemez; recovery failure isolation ve schedule success timing değişmez; full/security CI PASS.
+
+**Test planı:** E3-T8 automation focused testleri, characterization, full/security suite, syntax ve diff kontrolü.
+
+**Rollback planı:** Organic delegation ve metadata extension commit'i revert edilerek inline lifecycle geri alınır; data/schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Existing job time diagnostics, recovery result ve schedule timestamps korunur; credential/provider payload loglanmaz.
+
+**Güvenlik ve veri etkisi:** Repository/runtime orchestration refactor; production cron/job/database/provider çağrısı veya mutation yapılmaz.
+
+**Planlanan:** E3-T8-B2-B1 Organic automation boundary.
+
+**Gerçekleşen:** Organic delegation, controlled metadata extension ve pairing override testleri tamamlandı.
+
+**Sapmalar:** Meta/Google diagnostic shapes E3-T8-B2-B2 kapsamına bırakıldı; parent E3-T8 henüz `Done` değildir.
+
+**Evidence:** `src/jobs/automation-snapshot-orchestrator.js`, `server.js`, `tests/e3-t8b2a-automation-snapshot-orchestrator.test.js`, full/security çıktıları ve PR CI.
+
+**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan E3-T8-B2-B1 `Done` değildir.

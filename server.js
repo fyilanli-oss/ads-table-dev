@@ -5369,85 +5369,33 @@ async function runOrganicAutoRefreshForSchedule(schedule){
   }
 
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
-  const job=await createRefreshJob(schedule.user_id,"organic",platformAccountId,{
-    trigger:"automation",
-    datePreset:policy.datePreset,
+  const execution=await automationSnapshotOrchestrator.run({
+    userId:schedule.user_id,
+    platform:"organic",
+    platformAccountId,
     snapshotDate,
-    captureReason:policy.captureReason,
-    snapshotClass:policy.snapshotClass,
     scheduleId:schedule.id,
-    platformBusinessHour:policy.platform_business_hour,
-    dataMaturityWindowHours:policy.data_maturity_window_hours,
-    server_time_utc:policy.server_time_utc,
-    istanbul_time:policy.istanbul_time,
-    platform_account_time:policy.platform_account_time,
-    platform_account_timezone:policy.platform_account_timezone,
-    platform_business_date:policy.platform_business_date,
-    timeEngineVersion:TIME_ENGINE_VERSION
+    policy,
+    primaryMetadata:{platformBusinessHour:policy.platform_business_hour,dataMaturityWindowHours:policy.data_maturity_window_hours,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,platform_account_time:policy.platform_account_time,platform_account_timezone:policy.platform_account_timezone,platform_business_date:policy.platform_business_date,timeEngineVersion:TIME_ENGINE_VERSION},
+    recoveryMetadata:{timeEngineVersion:TIME_ENGINE_VERSION},
+    write:jobContext=>writeOrganicSnapshotV1({user,...jobContext})
   });
 
-  await setRefreshJobStatus(job.id,"running");
+  await supabaseAdmin.from("snapshot_schedules").update({
+    last_run_at:new Date().toISOString(),
+    next_run_at:nextAutomationSlotUtc(),
+    updated_at:new Date().toISOString()
+  }).eq("id",schedule.id);
 
-  try{
-    const writeResult=await writeOrganicSnapshotV1({
-      user,
-      datePreset:policy.datePreset,
-      snapshotDate,
-      sourceJobId:job.id,
-      captureReason:policy.captureReason,
-      snapshotClass:policy.snapshotClass
-    });
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"organic",platformAccountId,{
-        trigger:"automation",
-        datePreset:policy.recoveryDatePreset,
-        snapshotDate,
-        captureReason:policy.recoveryCaptureReason,
-        snapshotClass:policy.recoverySnapshotClass,
-        scheduleId:schedule.id,
-        pairedPrimaryJobId:job.id,
-        timeEngineVersion:TIME_ENGINE_VERSION
-      });
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeOrganicSnapshotV1({
-          user,
-          datePreset:policy.recoveryDatePreset,
-          snapshotDate,
-          sourceJobId:recoveryJob.id,
-          captureReason:policy.recoveryCaptureReason,
-          snapshotClass:policy.recoverySnapshotClass
-        });
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-
-    await supabaseAdmin.from("snapshot_schedules").update({
-      last_run_at:new Date().toISOString(),
-      next_run_at:nextAutomationSlotUtc(),
-      updated_at:new Date().toISOString()
-    }).eq("id",schedule.id);
-
-    return {
-      ok:true,
-      platform:"organic",
-      job_id:job.id,
-      snapshot_id:writeResult.snapshot?.id||null,
-      row_counts:writeResult.row_counts,
-      performance_spread_result:writeResult.performance_spread_result||null,
-      recovery_result
-    };
-  }catch(e){
-    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    throw e;
-  }
+  return {
+    ok:true,
+    platform:"organic",
+    job_id:execution.job.id,
+    snapshot_id:execution.result.snapshot?.id||null,
+    row_counts:execution.result.row_counts,
+    performance_spread_result:execution.result.performance_spread_result||null,
+    recovery_result:execution.recoveryResult
+  };
 }
 
 async function runAutomationSnapshotForSchedule({schedule,platform,missingConnectionError,missingAccountError,writeSnapshot}){

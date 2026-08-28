@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1/T2 `Done`; E3-T3 runtime config boundary `Verification`; E3-T4–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1/T2/T3 `Done`; E3-T4 shared clients `Verification`; E3-T5–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -856,8 +856,8 @@ src/
 
 - **E3-T1 — `Done` — Characterization baseline:** Kritik V1 route/status/response davranışlarını sabitle.
 - **E3-T2 — `Done` — Composition root:** App oluşturma, dependency kurma ve `listen()` işlemini ayır.
-- **E3-T3 — `Verification` — Config boundary:** Environment doğrulama ve typed config sınırı kur.
-- **E3-T4 — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
+- **E3-T3 — `Done` — Config boundary:** Environment doğrulama ve typed config sınırı kur.
+- **E3-T4 — `Verification` — Shared clients:** Supabase/provider client creation'ı merkezi dependency yap.
 - **E3-T5 — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
 - **E3-T6 — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
 - **E3-T7 — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1/T2 `Done`; E3-T3 `Verification`; E3-T4–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1/T2/T3 `Done`; E3-T4 `Verification`; E3-T5–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -1797,11 +1797,47 @@ Bu V4 plan ile:
 
 **Planlanan:** E3-T3 immutable runtime config ve executable validation evidence.
 
-**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/merge bekleniyor.
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu PR #50 ile review edilmiş, bütün kontrolleri geçmiş ve `main` üzerine merge edilmiştir.
 
 **Sapmalar:** Provider-specific URL/version/account değerleri bu küçük extraction'da taşınmadı; shared/provider config kapsamı sonraki kontrollü tasklarda ele alınacaktır.
 
 **Evidence:** `src/config/runtime-config.js`, `tests/e3-t3-runtime-config.test.js`, production-config/E3/full/security test çıktıları ve PR CI.
+
+**Durum:** `Done` — PR #50 merge commit `38a70cab16d3d5bddbb9a9b0f368e1d0bda44e10`; runtime config, characterization, full/security CI ve review kapıları tamamlandı.
+
+### E3-T4 task aynası — shared clients
+
+**Amaç:** Supabase admin, OAuth transaction store ve provider-token vault/store creation'ını kök monolitten tek test edilebilir dependency graph sınırına taşımak.
+
+**Mevcut durum:** E3-T1/T2/T3 `Done`. Shared server-side client ve store nesneleri kök `server.js` içinde doğrudan ve birbirine bağlı ifadelerle kuruluyordu.
+
+**Planlanan durum:** `src/clients/shared-clients.js` bütün shared client/store nesnelerini explicit factory dependency'leriyle bir kez üretir; kök entrypoint yalnız immutable graph sonucunu tüketir.
+
+**Kapsam:** Supabase service-role client options, OAuth transaction store, provider-token vault/store composition, optional dependency davranışı, factory validation ve immutable graph.
+
+**Kapsam dışı:** Provider API client extraction, credential veya feature-flag redesign, route/OAuth/job business logic taşıma, schema/data/policy/grant ve production işlemi.
+
+**Bağımlılıklar:** E3-T3 runtime config boundary ve E1 OAuth/provider-token güvenlik contract'ları.
+
+**Uygulama adımları:** Shared client factory eklendi; kök doğrudan constructor import/çağrıları kaldırıldı; enabled/disabled, wiring ve invalid dependency testleri full/security suite'e bağlandı.
+
+**Kabul kriterleri:** Client graph immutable; Supabase yalnız tam service-role credential çiftiyle ve session persistence kapalı kurulur; bağlı store'lar aynı client/vault instance'larını alır; disabled optional yüzey factory çağırmaz; invalid composition dependency fail-closed; full/security CI PASS.
+
+**Test planı:** Dedicated E3-T4 dependency graph testi, E3-T1/T2/T3 regresyonları, full/security suite, syntax ve diff kontrolü.
+
+**Rollback planı:** Shared client delegation commit'i revert edilerek E3-T3 sonrası kök construction geri alınır; data/schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Yalnız composition/test sonucu; credential, keyring, token, identity veya provider payload loglanmaz.
+
+**Güvenlik ve veri etkisi:** Mevcut server-only construction seçeneklerini koruyan repository refactor'ıdır; production request, database/provider çağrısı, data/schema/policy/grant/token veya deployment etkisi yoktur.
+
+**Planlanan:** E3-T4 immutable shared dependency graph ve executable wiring evidence.
+
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu hazırlandı; review/merge bekleniyor.
+
+**Sapmalar:** Google/provider request client'ları kullanım noktalarında bırakıldı; E3-T4 yalnız gerçekten shared server-side data/security dependency'lerini merkezileştirir.
+
+**Evidence:** `src/clients/shared-clients.js`, `tests/e3-t4-shared-clients.test.js`, E3/full/security test çıktıları ve PR CI.
 
 **Durum:** `Verification` — review, CI ve merge tamamlanmadan `Done` değildir.
 

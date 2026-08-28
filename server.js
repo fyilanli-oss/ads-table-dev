@@ -16,6 +16,7 @@ const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handl
 const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
 const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");
+const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -1050,51 +1051,9 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
     snapshots:"preserved"
   };
 }
-async function createRefreshJob(userId,platform,platformAccountId,metadata={}){
-  const existing=await supabaseAdmin
-    .from("snapshot_jobs")
-    .select("id,status")
-    .eq("user_id",userId)
-    .eq("platform",platform)
-    .eq("platform_account_id",platformAccountId)
-    .in("status",["queued","running"])
-    .limit(1)
-    .maybeSingle();
-  if(existing.error)throw existing.error;
-  if(existing.data){
-    const err=new Error("Refresh job already queued or running for this platform account");
-    err.status=409;
-    err.job=existing.data;
-    throw err;
-  }
-  const {data,error}=await supabaseAdmin
-    .from("snapshot_jobs")
-    .insert({
-      user_id:userId,
-      platform,
-      platform_account_id:platformAccountId,
-      status:"queued",
-      job_type:metadata.jobType||metadata.job_type||metadata.trigger||"refresh",
-      capture_reason:metadata.captureReason||metadata.capture_reason||null,
-      lifecycle_version:metadata.lifecycleVersion||metadata.lifecycle_version||DISCONNECT_LIFECYCLE_VERSION,
-      metadata,
-      created_at:new Date().toISOString(),
-      updated_at:new Date().toISOString()
-    })
-    .select("*")
-    .maybeSingle();
-  if(error)throw error;
-  return data;
-}
-async function setRefreshJobStatus(jobId,status,extra={}){
-  const now=new Date().toISOString();
-  const patch={status,updated_at:now,...extra};
-  if(status==="running")patch.started_at=now;
-  if(["completed","failed"].includes(status))patch.finished_at=now;
-  const {data,error}=await supabaseAdmin.from("snapshot_jobs").update(patch).eq("id",jobId).select("*").maybeSingle();
-  if(error)throw error;
-  return data;
-}
+const refreshJobBoundary=createRefreshJobBoundary({client:supabaseAdmin,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION});
+const createRefreshJob=(userId,platform,platformAccountId,metadata={})=>refreshJobBoundary.create({userId,platform,platformAccountId,metadata});
+const setRefreshJobStatus=(jobId,status,extra={})=>refreshJobBoundary.transition(jobId,status,extra);
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}

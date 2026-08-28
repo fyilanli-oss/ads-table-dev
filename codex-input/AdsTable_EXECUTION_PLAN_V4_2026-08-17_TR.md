@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Verification`; E3-T8–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Done`; E3-T8-A `Verification`; E3-T8-B ve E3-T9–E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -860,7 +860,7 @@ src/
 - **E3-T4 — `Done` — Shared clients + static entrypoint incident corrective:** Supabase/provider client creation'ı merkezi dependency yap.
 - **E3-T5 — `Done` — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
 - **E3-T6 — `Done` — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
-- **E3-T7 — `In progress` — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
+- **E3-T7 — `Done` — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
 - **E3-T8 — Job boundary:** Refresh/snapshot orchestration için test edilebilir job sınırı kur.
 - **E3-T9 — Architecture guard:** Yeni business logic'in kök monolite eklenmesini CI kontrolüyle engelle.
 - **E3-T10 — Canonical boundary guard:** Provider-specific DTO'nun canonical validator'ı atlayarak repository, Formula Engine veya Funnel API sınırına geçmesini engelle.
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 `Verification`; E3-T7-B3-B2 ve E3-T8–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T7 `Done`; E3-T8-A `Verification`; E3-T8-B ve E3-T9–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -2059,3 +2059,40 @@ Bu V4 plan ile:
 **Evidence:** `src/oauth/organic-handlers.js`, `src/oauth/klaviyo-handlers.js`, `src/oauth/tiktok-handlers.js`, `tests/e3-t7b3b2-provider-oauth-handlers.test.js` ve CI çıktıları.
 
 **Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan `Done` değildir. E3-T7 parent aynı kapıya bağlıdır.
+
+
+### E3-T8-A task aynası — refresh job lifecycle boundary
+
+**Amaç:** Refresh/snapshot job persistence ve queued→running→terminal orchestration'ı kök monolitten injectable, test edilebilir bir job sınırına taşımak.
+
+**Mevcut durum:** E3-T7 PR #61 ile merge ve post-merge CI kapılarını tamamladı. Job duplicate guard, insert ve status timestamp davranışları kök `server.js` helper'larında bulunuyordu.
+
+**Planlanan durum:** `src/jobs/refresh-job-boundary.js` create/transition/run portlarını immutable dependency graph ile sunar; root yalnız compatibility delegation taşır.
+
+**Kapsam:** Active-job duplicate guard, queued insert contract, running/completed/failed timestamps, safe failure transition, injectable clock/client ve root delegation.
+
+**Kapsam dışı:** Provider-specific snapshot work extraction ve automation/recovery policy orchestration (E3-T8-B), schema/data, production job veya provider çağrısı.
+
+**Bağımlılıklar:** E3-T2 composition root, E3-T4 shared client, E3-T5 error boundary ve E3-T7 OAuth extraction.
+
+**Uygulama adımları:** Job boundary factory eklendi; kök create/status helper implementasyonları boundary alias'larına dönüştürüldü; deterministic lifecycle ve failure testleri security suite'e bağlandı.
+
+**Kabul kriterleri:** Duplicate active job 409 ile insert öncesi reddedilir; queued row parity korunur; running ve terminal timestamp'leri canonical clock kullanır; work hatası failed transition denedikten sonra aynı hatayı yeniden fırlatır; invalid dependency fail-closed; full/security CI PASS.
+
+**Test planı:** Dedicated E3-T8-A testi, E3 characterization, full/security suite, syntax ve diff kontrolü.
+
+**Rollback planı:** Boundary delegation commit'i revert edilerek kök helper implementasyonları geri alınır; data/schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Mevcut snapshot_jobs status/timestamp/error_message alanları korunur; credential, token veya provider payload loglanmaz.
+
+**Güvenlik ve veri etkisi:** Repository/runtime refactor; production database/provider çağrısı veya mutation yapılmaz.
+
+**Planlanan:** E3-T8-A canonical refresh job lifecycle boundary.
+
+**Gerçekleşen:** Factory, root delegation ve executable lifecycle/failure testleri tamamlandı.
+
+**Sapmalar:** Parent E3-T8, provider work ve automation/recovery orchestration E3-T8-B ile boundary `run` portuna taşınmadan `Done` değildir.
+
+**Evidence:** `src/jobs/refresh-job-boundary.js`, `tests/e3-t8a-refresh-job-boundary.test.js`, full/security çıktıları ve PR CI.
+
+**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan E3-T8-A `Done` değildir.

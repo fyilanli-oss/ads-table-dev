@@ -4,6 +4,7 @@ const {google}=require("googleapis");
 const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
 const {parseExplicitBoolean}=require("./security/production-config");
 const {createApplication,startApplication}=require("./src/app");
+const {installErrorBoundary}=require("./src/middleware/http-boundary");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -5772,6 +5773,8 @@ async function runKlaviyoAutoRefreshForSchedule(schedule){
 }
 
 // ===== END TIKTOK READ LAYER =====
+
+installErrorBoundary(app);
 
 if(process.env.VERCEL!=="1")startApplication(app,{port:runtimeConfig.port});
 module.exports=app;

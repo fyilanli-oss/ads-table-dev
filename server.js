@@ -18,6 +18,7 @@ const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
 const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
+const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -1056,6 +1057,7 @@ const refreshJobBoundary=createRefreshJobBoundary({getClient:()=>supabaseAdmin,l
 const createRefreshJob=(userId,platform,platformAccountId,metadata={})=>refreshJobBoundary.create({userId,platform,platformAccountId,metadata});
 const setRefreshJobStatus=(jobId,status,extra={})=>refreshJobBoundary.transition(jobId,status,extra);
 const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});
+const automationSnapshotOrchestrator=createAutomationSnapshotOrchestrator({jobBoundary:refreshJobBoundary});
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
@@ -5448,68 +5450,26 @@ async function runOrganicAutoRefreshForSchedule(schedule){
   }
 }
 
-async function runTikTokAutoRefreshForSchedule(schedule){
+async function runAutomationSnapshotForSchedule({schedule,platform,missingConnectionError,missingAccountError,writeSnapshot}){
   const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",schedule.user_id).maybeSingle();
   if(userError)throw userError;if(!user)throw new Error("Auto refresh user not found");
-  const conn=await getConnection(schedule.user_id,"tiktok");if(!conn)throw new Error("Auto refresh TikTok connection not found");
-  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);if(!platformAccountId)throw new Error("Auto refresh missing TikTok advertiser id");
-  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"tiktok",platformAccountId,conn,null);
-  const policy=resolveAutoRefreshPolicy({date:new Date(),platformTimeZone,platform:"tiktok"});
-  if(!policy.isAutomationHour)return {ok:true,skipped:true,platform:"tiktok",reason:"not_platform_automation_hour",schedule_id:schedule.id};
+  const conn=await getConnection(schedule.user_id,platform);if(!conn)throw new Error(missingConnectionError);
+  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);if(!platformAccountId)throw new Error(missingAccountError);
+  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,platform,platformAccountId,conn,null);
+  const policy=resolveAutoRefreshPolicy({date:new Date(),platformTimeZone,platform});
+  if(!policy.isAutomationHour)return {ok:true,skipped:true,platform,reason:"not_platform_automation_hour",schedule_id:schedule.id};
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
-  const job=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{trigger:"automation",datePreset:policy.datePreset,snapshotDate,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass,scheduleId:schedule.id});
-  await setRefreshJobStatus(job.id,"running");
-  try{
-    const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{trigger:"automation",datePreset:policy.recoveryDatePreset,snapshotDate,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass,scheduleId:schedule.id,pairedPrimaryJobId:job.id});
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.recoveryDatePreset,snapshotDate,sourceJobId:recoveryJob.id,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass});
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-    await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
-    return {ok:true,platform:"tiktok",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts,recovery_result};
-  }catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
+  const execution=await automationSnapshotOrchestrator.run({userId:schedule.user_id,platform,platformAccountId,snapshotDate,scheduleId:schedule.id,policy,write:jobContext=>writeSnapshot({user,conn,platformAccountId,...jobContext})});
+  await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
+  return {ok:true,platform,job_id:execution.job.id,snapshot_id:execution.result.snapshot?.id||null,row_counts:execution.result.row_counts,recovery_result:execution.recoveryResult};
 }
 
-async function runKlaviyoAutoRefreshForSchedule(schedule){
-  const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",schedule.user_id).maybeSingle();
-  if(userError)throw userError;if(!user)throw new Error("Auto refresh user not found");
-  const conn=await getConnection(schedule.user_id,"klaviyo");if(!conn)throw new Error("Auto refresh Klaviyo connection not found");
-  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);if(!platformAccountId)throw new Error("Auto refresh missing Klaviyo account id");
-  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"klaviyo",platformAccountId,conn,null);
-  const policy=resolveAutoRefreshPolicy({date:new Date(),platformTimeZone,platform:"klaviyo"});
-  if(!policy.isAutomationHour)return {ok:true,skipped:true,platform:"klaviyo",reason:"not_platform_automation_hour",schedule_id:schedule.id};
-  const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
-  const job=await createRefreshJob(schedule.user_id,"klaviyo",platformAccountId,{trigger:"automation",datePreset:policy.datePreset,snapshotDate,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass,scheduleId:schedule.id});
-  await setRefreshJobStatus(job.id,"running");
-  try{
-    const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"klaviyo",platformAccountId,{trigger:"automation",datePreset:policy.recoveryDatePreset,snapshotDate,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass,scheduleId:schedule.id,pairedPrimaryJobId:job.id});
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.recoveryDatePreset,snapshotDate,sourceJobId:recoveryJob.id,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass});
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-    await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
-    return {ok:true,platform:"klaviyo",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts,recovery_result};
-  }catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
+function runTikTokAutoRefreshForSchedule(schedule){
+  return runAutomationSnapshotForSchedule({schedule,platform:"tiktok",missingConnectionError:"Auto refresh TikTok connection not found",missingAccountError:"Auto refresh missing TikTok advertiser id",writeSnapshot:writeTikTokSnapshotImmutable});
+}
+
+function runKlaviyoAutoRefreshForSchedule(schedule){
+  return runAutomationSnapshotForSchedule({schedule,platform:"klaviyo",missingConnectionError:"Auto refresh Klaviyo connection not found",missingAccountError:"Auto refresh missing Klaviyo account id",writeSnapshot:writeKlaviyoSnapshotImmutable});
 }
 
 // ===== END TIKTOK READ LAYER =====

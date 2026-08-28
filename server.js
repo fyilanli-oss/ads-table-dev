@@ -5,6 +5,7 @@ const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
 const {parseExplicitBoolean}=require("./security/production-config");
 const {createApplication,startApplication}=require("./src/app");
 const {installErrorBoundary}=require("./src/middleware/http-boundary");
+const {createAccessBoundary}=require("./src/middleware/access-boundary");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -40,11 +41,10 @@ function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
 app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>productionConfig.tiktokTestPageEnabled?sendFile(res,"tiktok-test.html"):res.sendStatus(404));
 app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));
 async function getUserFromRequest(req){const a=req.headers.authorization||"";const t=a.startsWith("Bearer ")?a.slice(7):null;if(!t||!supabaseAdmin)return null;const {data,error}=await supabaseAdmin.auth.getUser(t);if(error||!data?.user?.id)return null;return data.user}
-async function requireUser(req,res){const u=await getUserFromRequest(req);if(!u){res.status(401).json({error:"Not authenticated"});return null}return u}
 async function expireTrialsIfNeeded(){if(!supabaseAdmin)return;const{error}=await supabaseAdmin.rpc("expire_trials");if(error)throw error}
 async function getUserSubscription(userId){await expireTrialsIfNeeded();const{data,error}=await supabaseAdmin.from("subscriptions").select("status,trial_end_date").eq("user_id",userId).maybeSingle();if(error)throw error;return data}
 function getAccessByStatus(status){const full=["trial","active"].includes(status);const readonly=status==="expired";const blocked=["suspended","deleted"].includes(status);return{dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
-async function requireAccess(req,res,userId,capability){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);if(access.blocked||!access[capability]){res.status(403).json({error:"Subscription inactive",status:sub?.status||null});return null}return{sub,access}}
+const {requireUser,requireAccess,requireLifecycleAccess,requireConnection,requireRefreshConnection,requireActiveOwnership}=createAccessBoundary({getUserFromRequest,getUserSubscription,getSubscriptionForLifecycle,getAccessByStatus,getLifecycleAccess,getConnection,getOwnership,activeOwnershipStatuses});
 const requireConnectAccessForOAuth=createRequireConnectAccessForOAuth({requireUser,getUserSubscription,getAccessByStatus});
 async function createOAuthTransaction(userId,provider,redirectUri,pkceVerifier=null){
   if(!oauthTransactionStore)throw new Error("OAuth transaction store is not configured");
@@ -93,8 +93,6 @@ async function saveConnection(userId,platform,payload){
 }
 async function getConnection(userId,platform){if(!supabaseAdmin||!userId)return null;const {data,error}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",platform).eq("connected",true).maybeSingle();if(error)throw new Error(error.message);if(!data||!providerTokenStore)return data;const tokens=await providerTokenStore.resolve({userId,platform,legacyAccessToken:data.access_token,legacyRefreshToken:data.refresh_token});return{...data,access_token:tokens.accessToken,refresh_token:tokens.refreshToken,token_storage_source:tokens.source,token_rotation_required:tokens.needsRotation}}
 async function connectionStatus(userId,platform){const r=await getConnection(userId,platform).catch(()=>null);return{connected:Boolean(r&&(r.access_token||r.refresh_token)),source:r?"database":"none",updatedAt:r?.updated_at||null}}
-async function requireConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked){res.status(403).json({error:"Account access blocked",status:access.status});return null}const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn}}
-async function requireRefreshConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return null;const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn,sub:accessCheck.sub,access:accessCheck.access}}
 async function canRunScheduledRefresh(userId){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);return Boolean(!access.blocked&&access.dailySync)}
 
 // ===== PHASE 1 CONSTITUTION PACK HELPERS =====
@@ -947,15 +945,6 @@ async function ensurePlatformOwnership(userId,platform,account){
   }
 
   return data;
-}
-async function requireActiveOwnership(userId,platform,platformAccountId){
-  const ownership=await getOwnership(platform,platformAccountId);
-  if(!ownership||ownership.owner_user_id!==userId||!activeOwnershipStatuses().includes(ownership.status)){
-    const err=new Error("Platform account ownership is not active");
-    err.status=403;
-    throw err;
-  }
-  return ownership;
 }
 async function disconnectPlatformLifecycle(userId,platform,options={}){
   const now=new Date().toISOString();
@@ -4936,7 +4925,6 @@ app.post("/api/account/currency",async(req,res)=>{try{const user=await requireLi
 function normalizeAccountStatus(status){return String(status||"").toLowerCase()}
 function getLifecycleAccess(status){const s=normalizeAccountStatus(status);const full=["trial","active"].includes(s);const readonly=s==="expired";const blocked=["suspended","deleted"].includes(s);return{status:s||null,login:full||readonly,dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,refresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
 async function getSubscriptionForLifecycle(userId){await expireTrialsIfNeeded();const{data,error}=await supabaseAdmin.from("subscriptions").select("status,trial_end_date").eq("user_id",userId).maybeSingle();if(error)throw error;return data}
-async function requireLifecycleAccess(req,res,capability){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked||!access[capability]){res.status(403).json({error:"Account access blocked",status:access.status,capability});return null}return{user,sub,access}}
 app.get("/api/account/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);res.json({status:access.status,access,deleted_at:null,hard_delete_at:null})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/account/request-delete",async(req,res)=>{try{const result=await requireLifecycleAccess(req,res,"dashboard");if(!result)return;const token=crypto.randomBytes(32).toString("hex");const expiresAt=new Date(Date.now()+30*60*1000).toISOString();const{error}=await supabaseAdmin.from("subscriptions").update({deletion_token:token,deletion_token_expires_at:expiresAt,updated_at:new Date().toISOString()}).eq("user_id",result.user.id).in("status",["trial","active","expired"]);if(error)throw error;const proto=req.headers["x-forwarded-proto"]||req.protocol||"https";const host=req.headers["x-forwarded-host"]||req.headers.host;const confirmationUrl=`${proto}://${host}/api/account/confirm-delete?token=${encodeURIComponent(token)}`;res.json({message:"Delete confirmation ready",confirmationUrl,tokenExpiresAt:expiresAt})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(req.query.token||"");if(!token)return res.status(400).send("Missing delete token.");const{data,error}=await supabaseAdmin.from("subscriptions").select("user_id,status,deletion_token_expires_at").eq("deletion_token",token).maybeSingle();if(error)throw error;if(!data)return res.status(400).send("Invalid or expired delete token.");if(data.status==="deleted")return res.redirect("/login?account_deleted=1");const expiresAt=data.deletion_token_expires_at?new Date(data.deletion_token_expires_at).getTime():0;if(!expiresAt||expiresAt<Date.now())return res.status(400).send("Invalid or expired delete token.");const deletedAt=new Date();const hardDeleteAt=new Date(deletedAt.getTime()+90*24*60*60*1000);const{error:updateError}=await supabaseAdmin.from("subscriptions").update({status:"deleted",deleted_at:deletedAt.toISOString(),hard_delete_at:hardDeleteAt.toISOString(),deletion_token:null,deletion_token_expires_at:null,updated_at:deletedAt.toISOString()}).eq("user_id",data.user_id);if(updateError)throw updateError;res.redirect("/login?account_deleted=1")}catch(e){res.status(500).send(e.message)}});

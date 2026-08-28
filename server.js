@@ -13,6 +13,9 @@ const {registerOAuthProviderRoutes}=require("./src/oauth/provider-routes");
 const {createMetaOAuthHandlers}=require("./src/oauth/meta-handlers");
 const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
+const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
+const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
+const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -1329,71 +1332,8 @@ function organicGoogleOAuthClient(req){
   if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)throw new Error("Missing Google OAuth env");
   return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,organicGoogleRedirectUri(req));
 }
-app.get("/auth/organic",async(req,res)=>{
-  try{
-    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
-    const userId=accessCheck.userId;
-    const {state}=await createOAuthTransaction(userId,"ga4_organic",organicGoogleRedirectUri(req));
-    const url=organicGoogleOAuthClient(req).generateAuthUrl({
-      access_type:"offline",
-      prompt:"consent",
-      include_granted_scopes:true,
-      state,
-      scope:ORGANIC_GOOGLE_SCOPES
-    });
-    sendOAuthAuthorizationResponse(req,res,url);
-  }catch(e){res.status(500).send(e.message)}
-});
-app.get("/auth/organic/callback",async(req,res)=>{
-  const callbackAt=new Date().toISOString();
-  let transaction=null;
-  try{
-    const{code,state,error,error_description}=req.query;
-    if(error)return res.redirect(`/dashboard?organic_error=${encodeURIComponent(error_description||error)}`);
-    if(!code)return res.redirect("/dashboard?organic_error=missing_code");
-    transaction=await consumeOAuthTransaction(state,"ga4_organic",organicGoogleRedirectUri(req));
-    if(!transaction)return res.redirect("/dashboard?organic_error=invalid_state");
-    const userId=transaction.user_id;
-    const client=organicGoogleOAuthClient(req);
-    const{tokens}=await client.getToken(code);
-    if(!tokens.access_token&&!tokens.refresh_token)throw new Error("Organic token exchange returned no token");
-    const existing=await getConnection(userId,"organic").catch(()=>null);
-    await saveConnection(userId,"organic",{
-      accessToken:tokens.access_token||existing?.access_token||null,
-      refreshToken:tokens.refresh_token||existing?.refresh_token||null,
-      tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:null,
-      accountName:null,
-      metadata:{
-        organicOAuthVersion:"v1.1-callback-fix",
-        organicOAuthConnectedAt:callbackAt,
-        organicOAuthStartedAt:transaction.created_at||null,
-        organicRedirectUri:organicGoogleRedirectUri(req),
-        scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),
-        tokenType:tokens.token_type||null,
-        expiryDate:tokens.expiry_date||null,
-        selectedPlatformAccountId:null,
-        selectedPlatformAccountIds:[],
-        selectedPlatformAccounts:[],
-        lastOwnedPlatformAccountId:null,
-        accountSelectionRequired:true,
-        reconnectSelectionRequired:true,
-        organicConfigured:false,
-        organicCallbackSaved:true
-      }
-    });
-    res.redirect("/dashboard?organic_connected=1&account_selection_required=1");
-  }catch(e){
-    try{
-      const userId=transaction?.user_id;
-      if(userId){
-        await saveConnection(userId,"organic",{metadata:{organicOAuthVersion:"v1.1-callback-fix",organicCallbackError:e.message,organicCallbackErrorAt:callbackAt}});
-      }
-    }catch{}
-    res.redirect(`/dashboard?organic_error=${encodeURIComponent(e.message)}`);
-  }
-});
-
+const {start:handleOrganicOAuthStart,callback:handleOrganicOAuthCallback}=createOrganicOAuthHandlers({scopes:ORGANIC_GOOGLE_SCOPES,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:organicGoogleRedirectUri,createClient:organicGoogleOAuthClient,getConnection,saveConnection});
+registerOAuthProviderRoutes({app,provider:"organic",startHandler:handleOrganicOAuthStart,callbackHandler:handleOrganicOAuthCallback});
 
 // ===== ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
 const GA4_ADMIN_API_BASE=process.env.GA4_ADMIN_API_BASE||"https://analyticsadmin.googleapis.com/v1beta";
@@ -2200,11 +2140,14 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     raw:{campaign,report,extraEvents}
   }
 }
-app.get("/auth/klaviyo",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());const {state}=await createOAuthTransaction(userId,"klaviyo",process.env.KLAVIYO_REDIRECT_URI,codeVerifier);const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});sendOAuthAuthorizationResponse(req,res,`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");const transaction=await consumeOAuthTransaction(state,"klaviyo",process.env.KLAVIYO_REDIRECT_URI);if(!transaction)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=transaction.user_id;const verifier=transaction.pkce_verifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});const klaviyoConn=await getConnection(userId,"klaviyo");
-const klaviyoAccount=await resolveKlaviyoAccountIdentity(klaviyoConn);
-await saveConnection(userId,"klaviyo",{accountId:null,accountName:null,metadata:{selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastDiscoveredPlatformAccountId:klaviyoAccount.platform_account_id,availableAccounts:[{platform_account_id:klaviyoAccount.platform_account_id,account_name:klaviyoAccount.account_name,currency:klaviyoAccount.currency||null}],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection",rawAccount:klaviyoAccount.raw_account}});
-res.redirect("/dashboard?klaviyo_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
+const {start:handleKlaviyoOAuthStart,callback:handleKlaviyoOAuthCallback}=createKlaviyoOAuthHandlers({
+  config:{clientId:process.env.KLAVIYO_CLIENT_ID,clientSecret:process.env.KLAVIYO_CLIENT_SECRET,redirectUri:process.env.KLAVIYO_REDIRECT_URI,scopes:klaviyoScopes(),authorizationBase:KLAVIYO_WWW_BASE},
+  requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,
+  createPkce:()=>{const verifier=base64Url(crypto.randomBytes(64));return{verifier,challenge:base64Url(crypto.createHash("sha256").update(verifier).digest())}},
+  exchangeToken:async({code,verifier,redirectUri})=>{const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:redirectUri,code_verifier:verifier});const response=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await response.json().catch(()=>({}));if(!response.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");return data},
+  saveConnection,getConnection,resolveAccount:resolveKlaviyoAccountIdentity,parseExpiry
+});
+registerOAuthProviderRoutes({app,provider:"klaviyo",startHandler:handleKlaviyoOAuthStart,callbackHandler:handleKlaviyoOAuthCallback});
 app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");res.json({connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),setupRequired:Boolean(conn?.metadata?.requiresSetup),estimatedMonthlySpend:conn?.metadata?.estimatedMonthlySpend||null,spendCurrency:conn?.metadata?.spendCurrency||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/klaviyo/accounts",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const account=await resolveKlaviyoAccountIdentity(result.conn);res.json({platform:"klaviyo",accounts:[{platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null}]})}catch(e){res.status(e.status||500).json({error:e.message})}});
 app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false})}catch(e){res.status(500).json({error:e.message})}});
@@ -4971,54 +4914,11 @@ async function bootstrapTikTokFromReport(userId,conn,advertiserId,context={}){
 }
 
 
-app.get("/auth/tiktok",async(req,res)=>{
-  try{
-    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
-    const userId=accessCheck.userId;
-
-    // TIKTOK_AUTH_GUARD_FIX_v1
-    // If TikTok is already connected and lifecycle-bound to an account, do not restart OAuth.
-    const existingTikTokConnection=await getConnection(userId,"tiktok").catch(()=>null);
-    if(existingTikTokConnection?.access_token&&normalizePlatformAccountId(existingTikTokConnection.account_id)){
-      return res.redirect("/dashboard?tiktok_already_connected=1");
-    }
-
-    if(!tiktokClientId()||!tiktokRedirectUri())throw new Error("Missing TikTok OAuth env");
-    const {state}=await createOAuthTransaction(userId,"tiktok",tiktokRedirectUri());
-    const p=new URLSearchParams({app_id:tiktokClientId(),redirect_uri:tiktokRedirectUri(),state});
-    sendOAuthAuthorizationResponse(req,res,`${TIKTOK_AUTH_BASE}?${p}`);
-  }catch(e){res.status(500).send(e.message)}
+const {start:handleTikTokOAuthStart,callback:handleTikTokOAuthCallback}=createTikTokOAuthHandlers({
+  config:{clientId:tiktokClientId(),clientSecret:tiktokClientSecret(),redirectUri:tiktokRedirectUri(),authorizationBase:TIKTOK_AUTH_BASE},requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getConnection,normalizeAccountId:normalizePlatformAccountId,
+  exchangeToken:async({code,clientId,clientSecret})=>{const response=await fetch(`${TIKTOK_API_BASE}/v1.3/oauth2/access_token/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({app_id:clientId,secret:clientSecret,auth_code:String(code)})});const payload=await response.json().catch(()=>({}));if(!response.ok||payload.code!==0||!payload.data?.access_token)throw new Error(payload.message||payload.error?.message||"TikTok token exchange failed");return payload.data},saveConnection,parseExpiry:parseTikTokExpiry
 });
-
-app.get("/auth/tiktok/callback",async(req,res)=>{
-  try{
-    const {state,error,error_description}=req.query;
-    const authCode=req.query.auth_code||req.query.code;
-    if(error)return res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(error_description||error)}`);
-    if(!authCode)return res.redirect("/dashboard?tiktok_error=missing_code");
-    const transaction=await consumeOAuthTransaction(state,"tiktok",tiktokRedirectUri());
-    if(!transaction)return res.redirect("/dashboard?tiktok_error=invalid_state");
-    const userId=transaction.user_id;
-    if(!tiktokClientId()||!tiktokClientSecret())throw new Error("Missing TikTok token env");
-    const r=await fetch(`${TIKTOK_API_BASE}/v1.3/oauth2/access_token/`,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({app_id:tiktokClientId(),secret:tiktokClientSecret(),auth_code:String(authCode)})
-    });
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok||data.code!==0||!data.data?.access_token)throw new Error(data.message||data.error?.message||"TikTok token exchange failed");
-    await saveConnection(userId,"tiktok",{
-      accessToken:data.data.access_token,
-      refreshToken:data.data.refresh_token||null,
-      tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
-      accountId:null,
-      accountName:null,
-      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}
-    });
-    res.redirect("/dashboard?tiktok_connected=1&account_selection_required=1");
-  }catch(e){res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`)}
-});
-
+registerOAuthProviderRoutes({app,provider:"tiktok",startHandler:handleTikTokOAuthStart,callbackHandler:handleTikTokOAuthCallback});
 app.get("/api/tiktok/status",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;

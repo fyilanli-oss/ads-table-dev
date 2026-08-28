@@ -17,6 +17,7 @@ const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
 const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
+const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -1054,6 +1055,7 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
 const refreshJobBoundary=createRefreshJobBoundary({getClient:()=>supabaseAdmin,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION});
 const createRefreshJob=(userId,platform,platformAccountId,metadata={})=>refreshJobBoundary.create({userId,platform,platformAccountId,metadata});
 const setRefreshJobStatus=(jobId,status,extra={})=>refreshJobBoundary.transition(jobId,status,extra);
+const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
@@ -1849,15 +1851,13 @@ async function handleOrganicSnapshotWrite(req,res){
     const datePreset=String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
     stage="job";
-    job=await createRefreshJob(user.id,"organic",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"running");
-    stage="snapshot";
-    const writeResult=await writeOrganicSnapshotV1({user,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"organic",platformAccountId,datePreset,snapshotDate,write:jobContext=>{stage="snapshot";return writeOrganicSnapshotV1({user,datePreset,snapshotDate,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({ok:true,platform:"Organic",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
   }catch(e){
-    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    job=e.refreshJob||job;
     res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null});
   }
 }
@@ -5230,14 +5230,12 @@ async function handleTikTokSnapshotWrite(req,res){
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,null);
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
     stage="job";
-    job=await createRefreshJob(user.id,"tiktok",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"running");
-    stage="snapshot";
-    const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"tiktok",platformAccountId,datePreset,snapshotDate,write:jobContext=>{stage="snapshot";return writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
-  }catch(e){if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
+  }catch(e){job=e.refreshJob||job;res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
 }
 
 async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
@@ -5291,14 +5289,12 @@ async function handleKlaviyoSnapshotWrite(req,res){
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"klaviyo",platformAccountId,conn,null);
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
     stage="job";
-    job=await createRefreshJob(user.id,"klaviyo",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"running");
-    stage="snapshot";
-    const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"klaviyo",platformAccountId,datePreset,snapshotDate,write:jobContext=>{stage="snapshot";return writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({ok:true,platform:"Klaviyo",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
-  }catch(e){if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
+  }catch(e){job=e.refreshJob||job;res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
 }
 
 

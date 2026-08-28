@@ -62,6 +62,7 @@ function createRefreshJobBoundary({ getClient, lifecycleVersion, now = () => new
       return Object.freeze({ job, result });
     } catch (error) {
       await transition(job.id, "failed", { error_message: error.message }).catch(() => null);
+      if (error && typeof error === "object" && Object.isExtensible(error)) Object.defineProperty(error, "refreshJob", { value: job, enumerable: false });
       throw error;
     }
   }

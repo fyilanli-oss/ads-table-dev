@@ -11,6 +11,7 @@ const {registerAccountStatusRoutes}=require("./src/routes/account-status-routes"
 const {createOAuthTransactionBoundary}=require("./src/oauth/transaction-boundary");
 const {registerOAuthProviderRoutes}=require("./src/oauth/provider-routes");
 const {createMetaOAuthHandlers}=require("./src/oauth/meta-handlers");
+const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -1107,60 +1108,8 @@ const {start:handleMetaOAuthStart,callback:handleMetaOAuthCallback}=createMetaOA
   parseExpiry
 });
 registerOAuthProviderRoutes({app,provider:"meta",startHandler:handleMetaOAuthStart,callbackHandler:handleMetaOAuthCallback});
-app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const {state}=await createOAuthTransaction(userId,"google_ads",process.env.GOOGLE_REDIRECT_URI);const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});sendOAuthAuthorizationResponse(req,res,url)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/google/callback",async(req,res)=>{try{
-  const{code,state,error}=req.query;
-  if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);
-  if(!code)return res.redirect("/dashboard?google_error=missing_code");
-  const transaction=await consumeOAuthTransaction(state,"google_ads",process.env.GOOGLE_REDIRECT_URI);
-  if(!transaction)return res.redirect("/dashboard?google_error=invalid_state");
-  const userId=transaction.user_id;
-  const client=googleOAuthClient();
-  const{tokens}=await client.getToken(code);
-  const reviewPair=GOOGLE_REVIEW_HARD_ROUTE_ENABLED?googleReviewAccountPair():null;
-  await saveConnection(userId,"google",{
-    accessToken:tokens.access_token,
-    refreshToken:tokens.refresh_token||null,
-    tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,
-    accountId:reviewPair?.customerId||null,
-    accountName:reviewPair?`Google customer ${reviewPair.customerId}`:null,
-    metadata:{
-      scope:tokens.scope||null,
-      expiryDate:tokens.expiry_date||null,
-      tokenType:tokens.token_type||null,
-      selectedCustomerId:reviewPair?.customerId||null,
-      selected_customer_id:reviewPair?.customerId||null,
-      selectedPlatformAccountId:reviewPair?.customerId||null,
-      selectedPlatformAccountIds:reviewPair?[reviewPair.customerId]:[],
-      selectedPlatformAccounts:reviewPair?[{
-        platform_account_id:reviewPair.customerId,
-        customerId:reviewPair.customerId,
-        loginCustomerId:reviewPair.loginCustomerId,
-        account_name:`Google customer ${reviewPair.customerId}`
-      }]:[],
-      platform_account_id:reviewPair?.customerId||null,
-      customerId:reviewPair?.customerId||null,
-      customer_id:reviewPair?.customerId||null,
-      loginCustomerId:reviewPair?.loginCustomerId||null,
-      login_customer_id:reviewPair?.loginCustomerId||null,
-      lastOwnedPlatformAccountId:reviewPair?.customerId||null,
-      accountSelectionRequired:reviewPair?false:true,
-      reconnectSelectionRequired:reviewPair?false:true,
-      accountSelectionGuardVersion:"v2-explicit-selection",
-      accountResolutionSource:reviewPair?.source||"oauth"
-    }
-  });
-  if(reviewPair){
-    const user={id:userId};
-    await ensureGoogleSnapshotLifecycle(user,reviewPair.customerId,reviewPair.loginCustomerId,{
-      accountName:`Google customer ${reviewPair.customerId}`,
-      source:"google_oauth_review_hard_route",
-      accountResolutionSource:reviewPair.source
-    });
-  }
-  res.redirect(reviewPair?"/dashboard?google_connected=1":"/dashboard?google_connected=1&account_selection_required=1");
-}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
-
+const {start:handleGoogleOAuthStart,callback:handleGoogleOAuthCallback}=createGoogleAdsOAuthHandlers({redirectUri:process.env.GOOGLE_REDIRECT_URI,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,createClient:googleOAuthClient,getReviewPair:()=>GOOGLE_REVIEW_HARD_ROUTE_ENABLED?googleReviewAccountPair():null,saveConnection,ensureSnapshotLifecycle:ensureGoogleSnapshotLifecycle});
+registerOAuthProviderRoutes({app,provider:"google",startHandler:handleGoogleOAuthStart,callbackHandler:handleGoogleOAuthCallback});
 
 // ===== GOOGLE SHEETS BACKEND INTEGRATION v1 =====
 const GOOGLE_SHEETS_PLATFORM="google_sheets";

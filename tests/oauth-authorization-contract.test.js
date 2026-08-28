@@ -16,7 +16,7 @@ function escapeRegex(value) {
 
 function functionBody(source, name, nextName) {
   const declaration = `async function ${name}(`;
-  const boundary = `async function ${nextName}(`;
+  const boundary = nextName.startsWith("const ") ? nextName : `async function ${nextName}(`;
   const start = source.indexOf(declaration);
   assert.notEqual(start, -1, `${name} start function must exist`);
   assert.equal(source.indexOf(declaration, start + declaration.length), -1, `${name} must have one declaration`);
@@ -64,7 +64,7 @@ test('provider ownership binds active ownership to authenticated user', () => {
 });
 
 test('disconnect lifecycle is exactly function-bounded and authenticated-user scoped', () => {
-  const body = functionBody(serverSource, 'disconnectPlatformLifecycle', 'createRefreshJob');
+  const body = functionBody(serverSource, 'disconnectPlatformLifecycle', 'const refreshJobBoundary=');
   assert.match(body, /from\("platform_connections"\)[\s\S]*?\.eq\("user_id",userId\)/);
   assert.match(body, /from\("platform_account_ownerships"\)[\s\S]*?\.eq\("owner_user_id",userId\)/);
   assert.match(body, /providerTokenStore\.remove\(\{userId,platform\}\)/);

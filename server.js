@@ -1051,7 +1051,7 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
     snapshots:"preserved"
   };
 }
-const refreshJobBoundary=createRefreshJobBoundary({client:supabaseAdmin,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION});
+const refreshJobBoundary=createRefreshJobBoundary({getClient:()=>supabaseAdmin,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION});
 const createRefreshJob=(userId,platform,platformAccountId,metadata={})=>refreshJobBoundary.create({userId,platform,platformAccountId,metadata});
 const setRefreshJobStatus=(jobId,status,extra={})=>refreshJobBoundary.transition(jobId,status,extra);
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====

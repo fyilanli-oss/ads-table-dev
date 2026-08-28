@@ -2,12 +2,19 @@
 
 const TERMINAL_STATUSES = new Set(["completed", "failed"]);
 
-function createRefreshJobBoundary({ client, lifecycleVersion, now = () => new Date().toISOString() } = {}) {
-  if (!client || typeof client.from !== "function") throw new TypeError("server-side database client is required");
+function createRefreshJobBoundary({ getClient, lifecycleVersion, now = () => new Date().toISOString() } = {}) {
+  if (typeof getClient !== "function") throw new TypeError("getClient must be a function");
   if (typeof lifecycleVersion !== "string" || !lifecycleVersion) throw new TypeError("lifecycleVersion is required");
   if (typeof now !== "function") throw new TypeError("now must be a function");
 
+  function database() {
+    const client = getClient();
+    if (!client || typeof client.from !== "function") throw new TypeError("server-side database client is required");
+    return client;
+  }
+
   async function create({ userId, platform, platformAccountId, metadata = {} } = {}) {
+    const client = database();
     const existing = await client.from("snapshot_jobs").select("id,status").eq("user_id", userId).eq("platform", platform).eq("platform_account_id", platformAccountId).in("status", ["queued", "running"]).limit(1).maybeSingle();
     if (existing.error) throw existing.error;
     if (existing.data) {
@@ -34,6 +41,7 @@ function createRefreshJobBoundary({ client, lifecycleVersion, now = () => new Da
   }
 
   async function transition(jobId, status, extra = {}) {
+    const client = database();
     const timestamp = now();
     const patch = { status, updated_at: timestamp, ...extra };
     if (status === "running") patch.started_at = timestamp;

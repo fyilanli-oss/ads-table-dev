@@ -12,6 +12,7 @@ const {createOAuthTransactionBoundary}=require("./src/oauth/transaction-boundary
 const {registerOAuthProviderRoutes}=require("./src/oauth/provider-routes");
 const {createMetaOAuthHandlers}=require("./src/oauth/meta-handlers");
 const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
+const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -1263,55 +1264,8 @@ async function maybeAutoSyncGoogleSheets(userId){
     return {attempted:true,ok:false,spreadsheet_id:null,rows_written:0,error:e.message};
   }
 }
-app.get("/auth/google-sheets",async(req,res)=>{
-  try{
-    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
-    const {state}=await createOAuthTransaction(accessCheck.userId,"google_sheets",googleSheetsRedirectUri(req));
-    const url=googleSheetsOAuthClient(req).generateAuthUrl({access_type:"offline",prompt:"consent",include_granted_scopes:true,state,scope:GOOGLE_SHEETS_SCOPES});
-    sendOAuthAuthorizationResponse(req,res,url);
-  }catch(e){res.status(500).send(e.message)}
-});
-app.get("/auth/google-sheets/callback",async(req,res)=>{
-  try{
-    const {code,state,error,error_description}=req.query;
-    if(error)return res.redirect(`/dashboard?google_sheets_error=${encodeURIComponent(error_description||error)}`);
-    if(!code)return res.redirect("/dashboard?google_sheets_error=missing_code");
-    const transaction=await consumeOAuthTransaction(state,"google_sheets",googleSheetsRedirectUri(req));
-    if(!transaction)return res.redirect("/dashboard?google_sheets_error=invalid_state");
-    const userId=transaction.user_id;
-    const client=googleSheetsOAuthClient(req);
-    const {tokens}=await client.getToken(code);
-    if(!tokens.access_token&&!tokens.refresh_token)throw new Error("Google Sheets token exchange returned no token");
-    const existing=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
-    await saveConnection(userId,GOOGLE_SHEETS_PLATFORM,{
-      accessToken:tokens.access_token||existing?.access_token||null,
-      refreshToken:tokens.refresh_token||existing?.refresh_token||null,
-      tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:null,
-      accountName:null,
-      metadata:{
-        googleSheetsOAuthVersion:"v1",
-        scope:tokens.scope||GOOGLE_SHEETS_SCOPES.join(" "),
-        tokenType:tokens.token_type||null,
-        connectedAt:new Date().toISOString(),
-        selectedPlatformAccountId:null,
-        selectedPlatformAccountIds:[],
-        selectedPlatformAccounts:[],
-        lastOwnedPlatformAccountId:null,
-        accountSelectionRequired:true,
-        reconnectSelectionRequired:true,
-        spreadsheet_id:null,
-        spreadsheet_name:null,
-        worksheet_name:GOOGLE_SHEETS_DEFAULT_WORKSHEET,
-        auto_sync_enabled:false,
-        last_sync_at:null,
-        last_sync_status:null,
-        last_sync_error:null
-      }
-    });
-    res.redirect("/dashboard?google_sheets_connected=1&account_selection_required=1");
-  }catch(e){res.redirect(`/dashboard?google_sheets_error=${encodeURIComponent(e.message)}`)}
-});
+const {start:handleGoogleSheetsOAuthStart,callback:handleGoogleSheetsOAuthCallback}=createGoogleSheetsOAuthHandlers({scopes:GOOGLE_SHEETS_SCOPES,defaultWorksheet:GOOGLE_SHEETS_DEFAULT_WORKSHEET,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:googleSheetsRedirectUri,createClient:googleSheetsOAuthClient,getConnection,saveConnection});
+registerOAuthProviderRoutes({app,provider:"google-sheets",startHandler:handleGoogleSheetsOAuthStart,callbackHandler:handleGoogleSheetsOAuthCallback});
 app.get("/api/google-sheets/status",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;

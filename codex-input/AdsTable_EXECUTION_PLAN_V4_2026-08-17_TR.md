@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8 `Done`; E3-T9 `Done`; E3-T10 `Verification`.
+**Durum:** `Done` — E3-T1–E3-T10 uygulama, PR, CI ve post-merge `main` doğrulama kapıları tamamlandı.
 
 ### Hedef yapı
 
@@ -863,7 +863,7 @@ src/
 - **E3-T7 — `Done` — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
 - **E3-T8 — `Done` — Job boundary:** Refresh/snapshot orchestration için test edilebilir job sınırı kur.
 - **E3-T9 — `Done` — Architecture guard:** Yeni business logic'in kök monolite eklenmesini CI kontrolüyle engelle.
-- **E3-T10 — Canonical boundary guard:** Provider-specific DTO'nun canonical validator'ı atlayarak repository, Formula Engine veya Funnel API sınırına geçmesini engelle.
+- **E3-T10 — `Done` — Canonical boundary guard:** Provider-specific DTO'nun canonical validator'ı atlayarak repository, Formula Engine veya Funnel API sınırına geçmesini engelle.
 
 ### E3 ilerleme raporlama kuralı
 
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1–E3-T7 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8 `Done`; E3-T9 `Done`; E3-T10 `Verification`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T10 ve parent E3 `Done`. Son tamamlanan iş E3-T10; sıradaki uygulanabilir aday E4-T1 Meta provider fixture ve mevcut fetch characterization. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -2354,4 +2354,4 @@ Bu V4 plan ile:
 
 **Evidence:** `funnel-core/canonical-write-boundary.js`, `security/e3-canonical-boundary-policy.json`, `security/canonical-boundary-guard.js`, `tests/e3-t10-canonical-boundary-guard.test.js` ve CI çıktıları.
 
-**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan E3-T10 ve parent E3 `Done` değildir.
+**Durum:** `Done` — PR #69 merge commit `67c7a19d17541db734747e6de712486555585f3e`; PR Security/Vercel kapıları ile post-merge `main` Security Regression (security + full regression) tamamlandı. Production işlemi yapılmadı.

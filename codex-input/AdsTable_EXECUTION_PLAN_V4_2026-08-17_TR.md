@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8 `Done`; E3-T9 `Verification`; E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8 `Done`; E3-T9 `Done`; E3-T10 `Verification`.
 
 ### Hedef yapı
 
@@ -862,7 +862,7 @@ src/
 - **E3-T6 — `Done` — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
 - **E3-T7 — `Done` — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
 - **E3-T8 — `Done` — Job boundary:** Refresh/snapshot orchestration için test edilebilir job sınırı kur.
-- **E3-T9 — Architecture guard:** Yeni business logic'in kök monolite eklenmesini CI kontrolüyle engelle.
+- **E3-T9 — `Done` — Architecture guard:** Yeni business logic'in kök monolite eklenmesini CI kontrolüyle engelle.
 - **E3-T10 — Canonical boundary guard:** Provider-specific DTO'nun canonical validator'ı atlayarak repository, Formula Engine veya Funnel API sınırına geçmesini engelle.
 
 ### E3 ilerleme raporlama kuralı
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1–E3-T7 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8 `Done`; E3-T9 `Verification`; E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T7 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8 `Done`; E3-T9 `Done`; E3-T10 `Verification`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -2317,4 +2317,41 @@ Bu V4 plan ile:
 
 **Evidence:** `security/e3-architecture-baseline.json`, `security/architecture-guard.js`, `tests/e3-t9-architecture-guard.test.js`, `tests/security-regression-manifest.js`, `.github/workflows/security-regression.yml` ve CI çıktıları.
 
-**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan E3-T9 `Done` değildir.
+**Durum:** `Done` — PR #68 merge commit `718b370dc2df7b5897e79aa27b759c85ad2ff8f6`; architecture/security/full CI, Vercel ve post-merge `main` Security Regression kapıları tamamlandı.
+
+
+### E3-T10 task aynası — canonical boundary guard
+
+**Amaç:** Provider-specific DTO veya doğrudan Dataset V2 erişiminin canonical validator/hierarchy ve repository portunu atlayarak persistence, Formula Engine veya Funnel Query sınırına geçmesini executable CI kontrolüyle engellemek.
+
+**Mevcut durum:** E3-T9 PR #68 ile merge ve post-merge CI kapılarını tamamladı. Repository implementasyonlarında validator vardı; cross-module bypass ve provider→business-math import yasağı için merkezi guard/port yoktu.
+
+**Planlanan durum:** Canonical write boundary validation-before-delegation uygular; policy guard Dataset V2 relation ve canonical upsert allowlist'ini, business-math provider import yasağını ve zorunlu boundary dosyalarını fail-closed denetler.
+
+**Kapsam:** Runtime module scan, direct Dataset V2 access rejection, canonical upsert bypass rejection, Formula/Query provider import rejection, canonical write port, deterministic CLI, negative tests ve locked security manifest.
+
+**Kapsam dışı:** Provider adapter implementasyonları (E4+), Dataset V2 schema/data, production ingest veya canlı işlem.
+
+**Bağımlılıklar:** V4 canonical envelope freeze, existing canonical/hierarchy validators, Dataset V2 repositories ve E3-T9 architecture guard.
+
+**Uygulama adımları:** Canonical write boundary ve policy manifest eklendi; runtime scanner/CLI oluşturuldu; bypass/provider-import/missing-boundary negatif testleri security suite'e bağlandı.
+
+**Kabul kriterleri:** Current runtime PASS; invalid provider DTO repository'ye ulaşmadan FAIL; direct Dataset V2 runtime access allowlist dışı FAIL; canonical repository method bypass FAIL; Formula/Query provider import FAIL; missing boundary/policy FAIL; full/security CI PASS.
+
+**Test planı:** Dedicated canonical boundary test, CLI, Phase 1/2 regression, locked manifest, full/security suite, syntax ve diff kontrolü.
+
+**Rollback planı:** Guard/port/manifest commit'i revert edilir; runtime/data/schema rollback yoktur. Guard allowlist'i provider ihtiyacıyla sessizce genişletilemez; yeni write path canonical port üzerinden kurulmalıdır.
+
+**Gözlemlenebilirlik:** Yalnız checked-module count ve violation code JSON çıktısı; source, row, credential, identity veya provider payload yok.
+
+**Güvenlik ve veri etkisi:** CI/repository static/runtime validation boundary; production database/provider çağrısı veya mutation yapılmaz.
+
+**Planlanan:** E3-T10 canonical validation/repository/business-math boundary guard.
+
+**Gerçekleşen:** Canonical write port, policy/scanner CLI, bypass/import/missing-boundary testleri ve security manifest entegrasyonu tamamlandı.
+
+**Sapmalar:** Uygulanamaz — kapsam planlandığı gibi uygulandı.
+
+**Evidence:** `funnel-core/canonical-write-boundary.js`, `security/e3-canonical-boundary-policy.json`, `security/canonical-boundary-guard.js`, `tests/e3-t10-canonical-boundary-guard.test.js` ve CI çıktıları.
+
+**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan E3-T10 ve parent E3 `Done` değildir.

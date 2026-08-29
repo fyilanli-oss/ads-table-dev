@@ -11,14 +11,22 @@ function shapeMetadata(value) {
   });
 }
 
-function fail(message, value) {
+function fail(message, value, safeCode = 'MANAGEMENT_RESPONSE_INVALID') {
   const error = new Error(message);
   error.safeMetadata = shapeMetadata(value);
+  error.safeCode = safeCode;
   throw error;
 }
 
 function normalizeResponse(status, body) {
-  if (!SAFE_STATUSES.has(status)) fail(`Management API rejected request (HTTP ${status})`, null);
+  if (!SAFE_STATUSES.has(status)) {
+    const safeCode = status === 401 || status === 403
+      ? 'MANAGEMENT_AUTH_REJECTED'
+      : status >= 400 && status < 500
+        ? 'MANAGEMENT_QUERY_REJECTED'
+        : 'MANAGEMENT_SERVICE_UNAVAILABLE';
+    fail(`Management API rejected request (HTTP ${status})`, null, safeCode);
+  }
   let parsed;
   try { parsed = typeof body === 'string' ? JSON.parse(body) : body; }
   catch { fail('Management API returned malformed JSON', null); }
@@ -58,9 +66,15 @@ function createManagementClient({ token, projectRef, timeoutMs = 30000, transpor
         });
         return normalizeResponse(response.status, await response.text());
       } catch (error) {
-        if (error && error.name === 'AbortError') throw new Error('Management API request timed out');
+        if (error && error.name === 'AbortError') {
+          const timeout = new Error('Management API request timed out');
+          timeout.safeCode = 'MANAGEMENT_TIMEOUT';
+          throw timeout;
+        }
         if (error && error.safeMetadata) throw error;
-        throw new Error('Management API transport failed');
+        const transportError = new Error('Management API transport failed');
+        transportError.safeCode = 'MANAGEMENT_TRANSPORT_FAILED';
+        throw transportError;
       } finally { clearTimeout(timer); }
     }
   });

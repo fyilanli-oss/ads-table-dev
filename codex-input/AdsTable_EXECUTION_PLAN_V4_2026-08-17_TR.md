@@ -656,6 +656,8 @@ E2-T8-A tek iş paketidir; güvenlik nedeniyle package içindeki production sour
 
 **Gerçekleşen:** Scope contract ve capture operator/validator/inventory/acceptance preparation hazır. Actual schema capture yapılmadı; baseline SQL üretilmedi; cutoff kesinleşmedi; target provision edilmedi; restore çalıştırılmadı; fresh restore doğrulanmadı; production değişmedi.
 
+E2-T8-A source inventory için açık insan onaylı tek production request çalıştırıldı ve `SOURCE_INVENTORY_QUERY_FAILED` ile fail-closed oldu. State/inventory kapsülü oluşmadı, schema capture çalışmadı ve otomatik retry yapılmadı. Corrective revizyon, sonraki insan onaylı denemede credential, query, service, timeout ve transport sınıflarını secret-free ayıracak şekilde hazırlanır; E2-T8-A `Verification` kalır.
+
 **Sapmalar:** Actual baseline olmadan restore operatorü hazırlanmadı. Altı migration bilinçli olarak `pending_capture_checksum` ve replay-disabled kaldı.
 
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t8-restore/`, `docs/security/E2_T8_RESTORE_READINESS_RUNBOOK.md`, `docs/security/sql/E2_T8_*.sql`, `security/e2-t8-restore-contract.js`, `scripts/e2-t8-*.js`, `tests/e2-t8-restore-readiness-artifacts.test.js`.

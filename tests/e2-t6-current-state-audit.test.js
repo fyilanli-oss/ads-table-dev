@@ -36,3 +36,9 @@ test('current-state audit requires exact confirmation and maps query/contract st
   const report = await audit.audit({ repo, client:valid, confirmation:audit.CONFIRMATION, verifyRepository(){} });
   assert.equal(report.safeToPrepareFreshAcceptance, true);
 });
+test('committed live audit evidence is exact, redacted, and single-request', () => {
+  const evidence = JSON.parse(fs.readFileSync(path.join(repo, 'artifacts/dataset-v2-acceptance/e2-t6-rls/current-state-audit-v1.json'), 'utf8'));
+  assert.deepEqual(evidence, audit.buildReport(rows()));
+  assert.equal(JSON.stringify(evidence).match(/count/gi)?.length, 1);
+  assert.doesNotMatch(JSON.stringify(evidence), /(?:user|email|token|uuid|https?:|actual_count|expected_count)/i);
+});

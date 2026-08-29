@@ -33,8 +33,20 @@ test("does not intercept provider errors owned by the lifecycle boundary", async
   await assert.rejects(orchestrator.run({ write: async () => { throw failure; } }), failure);
 });
 
+
+test("merges provider job metadata and delegates custom completion evidence", async () => {
+  const target = boundary();
+  const custom = (result, job) => ({ snapshot_id: result.snapshot.id, metadata: { ...job.metadata, custom: true } });
+  await createManualSnapshotOrchestrator({ jobBoundary: target.jobBoundary }).run({ platform: "google", jobMetadata: { dateRange: "today", trigger: "untrusted" }, complete: custom, write: async () => ({ snapshot: { id: "snapshot" } }) });
+  assert.equal(target.calls[0].metadata.trigger, "manual");
+  assert.equal(target.calls[0].metadata.dateRange, "today");
+  assert.equal(target.calls[0].completed, custom);
+  assert.equal(target.calls[1].metadata.custom, true);
+});
+
 test("fails closed for missing boundary and work dependencies", async () => {
   assert.throws(() => createManualSnapshotOrchestrator(), /jobBoundary.run/);
   const orchestrator = createManualSnapshotOrchestrator({ jobBoundary: { run() {} } });
   await assert.rejects(orchestrator.run({}), /write must be a function/);
+  await assert.rejects(orchestrator.run({ write() {}, complete: true }), /complete must be a function/);
 });

@@ -18,12 +18,26 @@ function validateOutcome(outcome) {
   return outcome;
 }
 function buildReport(rows) {
-  if (!Array.isArray(rows) || rows.length !== acceptance.POSTCHECK_CODES.length) throw new Error('Diagnostic gate count mismatch');
-  const codes = rows.map((row) => row && row.check_code).sort();
-  if (JSON.stringify(codes) !== JSON.stringify(acceptance.POSTCHECK_CODES)) throw new Error('Diagnostic gate allowlist mismatch');
-  if (rows.some((row) => typeof row.passed !== 'boolean')) throw new Error('Diagnostic passed contract mismatch');
-  const failedGateCodes = rows.filter((row) => !row.passed).map((row) => row.check_code).sort();
-  return Object.freeze({ operation: acceptance.OPERATION, status: 'DIAGNOSTIC_COMPLETE', checkedGates: rows.length, currentPostcheckPass: failedGateCodes.length === 0, failedGateCodes: Object.freeze(failedGateCodes), productionCountsExposed: false });
+  if (!Array.isArray(rows)) throw new Error('Diagnostic rows are required');
+  const allowed = new Set(acceptance.POSTCHECK_CODES);
+  const counts = new Map(acceptance.POSTCHECK_CODES.map((code) => [code, 0]));
+  let unknownGatePresent = false;
+  for (const row of rows) {
+    if (!row || typeof row.check_code !== 'string' || !allowed.has(row.check_code)) { unknownGatePresent = true; continue; }
+    counts.set(row.check_code, counts.get(row.check_code) + 1);
+  }
+  const missingGateCodes = acceptance.POSTCHECK_CODES.filter((code) => counts.get(code) === 0);
+  const duplicateGateCodes = acceptance.POSTCHECK_CODES.filter((code) => counts.get(code) > 1);
+  const malformedGateCodes = acceptance.POSTCHECK_CODES.filter((code) => rows.some((row) => row && row.check_code === code && typeof row.passed !== 'boolean'));
+  const failedGateCodes = acceptance.POSTCHECK_CODES.filter((code) => rows.some((row) => row && row.check_code === code && row.passed === false));
+  const shapePass = !unknownGatePresent && missingGateCodes.length === 0 && duplicateGateCodes.length === 0 && malformedGateCodes.length === 0 && rows.length === acceptance.POSTCHECK_CODES.length;
+  return Object.freeze({
+    operation: acceptance.OPERATION, status: 'DIAGNOSTIC_COMPLETE', checkedGates: rows.length,
+    currentPostcheckPass: shapePass && failedGateCodes.length === 0,
+    failedGateCodes: Object.freeze(failedGateCodes), missingGateCodes: Object.freeze(missingGateCodes),
+    duplicateGateCodes: Object.freeze(duplicateGateCodes), malformedGateCodes: Object.freeze(malformedGateCodes),
+    unknownGatePresent, productionCountsExposed: false, productionIdentitiesExposed: false
+  });
 }
 async function diagnose({ repo, stateFile, client, confirmation }) {
   if (confirmation !== CONFIRMATION) throw new Error('Exact human confirmation is required');

@@ -19,6 +19,7 @@ const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
 const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
+const {googleSnapshotJobEvidence}=require("./src/jobs/google-snapshot-job-evidence");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -2893,14 +2894,10 @@ async function handleMetaSnapshotWrite(req,res){
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
-    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit,captureReason:"manual_refresh",snapshotClass:"primary",...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION});
-    await setRefreshJobStatus(job.id,"running");
-
-    stage="meta_api";
-    const writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,sourceJobId:job.id,captureReason:"manual_refresh",platformTimeZone,adminTimeSync,snapshotClass:"primary"});
-
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"meta",platformAccountId,datePreset,snapshotDate,jobMetadata:{limit,...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION},write:jobContext=>{stage="meta_api";return writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,platformTimeZone,adminTimeSync,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
 
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({
@@ -2936,7 +2933,7 @@ async function handleMetaSnapshotWrite(req,res){
       click_journey:writeResult.snapshot?.click_journey||{}
     });
   }catch(e){
-    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    job=e.refreshJob||job;
     res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null});
   }
 }
@@ -4348,12 +4345,10 @@ async function handleGoogleSnapshotWrite(req,res){
     stage="lifecycle";
     await ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustomerId,{accountName:`Google customer ${platformAccountId}`,source:"manual_google_refresh"});
     stage="job";
-    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId});
-    await setRefreshJobStatus(job.id,"running");
-    stage="google_api";
-    const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"google",platformAccountId,snapshotDate,jobMetadata:{dateRange,timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId},complete:googleSnapshotJobEvidence,write:jobContext=>{stage="google_api";return writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({
       ok:true,
@@ -4375,7 +4370,7 @@ async function handleGoogleSnapshotWrite(req,res){
       performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{}
     });
   }catch(e){
-    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    job=e.refreshJob||job;
     res.status(e.status||500).json({ok:false,error:e.message,stage,refresh_job_id:job?.id||null});
   }
 }

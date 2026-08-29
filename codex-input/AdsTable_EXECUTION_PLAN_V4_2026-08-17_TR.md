@@ -621,6 +621,17 @@ Mutabakat dışında bağımlılık yoktur.
 
 **Mevcut durum:** E2-T1–T7 `Done`; yalnız E2-T8 `Verification`. Ledger 37 olarak reconciled; 31 historical SQL body mevcut değil; altı repository migration’ı bulunuyor; fresh restore doğrulanmadı.
 
+**E2-T8 kalan paket sırası:** PR #91 yalnız capture operatorü hazırlığını tamamladı; E2-T8'i veya aşağıdaki ilk evidence paketini kapatmadı. Paketler bölünmeden ve sırası değiştirilmeden yürütülür.
+
+| Paket | Durum | İçerik | Tamamlanma kapısı |
+|---|---|---|---|
+| **E2-T8-A** | `Verification` | Source inventory + schema capture evidence ve migration cutoff/classification | Ayrı onaylı production inventory ve schema-only capture sonuçları; redacted evidence; final cutoff/classification review |
+| **E2-T8-B** | `Not started` | Disposable restore operatorü | E2-T8-A kabulü; checksum-bound disposable-target operator ve testleri |
+| **E2-T8-C** | `Not started` | Disposable restore ve acceptance evidence | Ayrı insan onaylı restore; normalized parity, zero-row ve managed-primitives evidence review |
+| **E2-T8-D** | `Not started` | E2-T8 + parent E2 closeout | Bütün E2-T8 kabul kapıları, PR/CI, insan kabulü ve closeout evidence |
+
+E2-T8-A tek iş paketidir; güvenlik nedeniyle package içindeki production source inventory ve schema-only capture iki ayrı açık insan onayıyla çalıştırılır. Bu operasyon kapıları yeni iş paketi oluşturmaz. E2-T8-B, E2-T8-A tamamlanmadan başlatılmaz.
+
 **Planlanan durum:** Ayrı insan onaylı capture ve disposable Supabase restore sonrasında normalized parity evidence’ının review edilmesi; o zamana kadar `Verification`.
 
 **Kapsam:** Scope contract, altı migration classification manifest’i, schema-only capture planı, artifact validator, source inventory, target preflight/acceptance, redacted evidence converter ve executable contract testleri.

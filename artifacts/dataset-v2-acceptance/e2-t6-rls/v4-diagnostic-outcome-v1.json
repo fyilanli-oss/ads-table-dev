@@ -1,0 +1,9 @@
+{
+  "operation": "e2_t6_rls_v4",
+  "status": "DIAGNOSTIC_FAIL_CLOSED",
+  "safeCode": "DIAGNOSTIC_CONTRACT_FAILED",
+  "requests": 1,
+  "retries": 0,
+  "productionCountsExposed": false,
+  "productionIdentitiesExposed": false
+}

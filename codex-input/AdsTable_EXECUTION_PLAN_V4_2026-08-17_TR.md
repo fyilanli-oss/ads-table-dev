@@ -5,6 +5,8 @@
 **Belge türü:** Güncel uygulama, kabul ve takip planı  
 **Durum:** Mutabık kalınan execution baseline  
 
+**Kalıcı yürütme kaydı:** GitHub issue [#36 — AdsTable Execution Control](https://github.com/fyilanli-oss/ads-table-dev/issues/36). Bu belge kapsam, bağımlılık ve kabul kaynağıdır; PR/merge/CI ve insan onayı gerektiren production kapılarının güncel koordinasyon durumu kalıcı issue üzerinde tutulur.
+
 ## 0. Belge hiyerarşisi ve kullanım kuralı
 
 Bu belge, aşağıdaki iki belgeyi değiştirmez:
@@ -13,6 +15,8 @@ Bu belge, aşağıdaki iki belgeyi değiştirmez:
 2. **V3 Implementation Plan:** Canonical contract, platform semantiği, hierarchy, metric support, time, FX, formula, Dataset V2 ve Funnel API için teknik referanstır.
 
 **V4 Execution Plan**, bu iki kaynağı uygulanabilir epic, task, kabul kapısı ve kanıt yapısına dönüştürür. Günlük ilerleme bu belge üzerinden takip edilir. Teknik contract çatışmasında V3; öncelik, güvenlik, geçiş ve production kabul sıralamasında Final Rapor; iş takibinde V4 esas alınır. Bir çatışma görülürse sessizce yorumlanmaz, karar kaydı açılır.
+
+Repository ve CI yürütme günlüğü bu belgenin geçmişe dönük baseline niteliğini bozmayacak şekilde kalıcı Execution Control issue'sunda tutulur. Issue güncellemesi bu belgedeki kabul kriterlerinin yerine geçmez; task durumu yalnız repository, CI, canlı evidence ve gerekli insan kabulü birlikte sağlandığında ilerletilir.
 
 ### 0.1 Planlanan ve gerçekleşen ayrımı
 
@@ -616,6 +620,17 @@ Mutabakat dışında bağımlılık yoktur.
 **Amaç:** Eksik historical SQL’i uydurmadan application-owned current-state baseline capture, disposable Supabase restore ve normalized acceptance için fail-closed repository hazırlığı sağlamak.
 
 **Mevcut durum:** E2-T1–T7 `Done`; yalnız E2-T8 `Verification`. Ledger 37 olarak reconciled; 31 historical SQL body mevcut değil; altı repository migration’ı bulunuyor; fresh restore doğrulanmadı.
+
+**E2-T8 kalan paket sırası:** PR #91 yalnız capture operatorü hazırlığını tamamladı; E2-T8'i veya aşağıdaki ilk evidence paketini kapatmadı. Paketler bölünmeden ve sırası değiştirilmeden yürütülür.
+
+| Paket | Durum | İçerik | Tamamlanma kapısı |
+|---|---|---|---|
+| **E2-T8-A** | `Verification` | Source inventory + schema capture evidence ve migration cutoff/classification | Ayrı onaylı production inventory ve schema-only capture sonuçları; redacted evidence; final cutoff/classification review |
+| **E2-T8-B** | `Not started` | Disposable restore operatorü | E2-T8-A kabulü; checksum-bound disposable-target operator ve testleri |
+| **E2-T8-C** | `Not started` | Disposable restore ve acceptance evidence | Ayrı insan onaylı restore; normalized parity, zero-row ve managed-primitives evidence review |
+| **E2-T8-D** | `Not started` | E2-T8 + parent E2 closeout | Bütün E2-T8 kabul kapıları, PR/CI, insan kabulü ve closeout evidence |
+
+E2-T8-A tek iş paketidir; güvenlik nedeniyle package içindeki production source inventory ve schema-only capture iki ayrı açık insan onayıyla çalıştırılır. Bu operasyon kapıları yeni iş paketi oluşturmaz. E2-T8-B, E2-T8-A tamamlanmadan başlatılmaz.
 
 **Planlanan durum:** Ayrı insan onaylı capture ve disposable Supabase restore sonrasında normalized parity evidence’ının review edilmesi; o zamana kadar `Verification`.
 

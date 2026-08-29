@@ -598,7 +598,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2/T3/T4/T5 `Done`; E2-T6/T7/T8 `Verification`.
+**Durum:** `In progress` — E2-T1/T2/T3/T4/T5/T6 `Done`; E2-T7/T8 `Verification`.
 
 ### Planlanan işler
 
@@ -607,7 +607,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T3 — `Done`:** Canlı canonical round-trip acceptance yönetim sonucu tamamlandı.
 - **E2-T4 — `Done`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü tamamlandı.
 - **E2-T5 — `Done`:** V2 preflight 18/18 PASS; 35 vakalı rollback-only canlı rejection acceptance PASS; mandatory postcheck 15/15 PASS; transaction ve postcheck retry edilmedi, production no-change korundu.
-- **E2-T6 — `Verification`:** V3 preflight 21/21 PASS; rollback-only transaction ve mandatory postcheck birer kez gönderildi, capsule tüketildi, sonuç `POSTCHECK_FAILED`. Retry/cleanup yapılmadı; E2-T6-D1 redacted read-only diagnostic preparation ilerliyor.
+- **E2-T6 — `Done`:** V4 preflight 21/21 PASS; corrected canonical 16-case rollback-only RLS transaction evidence PASS; mandatory postcheck zero-baseline SQL shape nedeniyle fail-closed oldu; root cause redacted diagnostic ile doğrulandı; zero-safe corrective diagnostic 19/19 PASS. Transaction/postcheck retry edilmedi, production no-change korundu ve açık insan iş kabulü PR #81 sonrasında verildi.
 - **E2-T7 — `Verification`:** Final no-change artefaktları hazırdır; E2-T6 kabulü ve ayrı canlı evidence/review tamamlanmadan `Done` değildir.
 - **E2-T8 — `Verification`:** Restore-readiness repository hazırlığı tamamlandı; actual capture, disposable restore ve human-reviewed acceptance beklenir.
 
@@ -1563,7 +1563,7 @@ Bu V4 plan ile:
 
 **Amaç:** E2-T3–T6 outer rollback işlemleri sonrasında sıfır aggregate fixture residue ve Dataset V2/V1/snapshot ile ledger/OAuth/token/schema/RLS/policy/grant exact no-change kanıtı üretmek.
 
-**Mevcut durum:** E2-T1/T2 `Done`; E2-T3/T4/T5/T6/T7/T8 `Verification`. Repository preparation tamamlandı; canlı evidence ve insan review'ı bekleniyor.
+**Mevcut durum:** E2-T1–T6 `Done`; E2-T7/T8 `Verification`. T7 repository preparation tamamlandı; E2-T6 kabul zinciri kapandı ve T7 final no-change evidence/insan review'ı sıradaki kapıdır.
 
 **Planlanan durum:** Ayrı insan onaylı baseline, rollback-only operation serisi, final read-only parity check ve redacted evidence review; tamamlanana kadar `Verification`.
 
@@ -2448,4 +2448,4 @@ Bu V4 plan ile:
 
 **Kabul önerisi:** V4 21/21 preflight PASS, corrected canonical 16-case transaction evidence PASS, mandatory rollback, terminal observability, deterministic missing-gate root cause ve zero-safe 19/19 current postcheck PASS birlikte E2-T6 kabul zincirini tamamlar. Original mandatory postcheck'in `POSTCHECK_FAILED` sonucu silinmez; zero-baseline SQL shape sapması olarak evidence zincirinde korunur.
 
-**Durum:** `Verification` — teknik evidence zinciri tamamlandı; closeout PR/CI merge ve açık insan iş kabulü sonrasında E2-T6 `Done` yapılabilir. E2-T7 final no-change acceptance bundan sonra sıradaki uygulanabilir iştir; parent E2, T7/T8 tamamlanana kadar `In progress` kalır.
+**Durum:** `Done` — closeout PR #81 merge commit `97e380daa37dd38d811d918c8c5f8e121100af7f`, post-merge Security/Full Regression ve açık insan iş kabulü tamamlandı. E2-T7 final no-change acceptance sıradaki uygulanabilir iştir; parent E2, T7/T8 tamamlanana kadar `In progress` kalır.

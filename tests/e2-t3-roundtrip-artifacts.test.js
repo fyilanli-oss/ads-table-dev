@@ -137,7 +137,7 @@ test('execution plan keeps later E2 tasks open and E2-T8 in verification', () =>
   assert.match(plan, /E2-T3 — `Done`/);
   assert.match(plan, /E2-T4 — `Done`/);
   assert.match(plan, /E2-T5 — `Done`/);
-  assert.match(plan, /E2-T6 — `Verification`/);
+  assert.match(plan, /E2-T6 — `Done`/);
   assert.match(plan, /E2-T7 — `Verification`/);
   assert.match(plan, /E2-T8 — `Verification`/);
 });

@@ -59,3 +59,8 @@ test('corrected diagnostic preserves zero-row baseline gates as scalar rows', ()
   assert.doesNotMatch(sql, /cross join expected e group by e\.(?:dataset_v2_rows|dataset_v1_rows|snapshot_rows)/);
   assert.equal((sql.match(/\(-1\)::bigint/g)||[]).length, 5);
 });
+test('committed corrective diagnostic evidence is exact, all-pass, and redacted', () => {
+  const evidence = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'artifacts/dataset-v2-acceptance/e2-t6-rls/v4-corrective-diagnostic-live.json'), 'utf8'));
+  assert.deepEqual(evidence, { operation:'e2_t6_rls_v4', status:'DIAGNOSTIC_COMPLETE', checkedGates:19, currentPostcheckPass:true, failedGateCodes:[], missingGateCodes:[], duplicateGateCodes:[], malformedGateCodes:[], unknownGatePresent:false, productionCountsExposed:false, productionIdentitiesExposed:false, requests:1, retries:0 });
+  assert.doesNotMatch(JSON.stringify(evidence), /actual_count|expected_count|user_id|email|uuid|https?:/i);
+});

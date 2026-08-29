@@ -36,6 +36,16 @@ test("skips recovery when policy disables it", async () => {
   assert.equal(result.recoveryResult, null);
 });
 
+
+test("merges provider diagnostics into primary and recovery metadata without overriding pairing", async () => {
+  const target = fakeBoundary();
+  await createAutomationSnapshotOrchestrator({ jobBoundary: target.boundary }).run({ policy, primaryMetadata: { timeEngineVersion: "v1", platformBusinessHour: 4 }, recoveryMetadata: { timeEngineVersion: "v1", pairedPrimaryJobId: "untrusted" }, write: async () => ({}) });
+  assert.equal(target.calls[0].metadata.timeEngineVersion, "v1");
+  assert.equal(target.calls[0].metadata.platformBusinessHour, 4);
+  assert.equal(target.calls[2].metadata.timeEngineVersion, "v1");
+  assert.equal(target.calls[2].metadata.pairedPrimaryJobId, "primary-job");
+});
+
 test("fails closed for missing dependencies", async () => {
   assert.throws(() => createAutomationSnapshotOrchestrator(), /jobBoundary.run/);
   const orchestrator = createAutomationSnapshotOrchestrator({ jobBoundary: { run() {} } });

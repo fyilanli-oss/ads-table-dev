@@ -12,5 +12,5 @@ async function main() {
   const report = await diagnostic.diagnose({ repo, stateFile, client, confirmation: args[2] });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }
-if (require.main === module) main().catch(() => { process.stderr.write(`${JSON.stringify({ operation: 'e2_t6_rls_v3', status: 'DIAGNOSTIC_FAIL_CLOSED' })}\n`); process.exitCode = 1; });
+if (require.main === module) main().catch((error) => { process.stderr.write(`${JSON.stringify({ operation: 'e2_t6_rls_v3', status: 'DIAGNOSTIC_FAIL_CLOSED', safeCode: error && error.safeCode || 'DIAGNOSTIC_PREREQUISITE_FAILED' })}\n`); process.exitCode = 1; });
 module.exports = Object.freeze({ main });

@@ -23,8 +23,7 @@ function buildReport(rows) {
   if (JSON.stringify(codes) !== JSON.stringify(acceptance.POSTCHECK_CODES)) throw new Error('Diagnostic gate allowlist mismatch');
   if (rows.some((row) => typeof row.passed !== 'boolean')) throw new Error('Diagnostic passed contract mismatch');
   const failedGateCodes = rows.filter((row) => !row.passed).map((row) => row.check_code).sort();
-  if (!failedGateCodes.length) throw new Error('Diagnostic must identify at least one failed gate');
-  return Object.freeze({ operation: acceptance.OPERATION, status: 'DIAGNOSTIC_COMPLETE', checkedGates: rows.length, failedGateCodes: Object.freeze(failedGateCodes), productionCountsExposed: false });
+  return Object.freeze({ operation: acceptance.OPERATION, status: 'DIAGNOSTIC_COMPLETE', checkedGates: rows.length, currentPostcheckPass: failedGateCodes.length === 0, failedGateCodes: Object.freeze(failedGateCodes), productionCountsExposed: false });
 }
 async function diagnose({ repo, stateFile, client, confirmation }) {
   if (confirmation !== CONFIRMATION) throw new Error('Exact human confirmation is required');
@@ -33,7 +32,8 @@ async function diagnose({ repo, stateFile, client, confirmation }) {
   if (state.phase !== 'consumed' || !state.transactionSent || !state.postcheckSent || !state.consumed) throw new Error('Consumed failed acceptance state is required');
   validateOutcome(JSON.parse(fs.readFileSync(`${stateFile}.outcome.json`, 'utf8')));
   const sql = acceptance.postcheckSql(fs.readFileSync(`${repo}/${acceptance.SQL.postcheck}`, 'utf8'), state.baselines);
-  const result = await client.query(sql);
-  return buildReport(result.rows);
+  let result;
+  try { result = await client.query(sql); } catch (_) { const error = new Error('Diagnostic query failed'); error.safeCode = 'DIAGNOSTIC_QUERY_FAILED'; throw error; }
+  try { return buildReport(result.rows); } catch (_) { const error = new Error('Diagnostic contract failed'); error.safeCode = 'DIAGNOSTIC_CONTRACT_FAILED'; throw error; }
 }
 module.exports = Object.freeze({ CONFIRMATION, buildReport, diagnose, validateOutcome });

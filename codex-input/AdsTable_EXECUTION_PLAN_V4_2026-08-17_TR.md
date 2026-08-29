@@ -660,6 +660,8 @@ E2-T8-A source inventory için açık insan onaylı tek production request çal�
 
 İnsan onaylı corrective request `SOURCE_INVENTORY_MANAGEMENT_TRANSPORT_FAILED` ile fail-closed oldu. Credential-free ağ probe'u ortam proxy'si üzerinden Management API'ye ulaşırken Node fetch'in proxy sınırı olmadan `ENETUNREACH` verdiğini doğruladı. State/inventory kapsülü, schema capture ve production mutation oluşmadı; retry yapılmadı. Redacted sonuç `source-inventory-attempts.json` içinde tutulur; proxy-aware Node 24 CLI yeni insan onayı olmadan production request göndermez.
 
+Proxy-aware üçüncü insan onaylı request Management API transport'unu geçti ve `SOURCE_INVENTORY_CONTRACT_FAILED` ile fail-closed oldu. Kapsül, schema capture, mutation ve otomatik retry yine oluşmadı. Corrective validator revizyonu raw object/identity göstermeden empty, row-shape, identity, ownership, fingerprint, duplicate ve application-empty sınıflarını ayırır; yeni request tekrar açık insan onayı gerektirir.
+
 **Sapmalar:** Actual baseline olmadan restore operatorü hazırlanmadı. Altı migration bilinçli olarak `pending_capture_checksum` ve replay-disabled kaldı.
 
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t8-restore/`, `docs/security/E2_T8_RESTORE_READINESS_RUNBOOK.md`, `docs/security/sql/E2_T8_*.sql`, `security/e2-t8-restore-contract.js`, `scripts/e2-t8-*.js`, `tests/e2-t8-restore-readiness-artifacts.test.js`.

@@ -607,7 +607,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T3 — `Done`:** Canlı canonical round-trip acceptance yönetim sonucu tamamlandı.
 - **E2-T4 — `Done`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü tamamlandı.
 - **E2-T5 — `Done`:** V2 preflight 18/18 PASS; 35 vakalı rollback-only canlı rejection acceptance PASS; mandatory postcheck 15/15 PASS; transaction ve postcheck retry edilmedi, production no-change korundu.
-- **E2-T6 — `Verification`:** V1/V2 fail-closed recovery'leri ve V3 diagnostic operator hazırlığı tamamlandı; production acceptance PASS değildir ve yeni read-only diagnostic preflight açık insan production onayı bekler.
+- **E2-T6 — `Verification`:** V3 preflight 21/21 PASS; rollback-only transaction ve mandatory postcheck birer kez gönderildi, capsule tüketildi, sonuç `POSTCHECK_FAILED`. Retry/cleanup yapılmadı; E2-T6-D1 redacted read-only diagnostic preparation ilerliyor.
 - **E2-T7 — `Verification`:** Final no-change artefaktları hazırdır; E2-T6 kabulü ve ayrı canlı evidence/review tamamlanmadan `Done` değildir.
 - **E2-T8 — `Verification`:** Restore-readiness repository hazırlığı tamamlandı; actual capture, disposable restore ve human-reviewed acceptance beklenir.
 
@@ -2355,3 +2355,19 @@ Bu V4 plan ile:
 **Evidence:** `funnel-core/canonical-write-boundary.js`, `security/e3-canonical-boundary-policy.json`, `security/canonical-boundary-guard.js`, `tests/e3-t10-canonical-boundary-guard.test.js` ve CI çıktıları.
 
 **Durum:** `Done` — PR #69 merge commit `67c7a19d17541db734747e6de712486555585f3e`; PR Security/Vercel kapıları ile post-merge `main` Security Regression (security + full regression) tamamlandı. Production işlemi yapılmadı.
+
+### E2-T6-D1 task aynası — postcheck failure diagnostic preparation
+
+**Amaç:** E2-T6 V3 rollback-only acceptance sonrasında alınan `POSTCHECK_FAILED` sonucunu transaction retry, cleanup veya raw production veri ifşası olmadan allowlisted failed gate code seviyesinde teşhis etmek.
+
+**Mevcut durum:** Read-only preflight 21/21 PASS verdi. Açık production onayıyla transaction tam bir kez ve mandatory postcheck tam bir kez gönderildi; operator `POSTCHECK_FAILED` üretti, capsule `consumed` oldu ve retry yapılmadı.
+
+**Kapsam:** Consumed state ve exact `POSTCHECK_FAILED` outcome binding; explicit diagnostic confirmation; mevcut postcheck sorgusunun operator-local baseline ile read-only çalıştırılması; yalnız failed gate code, checked gate count ve `productionCountsExposed:false` çıktısı; fail-closed test ve security manifest entegrasyonu.
+
+**Kapsam dışı:** Bu PR'da production diagnostic sorgusu, transaction retry, cleanup/recovery, write, schema/policy/grant/ledger, deployment, environment veya secret değişikliği.
+
+**Kabul kriterleri:** Exact confirmation olmadan çalışma yok; yalnız consumed failed capsule kabul edilir; gate allowlist/count/passed sözleşmesi exact olur; all-pass veya malformed diagnostic fail-closed olur; actual/expected production count ve identity raporlanmaz; full/security CI PASS.
+
+**Rollback:** Diagnostic operator/script/test ve manifest kaydı revert edilir. Consumed production capsule ve outcome değiştirilmez.
+
+**Durum:** `Verification` — repository hazırlığı ve PR/CI tamamlanmadan, ardından ayrı açık production onayıyla diagnostic çalıştırılmadan E2-T6-D1 `Done` değildir. E2-T6 ve parent E2 `Verification/In progress` kalır.

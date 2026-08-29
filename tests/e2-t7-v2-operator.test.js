@@ -6,6 +6,7 @@ function fake(results){let calls=0;return{get calls(){return calls},query:async(
 const verified={verifyRepository(){}};
 const diagnostic=require('../operator/e2-t7-final-diagnostic');
 const diagnosticCli=require('../scripts/e2-t7-final-diagnostic');
+const diagnosticV2=require('../operator/e2-t7-final-diagnostic-v2');
 test('T7 V2 binds exact approved main and complete artifacts',()=>{assert.equal(op.APPROVED_MAIN_SHA,'ba298aa8e9ac5701d5609d48770f13909951bdb2');for(const file of [...Object.values(op.SQL),'operator/e2-t7-v2.js','scripts/e2-t7-v2-operator.js'])assert(op.ARTIFACTS.includes(file));assert.equal(op.checksum(repo).length,64)});
 test('T7 V2 CLI accepts only exact preflight and execute forms',()=>{assert.deepEqual(parseArgs(['preflight']),{action:'preflight'});assert.deepEqual(parseArgs(['execute','--confirm',op.CONFIRMATION]),{action:'execute',confirmation:op.CONFIRMATION});for(const args of [[],['execute'],['preflight','x']])assert.throws(()=>parseArgs(args))});
 test('T7 V2 preflight captures one read-only baseline and creates external capsule',async()=>{const t=tmp(),client=fake([rows()]),report=await op.preflight({repo,stateFile:t.file,client,runTests(){},...verified});assert.equal(report.baseline,'19/19 PASS');assert.equal(client.calls,1);assert.equal(fs.statSync(`${t.file}.baseline.json`).mode&0o777,0o600);assert.deepEqual(store.readState(t.file,op.binding(repo),repo).baselines,{datasetRows:10,v1Rows:16,snapshotRows:17,connectedRows:4,encryptedRows:4})});
@@ -39,4 +40,32 @@ test('T7 corrective diagnostic SQL is one read-only statement and returns no cou
   assert.match(sql,/select check_code, case comparison/);
   assert.doesNotMatch(sql,/select check_code,actual_count/);
   assert.equal((sql.match(/\(-1\)::bigint/g)||[]).length,5);
+});
+
+test('T7 V2 diagnostic binds every baseline by name rather than position',()=>{
+  const sql=fs.readFileSync(path.join(repo,diagnosticV2.SQL),'utf8');
+  const values={datasetRows:11,v1Rows:22,snapshotRows:33,connectedRows:44,encryptedRows:55};
+  const bound=diagnosticV2.bindNamed(sql,values);
+  for(const [key,token] of Object.entries(diagnosticV2.TOKENS)){assert.equal((sql.match(new RegExp(`\\(${token}\\)::bigint`,'g'))||[]).length,1,key);assert.doesNotMatch(bound,new RegExp(`\\(${token}\\)::bigint`));}
+  assert.match(bound,/values \(\(44\)::bigint,\(55\)::bigint\)/);
+  assert.match(bound,/performance_dataset_rows_v2\),\(11\)::bigint/);
+  assert.match(bound,/performance_dataset_rows\),\(22\)::bigint/);
+  assert.match(bound,/dashboard_snapshots\),\(33\)::bigint/);
+});
+test('committed T7 V1 diagnostic evidence is exact and redacted',()=>{
+ const value=JSON.parse(fs.readFileSync(path.join(repo,'artifacts/dataset-v2-acceptance/e2-t7-cleanup/v1-diagnostic-live.json'),'utf8'));
+ assert.deepEqual(value.failedCodes,['DATASET_V2_BASELINE','DATASET_V1_BASELINE','SNAPSHOT_BASELINE','CONNECTED_CONNECTIONS','ENCRYPTED_TOKEN_ROWS']);
+ assert.equal(value.requests,1);assert.equal(value.retries,0);assert.equal(value.productionCountsExposed,false);assert.doesNotMatch(JSON.stringify(value),/actual_count|expected_count|user_id|email|uuid|https?:/i);
+});
+test('T7 V2 diagnostic requires V1 consumption and remains single-use',async()=>{
+  const t=tmp();
+  await op.preflight({repo,stateFile:t.file,client:fake([rows()]),runTests(){},...verified});
+  await assert.rejects(op.execute({repo,stateFile:t.file,client:fake([[]]),confirmation:op.CONFIRMATION,...verified}));
+  const allPass=converter.CHECK_CODES.map(check_code=>({check_code,passed:true}));
+  await diagnostic.diagnose({repo,stateFile:t.file,client:fake([allPass]),confirmation:diagnostic.CONFIRMATION,...verified});
+  const client=fake([allPass]);
+  const report=await diagnosticV2.diagnose({repo,stateFile:t.file,client,confirmation:diagnosticV2.CONFIRMATION,...verified});
+  assert.equal(report.status,'ALL_GATES_PASS');assert.equal(report.requests,1);assert.equal(client.calls,1);
+  await assert.rejects(diagnosticV2.diagnose({repo,stateFile:t.file,client,confirmation:diagnosticV2.CONFIRMATION,...verified}));
+  assert.equal(client.calls,1);
 });

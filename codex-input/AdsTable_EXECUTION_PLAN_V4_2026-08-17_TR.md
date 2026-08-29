@@ -87,6 +87,11 @@ Her task aşağıdaki alanları eksiksiz taşımalıdır:
 
 Alanlardan biri uygulanabilir değilse silinmez; `Uygulanamaz — gerekçe` yazılır.
 
+
+### 1.4 Analist diliyle koordinasyon kuralı
+
+Her paket koordinasyon özetinde önce tek cümlelik **iş çıktısı** ve ölçülebilir **iş değeri** yazılır. Teknik araç, PR, hata kodu ve operasyon kapıları ana çıktı gibi sunulmaz; yalnız gerektiğinde teknik evidence olarak eklenir. İş çıktısı kullanıcı, gelir, operasyon, güvenlik veya süreklilik açısından anlamlı değilse paket ilerletilmez; kapsam/öncelik için iş kararı istenir. Bir paketin içindeki güvenlik adımları yeni paket veya alt task gibi raporlanmaz.
+
 ## 2. V3 gerçekleşme haritası
 
 | V3 fazı | Planlanan | Doğrulanmış gerçekleşen | V4 kararı |
@@ -621,16 +626,11 @@ Mutabakat dışında bağımlılık yoktur.
 
 **Mevcut durum:** E2-T1–T7 `Done`; yalnız E2-T8 `Verification`. Ledger 37 olarak reconciled; 31 historical SQL body mevcut değil; altı repository migration’ı bulunuyor; fresh restore doğrulanmadı.
 
-**E2-T8 kalan paket sırası:** PR #91 yalnız capture operatorü hazırlığını tamamladı; E2-T8'i veya aşağıdaki ilk evidence paketini kapatmadı. Paketler bölünmeden ve sırası değiştirilmeden yürütülür.
+**E2-T8 iş değeri değerlendirmesi ve stop kararı önerisi:** E2-T8 tek pakettir; alt paketlere bölünmez. Schema-only fresh-project restore, application DDL/RLS/policy tekrar üretilebilirliğini gösterebilir fakat müşteri/reklam verisini, auth/storage içeriğini, tokenları ve operasyonel sürekliliği geri getirmez. Bu nedenle bu çalışma **felaket kurtarma, veri yedeği veya iş sürekliliği kanıtı değildir** ve E2 Dataset V2 canlı kabulünün kapanışını bloke etmesi önerilmez.
 
-| Paket | Durum | İçerik | Tamamlanma kapısı |
-|---|---|---|---|
-| **E2-T8-A** | `Verification` | Source inventory + schema capture evidence ve migration cutoff/classification | Ayrı onaylı production inventory ve schema-only capture sonuçları; redacted evidence; final cutoff/classification review |
-| **E2-T8-B** | `Not started` | Disposable restore operatorü | E2-T8-A kabulü; checksum-bound disposable-target operator ve testleri |
-| **E2-T8-C** | `Not started` | Disposable restore ve acceptance evidence | Ayrı insan onaylı restore; normalized parity, zero-row ve managed-primitives evidence review |
-| **E2-T8-D** | `Not started` | E2-T8 + parent E2 closeout | Bütün E2-T8 kabul kapıları, PR/CI, insan kabulü ve closeout evidence |
+**Önerilen iş kararı:** Yeni production inventory/capture/restore isteği durdurulur. E2, tamamlanan E2-T1–T7 canlı veri ve güvenlik kabulleriyle kapatılır; E2-T8 `Deferred` olarak ayrı Production Disaster Recovery programına taşınır. Bu programın iş çıktısı boş tablolar değil; insan onaylı bir tatbikatta gerçek yedekten geri getirilen kullanılabilir veri, doğrulanmış RPO/RTO, bütünlük/parity sonucu, auth/storage kapsam kararı, şifre/token kurtarma veya provider yeniden bağlama prosedürü ve imzalı GO/NO-GO raporudur.
 
-E2-T8-A tek iş paketidir; güvenlik nedeniyle package içindeki production source inventory ve schema-only capture iki ayrı açık insan onayıyla çalıştırılır. Bu operasyon kapıları yeni iş paketi oluşturmaz. E2-T8-B, E2-T8-A tamamlanmadan başlatılmaz.
+**Mevcut koordinasyon durumu:** Bu öneri iş onayı ve merge alınana kadar E2-T8 `Verification` kalır. Ownership diagnostic PR'ı ilerletilmez ve yeni production operation çalıştırılmaz.
 
 **Planlanan durum:** Ayrı insan onaylı capture ve disposable Supabase restore sonrasında normalized parity evidence’ının review edilmesi; o zamana kadar `Verification`.
 
@@ -662,7 +662,7 @@ E2-T8-A source inventory için açık insan onaylı tek production request çal�
 
 Proxy-aware üçüncü insan onaylı request Management API transport'unu geçti ve `SOURCE_INVENTORY_CONTRACT_FAILED` ile fail-closed oldu. Kapsül, schema capture, mutation ve otomatik retry yine oluşmadı. Corrective validator revizyonu raw object/identity göstermeden empty, row-shape, identity, ownership, fingerprint, duplicate ve application-empty sınıflarını ayırır; yeni request tekrar açık insan onayı gerektirir.
 
-Classified dördüncü insan onaylı request `SOURCE_INVENTORY_OWNERSHIP_UNCLASSIFIED` ile fail-closed oldu. Production mutation, kapsül, schema capture veya retry oluşmadı. Ownership kararının uydurulmaması için sıradaki corrective, tek read-only request ile unclassified metadata kimliklerini repository dışı `0600` karantinaya alır; repository/issue evidence yalnız count ve SHA-256 taşır ve operation ayrı açık insan onayı gerektirir.
+Classified dördüncü insan onaylı request `SOURCE_INVENTORY_OWNERSHIP_UNCLASSIFIED` ile fail-closed oldu. Production mutation, kapsül, schema capture veya retry oluşmadı. İş değeri değerlendirmesi sonrasında yeni diagnostic/capture operasyonları durduruldu ve E2-T8 defer/E2 closeout iş kararına taşındı.
 
 **Sapmalar:** Actual baseline olmadan restore operatorü hazırlanmadı. Altı migration bilinçli olarak `pending_capture_checksum` ve replay-disabled kaldı.
 

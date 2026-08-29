@@ -46,9 +46,23 @@ test("merges provider diagnostics into primary and recovery metadata without ove
   assert.equal(target.calls[2].metadata.pairedPrimaryJobId, "primary-job");
 });
 
+
+test("delegates provider-specific primary and recovery completion evidence", async () => {
+  const target = fakeBoundary();
+  const primaryComplete = (result, job) => ({ snapshot_id: result.snapshot?.id, metadata: { ...job.metadata, primary: true } });
+  const recoveryComplete = result => ({ snapshot_id: result.snapshot?.id, metadata: { recovery: true } });
+  await createAutomationSnapshotOrchestrator({ jobBoundary: target.boundary }).run({ policy, primaryComplete, recoveryComplete, write: async context => ({ snapshot: { id: context.sourceJobId } }) });
+  assert.equal(target.calls[0].completed, primaryComplete);
+  assert.equal(target.calls[1].metadata.primary, true);
+  assert.equal(target.calls[2].completed, recoveryComplete);
+  assert.deepEqual(target.calls[3].metadata, { recovery: true });
+});
+
 test("fails closed for missing dependencies", async () => {
   assert.throws(() => createAutomationSnapshotOrchestrator(), /jobBoundary.run/);
   const orchestrator = createAutomationSnapshotOrchestrator({ jobBoundary: { run() {} } });
   await assert.rejects(orchestrator.run({ write() {} }), /policy is required/);
   await assert.rejects(orchestrator.run({ policy: {} }), /write must be a function/);
+  await assert.rejects(orchestrator.run({ policy: {}, write() {}, primaryComplete: true }), /primaryComplete must be a function/);
+  await assert.rejects(orchestrator.run({ policy: {}, write() {}, recoveryComplete: true }), /recoveryComplete must be a function/);
 });

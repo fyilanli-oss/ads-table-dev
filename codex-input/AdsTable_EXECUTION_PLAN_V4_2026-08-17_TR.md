@@ -833,7 +833,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 7. E3 — Backend modularization foundation
 
-**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8-B2-B2-B `Verification`; E3-T9–E3-T10 `Not started`.
+**Durum:** `In progress` — E3-T1–E3-T6 `Done`; E3-T7-A `Done`; E3-T7-B1 `Done`; E3-T7-B2 `Done`; E3-T7-B3-A `Done`; E3-T7-B3-B1 Google Sheets `Done`; E3-T7-B3-B2 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8 `Done`; E3-T9 `Verification`; E3-T10 `Not started`.
 
 ### Hedef yapı
 
@@ -861,7 +861,7 @@ src/
 - **E3-T5 — `Done` — Middleware boundary:** Auth, access, ownership, error, request ID ve logging'i ayır.
 - **E3-T6 — `Done` — Route registration:** İnce route→validation→authorization→service→repository akışını kur.
 - **E3-T7 — `Done` — OAuth extraction:** E1'de güvenli hale gelen OAuth'u modüle taşı.
-- **E3-T8 — Job boundary:** Refresh/snapshot orchestration için test edilebilir job sınırı kur.
+- **E3-T8 — `Done` — Job boundary:** Refresh/snapshot orchestration için test edilebilir job sınırı kur.
 - **E3-T9 — Architecture guard:** Yeni business logic'in kök monolite eklenmesini CI kontrolüyle engelle.
 - **E3-T10 — Canonical boundary guard:** Provider-specific DTO'nun canonical validator'ı atlayarak repository, Formula Engine veya Funnel API sınırına geçmesini engelle.
 
@@ -871,7 +871,7 @@ src/
 - Bir task bölünmeden tek PR'da ilerlerse `E3-T1`, `E3-T2`, `E3-T3` kimlikleri korunur.
 - Bir task birden fazla kontrollü parçaya ayrılırsa alt işler `E3-T1-A`, `E3-T1-B` biçiminde adlandırılır; parent `E3-T1`, bütün zorunlu alt işler tamamlanmadan `Done` olmaz.
 - Tek PR birden fazla taskı gerçekten bütün kabul kriterleriyle kapatırsa özet `E3-T1 + E3-T2 + E3-T3 Done` biçiminde yazılır; yalnız hazırlanan fakat kabulü tamamlanmayan tasklar `Verification` olarak ayrıca gösterilir.
-- Güncel E3 özeti: E3-T1–E3-T7 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8-B2-B2-B `Verification`; E3-T9–E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
+- Güncel E3 özeti: E3-T1–E3-T7 `Done`; E3-T8-A `Done`; E3-T8-B1 `Done`; E3-T8-B2-A `Done`; E3-T8-B2-B1 `Done`; E3-T8-B2-B2-A `Done`; E3-T8 `Done`; E3-T9 `Verification`; E3-T10 `Not started`. E2 ana production kabul hattı değişmez.
 
 ### Kabul kriterleri
 
@@ -2280,4 +2280,41 @@ Bu V4 plan ile:
 
 **Evidence:** `src/jobs/automation-snapshot-orchestrator.js`, `src/jobs/snapshot-job-evidence.js`, `tests/e3-t8b2b2b-snapshot-job-evidence.test.js`, full/security çıktıları ve PR CI.
 
-**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan E3-T8-B2-B2-B ve parent E3-T8 `Done` değildir.
+**Durum:** `Done` — PR #67 merge commit `2cb6b14453b2fbf543f9e2fe4f3c54208169a2d9`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapıları tamamlandı. Parent E3-T8 kapanmıştır.
+
+
+### E3-T9 task aynası — architecture growth guard
+
+**Amaç:** Yeni business logic, named/async function veya route registration'ın kök `server.js` monolitini büyütmesini ve extracted `src` modüllerinin root monolite geri bağımlı olmasını CI seviyesinde engellemek.
+
+**Mevcut durum:** E3-T8 PR #67 ile merge ve post-merge CI kapılarını tamamladı. Monolit büyütmeme kuralı belge düzeyindeydi; executable CI guard yoktu.
+
+**Planlanan durum:** Frozen baseline ve fail-closed architecture evaluator, root satır/function/route growth'ünü ve `src`→`server.js` ters bağımlılığını reddeder; workflow içindeki zorunlu security suite guard testini çalıştırır.
+
+**Kapsam:** Server line/named/async/route ceilings, extracted-module root import rejection, deterministic JSON CLI, unit/negative testler, locked security manifest ve GitHub Actions step.
+
+**Kapsam dışı:** Canonical DTO/repository boundary guard (E3-T10), mevcut monolitin kalan extraction'ı, runtime/data/schema veya production işlem.
+
+**Bağımlılıklar:** E3-T1–E3-T8 modularization baseline.
+
+**Uygulama adımları:** Baseline manifest ve evaluator eklendi; CLI/npm script oluşturuldu; mevcut zorunlu security suite manifestine architecture testi bağlandı; growth/root-import negatif testleri security suite'e eklendi.
+
+**Kabul kriterleri:** Current main PASS; herhangi guarded metric growth FAIL; invalid limit FAIL; `src` module root server import FAIL; deterministic redacted output; security/full CI PASS.
+
+**Test planı:** Dedicated architecture test, CLI, locked manifest, full/security suite, workflow contract, syntax ve diff kontrolü.
+
+**Rollback planı:** Guard/workflow commit'i revert edilir; runtime/data/schema rollback yoktur. Guard bypass için baseline sessizce yükseltilemez; yeni business logic önce target module extraction ile net-negative root değişiklik üretmelidir.
+
+**Gözlemlenebilirlik:** Yalnız metric/limit/violation code JSON çıktısı; source, credential, env veya payload yok.
+
+**Güvenlik ve veri etkisi:** CI/repository statik kontrol; production runtime/database/provider çağrısı veya mutation yapılmaz.
+
+**Planlanan:** E3-T9 executable architecture guard.
+
+**Gerçekleşen:** Baseline/evaluator, CLI, tests, security manifest ve workflow step tamamlandı.
+
+**Sapmalar:** Uygulanamaz — kapsam planlandığı gibi uygulandı.
+
+**Evidence:** `security/e3-architecture-baseline.json`, `security/architecture-guard.js`, `tests/e3-t9-architecture-guard.test.js`, `tests/security-regression-manifest.js`, `.github/workflows/security-regression.yml` ve CI çıktıları.
+
+**Durum:** `Verification` — PR review/merge ve remote CI tamamlanmadan E3-T9 `Done` değildir.

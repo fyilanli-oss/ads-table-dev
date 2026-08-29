@@ -1,0 +1,10 @@
+{
+  "version": "e3-t9-v1",
+  "server": {
+    "max_lines": 5271,
+    "max_named_functions": 237,
+    "max_async_functions": 83,
+    "max_route_registrations": 89
+  },
+  "module_roots": ["src"]
+}

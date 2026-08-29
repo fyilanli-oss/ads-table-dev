@@ -13,6 +13,7 @@ const CAPTURE_CONFIRMATION = 'E2-T8-SCHEMA-CAPTURE';
 const SQL = 'docs/security/sql/E2_T8_SOURCE_INVENTORY.sql';
 const ARTIFACTS = Object.freeze([
   SQL, 'operator/e2-t8-capture.js', 'operator/management-api.js', 'operator/state-store.js',
+  'package.json',
   'scripts/e2-t8-capture-operator.js', 'scripts/e2-t8-schema-capture.js',
   'security/e2-t8-captured-schema-validator.js', 'security/e2-t8-restore-contract.js',
   'artifacts/dataset-v2-acceptance/e2-t8-restore/restore-scope.json',

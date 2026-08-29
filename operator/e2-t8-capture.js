@@ -54,16 +54,18 @@ function verifyGit(repo, exec = cp.execFileSync) {
   if (approved !== APPROVED_MAIN_SHA || base !== APPROVED_MAIN_SHA) throw new Error('HEAD is not based on approved main SHA');
 }
 function validateInventory(rows) {
-  if (!Array.isArray(rows) || rows.length === 0) throw new Error('Source inventory is empty');
+  if (!Array.isArray(rows) || rows.length === 0) throw safeError('SOURCE_INVENTORY_EMPTY');
   const seen = new Set();
   for (const row of rows) {
     if (!row || Object.getPrototypeOf(row) !== Object.prototype ||
-      JSON.stringify(Object.keys(row).sort()) !== JSON.stringify(['fingerprint','object_class','object_key','ownership_class']) ||
-      typeof row.object_key !== 'string' || !/^[a-z]+:.+/.test(row.object_key) || typeof row.object_class !== 'string' ||
-      !OWNERSHIP.includes(row.ownership_class) || !/^[0-9a-f]{64}$/.test(row.fingerprint) || seen.has(row.object_key)) throw new Error('Source inventory contract mismatch');
+      JSON.stringify(Object.keys(row).sort()) !== JSON.stringify(['fingerprint','object_class','object_key','ownership_class'])) throw safeError('SOURCE_INVENTORY_ROW_SHAPE_INVALID');
+    if (typeof row.object_key !== 'string' || !/^[a-z]+:.+/.test(row.object_key) || typeof row.object_class !== 'string') throw safeError('SOURCE_INVENTORY_IDENTITY_INVALID');
+    if (!OWNERSHIP.includes(row.ownership_class)) throw safeError('SOURCE_INVENTORY_OWNERSHIP_UNCLASSIFIED');
+    if (!/^[0-9a-f]{64}$/.test(row.fingerprint)) throw safeError('SOURCE_INVENTORY_FINGERPRINT_INVALID');
+    if (seen.has(row.object_key)) throw safeError('SOURCE_INVENTORY_DUPLICATE_IDENTITY');
     seen.add(row.object_key);
   }
-  if (!rows.some(row => row.ownership_class === 'application_owned')) throw new Error('Application inventory is empty');
+  if (!rows.some(row => row.ownership_class === 'application_owned')) throw safeError('SOURCE_INVENTORY_APPLICATION_EMPTY');
   return rows;
 }
 function inventoryChecksum(rows) { return crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex'); }
@@ -81,7 +83,11 @@ async function preflight({ repo, stateFile, client, confirmation, verifyReposito
     throw safeError(`SOURCE_INVENTORY_${allowed.has(error && error.safeCode) ? error.safeCode : 'QUERY_FAILED'}`);
   }
   let rows;
-  try { rows = validateInventory(result.rows); } catch { throw safeError('SOURCE_INVENTORY_CONTRACT_FAILED'); }
+  try { rows = validateInventory(result.rows); }
+  catch (error) {
+    const allowed = new Set(['SOURCE_INVENTORY_EMPTY','SOURCE_INVENTORY_ROW_SHAPE_INVALID','SOURCE_INVENTORY_IDENTITY_INVALID','SOURCE_INVENTORY_OWNERSHIP_UNCLASSIFIED','SOURCE_INVENTORY_FINGERPRINT_INVALID','SOURCE_INVENTORY_DUPLICATE_IDENTITY','SOURCE_INVENTORY_APPLICATION_EMPTY']);
+    throw safeError(allowed.has(error && error.safeCode) ? error.safeCode : 'SOURCE_INVENTORY_CONTRACT_FAILED');
+  }
   fs.mkdirSync(path.dirname(stateFile), { recursive: true, mode: 0o700 });
   fs.writeFileSync(inventoryFile, JSON.stringify(rows), { flag: 'wx', mode: 0o600 });
   const state = { schemaVersion: 1, phase: 'capture-approval-ready', consumed: false, inventorySha256: inventoryChecksum(rows), inventoryRequests: 1, captureRequests: 0 };

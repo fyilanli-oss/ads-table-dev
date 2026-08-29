@@ -21,7 +21,8 @@
     "e2:t6:v4:execute": "node scripts/e2-t6-v4-operator.js execute",
     "e2:t6:v4:diagnose": "node scripts/e2-t6-v4-postcheck-diagnostic.js diagnose",
     "e2:t7:v2:preflight": "node scripts/e2-t7-v2-operator.js preflight",
-    "e2:t7:v2:execute": "node scripts/e2-t7-v2-operator.js execute"
+    "e2:t7:v2:execute": "node scripts/e2-t7-v2-operator.js execute",
+    "e2:t7:final-diagnostic": "node scripts/e2-t7-final-diagnostic.js"
   },
   "dependencies": {
     "express": "^4.18.3",

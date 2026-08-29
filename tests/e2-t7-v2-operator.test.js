@@ -69,3 +69,8 @@ test('T7 V2 diagnostic requires V1 consumption and remains single-use',async()=>
   await assert.rejects(diagnosticV2.diagnose({repo,stateFile:t.file,client,confirmation:diagnosticV2.CONFIRMATION,...verified}));
   assert.equal(client.calls,1);
 });
+test('committed T7 V2 diagnostic evidence is exact, all-pass, and redacted',()=>{
+ const value=JSON.parse(fs.readFileSync(path.join(repo,'artifacts/dataset-v2-acceptance/e2-t7-cleanup/v2-diagnostic-live.json'),'utf8'));
+ assert.deepEqual(value,{operation:'e2_t7_named_baseline_diagnostic_v2',status:'ALL_GATES_PASS',checkCount:19,failedCodes:[],requests:1,retries:0,productionCountsExposed:false,productionIdentitiesExposed:false});
+ assert.doesNotMatch(JSON.stringify(value),/actual_count|expected_count|user_id|email|uuid|https?:/i);
+});

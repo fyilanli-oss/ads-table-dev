@@ -1,0 +1,13 @@
+{
+  "evidence_version": "e2-t8-source-inventory-attempts-v1",
+  "status": "FAIL_CLOSED",
+  "attempts": [
+    { "sequence": 1, "safe_code": "SOURCE_INVENTORY_QUERY_FAILED", "request_count": 1, "state_capsule_created": false },
+    { "sequence": 2, "safe_code": "SOURCE_INVENTORY_MANAGEMENT_TRANSPORT_FAILED", "request_count": 1, "state_capsule_created": false }
+  ],
+  "schema_capture_requests": 0,
+  "automatic_retries": 0,
+  "production_mutations": 0,
+  "diagnosis": "NODE_DIRECT_NETWORK_UNREACHABLE_ENVIRONMENT_PROXY_REACHABLE",
+  "next_gate": "HUMAN_APPROVED_PROXY_AWARE_SOURCE_INVENTORY_RETRY"
+}

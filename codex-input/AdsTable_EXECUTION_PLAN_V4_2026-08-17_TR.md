@@ -658,7 +658,7 @@ E2-T8-A tek iş paketidir; güvenlik nedeniyle package içindeki production sour
 
 E2-T8-A source inventory için açık insan onaylı tek production request çalıştırıldı ve `SOURCE_INVENTORY_QUERY_FAILED` ile fail-closed oldu. State/inventory kapsülü oluşmadı, schema capture çalışmadı ve otomatik retry yapılmadı. Corrective revizyon, sonraki insan onaylı denemede credential, query, service, timeout ve transport sınıflarını secret-free ayıracak şekilde hazırlanır; E2-T8-A `Verification` kalır.
 
-İnsan onaylı corrective request `SOURCE_INVENTORY_MANAGEMENT_TRANSPORT_FAILED` ile fail-closed oldu. Credential-free ağ probe'u ortam proxy'si üzerinden Management API'ye ulaşırken Node fetch'in proxy sınırı olmadan `ENETUNREACH` verdiğini doğruladı. State/inventory kapsülü ve production mutation oluşmadı; retry yapılmadı. Proxy-aware Node 24 CLI corrective'i ayrı PR/CI/merge ve yeni insan onayı olmadan production request göndermez.
+İnsan onaylı corrective request `SOURCE_INVENTORY_MANAGEMENT_TRANSPORT_FAILED` ile fail-closed oldu. Credential-free ağ probe'u ortam proxy'si üzerinden Management API'ye ulaşırken Node fetch'in proxy sınırı olmadan `ENETUNREACH` verdiğini doğruladı. State/inventory kapsülü, schema capture ve production mutation oluşmadı; retry yapılmadı. Redacted sonuç `source-inventory-attempts.json` içinde tutulur; proxy-aware Node 24 CLI yeni insan onayı olmadan production request göndermez.
 
 **Sapmalar:** Actual baseline olmadan restore operatorü hazırlanmadı. Altı migration bilinçli olarak `pending_capture_checksum` ve replay-disabled kaldı.
 

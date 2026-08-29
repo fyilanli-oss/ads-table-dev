@@ -2,7 +2,7 @@
 
 ## Status and boundary
 
-**Status: `Verification`.** This is a preparation-only repository package. PR #27 performs no live Supabase query, Management API call, cleanup, final check, fixture mutation, schema/policy/grant/ledger change, environment change, or deployment. Static tests do not replace live acceptance. E2-T3, E2-T4, E2-T5, and E2-T6 remain `Verification`; E2-T8 restore readiness remains open. E2-T7 cannot become `Done` without live final evidence and human review.
+**Status: `Verification`.** This is a preparation-only repository package. It performs no live Supabase query, Management API call, cleanup, final check, fixture mutation, schema/policy/grant/ledger change, environment change, or deployment. Static tests do not replace live acceptance. E2-T3–T6 are `Done`; E2-T8 restore readiness remains open. E2-T7 cannot become `Done` without live final evidence and human review.
 
 The mandatory normal cleanup for every E2-T3–T6 acceptance transaction is its intact outer `ROLLBACK`. E2-T7 never runs an automatic `DELETE` or an ad hoc cleanup statement. A non-zero aggregate residue is a fail-closed **STOP**: report only the affected namespace and aggregate count, expose no user/entity identity, run no cleanup, and request separate human investigation and recovery approval.
 
@@ -13,7 +13,8 @@ Before use, an operator must verify the exact approved `main` commit and checksu
 - E2-T3 exact equality: `meta:e2_t3_static_v2_account:paid:none:campaign:e2_t3_static_v2_campaign:ad:e2_t3_static_v2_ad`
 - E2-T4 exact equality: `meta:e2_t4_same_key_v2_account:paid:none:campaign:e2_t4_same_key_v2_campaign:ad:e2_t4_same_key_v2_ad`
 - E2-T5 escaped literal prefix: `e2\_t5\_rejection\_v1:`
-- E2-T6 escaped literal prefix: `e2\_t6\_rls\_v1:`
+- E2-T6 V1/V2 escaped literal prefixes: `e2\_t6\_rls\_v1:` and `e2\_t6\_rls\_v2:`
+- E2-T6 V3/V4 canonical escaped prefixes: `meta:e2\_t6\_rls\_v3\_%` and `meta:e2\_t6\_rls\_v4\_%`
 
 Broad wildcard matching is prohibited.
 

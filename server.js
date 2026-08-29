@@ -20,6 +20,7 @@ const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
 const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
 const {googleSnapshotJobEvidence}=require("./src/jobs/google-snapshot-job-evidence");
+const {snapshotSpreadJobEvidence,recoverySnapshotSpreadJobEvidence}=require("./src/jobs/snapshot-job-evidence");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
@@ -3271,7 +3272,6 @@ app.post("/api/backfill/process",async(req,res)=>{
 });
 
 async function runMetaAutoRefreshForSchedule(schedule){
-  let job=null;
   const runDate=new Date();
   const limit=String(schedule.metadata?.limit||"100");
 
@@ -3318,94 +3318,16 @@ async function runMetaAutoRefreshForSchedule(schedule){
     };
   }
 
-  job=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
-    trigger:"automation",
-    datePreset:policy.datePreset,
-    snapshotDate,
-    limit,
-    captureReason:policy.captureReason,
-    snapshotClass:policy.snapshotClass,
-    scheduleId:schedule.id,
-    platformHour:policy.hour,
-    platformBusinessHour:policy.platform_business_hour,
-    dataMaturityWindowHours:policy.data_maturity_window_hours,
-    server_time_utc:policy.server_time_utc,
-    istanbul_time:policy.istanbul_time,
-    platform_account_time:policy.platform_account_time,
-    platform_account_timezone:policy.platform_account_timezone,
-    platform_business_date:policy.platform_business_date,
-    timeEngineVersion:TIME_ENGINE_VERSION
+  const execution=await automationSnapshotOrchestrator.run({
+    userId:schedule.user_id,platform:"meta",platformAccountId,snapshotDate,scheduleId:schedule.id,policy,
+    primaryMetadata:{limit,platformHour:policy.hour,platformBusinessHour:policy.platform_business_hour,dataMaturityWindowHours:policy.data_maturity_window_hours,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,platform_account_time:policy.platform_account_time,platform_account_timezone:policy.platform_account_timezone,platform_business_date:policy.platform_business_date,timeEngineVersion:TIME_ENGINE_VERSION},
+    recoveryMetadata:{limit,timeEngineVersion:TIME_ENGINE_VERSION},
+    write:jobContext=>writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,limit,platformTimeZone,adminTimeSync:policy,...jobContext})
   });
 
-  await setRefreshJobStatus(job.id,"running");
-
-  try{
-    const writeResult=await writeMetaSnapshotImmutable({
-      user,
-      conn,
-      adAccountId:platformAccountId,
-      datePreset:policy.datePreset,
-      snapshotDate,
-      limit,
-      sourceJobId:job.id,
-      captureReason:policy.captureReason,
-      platformTimeZone,
-      adminTimeSync:policy,
-      snapshotClass:policy.snapshotClass
-    });
-
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
-        trigger:"automation",
-        datePreset:policy.recoveryDatePreset,
-        snapshotDate,
-        limit,
-        captureReason:policy.recoveryCaptureReason,
-        snapshotClass:policy.recoverySnapshotClass,
-        scheduleId:schedule.id,
-        pairedPrimaryJobId:job.id,
-        timeEngineVersion:TIME_ENGINE_VERSION
-      });
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeMetaSnapshotImmutable({
-          user,
-          conn,
-          adAccountId:platformAccountId,
-          datePreset:policy.recoveryDatePreset,
-          snapshotDate,
-          limit,
-          sourceJobId:recoveryJob.id,
-          captureReason:policy.recoveryCaptureReason,
-          platformTimeZone,
-          adminTimeSync:policy,
-          snapshotClass:policy.recoverySnapshotClass
-        });
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-
-    await supabaseAdmin
-      .from("snapshot_schedules")
-      .update({
-        last_run_at:new Date().toISOString(),
-        next_run_at:nextAutomationSlotUtc(),
-        updated_at:new Date().toISOString()
-      })
-      .eq("id",schedule.id);
-
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,fx_rate:writeResult.snapshot?.fx_rate??null,fx_provider:writeResult.snapshot?.fx_provider||null,fx_source_currency:writeResult.snapshot?.fx_source_currency||null,fx_target_currency:writeResult.snapshot?.fx_target_currency||null,fx_engine_version:writeResult.snapshot?.fx_engine_version||null,performance_spread_result:writeResult.performance_spread_result||null};
-  }catch(e){
-    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    throw e;
-  }
+  await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
+  const writeResult=execution.result;
+  return {ok:true,job_id:execution.job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,fx_rate:writeResult.snapshot?.fx_rate??null,fx_provider:writeResult.snapshot?.fx_provider||null,fx_source_currency:writeResult.snapshot?.fx_source_currency||null,fx_target_currency:writeResult.snapshot?.fx_target_currency||null,fx_engine_version:writeResult.snapshot?.fx_engine_version||null,performance_spread_result:writeResult.performance_spread_result||null};
 }
 
 app.get("/api/cron/auto-refresh",async(req,res)=>{
@@ -4182,7 +4104,6 @@ async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustome
 }
 
 async function runGoogleAutoRefreshForSchedule(schedule){
-  let job=null;
   const runDate=new Date();
 
   const {data:user,error:userError}=await supabaseAdmin
@@ -4239,90 +4160,17 @@ async function runGoogleAutoRefreshForSchedule(schedule){
     };
   }
 
-  job=await createRefreshJob(schedule.user_id,"google",platformAccountId,{
-    trigger:"automation",
-    dateRange:policy.datePreset,
-    datePreset:policy.datePreset,
-    snapshotDate,
-    captureReason:policy.captureReason,
-    snapshotClass:policy.snapshotClass,
-    scheduleId:schedule.id,
-    loginCustomerId,
-    platformHour:policy.hour,
-    platformBusinessHour:policy.platform_business_hour,
-    dataMaturityWindowHours:policy.data_maturity_window_hours,
-    server_time_utc:policy.server_time_utc,
-    istanbul_time:policy.istanbul_time,
-    platform_account_time:policy.platform_account_time,
-    platform_account_timezone:policy.platform_account_timezone,
-    platform_business_date:policy.platform_business_date,
-    timeEngineVersion:TIME_ENGINE_VERSION
+  const execution=await automationSnapshotOrchestrator.run({
+    userId:schedule.user_id,platform:"google",platformAccountId,snapshotDate,scheduleId:schedule.id,policy,
+    primaryMetadata:{dateRange:policy.datePreset,loginCustomerId,platformHour:policy.hour,platformBusinessHour:policy.platform_business_hour,dataMaturityWindowHours:policy.data_maturity_window_hours,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,platform_account_time:policy.platform_account_time,platform_account_timezone:policy.platform_account_timezone,platform_business_date:policy.platform_business_date,timeEngineVersion:TIME_ENGINE_VERSION},
+    recoveryMetadata:{dateRange:policy.recoveryDatePreset,loginCustomerId,timeEngineVersion:TIME_ENGINE_VERSION},
+    primaryComplete:snapshotSpreadJobEvidence,recoveryComplete:recoverySnapshotSpreadJobEvidence,
+    write:jobContext=>writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange:jobContext.datePreset,...jobContext})
   });
 
-  await setRefreshJobStatus(job.id,"running");
-
-  try{
-    const writeResult=await writeGoogleSnapshotImmutable({
-      user,
-      customerId:platformAccountId,
-      loginCustomerId,
-      dateRange:policy.datePreset,
-      snapshotDate,
-      sourceJobId:job.id,
-      captureReason:policy.captureReason,
-      snapshotClass:policy.snapshotClass
-    });
-
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null}});
-
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"google",platformAccountId,{
-        trigger:"automation",
-        dateRange:policy.recoveryDatePreset,
-        datePreset:policy.recoveryDatePreset,
-        snapshotDate,
-        captureReason:policy.recoveryCaptureReason,
-        snapshotClass:policy.recoverySnapshotClass,
-        scheduleId:schedule.id,
-        loginCustomerId,
-        pairedPrimaryJobId:job.id,
-        timeEngineVersion:TIME_ENGINE_VERSION
-      });
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeGoogleSnapshotImmutable({
-          user,
-          customerId:platformAccountId,
-          loginCustomerId,
-          dateRange:policy.recoveryDatePreset,
-          snapshotDate,
-          sourceJobId:recoveryJob.id,
-          captureReason:policy.recoveryCaptureReason,
-          snapshotClass:policy.recoverySnapshotClass
-        });
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null,metadata:{row_counts:recoveryWrite.row_counts||null,performance_spread_result:recoveryWrite.performance_spread_result||null}});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-
-    await supabaseAdmin
-      .from("snapshot_schedules")
-      .update({
-        last_run_at:new Date().toISOString(),
-        next_run_at:nextAutomationSlotUtc(),
-        updated_at:new Date().toISOString()
-      })
-      .eq("id",schedule.id);
-
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null};
-  }catch(e){
-    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    throw e;
-  }
+  await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
+  const writeResult=execution.result;
+  return {ok:true,job_id:execution.job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null};
 }
 
 async function handleGoogleSnapshotWrite(req,res){

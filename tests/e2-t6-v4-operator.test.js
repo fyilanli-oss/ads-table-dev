@@ -35,3 +35,8 @@ test('T6 V4 is a distinct fresh namespace with aggregate historical residue gate
   assert.match(transaction,/e2_t6_rls_v4/);
   assert.match(transaction.trim(),/rollback;$/i);
 });
+test('T6 V4 committed live preflight evidence is redacted and transaction-free',()=>{
+  const evidence=JSON.parse(fs.readFileSync(path.join(repo,'artifacts/dataset-v2-acceptance/e2-t6-rls/v4-preflight-live.json'),'utf8'));
+  assert.deepEqual(evidence,{operation:'e2_t6_rls_v4',status:'APPROVAL_READY',preflight:'21/21 PASS',baselineCount:5,transactionRequests:0,productionCountsExposed:false,productionIdentitiesExposed:false});
+  assert.doesNotMatch(JSON.stringify(evidence),/(?:user_id|email|token|uuid|https?:|actual_count|expected_count)/i);
+});

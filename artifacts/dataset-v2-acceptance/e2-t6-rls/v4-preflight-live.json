@@ -1,0 +1,9 @@
+{
+  "operation": "e2_t6_rls_v4",
+  "status": "APPROVAL_READY",
+  "preflight": "21/21 PASS",
+  "baselineCount": 5,
+  "transactionRequests": 0,
+  "productionCountsExposed": false,
+  "productionIdentitiesExposed": false
+}

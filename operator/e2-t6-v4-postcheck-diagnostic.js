@@ -4,6 +4,7 @@ const { readState } = require('./state-store');
 const acceptance = require('./e2-t6-v4');
 
 const CONFIRMATION = 'E2-T6-V4-POSTCHECK-DIAGNOSTIC';
+const DIAGNOSTIC_SQL = 'docs/security/sql/E2_T6_RLS_V4_ZERO_SAFE_DIAGNOSTIC.sql';
 const OUTCOME_FIELDS = Object.freeze(['schemaVersion', 'operation', 'version', 'code']);
 function exactKeys(value, keys) {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -45,9 +46,9 @@ async function diagnose({ repo, stateFile, client, confirmation }) {
   const state = readState(stateFile, acceptance.binding(repo), repo);
   if (state.phase !== 'consumed' || !state.transactionSent || !state.postcheckSent || !state.consumed) throw new Error('Consumed failed acceptance state is required');
   validateOutcome(JSON.parse(fs.readFileSync(`${stateFile}.outcome.json`, 'utf8')));
-  const sql = acceptance.postcheckSql(fs.readFileSync(`${repo}/${acceptance.SQL.postcheck}`, 'utf8'), state.baselines);
+  const sql = acceptance.postcheckSql(fs.readFileSync(`${repo}/${DIAGNOSTIC_SQL}`, 'utf8'), state.baselines);
   let result;
   try { result = await client.query(sql); } catch (_) { const error = new Error('Diagnostic query failed'); error.safeCode = 'DIAGNOSTIC_QUERY_FAILED'; throw error; }
   try { return buildReport(result.rows); } catch (_) { const error = new Error('Diagnostic contract failed'); error.safeCode = 'DIAGNOSTIC_CONTRACT_FAILED'; throw error; }
 }
-module.exports = Object.freeze({ CONFIRMATION, buildReport, diagnose, validateOutcome });
+module.exports = Object.freeze({ CONFIRMATION, DIAGNOSTIC_SQL, buildReport, diagnose, validateOutcome });

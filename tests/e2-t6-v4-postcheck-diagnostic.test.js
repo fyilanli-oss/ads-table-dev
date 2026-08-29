@@ -38,3 +38,24 @@ test('committed first diagnostic outcome is redacted and retry-free', () => {
   const evidence = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'artifacts/dataset-v2-acceptance/e2-t6-rls/v4-diagnostic-outcome-v1.json'), 'utf8'));
   assert.deepEqual(evidence, { operation:'e2_t6_rls_v4', status:'DIAGNOSTIC_FAIL_CLOSED', safeCode:'DIAGNOSTIC_CONTRACT_FAILED', requests:1, retries:0, productionCountsExposed:false, productionIdentitiesExposed:false });
 });
+test('shape diagnostic identifies the zero-baseline row omission without values', () => {
+  const evidence = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'artifacts/dataset-v2-acceptance/e2-t6-rls/v4-diagnostic-shape-v2.json'), 'utf8'));
+  assert.equal(evidence.checkedGates, 18);
+  assert.deepEqual(evidence.missingGateCodes, ['DATASET_V2_BASELINE']);
+  assert.deepEqual(evidence.failedGateCodes, []);
+  assert.equal(evidence.requests, 1);
+  assert.equal(evidence.retries, 0);
+  assert.doesNotMatch(JSON.stringify(evidence), /actual_count|expected_count|user_id|email|uuid|https?:/i);
+});
+test('corrected diagnostic preserves zero-row baseline gates as scalar rows', () => {
+  const sql = fs.readFileSync(path.join(__dirname, '..', diagnostic.DIAGNOSTIC_SQL), 'utf8');
+  for (const [code, relation, baseline] of [
+    ['DATASET_V2_BASELINE','public.performance_dataset_rows_v2','dataset_v2_rows'],
+    ['DATASET_V1_BASELINE','public.performance_dataset_rows','dataset_v1_rows'],
+    ['SNAPSHOT_BASELINE','public.dashboard_snapshots','snapshot_rows']
+  ]) {
+    assert.match(sql, new RegExp(`select '${code}',\\(select count\\(\\*\\) from ${relation.replaceAll('.', '\\.') }\\),\\(select ${baseline} from expected\\)`));
+  }
+  assert.doesNotMatch(sql, /cross join expected e group by e\.(?:dataset_v2_rows|dataset_v1_rows|snapshot_rows)/);
+  assert.equal((sql.match(/\(-1\)::bigint/g)||[]).length, 5);
+});

@@ -139,7 +139,7 @@ test('execution plan keeps later E2 tasks open and E2-T8 in verification', () =>
   assert.match(plan, /E2-T5 — `Done`/);
   assert.match(plan, /E2-T6 — `Done`/);
   assert.match(plan, /E2-T7 — `Done`/);
-  assert.match(plan, /E2-T8 — `Verification`/);
+  assert.match(plan, /E2-T8 — `Deferred`/);
 });
 
 test('E2-C1 captured provider-token parity is fail-closed', () => {

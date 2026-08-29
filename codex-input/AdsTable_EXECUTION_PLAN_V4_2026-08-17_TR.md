@@ -87,6 +87,11 @@ Her task aşağıdaki alanları eksiksiz taşımalıdır:
 
 Alanlardan biri uygulanabilir değilse silinmez; `Uygulanamaz — gerekçe` yazılır.
 
+
+### 1.4 Analist diliyle koordinasyon kuralı
+
+Her paket koordinasyon özetinde önce tek cümlelik **iş çıktısı** ve ölçülebilir **iş değeri** yazılır. Teknik araç, PR, hata kodu ve operasyon kapıları ana çıktı gibi sunulmaz; yalnız gerektiğinde teknik evidence olarak eklenir. İş çıktısı kullanıcı, gelir, operasyon, güvenlik veya süreklilik açısından anlamlı değilse paket ilerletilmez; kapsam/öncelik için iş kararı istenir. Bir paketin içindeki güvenlik adımları yeni paket veya alt task gibi raporlanmaz.
+
 ## 2. V3 gerçekleşme haritası
 
 | V3 fazı | Planlanan | Doğrulanmış gerçekleşen | V4 kararı |
@@ -602,7 +607,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2/T3/T4/T5/T6/T7 `Done`; yalnız E2-T8 `Verification`.
+**Durum:** `Done` — E2-T1–E2-T7 canlı veri, constraint, upsert, RLS, service-role ve cleanup kabul kapıları tamamlandı. E2-T8 açık insan iş kararıyla `Deferred` edildi ve E2 kapanış kapısından çıkarıldı. E1, E2 ve E3 bu tek closeout merge'iyle kapalıdır.
 
 ### Planlanan işler
 
@@ -613,24 +618,19 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T5 — `Done`:** V2 preflight 18/18 PASS; 35 vakalı rollback-only canlı rejection acceptance PASS; mandatory postcheck 15/15 PASS; transaction ve postcheck retry edilmedi, production no-change korundu.
 - **E2-T6 — `Done`:** V4 preflight 21/21 PASS; corrected canonical 16-case rollback-only RLS transaction evidence PASS; mandatory postcheck zero-baseline SQL shape nedeniyle fail-closed oldu; root cause redacted diagnostic ile doğrulandı; zero-safe corrective diagnostic 19/19 PASS. Transaction/postcheck retry edilmedi, production no-change korundu ve açık insan iş kabulü PR #81 sonrasında verildi.
 - **E2-T7 — `Done`:** Baseline, tek final request, corrective named-baseline 19/19 PASS evidence, PR/CI ve açık insan iş kabulü tamamlandı.
-- **E2-T8 — `Verification`:** Restore-readiness repository hazırlığı tamamlandı; actual capture, disposable restore ve human-reviewed acceptance beklenir.
+- **E2-T8 — `Deferred`:** Schema-only restore'un müşteri/reklam verisini geri getirmediği ve Dataset V2 canlı kabulüne iş değeri katmadığı açık insan kararıyla kabul edildi; yeni inventory/capture/restore operationu yapılmayacaktır.
 
 #### E2-T8 task aynası — fresh-project restore readiness
 
 **Amaç:** Eksik historical SQL’i uydurmadan application-owned current-state baseline capture, disposable Supabase restore ve normalized acceptance için fail-closed repository hazırlığı sağlamak.
 
-**Mevcut durum:** E2-T1–T7 `Done`; yalnız E2-T8 `Verification`. Ledger 37 olarak reconciled; 31 historical SQL body mevcut değil; altı repository migration’ı bulunuyor; fresh restore doğrulanmadı.
+**Mevcut durum:** E2-T1–T7 `Done`; bilinen/açık Dataset V2 database acceptance açığı yoktur. E2-T8 iş değeri olmadığı yönündeki açık insan kararıyla `Deferred` edilmiştir.
 
-**E2-T8 kalan paket sırası:** PR #91 yalnız capture operatorü hazırlığını tamamladı; E2-T8'i veya aşağıdaki ilk evidence paketini kapatmadı. Paketler bölünmeden ve sırası değiştirilmeden yürütülür.
+**E2-T8 iş değeri ve kapanış kararı:** E2-T8 tek pakettir; alt paketlere bölünmez. Schema-only fresh-project restore müşteri/reklam verisini geri getirmediği için Dataset V2 canlı kabulüne anlamlı iş değeri sağlamaz. Bu çalışma durdurulmuş, `Deferred` edilmiş ve E2 kapanış kapısından çıkarılmıştır.
 
-| Paket | Durum | İçerik | Tamamlanma kapısı |
-|---|---|---|---|
-| **E2-T8-A** | `Verification` | Source inventory + schema capture evidence ve migration cutoff/classification | Ayrı onaylı production inventory ve schema-only capture sonuçları; redacted evidence; final cutoff/classification review |
-| **E2-T8-B** | `Not started` | Disposable restore operatorü | E2-T8-A kabulü; checksum-bound disposable-target operator ve testleri |
-| **E2-T8-C** | `Not started` | Disposable restore ve acceptance evidence | Ayrı insan onaylı restore; normalized parity, zero-row ve managed-primitives evidence review |
-| **E2-T8-D** | `Not started` | E2-T8 + parent E2 closeout | Bütün E2-T8 kabul kapıları, PR/CI, insan kabulü ve closeout evidence |
+**İş çıktısı:** Dataset V2'nin production şeması, veri kuralları, idempotent upsert'i, RLS/ownership sınırları, service-role erişimi ve test kalıntısı temizliği kabul edilmiştir. E2'nin işi budur ve tamamlanmıştır.
 
-E2-T8-A tek iş paketidir; güvenlik nedeniyle package içindeki production source inventory ve schema-only capture iki ayrı açık insan onayıyla çalıştırılır. Bu operasyon kapıları yeni iş paketi oluşturmaz. E2-T8-B, E2-T8-A tamamlanmadan başlatılmaz.
+**Kapanış:** E1 `Done`, E2 `Done`, E3 `Done`. Ownership diagnostic ilerletilmez; E2-T8 için yeni production operation veya yeni takip programı açılmaz.
 
 **Planlanan durum:** Ayrı insan onaylı capture ve disposable Supabase restore sonrasında normalized parity evidence’ının review edilmesi; o zamana kadar `Verification`.
 
@@ -662,11 +662,13 @@ E2-T8-A source inventory için açık insan onaylı tek production request çal�
 
 Proxy-aware üçüncü insan onaylı request Management API transport'unu geçti ve `SOURCE_INVENTORY_CONTRACT_FAILED` ile fail-closed oldu. Kapsül, schema capture, mutation ve otomatik retry yine oluşmadı. Corrective validator revizyonu raw object/identity göstermeden empty, row-shape, identity, ownership, fingerprint, duplicate ve application-empty sınıflarını ayırır; yeni request tekrar açık insan onayı gerektirir.
 
+Classified dördüncü insan onaylı request `SOURCE_INVENTORY_OWNERSHIP_UNCLASSIFIED` ile fail-closed oldu. Production mutation, kapsül, schema capture veya retry oluşmadı. İş değeri değerlendirmesi sonrasında yeni diagnostic/capture operasyonları durduruldu ve E2-T8 defer/E2 closeout iş kararına taşındı.
+
 **Sapmalar:** Actual baseline olmadan restore operatorü hazırlanmadı. Altı migration bilinçli olarak `pending_capture_checksum` ve replay-disabled kaldı.
 
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t8-restore/`, `docs/security/E2_T8_RESTORE_READINESS_RUNBOOK.md`, `docs/security/sql/E2_T8_*.sql`, `security/e2-t8-restore-contract.js`, `scripts/e2-t8-*.js`, `tests/e2-t8-restore-readiness-artifacts.test.js`.
 
-**Durum:** `Verification` — actual capture, final cutoff/classification, disposable restore ve human-reviewed acceptance tamamlanmadan E2-T8 `Done` değildir.
+**Durum:** `Deferred` — açık insan iş kararıyla durduruldu; E2 kapanışını bloke etmez.
 
 ### Kabul kriterleri
 

@@ -4,11 +4,12 @@
   "attempts": [
     { "sequence": 1, "safe_code": "SOURCE_INVENTORY_QUERY_FAILED", "request_count": 1, "state_capsule_created": false },
     { "sequence": 2, "safe_code": "SOURCE_INVENTORY_MANAGEMENT_TRANSPORT_FAILED", "request_count": 1, "state_capsule_created": false },
-    { "sequence": 3, "safe_code": "SOURCE_INVENTORY_CONTRACT_FAILED", "request_count": 1, "state_capsule_created": false }
+    { "sequence": 3, "safe_code": "SOURCE_INVENTORY_CONTRACT_FAILED", "request_count": 1, "state_capsule_created": false },
+    { "sequence": 4, "safe_code": "SOURCE_INVENTORY_OWNERSHIP_UNCLASSIFIED", "request_count": 1, "state_capsule_created": false }
   ],
   "schema_capture_requests": 0,
   "automatic_retries": 0,
   "production_mutations": 0,
-  "diagnosis": "PROXY_TRANSPORT_RESOLVED_INVENTORY_CONTRACT_REJECTED",
-  "next_gate": "HUMAN_APPROVED_CLASSIFIED_SOURCE_INVENTORY_RETRY"
+  "diagnosis": "STOPPED_NO_INCREMENTAL_DATASET_V2_BUSINESS_VALUE",
+  "next_gate": "CLOSED_BY_HUMAN_BUSINESS_DECISION"
 }

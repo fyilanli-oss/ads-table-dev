@@ -75,7 +75,10 @@ async function preflight({ repo, stateFile, client, confirmation, verifyReposito
   if (fs.existsSync(stateFile) || fs.existsSync(inventoryFile) || fs.existsSync(`${stateFile}.outcome.json`)) throw new Error('Capture state already exists');
   let result;
   try { result = await client.query(fs.readFileSync(path.join(repo, SQL), 'utf8')); }
-  catch { throw safeError('SOURCE_INVENTORY_QUERY_FAILED'); }
+  catch (error) {
+    const allowed = new Set(['MANAGEMENT_AUTH_REJECTED','MANAGEMENT_QUERY_REJECTED','MANAGEMENT_SERVICE_UNAVAILABLE','MANAGEMENT_RESPONSE_INVALID','MANAGEMENT_TIMEOUT','MANAGEMENT_TRANSPORT_FAILED']);
+    throw safeError(`SOURCE_INVENTORY_${allowed.has(error && error.safeCode) ? error.safeCode : 'QUERY_FAILED'}`);
+  }
   let rows;
   try { rows = validateInventory(result.rows); } catch { throw safeError('SOURCE_INVENTORY_CONTRACT_FAILED'); }
   fs.mkdirSync(path.dirname(stateFile), { recursive: true, mode: 0o700 });

@@ -25,6 +25,7 @@
     "e2:t7:final-diagnostic": "node scripts/e2-t7-final-diagnostic.js",
     "e2:t7:final-diagnostic:v2": "node scripts/e2-t7-final-diagnostic-v2.js",
     "e2:t8:capture:preflight": "node --use-env-proxy scripts/e2-t8-capture-operator.js preflight",
+    "e2:t8:capture:diagnose-ownership": "node --use-env-proxy scripts/e2-t8-capture-operator.js diagnose-ownership",
     "e2:t8:capture:execute": "node scripts/e2-t8-capture-operator.js execute"
   },
   "dependencies": {

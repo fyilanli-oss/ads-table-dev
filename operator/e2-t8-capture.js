@@ -9,6 +9,7 @@ const capture = require('../scripts/e2-t8-schema-capture');
 const APPROVED_MAIN_SHA = 'a5e0917acf650e753161a97a85baf9e851d967b9';
 const OPERATION = 'e2_t8_source_capture_v1';
 const INVENTORY_CONFIRMATION = 'E2-T8-SOURCE-INVENTORY';
+const OWNERSHIP_DIAGNOSTIC_CONFIRMATION = 'E2-T8-SOURCE-OWNERSHIP-DIAGNOSTIC';
 const CAPTURE_CONFIRMATION = 'E2-T8-SCHEMA-CAPTURE';
 const SQL = 'docs/security/sql/E2_T8_SOURCE_INVENTORY.sql';
 const ARTIFACTS = Object.freeze([
@@ -95,6 +96,24 @@ async function preflight({ repo, stateFile, client, confirmation, verifyReposito
   return Object.freeze({ operation: OPERATION, status: 'CAPTURE_APPROVAL_READY', inventorySha256: state.inventorySha256, inventoryRequests: 1, captureRequests: 0, productionRowsRead: false, productionIdentitiesExposed: false });
 }
 
+async function diagnoseOwnership({ repo, stateFile, client, confirmation, verifyRepository = verifyGit }) {
+  if (confirmation !== OWNERSHIP_DIAGNOSTIC_CONFIRMATION) throw new Error('Exact ownership diagnostic confirmation is required');
+  verifyRepository(repo);
+  const diagnosticFile = `${stateFile}.ownership.json`;
+  if (fs.existsSync(stateFile) || fs.existsSync(diagnosticFile)) throw new Error('Ownership diagnostic state already exists');
+  let result;
+  try { result = await client.query(fs.readFileSync(path.join(repo, SQL), 'utf8')); }
+  catch { throw safeError('SOURCE_OWNERSHIP_DIAGNOSTIC_QUERY_FAILED'); }
+  const rows = Array.isArray(result && result.rows) ? result.rows.filter(row => row && row.ownership_class === 'unclassified') : null;
+  if (!rows || rows.length === 0 || rows.some(row => Object.getPrototypeOf(row) !== Object.prototype ||
+    JSON.stringify(Object.keys(row).sort()) !== JSON.stringify(['fingerprint','object_class','object_key','ownership_class']) ||
+    typeof row.object_key !== 'string' || typeof row.object_class !== 'string' || !/^[0-9a-f]{64}$/.test(row.fingerprint))) throw safeError('SOURCE_OWNERSHIP_DIAGNOSTIC_CONTRACT_FAILED');
+  fs.mkdirSync(path.dirname(stateFile), { recursive: true, mode: 0o700 }); fs.chmodSync(path.dirname(stateFile), 0o700);
+  fs.writeFileSync(diagnosticFile, JSON.stringify(rows), { flag: 'wx', mode: 0o600 }); fs.chmodSync(diagnosticFile, 0o600);
+  return Object.freeze({ operation: OPERATION, status: 'OWNERSHIP_REVIEW_REQUIRED', unclassifiedCount: rows.length,
+    diagnosticSha256: inventoryChecksum(rows), requests: 1, repositoryArtifactWritten: false, productionRowsRead: false });
+}
+
 function execute({ repo, stateFile, confirmation, runCapture = capture.run, verifyRepository = verifyGit, env = process.env }) {
   if (confirmation !== CAPTURE_CONFIRMATION) throw new Error('Exact capture confirmation is required');
   verifyRepository(repo);
@@ -117,4 +136,4 @@ function execute({ repo, stateFile, confirmation, runCapture = capture.run, veri
   return Object.freeze({ operation: OPERATION, status: 'CAPTURE_QUARANTINED_CONTRACT_PASS', sourceInventorySha256: state.inventorySha256, baselineSha256: result.artifact_checksum, inventoryRequests: 1, captureRequests: 1, retries: 0, repositoryArtifactWritten: false, productionRowsRead: false, productionIdentitiesExposed: false });
 }
 
-module.exports = Object.freeze({ APPROVED_MAIN_SHA, ARTIFACTS, CAPTURE_CONFIRMATION, INVENTORY_CONFIRMATION, OPERATION, SQL, binding, checksum, execute, inventoryChecksum, preflight, readCaptureState, validateInventory, verifyGit });
+module.exports = Object.freeze({ APPROVED_MAIN_SHA, ARTIFACTS, CAPTURE_CONFIRMATION, INVENTORY_CONFIRMATION, OWNERSHIP_DIAGNOSTIC_CONFIRMATION, OPERATION, SQL, binding, checksum, diagnoseOwnership, execute, inventoryChecksum, preflight, readCaptureState, validateInventory, verifyGit });

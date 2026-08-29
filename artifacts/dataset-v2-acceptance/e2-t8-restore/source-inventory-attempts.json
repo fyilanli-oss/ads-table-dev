@@ -10,6 +10,6 @@
   "schema_capture_requests": 0,
   "automatic_retries": 0,
   "production_mutations": 0,
-  "diagnosis": "UNCLASSIFIED_PUBLIC_OBJECT_OWNERSHIP_REQUIRES_BUSINESS_SCOPE_DECISION",
-  "next_gate": "STOP_PENDING_E2_T8_DEFER_DECISION"
+  "diagnosis": "STOPPED_NO_INCREMENTAL_DATASET_V2_BUSINESS_VALUE",
+  "next_gate": "CLOSED_BY_HUMAN_BUSINESS_DECISION"
 }

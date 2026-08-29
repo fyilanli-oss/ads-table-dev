@@ -607,7 +607,7 @@ Mutabakat dışında bağımlılık yoktur.
 
 ## 6. E2 — Dataset V2 canlı kabulü
 
-**Durum:** `In progress` — E2-T1/T2/T3/T4/T5/T6/T7 `Done`; yalnız E2-T8 `Verification`.
+**Durum:** `Done` — E2-T1–E2-T7 canlı veri, constraint, upsert, RLS, service-role ve cleanup kabul kapıları tamamlandı. E2-T8 açık insan iş kararıyla `Deferred` edildi ve E2 kapanış kapısından çıkarıldı. E1, E2 ve E3 bu tek closeout merge'iyle kapalıdır.
 
 ### Planlanan işler
 
@@ -618,19 +618,19 @@ Mutabakat dışında bağımlılık yoktur.
 - **E2-T5 — `Done`:** V2 preflight 18/18 PASS; 35 vakalı rollback-only canlı rejection acceptance PASS; mandatory postcheck 15/15 PASS; transaction ve postcheck retry edilmedi, production no-change korundu.
 - **E2-T6 — `Done`:** V4 preflight 21/21 PASS; corrected canonical 16-case rollback-only RLS transaction evidence PASS; mandatory postcheck zero-baseline SQL shape nedeniyle fail-closed oldu; root cause redacted diagnostic ile doğrulandı; zero-safe corrective diagnostic 19/19 PASS. Transaction/postcheck retry edilmedi, production no-change korundu ve açık insan iş kabulü PR #81 sonrasında verildi.
 - **E2-T7 — `Done`:** Baseline, tek final request, corrective named-baseline 19/19 PASS evidence, PR/CI ve açık insan iş kabulü tamamlandı.
-- **E2-T8 — `Verification`:** Restore-readiness repository hazırlığı tamamlandı; actual capture, disposable restore ve human-reviewed acceptance beklenir.
+- **E2-T8 — `Deferred`:** Schema-only restore'un müşteri/reklam verisini geri getirmediği ve Dataset V2 canlı kabulüne iş değeri katmadığı açık insan kararıyla kabul edildi; yeni inventory/capture/restore operationu yapılmayacaktır.
 
 #### E2-T8 task aynası — fresh-project restore readiness
 
 **Amaç:** Eksik historical SQL’i uydurmadan application-owned current-state baseline capture, disposable Supabase restore ve normalized acceptance için fail-closed repository hazırlığı sağlamak.
 
-**Mevcut durum:** E2-T1–T7 `Done`; yalnız E2-T8 `Verification`. Ledger 37 olarak reconciled; 31 historical SQL body mevcut değil; altı repository migration’ı bulunuyor; fresh restore doğrulanmadı.
+**Mevcut durum:** E2-T1–T7 `Done`; bilinen/açık Dataset V2 database acceptance açığı yoktur. E2-T8 iş değeri olmadığı yönündeki açık insan kararıyla `Deferred` edilmiştir.
 
-**E2-T8 iş değeri değerlendirmesi ve stop kararı önerisi:** E2-T8 tek pakettir; alt paketlere bölünmez. Schema-only fresh-project restore, application DDL/RLS/policy tekrar üretilebilirliğini gösterebilir fakat müşteri/reklam verisini, auth/storage içeriğini, tokenları ve operasyonel sürekliliği geri getirmez. Bu nedenle bu çalışma **felaket kurtarma, veri yedeği veya iş sürekliliği kanıtı değildir** ve E2 Dataset V2 canlı kabulünün kapanışını bloke etmesi önerilmez.
+**E2-T8 iş değeri ve kapanış kararı:** E2-T8 tek pakettir; alt paketlere bölünmez. Schema-only fresh-project restore müşteri/reklam verisini geri getirmediği için Dataset V2 canlı kabulüne anlamlı iş değeri sağlamaz. Bu çalışma durdurulmuş, `Deferred` edilmiş ve E2 kapanış kapısından çıkarılmıştır.
 
-**Önerilen iş kararı:** Yeni production inventory/capture/restore isteği durdurulur. E2, tamamlanan E2-T1–T7 canlı veri ve güvenlik kabulleriyle kapatılır; E2-T8 `Deferred` olarak ayrı Production Disaster Recovery programına taşınır. Bu programın iş çıktısı boş tablolar değil; insan onaylı bir tatbikatta gerçek yedekten geri getirilen kullanılabilir veri, doğrulanmış RPO/RTO, bütünlük/parity sonucu, auth/storage kapsam kararı, şifre/token kurtarma veya provider yeniden bağlama prosedürü ve imzalı GO/NO-GO raporudur.
+**İş çıktısı:** Dataset V2'nin production şeması, veri kuralları, idempotent upsert'i, RLS/ownership sınırları, service-role erişimi ve test kalıntısı temizliği kabul edilmiştir. E2'nin işi budur ve tamamlanmıştır.
 
-**Mevcut koordinasyon durumu:** Bu öneri iş onayı ve merge alınana kadar E2-T8 `Verification` kalır. Ownership diagnostic PR'ı ilerletilmez ve yeni production operation çalıştırılmaz.
+**Kapanış:** E1 `Done`, E2 `Done`, E3 `Done`. Ownership diagnostic ilerletilmez; E2-T8 için yeni production operation veya yeni takip programı açılmaz.
 
 **Planlanan durum:** Ayrı insan onaylı capture ve disposable Supabase restore sonrasında normalized parity evidence’ının review edilmesi; o zamana kadar `Verification`.
 
@@ -668,7 +668,7 @@ Classified dördüncü insan onaylı request `SOURCE_INVENTORY_OWNERSHIP_UNCLASS
 
 **Evidence:** `artifacts/dataset-v2-acceptance/e2-t8-restore/`, `docs/security/E2_T8_RESTORE_READINESS_RUNBOOK.md`, `docs/security/sql/E2_T8_*.sql`, `security/e2-t8-restore-contract.js`, `scripts/e2-t8-*.js`, `tests/e2-t8-restore-readiness-artifacts.test.js`.
 
-**Durum:** `Verification` — actual capture, final cutoff/classification, disposable restore ve human-reviewed acceptance tamamlanmadan E2-T8 `Done` değildir.
+**Durum:** `Deferred` — açık insan iş kararıyla durduruldu; E2 kapanışını bloke etmez.
 
 ### Kabul kriterleri
 

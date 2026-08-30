@@ -1248,11 +1248,11 @@ src/
 
 **Amaç:** Kullanıcının mevcut Meta Refresh işlemini gerçek Meta verisiyle Dataset V2'ye bağlamak ve Google'a geçmeden önce canlı V2 sonucunu birlikte doğrulamak.
 
-**Mevcut durum:** E4-T1–T8 kod/sentetik kabul `Done`; V2-primary runtime production'da aktiftir. 2026-08-30 ilk canlı Refresh tamamlandı fakat V1 ve V2 satır sayısı sıfır kaldı; o job provider cevap sayısı ve mapping sonucunu kalıcı metadata olarak taşımadığı için bu sonuç canlı veri kabulünü tek başına kanıtlamaz.
+**Mevcut durum:** E4-T1–T8 kod/sentetik kabul `Done`; V2-primary runtime production'da aktiftir. Kalıcı evidence ile yapılan ilk canlı Refresh Meta tarafından geçerli fakat sıfır satırlı cevap verdi. Kanıt, isteğin Meta hesap saat dilimi yerine caller tarafından taşınan `2026-08-31` tarihini kullandığını gösterdi; bu nedenle canlı kabul tamamlanmadı.
 
 **Planlanan durum:** Açık insan production onayı sonrası `META_V2_PRIMARY_REFRESH_ENABLED` checked-in default `true` olur. Explicit `false` rollback sağlar; aktifken aynı Refresh job gerçek Meta Ad daily insights'ı doğrudan canonical→FX→Dataset V2 UPSERT zincirine gönderir ve V1 snapshot yazmaz.
 
-**Kapsam:** Gerçek account discovery, yalnız seçili business date için günlük Meta sorgusu, cursor pagination, business-date FX tarihi, account/currency/timezone parity, source job lineage, server-side Supabase repository, V2 primary handler wiring ve güvenli zero-row sonuç kanıtı.
+**Kapsam:** Gerçek account discovery, caller tarihini reddedip Meta hesap saat diliminden üretilen tek business date için günlük Meta sorgusu, cursor pagination, business-date FX tarihi, account/currency/timezone parity, source job lineage, server-side Supabase repository, V2 primary handler wiring ve güvenli zero-row sonuç kanıtı.
 
 **Kapsam dışı:** Bu PR içinde canlı Refresh çalıştırılması veya geçmiş dönem backfill, Google E5, sentetik/fake empty row, V1 migration veya UI redesign.
 
@@ -1270,7 +1270,7 @@ src/
 
 **Evidence:** `src/providers/meta/live-refresh.js`, `src/providers/meta/client.js`, `server.js`, `tests/e4-live-meta-v2-primary.test.js`, `tests/e4-live-meta-runtime-wiring.test.js`.
 
-**Durum:** `Verification` — production activation tamamlandı ve ilk canlı zero-row sonuç gözlendi. Bu paket production backfill çalıştırmaz; merge/deploy sonrasında kullanıcı normal business-date Refresh çalıştıracaktır; geçmiş dönem backfill bu akışa bağlanmaz.
+**Durum:** `Verification` — ilk evidence-enabled canlı Refresh yanlış caller günü nedeniyle zero-row kaldı. Corrective PR, Meta Refresh tarihini yalnız hesap saat diliminden üretir; production Refresh çalıştırmaz. Merge/deploy sonrasında yeni canlı kabul ayrıca yürütülür.
 
 ### Kabul kriterleri
 

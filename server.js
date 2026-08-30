@@ -20,13 +20,13 @@ const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
 const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
 const {googleSnapshotJobEvidence}=require("./src/jobs/google-snapshot-job-evidence");
-const {snapshotSpreadJobEvidence,recoverySnapshotSpreadJobEvidence}=require("./src/jobs/snapshot-job-evidence");
+const {snapshotSpreadJobEvidence,recoverySnapshotSpreadJobEvidence}=require("./src/jobs/snapshot-job-evidence");const {createMetaLiveRefresh}=require("./src/providers/meta/live-refresh");
 const {createSharedClients}=require("./src/clients/shared-clients");
 const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
 const productionConfig=runtimeConfig.production;
 const app=createApplication({publicDirectory:runtimeConfig.publicDirectory,tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled});
-const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";
+const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";const META_V2_PRIMARY_REFRESH_ENABLED=parseExplicitBoolean(process.env.META_V2_PRIMARY_REFRESH_ENABLED,false,"META_V2_PRIMARY_REFRESH_ENABLED");
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
 const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
@@ -1058,7 +1058,7 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
 const refreshJobBoundary=createRefreshJobBoundary({getClient:()=>supabaseAdmin,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION});
 const createRefreshJob=(userId,platform,platformAccountId,metadata={})=>refreshJobBoundary.create({userId,platform,platformAccountId,metadata});
 const setRefreshJobStatus=(jobId,status,extra={})=>refreshJobBoundary.transition(jobId,status,extra);
-const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});
+const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});const metaV2LiveRefresh=createMetaLiveRefresh({supabaseClient:supabaseAdmin,graphVersion:META_GRAPH_VERSION,resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate});
 const automationSnapshotOrchestrator=createAutomationSnapshotOrchestrator({jobBoundary:refreshJobBoundary});
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
@@ -2895,7 +2895,7 @@ async function handleMetaSnapshotWrite(req,res){
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
-    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"meta",platformAccountId,datePreset,snapshotDate,jobMetadata:{limit,...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION},write:jobContext=>{stage="meta_api";return writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,platformTimeZone,adminTimeSync,...jobContext})}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"meta",platformAccountId,datePreset,snapshotDate,jobMetadata:{limit,...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION},write:jobContext=>{stage="meta_api";return META_V2_PRIMARY_REFRESH_ENABLED?metaV2LiveRefresh.run({userId:user.id,accessToken:conn.access_token,accountId:platformAccountId,since:snapshotDate,until:snapshotDate,sourceJobId:jobContext.sourceJobId,limit:Number(limit)}):writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,platformTimeZone,adminTimeSync,...jobContext})}});
     job=execution.job;
     const writeResult=execution.result;
     stage="snapshot";
@@ -2927,7 +2927,7 @@ async function handleMetaSnapshotWrite(req,res){
       fx_source_currency:writeResult.snapshot?.fx_source_currency||null,
       fx_target_currency:writeResult.snapshot?.fx_target_currency||null,
       fx_engine_version:writeResult.snapshot?.fx_engine_version||null,
-      row_counts:writeResult.row_counts,
+      row_counts:writeResult.row_counts,dataset_v2:writeResult.dataset_v2||null,
       performance_spread_result:writeResult.performance_spread_result||null,
       kpis:writeResult.snapshot?.kpis||{},
       purchase_journey:writeResult.snapshot?.purchase_journey||{},

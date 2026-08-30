@@ -26,7 +26,7 @@ const {loadRuntimeConfig}=require("./src/config/runtime-config");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
 const productionConfig=runtimeConfig.production;
 const app=createApplication({publicDirectory:runtimeConfig.publicDirectory,tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled});
-const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";const META_V2_PRIMARY_REFRESH_ENABLED=parseExplicitBoolean(process.env.META_V2_PRIMARY_REFRESH_ENABLED,false,"META_V2_PRIMARY_REFRESH_ENABLED");
+const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";const META_V2_PRIMARY_REFRESH_ENABLED=parseExplicitBoolean(process.env.META_V2_PRIMARY_REFRESH_ENABLED,true,"META_V2_PRIMARY_REFRESH_ENABLED");
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
 const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";

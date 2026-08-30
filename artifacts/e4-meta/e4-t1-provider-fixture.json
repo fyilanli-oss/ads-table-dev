@@ -1,0 +1,56 @@
+{
+  "fixture_version": "e4-t1-meta-provider-v1",
+  "synthetic": true,
+  "purpose": "contract characterization only; not production evidence",
+  "account": {
+    "id": "act_meta_fixture",
+    "name": "Meta Fixture Account",
+    "account_status": 1,
+    "currency": "USD",
+    "timezone_name": "America/New_York"
+  },
+  "insight": {
+    "campaign_id": "cmp_fixture",
+    "campaign_name": "Fixture Campaign",
+    "adset_id": "set_fixture",
+    "adset_name": "Fixture AdSet",
+    "ad_id": "ad_fixture",
+    "ad_name": "Fixture Ad",
+    "account_currency": "USD",
+    "date_start": "2026-08-29",
+    "date_stop": "2026-08-29",
+    "impressions": "1000",
+    "reach": "850",
+    "clicks": "80",
+    "ctr": "8",
+    "cpc": "1.56875",
+    "spend": "125.50",
+    "actions": [
+      { "action_type": "link_click", "value": "60" },
+      { "action_type": "landing_page_view", "value": "50" },
+      { "action_type": "add_to_cart", "value": "12" },
+      { "action_type": "omni_add_to_cart", "value": "12" },
+      { "action_type": "initiate_checkout", "value": "7" },
+      { "action_type": "omni_initiated_checkout", "value": "7" },
+      { "action_type": "purchase", "value": "4" },
+      { "action_type": "omni_purchase", "value": "4" }
+    ],
+    "action_values": [
+      { "action_type": "add_to_cart", "value": "900.00" },
+      { "action_type": "omni_add_to_cart", "value": "900.00" },
+      { "action_type": "initiate_checkout", "value": "650.00" },
+      { "action_type": "omni_initiated_checkout", "value": "650.00" },
+      { "action_type": "purchase", "value": "480.00" },
+      { "action_type": "omni_purchase", "value": "480.00" }
+    ]
+  },
+  "characterization": {
+    "leaf": "ad",
+    "lineage": ["campaign", "adset", "ad"],
+    "conversion_rule": "standard action first, omni fallback, never sum aliases",
+    "ad_click_decision": "link_click",
+    "clicks_field_role": "delivery_parity_evidence_only",
+    "evidence_only_fields": ["reach", "ctr", "cpc"],
+    "derived_fields_forbidden_in_dataset_v2": ["ctr", "cpc", "roas", "sales", "revenue", "abandoned"]
+  }
+}

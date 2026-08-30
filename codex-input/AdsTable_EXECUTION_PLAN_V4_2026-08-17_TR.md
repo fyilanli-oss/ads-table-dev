@@ -938,11 +938,11 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `Not started`
+**Durum:** `In progress` — E4-T1 `Done`; sıradaki iş E4-T2 Meta client/mapper/capabilities/adapter modülleridir.
 
 ### Planlanan işler
 
-- **E4-T1:** Meta provider fixture ve mevcut fetch characterization.
+- **E4-T1 — `Done`:** Meta provider fixture ve mevcut fetch characterization; Paid Funnel `ad_click = link_click`, `clicks` yalnız delivery/parity evidence olarak onaylandı.
 - **E4-T2:** Client/mapper/capabilities/adapter modüllerini `src/providers/meta` altında kur.
 - **E4-T2A:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mappingini uygula.
 - **E4-T2B:** Meta output'unu yedi bloklu canonical envelope'a eksiksiz normalize et; provider DTO'yu adapter sınırının dışına çıkarma.
@@ -952,6 +952,42 @@ src/
 - **E4-T6:** Refresh job retry/idempotency/telemetry.
 - **E4-T7:** Kullanıcı/account allowlist ile V1+V2 dual-write.
 - **E4-T8:** Provider→canonical→FX→V2→Formula→expected totals parity.
+
+#### E4-T1 task aynası — Meta alan ve mevcut fetch karakterizasyonu
+
+**Amaç:** Meta API alanlarını AdsTable canonical iş gerçekleriyle eşleştirmeden önce mevcut davranışı ve açık iş kararlarını executable fixture ile sabitlemek.
+
+**Mevcut durum:** Meta account discovery ve Campaign/AdSet/Ad Insights fetch çalışıyor; provider-specific mapping, derived KPI ve sıfır fallback davranışı kök `server.js` içinde.
+
+**Planlanan durum:** Account/time/currency, lineage, raw metric, conversion alias, evidence-only alan ve Dataset V2'ye girmeyecek derived alan kararları review edilmiş baseline olur.
+
+**Kapsam:** Sentetik provider fixture, mevcut fetch/action priority characterization, alan karar matrisi ve executable contract testleri.
+
+**Kapsam dışı:** Meta production API çağrısı, runtime adapter, Dataset V2 write, dual-write, feature flag, deployment veya UI değişikliği.
+
+**Bağımlılıklar:** E1, E2 ve E3 `Done`; V4 canonical envelope ve Meta hierarchy freeze.
+
+**Uygulama adımları:** Mevcut sorgu alanlarını sabitle; Meta alias örneklerini fixture'a bağla; canonical/evidence/forbidden alanları ayır; `ad_click` iş kararını review'a sun.
+
+**Kabul kriterleri:** Fixture secret-free ve sentetik; Campaign→AdSet→Ad eksiksiz; standard/omni alias'lar toplanmıyor; derived KPI'lar V2 fact sayılmıyor; açık click kararı belgeli.
+
+**Test planı:** Fixture schema/redaction, mevcut source characterization, alias double-count negatif kontrolü, plan/status ve karar matrisi testleri; full/security/architecture/canonical suite.
+
+**Rollback planı:** Runtime etkisi yoktur; commit revert fixture, doküman, test ve plan durumunu kaldırır.
+
+**Gözlemlenebilirlik:** Yalnız sentetik fixture ve statik karakterizasyon; production kimliği, count veya credential yok.
+
+**Güvenlik ve veri etkisi:** Production request/write yok; secret, PII ve gerçek hesap kimliği yok.
+
+**Planlanan:** Meta alan sözleşmesinin uygulanmadan önce review edilmesi.
+
+**Gerçekleşen:** Sentetik fixture, mevcut davranış baseline'ı ve alan karar matrisi hazırlandı; runtime değiştirilmedi.
+
+**Sapmalar:** Yok. `ad_click = link_click` açık insan iş kararıyla onaylandı; `clicks` canonical toplama girmez.
+
+**Evidence:** `artifacts/e4-meta/e4-t1-provider-fixture.json`, `docs/E4_T1_META_CHARACTERIZATION.md`, `tests/e4-t1-meta-characterization.test.js`.
+
+**Durum:** `Done` — fixture, characterization, `ad_click` iş kararı, PR/CI ve review tamamlandı.
 
 ### Kabul kriterleri
 

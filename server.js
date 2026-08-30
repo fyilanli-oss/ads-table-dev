@@ -2891,7 +2891,7 @@ async function handleMetaSnapshotWrite(req,res){
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"meta",platformAccountId,conn,null);
     const adminTimeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
     const datePreset="today";
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
+    const snapshotDate=adminTimeSync.platform_business_date;
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";

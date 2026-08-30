@@ -938,14 +938,14 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1 `Done`; E4-T2 + E4-T2A + E4-T2B `Verification`.
+**Durum:** `In progress` — E4-T1 + E4-T2 + E4-T2A + E4-T2B `Done`; sıradaki iş E4-T3 conversion count/value provenance.
 
 ### Planlanan işler
 
 - **E4-T1 — `Done`:** Meta provider fixture ve mevcut fetch characterization; Paid Funnel `ad_click = link_click`, `clicks` yalnız delivery/parity evidence olarak onaylandı.
-- **E4-T2 — `Verification`:** Client/mapper/capabilities/adapter modülleri `src/providers/meta` altında hazır; PR/CI review bekleniyor.
-- **E4-T2A — `Verification`:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mapping hazır; PR/CI review bekleniyor.
-- **E4-T2B — `Verification`:** Meta output yedi bloklu canonical envelope'a normalize ediliyor; provider DTO adapter sınırının dışına çıkmıyor; PR/CI review bekleniyor.
+- **E4-T2 — `Done`:** Client/mapper/capabilities/adapter modülleri `src/providers/meta` altında kabul edildi.
+- **E4-T2A — `Done`:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mapping kabul edildi.
+- **E4-T2B — `Done`:** Meta output yedi bloklu canonical envelope'a normalize ediliyor; provider DTO adapter sınırının dışına çıkmıyor.
 - **E4-T3:** ATC/Checkout/Purchase count/value mapping ve provenance'ı explicit yap.
 - **E4-T4:** Account timezone/currency doğrulaması, Time ve FX servislerini bağla.
 - **E4-T5:** Canonical validation ve Dataset V2 idempotent write.
@@ -1023,7 +1023,7 @@ src/
 
 **Evidence:** `src/providers/meta/`, `tests/e4-t2-meta-adapter.test.js`, E4-T1 sentetik fixture.
 
-**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T2/E4-T2A/E4-T2B `Done` değildir.
+**Durum:** `Done` — client/capability/mapper/adapter, lineage, canonical envelope, PR/CI ve insan review tamamlandı.
 
 ### Kabul kriterleri
 

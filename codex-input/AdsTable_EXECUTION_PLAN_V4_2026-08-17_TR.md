@@ -938,7 +938,7 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1–T5 `Done`; E4-T6 `Verification`.
+**Durum:** `In progress` — E4-T1–T6 `Done`; E4-T7 `Verification`.
 
 ### Planlanan işler
 
@@ -949,8 +949,8 @@ src/
 - **E4-T3 — `Done`:** ATC/Checkout/Purchase count/value mapping ve provenance kabul edildi.
 - **E4-T4 — `Done`:** Account timezone/currency doğrulaması ve Time/FX service binding kabul edildi.
 - **E4-T5 — `Done`:** Canonical validation ve Dataset V2 idempotent write boundary kabul edildi.
-- **E4-T6 — `Verification`:** Refresh job retry/idempotency/telemetry sözleşmesi hazır; PR/CI review bekleniyor.
-- **E4-T7:** Kullanıcı/account allowlist ile V1+V2 dual-write.
+- **E4-T6 — `Done`:** Refresh job retry/idempotency/telemetry sözleşmesi kabul edildi.
+- **E4-T7 — `Verification`:** Kullanıcı/account allowlist ile V1+V2 shadow dual-write boundary hazır; PR/CI review bekleniyor.
 - **E4-T8:** Provider→canonical→FX→V2→Formula→expected totals parity.
 
 #### E4-T1 task aynası — Meta alan ve mevcut fetch karakterizasyonu
@@ -1167,7 +1167,43 @@ src/
 
 **Evidence:** `src/providers/meta/refresh-runner.js`, `src/providers/meta/client.js`, `tests/e4-t6-meta-refresh-reliability.test.js`.
 
-**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T6 `Done` değildir.
+**Durum:** `Done` — PR #103, CI ve insan merge onayı tamamlandı.
+
+#### E4-T7 task aynası — Meta allowlisted shadow dual-write
+
+**Amaç:** Mevcut V1 Meta snapshot sonucunu değiştirmeden, yalnız açıkça izin verilen kullanıcı ve reklam hesaplarında V2 yazımını gölge olarak çalıştırmak.
+
+**Mevcut durum:** E4-T6 `Done`; V2 refresh zinciri hazır fakat V1 yanında hangi kullanıcı/hesap için devreye gireceğini belirleyen kapalı varsayılanlı dual-write sınırı yoktu.
+
+**Planlanan durum:** Dual-write default kapalı ve allowlist boş; V1 daima önce ve authoritative çalışır; yalnız exact user+account eşleşmesinde V2 çağrılır; V2 başarısızlığı başarılı V1 sonucunu değiştirmez.
+
+**Kapsam:** Boolean master switch, exact pair allowlist, V1-first sıralama, ownership parity, V1 response identity/no-change, V2 safe telemetry ve repeated delegation.
+
+**Kapsam dışı:** `server.js` runtime wiring, production flag/allowlist değeri, canlı V1/V2 write, deployment, kullanıcı rollout'u ve UI.
+
+**Bağımlılıklar:** E4-T1–T6 `Done`; V1 snapshot yolu korunuyor; V2 refresh idempotent.
+
+**Uygulama adımları:** Allowlist'i exact schema ile doğrula; disabled/not-allowlisted/mismatch skip et; V1 sonucunu önce al; allowlisted durumda V2'yi shadow çağır; V2 hatasını güvenli telemetry'ye indirgeme.
+
+**Kabul kriterleri:** Default off/empty; pair eşleşmesi exact; V1 önce; dönen V1 object/shape aynı; non-allowlisted V2 yok; ownership mismatch V2 yok; V2 hata V1'i bozmaz; unknown safeCode dışarı taşınmaz; tekrar T5 idempotency'ye delege edilir.
+
+**Test planı:** Disabled, non-allowlisted, allowlisted order/no-change, V2 failure, unknown-code redaction, ownership mismatch, malformed/duplicate allowlist ve repeated run; full/security/architecture/canonical suite.
+
+**Rollback planı:** Runtime wiring yoktur; commit revert dual-write coordinator ve testini kaldırır; V1 ve V2 bağımsız akışlar değişmez.
+
+**Gözlemlenebilirlik:** Yalnız `skipped|completed|failed`, safe reason/code, attempt ve rows_written; kullanıcı/account identity, raw provider body ve credential yok.
+
+**Güvenlik ve veri etkisi:** Sentetik/mock çalışma; master switch default off, allowlist empty; production request/write yok.
+
+**Planlanan:** V2'yi küçük ve açık bir grupta V1 sonucuna risk oluşturmadan gözlemleyebilmek.
+
+**Gerçekleşen:** Default-off exact-pair shadow coordinator, V1 no-change ve safe failure telemetry testleri hazır; runtime henüz bağlanmadı.
+
+**Sapmalar:** Production allowlist/flag konfigürasyonu ve rollout yapılmadı; açık production onayı gerektirir.
+
+**Evidence:** `src/providers/meta/dual-write.js`, `tests/e4-t7-meta-allowlisted-dual-write.test.js`.
+
+**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T7 `Done` değildir.
 
 ### Kabul kriterleri
 

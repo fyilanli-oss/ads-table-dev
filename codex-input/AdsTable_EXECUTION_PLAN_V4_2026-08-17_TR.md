@@ -938,14 +938,14 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1 `Done`; sıradaki iş E4-T2 Meta client/mapper/capabilities/adapter modülleridir.
+**Durum:** `In progress` — E4-T1 + E4-T2 + E4-T2A + E4-T2B `Done`; sıradaki iş E4-T3 conversion count/value provenance.
 
 ### Planlanan işler
 
 - **E4-T1 — `Done`:** Meta provider fixture ve mevcut fetch characterization; Paid Funnel `ad_click = link_click`, `clicks` yalnız delivery/parity evidence olarak onaylandı.
-- **E4-T2:** Client/mapper/capabilities/adapter modüllerini `src/providers/meta` altında kur.
-- **E4-T2A:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mappingini uygula.
-- **E4-T2B:** Meta output'unu yedi bloklu canonical envelope'a eksiksiz normalize et; provider DTO'yu adapter sınırının dışına çıkarma.
+- **E4-T2 — `Done`:** Client/mapper/capabilities/adapter modülleri `src/providers/meta` altında kabul edildi.
+- **E4-T2A — `Done`:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mapping kabul edildi.
+- **E4-T2B — `Done`:** Meta output yedi bloklu canonical envelope'a normalize ediliyor; provider DTO adapter sınırının dışına çıkmıyor.
 - **E4-T3:** ATC/Checkout/Purchase count/value mapping ve provenance'ı explicit yap.
 - **E4-T4:** Account timezone/currency doğrulaması, Time ve FX servislerini bağla.
 - **E4-T5:** Canonical validation ve Dataset V2 idempotent write.
@@ -988,6 +988,42 @@ src/
 **Evidence:** `artifacts/e4-meta/e4-t1-provider-fixture.json`, `docs/E4_T1_META_CHARACTERIZATION.md`, `tests/e4-t1-meta-characterization.test.js`.
 
 **Durum:** `Done` — fixture, characterization, `ad_click` iş kararı, PR/CI ve review tamamlandı.
+
+#### E4-T2 + E4-T2A + E4-T2B task aynası — Meta adapter sınırı
+
+**Amaç:** Meta ham API cevabını, provider alanlarını sistemin geri kalanına sızdırmadan AdsTable ortak veri diline çevirmek.
+
+**Mevcut durum:** E4-T1 alan sözleşmesi `Done`; mevcut Meta fetch/mapping kök `server.js` içinde ve V1 snapshot'a özel.
+
+**Planlanan durum:** Bağımsız Meta client, capability ve mapper; Ad leaf lineage, deterministik key ve yedi bloklu canonical çıktı üretir.
+
+**Kapsam:** `src/providers/meta` client/capabilities/mapper/adapter, sentetik fixture mapping'i, canonical/hierarchy ve negatif contract testleri.
+
+**Kapsam dışı:** Production Meta request, Time/FX servis binding, Dataset V2 write, job, dual-write, feature flag, deployment ve UI.
+
+**Bağımlılıklar:** E4-T1 `Done`; E3 canonical boundary; V4 envelope/hierarchy freeze.
+
+**Uygulama adımları:** Fixed Ad-level client kur; capability kararlarını kodla; provider DTO'yu canonical row'a map et; canonical/hierarchy validator ve deterministic key ile doğrula; adapter dışına yalnız canonical sonuç çıkar.
+
+**Kabul kriterleri:** Token URL'ye girmez; daily Ad-level fetch; Campaign/AdSet/Ad eksiksiz; `link_click` canonical click; alias double-count yok; eksik metrik unknown/null; gerçek zero supported; derived KPI sızıntısı yok; E4-T4 öncesi cross-currency çıktı fail-closed olur.
+
+**Test planı:** Client request/auth, capability, seven-block envelope, deterministic key, alias, zero/null/support, eksik lineage ve adapter output testleri; full/security/architecture/canonical suite.
+
+**Rollback planı:** Runtime delegation yoktur; commit revert yeni modülleri ve testleri kaldırır, V1 davranışı değişmez.
+
+**Gözlemlenebilirlik:** Adapter version ve redacted action-type provenance; raw provider payload dışarı çıkmaz.
+
+**Güvenlik ve veri etkisi:** Production request/write yok; access token yalnız Authorization header contract'ında; fixture sentetik.
+
+**Planlanan:** Meta provider DTO → ortak canonical envelope sınırı.
+
+**Gerçekleşen:** Client/capabilities/mapper/adapter ve executable testler hazır; runtime henüz bağlanmadı.
+
+**Sapmalar:** Time/FX değerleri mapper context'inden alınır; gerçek servis binding'i planlandığı gibi E4-T4 kapsamındadır.
+
+**Evidence:** `src/providers/meta/`, `tests/e4-t2-meta-adapter.test.js`, E4-T1 sentetik fixture.
+
+**Durum:** `Done` — client/capability/mapper/adapter, lineage, canonical envelope, PR/CI ve insan review tamamlandı.
 
 ### Kabul kriterleri
 

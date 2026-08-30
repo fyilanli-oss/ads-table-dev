@@ -938,7 +938,7 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1–T6 `Done`; E4-T7 `Verification`.
+**Durum:** `In progress` — E4-T1–T7 `Done`; E4-T8 `Verification`.
 
 ### Planlanan işler
 
@@ -950,8 +950,8 @@ src/
 - **E4-T4 — `Done`:** Account timezone/currency doğrulaması ve Time/FX service binding kabul edildi.
 - **E4-T5 — `Done`:** Canonical validation ve Dataset V2 idempotent write boundary kabul edildi.
 - **E4-T6 — `Done`:** Refresh job retry/idempotency/telemetry sözleşmesi kabul edildi.
-- **E4-T7 — `Verification`:** Kullanıcı/account allowlist ile V1+V2 shadow dual-write boundary hazır; PR/CI review bekleniyor.
-- **E4-T8:** Provider→canonical→FX→V2→Formula→expected totals parity.
+- **E4-T7 — `Done`:** Kullanıcı/account allowlist ile V1+V2 shadow dual-write boundary kabul edildi.
+- **E4-T8 — `Verification`:** Provider→canonical→FX→V2→Formula expected totals parity hazır; PR/CI review bekleniyor.
 
 #### E4-T1 task aynası — Meta alan ve mevcut fetch karakterizasyonu
 
@@ -1203,7 +1203,43 @@ src/
 
 **Evidence:** `src/providers/meta/dual-write.js`, `tests/e4-t7-meta-allowlisted-dual-write.test.js`.
 
-**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T7 `Done` değildir.
+**Durum:** `Done` — PR #104, CI ve insan merge onayı tamamlandı.
+
+#### E4-T8 task aynası — Meta uçtan uca expected totals parity
+
+**Amaç:** Aynı Meta döneminin provider cevabından Formula Engine sonucuna kadar hiçbir aşamada iş rakamı değiştirmeden veya kaybetmeden ilerlediğini tek kabul zincirinde kanıtlamak.
+
+**Mevcut durum:** E4-T7 `Done`; her katman ayrı testli fakat provider→canonical→FX→Dataset V2→Query/Formula zincirinin aynı frozen expected totals ile ortak kabulü yoktu.
+
+**Planlanan durum:** Sentetik Meta fixture USD kaynaktan TRY hedefe açık rate=32 ile işlenir; raw fact, V2 roundtrip, paid funnel, intent formülleri ve retry sonucu tek versioned expected artifact ile karşılaştırılır.
+
+**Kapsam:** Provider fixture, standard action seçimi, Time/FX, canonical write, in-memory V2 read, paid query, Formula/Intent totals, retry idempotency ve drift negatif kontrolü.
+
+**Kapsam dışı:** Production Meta request/token, gerçek FX sağlayıcı, Supabase write, runtime/dual-write activation, deployment, rollout ve UI.
+
+**Bağımlılıklar:** E4-T1–T7 `Done`; canonical/query/formula ve Dataset V2 repository sözleşmeleri hazır.
+
+**Uygulama adımları:** Expected artifact'i freeze et; tam zinciri sentetik client ile çalıştır; raw metrics ve currency/time/provenance'ı doğrula; funnel/intent totals'ı tolerance ile reconcile et; replay ve drift kontrolü ekle.
+
+**Kabul kriterleri:** Tek V2 row; 10 raw metric exact; TRY rate=32; standard purchase provenance; expected funnel/intent totals; Formula v1; replay duplicate yok; bir birim drift testi fail eder; artifact synthetic/versioned.
+
+**Test planı:** Provider-to-V2 raw parity, V2-to-Formula totals parity, complete-chain replay ve intentional drift negative; full/security/architecture/canonical suite.
+
+**Rollback planı:** Runtime etkisi yoktur; commit revert expected artifact ve E4-T8 acceptance testini kaldırır, E4-T1–T7 davranışı değişmez.
+
+**Gözlemlenebilirlik:** Versioned synthetic expected artifact yalnız sentetik metric/totals ve FX contract taşır; identity, credential veya production count yok.
+
+**Güvenlik ve veri etkisi:** Tamamen sentetik/in-memory; production request/write, müşteri verisi ve token yok.
+
+**Planlanan:** Meta vertical slice'ın iş sonucu açısından bütün katmanlarda aynı rakamı verdiğini kanıtlamak.
+
+**Gerçekleşen:** Provider→canonical→FX→V2→Formula raw, funnel, intent, replay ve drift acceptance zinciri hazır.
+
+**Sapmalar:** Gerçek provider/Supabase kabulü çalıştırılmadı; production activation ayrı insan onayı gerektirir.
+
+**Evidence:** `artifacts/e4-meta/e4-t8-expected-parity.json`, `tests/e4-t8-meta-end-to-end-parity.test.js`.
+
+**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T8 ve E4 `Done` değildir.
 
 ### Kabul kriterleri
 

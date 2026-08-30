@@ -938,7 +938,7 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1–T8 `Done`; gerçek Meta→Dataset V2 production activation `Verification`. E5 bu kabul tamamlanana kadar blokeli.
+**Durum:** `Done` — E4-T1–T8 ve zero-data canlı production kabulü tamamlandı; gerçek reklam satırı ilk oluştuğunda mevcut evidence ile izlenecek.
 
 ### Planlanan işler
 
@@ -952,7 +952,7 @@ src/
 - **E4-T6 — `Done`:** Refresh job retry/idempotency/telemetry sözleşmesi kabul edildi.
 - **E4-T7 — `Done`:** Kullanıcı/account allowlist ile V1+V2 shadow dual-write boundary kabul edildi.
 - **E4-T8 — `Done`:** Provider→canonical→FX→V2→Formula sentetik expected totals parity kabul edildi.
-- **E4 canlı kabul — `Verification`:** Meta Refresh V2-primary runtime bağlantısı ve activation `Done`; ilk canlı iş sıfır satırla tamamlandı. Business-date Refresh için kalıcı redacted kanıt doğrulanmadan E4 kapanmaz.
+- **E4 canlı kabul — `Done`:** Doğru Meta hesap business date sorgusu, geçerli provider response, zero-row/fake-free Dataset V2 sonucu ve kalıcı redacted evidence insan iş kararıyla kabul edildi.
 
 #### E4-T1 task aynası — Meta alan ve mevcut fetch karakterizasyonu
 
@@ -1270,7 +1270,7 @@ src/
 
 **Evidence:** `src/providers/meta/live-refresh.js`, `src/providers/meta/client.js`, `server.js`, `tests/e4-live-meta-v2-primary.test.js`, `tests/e4-live-meta-runtime-wiring.test.js`.
 
-**Durum:** `Verification` — ilk evidence-enabled canlı Refresh yanlış caller günü nedeniyle zero-row kaldı. Corrective PR, Meta Refresh tarihini yalnız hesap saat diliminden üretir; production Refresh çalıştırmaz. Merge/deploy sonrasında yeni canlı kabul ayrıca yürütülür.
+**Durum:** `Done` — PR #109 sonrası doğru account business date ile canlı Refresh completed/no-error, provider page `1`, provider row `0`, mapping accepted/rejected `0/0`, Dataset V2 attempted/persisted `0/0` ve fake row `0` olarak doğrulandı. Zero-data canlı kabul insan iş kararıyla kapatıldı; gerçek reklam satırı ilk oluştuğunda mevcut evidence ile izlenecek.
 
 ### Kabul kriterleri
 
@@ -1311,17 +1311,33 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `Not started`
+**Durum:** `In progress` — E4 `Done`; E5-T1 repository paketi `Verification`.
 
 ### Planlanan işler
 
-- **E5-T1:** Conversion action count/value mapping ve provenance.
+- **E5-T1 — `Verification`:** Conversion action count/value mapping ve provenance.
 - **E5-T2:** Gerçek customer currency/timezone.
 - **E5-T3:** Standard Campaign→AdGroup→Ad adapter.
 - **E5-T4:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
 - **E5-T4A:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
 - **E5-T5:** Time/FX/V2/job/telemetry entegrasyonu.
 - **E5-T6:** Dual-write, Standard/PMax ayrı completeness ve parity.
+
+#### E5-T1 task aynası — Google conversion count/value ve provenance
+
+**Amaç:** Google conversion action breakdown içindeki ATC, Checkout ve Purchase count/value değerlerini geniş isim tahmini yapmadan versionlı ve açıklanabilir bir sözleşmeye bağlamak.
+
+**İş kararı:** `ADD_TO_CART`, `BEGIN_CHECKOUT` ve `PURCHASE` kategorileri birincildir. Kategori bulunmazsa yalnız kapalı listedeki exact action adı fallback olabilir; `cart`, `order`, `sale` gibi substring eşleşmeleri ve generic `metrics.conversions_value` purchase yerine kullanılamaz. Aynı kategorideki farklı conversion action kayıtları count/value birlikte toplanır.
+
+**Kapsam:** Sentetik conversion fixture, versionlı mapping kuralları, count/value birlikte seçim, category-first/exact-name fallback, redacted provenance, null/zero ve negatif değer kontrolleri.
+
+**Kapsam dışı:** Production Google API çağrısı, customer/timezone/currency, Standard/PMax hierarchy, Dataset V2 write, runtime/deployment ve dual-write.
+
+**Kabul kriterleri:** Lead purchase olmaz; category exact-name fallback'ten önce gelir; geniş isim eşleşmesi yoktur; missing `null`, measured zero `0`; provenance ham action adı/resource/customer/value taşımaz; full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/google/conversion-mapping.js`, `artifacts/e5-google/e5-t1-conversion-fixture.json`, `docs/E5_T1_GOOGLE_CONVERSION_CHARACTERIZATION.md`, `tests/e5-t1-google-conversion-mapping.test.js`.
+
+**Durum:** `Verification` — repository paketi production işlemi yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 
 ### Kabul kriterleri
 

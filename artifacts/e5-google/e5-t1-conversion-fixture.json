@@ -1,0 +1,16 @@
+{
+  "fixture_version": "e5-t1-google-conversions-v1",
+  "synthetic": true,
+  "actions": [
+    { "name": "Cart Event", "category": "ADD_TO_CART", "conversions": 8, "conversions_value": 400 },
+    { "name": "Checkout Event", "category": "BEGIN_CHECKOUT", "conversions": 5, "conversions_value": 350 },
+    { "name": "Primary Sale", "category": "PURCHASE", "conversions": 3, "conversions_value": 300 },
+    { "name": "Secondary Sale", "category": "PURCHASE", "conversions": 1, "conversions_value": 125 },
+    { "name": "Qualified Lead", "category": "SUBMIT_LEAD_FORM", "conversions": 20, "conversions_value": 900 }
+  ],
+  "expected": {
+    "add_to_cart": { "count": 8, "value": 400, "match_basis": "category", "matched_action_count": 1 },
+    "checkout": { "count": 5, "value": 350, "match_basis": "category", "matched_action_count": 1 },
+    "purchase": { "count": 4, "value": 425, "match_basis": "category", "matched_action_count": 2 }
+  }
+}

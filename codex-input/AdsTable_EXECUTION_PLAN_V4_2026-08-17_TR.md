@@ -938,7 +938,7 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1 + E4-T2 + E4-T2A + E4-T2B `Done`; sıradaki iş E4-T3 conversion count/value provenance.
+**Durum:** `In progress` — E4-T1 + E4-T2 + E4-T2A + E4-T2B `Done`; E4-T3 `Verification`.
 
 ### Planlanan işler
 
@@ -946,7 +946,7 @@ src/
 - **E4-T2 — `Done`:** Client/mapper/capabilities/adapter modülleri `src/providers/meta` altında kabul edildi.
 - **E4-T2A — `Done`:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mapping kabul edildi.
 - **E4-T2B — `Done`:** Meta output yedi bloklu canonical envelope'a normalize ediliyor; provider DTO adapter sınırının dışına çıkmıyor.
-- **E4-T3:** ATC/Checkout/Purchase count/value mapping ve provenance'ı explicit yap.
+- **E4-T3 — `Verification`:** ATC/Checkout/Purchase count/value mapping ve provenance explicit; PR/CI review bekleniyor.
 - **E4-T4:** Account timezone/currency doğrulaması, Time ve FX servislerini bağla.
 - **E4-T5:** Canonical validation ve Dataset V2 idempotent write.
 - **E4-T6:** Refresh job retry/idempotency/telemetry.
@@ -1024,6 +1024,42 @@ src/
 **Evidence:** `src/providers/meta/`, `tests/e4-t2-meta-adapter.test.js`, E4-T1 sentetik fixture.
 
 **Durum:** `Done` — client/capability/mapper/adapter, lineage, canonical envelope, PR/CI ve insan review tamamlandı.
+
+#### E4-T3 task aynası — Meta conversion provenance
+
+**Amaç:** AdsTable ATC, Checkout ve Purchase count/value değerlerinin Meta'da hangi exact action kaydından geldiğini açıklanabilir yapmak.
+
+**Mevcut durum:** E4-T2 canonical mapping `Done`; action priority değeri doğru seçiyor fakat seçilen source field/action type/fallback kararını metrik bazında taşımıyordu.
+
+**Planlanan durum:** On canonical metriğin her biri value taşımayan, review edilebilir source provenance'a sahip olur; standard/omni ve count/value kararları ayrı izlenir.
+
+**Kapsam:** Action selection provenance, row confidence (`real|fallback|partial`) ve standard/fallback/missing/mixed count-value testleri.
+
+**Kapsam dışı:** Meta production request, runtime binding, Time/FX, Dataset V2 write, job, dual-write, deployment ve UI.
+
+**Bağımlılıklar:** E4-T1 + E4-T2 + E4-T2A + E4-T2B `Done`.
+
+**Uygulama adımları:** Her metriğin source field/action type/fallback bilgisini üret; raw değerleri provenance'a kopyalama; fallback/partial confidence belirle; count/value kaynaklarını bağımsız test et.
+
+**Kabul kriterleri:** Standard action kazanır; omni yalnız fallback; alias toplanmaz; missing unknown/null; provenance raw value taşımaz; count/value source kararları ayrı; confidence deterministik.
+
+**Test planı:** Standard, omni-only, missing, mixed count/value ve no-value-leak testleri; full/security/architecture/canonical suite.
+
+**Rollback planı:** Runtime binding yoktur; commit revert provenance genişlemesini kaldırır, E4-T2 mapping değerleri değişmez.
+
+**Gözlemlenebilirlik:** `metric_sources` yalnız `source_field`, `action_type`, `fallback_used`; gerçek metric value veya raw payload içermez.
+
+**Güvenlik ve veri etkisi:** Sentetik fixture; production request/write ve identity/credential yok.
+
+**Planlanan:** Conversion rakamlarının kaynağını kullanıcı desteği ve parity incelemesi için açıklanabilir kılmak.
+
+**Gerçekleşen:** Metrik bazlı source provenance ve row confidence hazır; runtime henüz bağlanmadı.
+
+**Sapmalar:** Yok.
+
+**Evidence:** `src/providers/meta/mapper.js`, `tests/e4-t3-conversion-provenance.test.js`.
+
+**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T3 `Done` değildir.
 
 ### Kabul kriterleri
 

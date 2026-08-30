@@ -1,0 +1,45 @@
+{
+  "evidence_version": "e4-t8-meta-parity-v1",
+  "synthetic": true,
+  "target_currency": "TRY",
+  "fx_rate": 32,
+  "expected_raw_metrics": {
+    "impression": 1000,
+    "ad_click": 60,
+    "session": null,
+    "spend_value": 4016,
+    "add_to_cart": 12,
+    "add_to_cart_value": 28800,
+    "checkout": 7,
+    "checkout_value": 20800,
+    "purchase": 4,
+    "purchase_value": 15360
+  },
+  "expected_funnel_totals": {
+    "row_count": 1,
+    "funnel_click": 60,
+    "funnel_impression": 1000,
+    "funnel_spend": 4016,
+    "funnel_add_to_cart": 12,
+    "funnel_add_to_cart_value": 28800,
+    "funnel_checkout": 7,
+    "funnel_checkout_value": 20800,
+    "funnel_purchase": 4,
+    "funnel_sales": 15360,
+    "sales": 15360,
+    "abandoned": 3,
+    "abandoned_value": 5440,
+    "profit": 11344,
+    "margin": 73.85416666666667,
+    "ctr": 6,
+    "cpc": 66.93333333333334,
+    "roas": 3.8247011952191237,
+    "cps": 1004
+  },
+  "expected_intent": {
+    "add_to_cart_rate": 20,
+    "checkout_rate": 58.333333333333336,
+    "abandoned_rate": 42.857142857142854,
+    "purchase_rate": 57.14285714285714
+  }
+}

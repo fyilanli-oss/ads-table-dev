@@ -938,7 +938,7 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1 + E4-T2 + E4-T2A + E4-T2B `Done`; E4-T3 `Verification`.
+**Durum:** `In progress` — E4-T1 + E4-T2 + E4-T2A + E4-T2B + E4-T3 `Done`; E4-T4 `Verification`.
 
 ### Planlanan işler
 
@@ -946,8 +946,8 @@ src/
 - **E4-T2 — `Done`:** Client/mapper/capabilities/adapter modülleri `src/providers/meta` altında kabul edildi.
 - **E4-T2A — `Done`:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mapping kabul edildi.
 - **E4-T2B — `Done`:** Meta output yedi bloklu canonical envelope'a normalize ediliyor; provider DTO adapter sınırının dışına çıkmıyor.
-- **E4-T3 — `Verification`:** ATC/Checkout/Purchase count/value mapping ve provenance explicit; PR/CI review bekleniyor.
-- **E4-T4:** Account timezone/currency doğrulaması, Time ve FX servislerini bağla.
+- **E4-T3 — `Done`:** ATC/Checkout/Purchase count/value mapping ve provenance kabul edildi.
+- **E4-T4 — `Verification`:** Account timezone/currency doğrulaması ve Time/FX service binding hazır; PR/CI review bekleniyor.
 - **E4-T5:** Canonical validation ve Dataset V2 idempotent write.
 - **E4-T6:** Refresh job retry/idempotency/telemetry.
 - **E4-T7:** Kullanıcı/account allowlist ile V1+V2 dual-write.
@@ -1059,7 +1059,43 @@ src/
 
 **Evidence:** `src/providers/meta/mapper.js`, `tests/e4-t3-conversion-provenance.test.js`.
 
-**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T3 `Done` değildir.
+**Durum:** `Done` — PR #100, CI ve insan merge onayı tamamlandı.
+
+#### E4-T4 task aynası — Meta Time/FX bağlama
+
+**Amaç:** Meta rapor gününü hesabın gerçek saat dilimine, parasal metrikleri ise açık ve denetlenebilir kur bilgisine bağlamak.
+
+**Mevcut durum:** E4-T3 `Done`; mapper context değerlerini taşıyor fakat Meta hesap metadata'sını ortak Time ve FX servisleri üzerinden doğrulamıyordu.
+
+**Planlanan durum:** Hesap kimliği, timezone ve currency Meta account metadata'sından doğrulanır; günlük tarih Time Service, spend ve conversion value alanları FX Service tarafından normalize edilir.
+
+**Kapsam:** Account identity/currency/timezone parity, tek günlük insight sınırı, same-currency rate=1, cross-currency explicit positive rate/provider ve dört parasal fact'in tek dönüşümü.
+
+**Kapsam dışı:** Production Meta request, gerçek kur sağlayıcı çağrısı, Dataset V2 write, refresh job, dual-write, deployment ve UI.
+
+**Bağımlılıklar:** E4-T1–T3 `Done`; ortak `time-service` ve `fx-service` hazır.
+
+**Uygulama adımları:** Account metadata'yı doğrula; provider date'i account timezone ile normalize et; mapper'ın source-currency çıktısını FX Service'e ver; canonical row ve entity key'i yeniden doğrula.
+
+**Kabul kriterleri:** Yanlış account/currency/timezone fail-closed; date range günlük; same-currency rate=1; cross-currency rate/provider zorunlu; desteklenen tüm parasal fact'ler bir kez çevrilir; adet metrikleri değişmez.
+
+**Test planı:** Same-currency, cross-currency, metadata spoof/mismatch, invalid timezone, multi-day insight, missing/invalid FX testleri; full/security/architecture/canonical suite.
+
+**Rollback planı:** Production delegation yoktur; commit revert adapter normalization katmanını kaldırır ve E4-T3 mapper davranışına döner.
+
+**Gözlemlenebilirlik:** Canonical `time` ve `currency` blokları kullanılan timezone, business date, rate date, provider ve engine version'ı taşır; credential veya raw account payload taşımaz.
+
+**Güvenlik ve veri etkisi:** Sentetik fixture; production request/write, müşteri kimliği ve credential yok.
+
+**Planlanan:** Meta gün ve para değerlerinin ortak AdsTable standardında karşılaştırılabilir olması.
+
+**Gerçekleşen:** Account metadata kontrollü Time/FX binding ve executable negatif kontroller hazır; runtime henüz bağlanmadı.
+
+**Sapmalar:** Gerçek FX provider çağrısı yapılmadı; rate ve provider bu pakette açık input sözleşmesidir.
+
+**Evidence:** `src/providers/meta/normalization.js`, `src/providers/meta/adapter.js`, `tests/e4-t4-meta-time-fx.test.js`.
+
+**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T4 `Done` değildir.
 
 ### Kabul kriterleri
 

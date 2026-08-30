@@ -48,8 +48,8 @@
     "leaf": "ad",
     "lineage": ["campaign", "adset", "ad"],
     "conversion_rule": "standard action first, omni fallback, never sum aliases",
-    "ad_click_decision": "pending_business_definition",
-    "ad_click_recommendation": "link_click",
+    "ad_click_decision": "link_click",
+    "clicks_field_role": "delivery_parity_evidence_only",
     "evidence_only_fields": ["reach", "ctr", "cpc"],
     "derived_fields_forbidden_in_dataset_v2": ["ctr", "cpc", "roas", "sales", "revenue", "abandoned"]
   }

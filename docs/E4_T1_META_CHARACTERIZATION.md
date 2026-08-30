@@ -22,21 +22,17 @@ Meta API'den alınacak hesap, hiyerarşi ve ham performans alanları; Dataset V2
 | Time/currency | `timezone_name`, `currency`, `account_currency`, `date_start`, `date_stop` | Business date ve FX | Zorunlu |
 | Lineage | Campaign, AdSet, Ad id/name | Campaign → AdSet → Ad | Kayıpsız korunur |
 | Delivery | `impressions` | `raw_metrics.impression` | Canonical fact |
-| Click | `clicks`, `actions.link_click` | `raw_metrics.ad_click` | İş tanımı kararı gerekli; öneri `link_click` |
+| Click | `actions.link_click` | `raw_metrics.ad_click` | Onaylandı |
+| Delivery click | `clicks` | Parity evidence | Dataset V2 raw fact değil |
 | Cost | `spend` | `raw_metrics.spend_value` | Canonical monetary fact |
 | ATC | `actions` + `action_values` | count/value | Standard önce, omni fallback |
 | Checkout | `actions` + `action_values` | count/value | Standard önce, omni fallback |
 | Purchase | `actions` + `action_values` | count/value | Standard önce, omni fallback |
 | Diagnostic | `reach`, `ctr`, `cpc`, rankings/cost fields | Parity evidence | Dataset V2 raw fact değil |
 
-## Açık iş kararı
+## Onaylanan iş kararı
 
-`ad_click` tanımı kesinleştirilmelidir:
-
-- `clicks`: Meta reklamı üzerindeki bütün click etkileşimleri.
-- `link_click`: Reklamdan bir bağlantıya yönelen click; Funnel web trafiği anlamına daha yakındır.
-
-**Öneri:** AdsTable Paid Funnel `ad_click = link_click` kullansın. `clicks` yalnız delivery/parity evidence olarak kalsın. Bu karar verilmeden adapter mapping'i production-ready sayılmaz.
+AdsTable Paid Funnel için `ad_click = link_click` onaylandı. Meta `clicks`, reklam üzerindeki daha geniş etkileşimleri içerdiği için yalnız delivery/parity evidence olarak kalır ve Dataset V2 canonical click toplamına girmez.
 
 ## E4 boyunca korunacak sınır
 

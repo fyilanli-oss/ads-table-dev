@@ -938,11 +938,11 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1 fixture/characterization hazır; `ad_click` iş tanımı kararı ve PR/CI review bekleniyor.
+**Durum:** `In progress` — E4-T1 `Done`; sıradaki iş E4-T2 Meta client/mapper/capabilities/adapter modülleridir.
 
 ### Planlanan işler
 
-- **E4-T1 — `Verification`:** Meta provider fixture ve mevcut fetch characterization; `ad_click` iş tanımı kararı ve review bekleniyor.
+- **E4-T1 — `Done`:** Meta provider fixture ve mevcut fetch characterization; Paid Funnel `ad_click = link_click`, `clicks` yalnız delivery/parity evidence olarak onaylandı.
 - **E4-T2:** Client/mapper/capabilities/adapter modüllerini `src/providers/meta` altında kur.
 - **E4-T2A:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mappingini uygula.
 - **E4-T2B:** Meta output'unu yedi bloklu canonical envelope'a eksiksiz normalize et; provider DTO'yu adapter sınırının dışına çıkarma.
@@ -983,11 +983,11 @@ src/
 
 **Gerçekleşen:** Sentetik fixture, mevcut davranış baseline'ı ve alan karar matrisi hazırlandı; runtime değiştirilmedi.
 
-**Sapmalar:** `ad_click` exact Meta kaynağı teknik varsayımla kapatılmadı; iş kararı bekleniyor.
+**Sapmalar:** Yok. `ad_click = link_click` açık insan iş kararıyla onaylandı; `clicks` canonical toplama girmez.
 
 **Evidence:** `artifacts/e4-meta/e4-t1-provider-fixture.json`, `docs/E4_T1_META_CHARACTERIZATION.md`, `tests/e4-t1-meta-characterization.test.js`.
 
-**Durum:** `Verification` — `ad_click` iş kararı, PR/CI ve review tamamlanmadan `Done` değildir.
+**Durum:** `Done` — fixture, characterization, `ad_click` iş kararı, PR/CI ve review tamamlandı.
 
 ### Kabul kriterleri
 

@@ -938,7 +938,7 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1 + E4-T2 + E4-T2A + E4-T2B + E4-T3 `Done`; E4-T4 `Verification`.
+**Durum:** `In progress` — E4-T1–T4 `Done`; E4-T5 `Verification`.
 
 ### Planlanan işler
 
@@ -947,8 +947,8 @@ src/
 - **E4-T2A — `Done`:** `Campaign → AdSet → Ad` root/parent/leaf lineage ve deterministic entity key mapping kabul edildi.
 - **E4-T2B — `Done`:** Meta output yedi bloklu canonical envelope'a normalize ediliyor; provider DTO adapter sınırının dışına çıkmıyor.
 - **E4-T3 — `Done`:** ATC/Checkout/Purchase count/value mapping ve provenance kabul edildi.
-- **E4-T4 — `Verification`:** Account timezone/currency doğrulaması ve Time/FX service binding hazır; PR/CI review bekleniyor.
-- **E4-T5:** Canonical validation ve Dataset V2 idempotent write.
+- **E4-T4 — `Done`:** Account timezone/currency doğrulaması ve Time/FX service binding kabul edildi.
+- **E4-T5 — `Verification`:** Canonical validation ve Dataset V2 idempotent write boundary hazır; PR/CI review bekleniyor.
 - **E4-T6:** Refresh job retry/idempotency/telemetry.
 - **E4-T7:** Kullanıcı/account allowlist ile V1+V2 dual-write.
 - **E4-T8:** Provider→canonical→FX→V2→Formula→expected totals parity.
@@ -1095,7 +1095,43 @@ src/
 
 **Evidence:** `src/providers/meta/normalization.js`, `src/providers/meta/adapter.js`, `tests/e4-t4-meta-time-fx.test.js`.
 
-**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T4 `Done` değildir.
+**Durum:** `Done` — PR #101, CI ve insan merge onayı tamamlandı.
+
+#### E4-T5 task aynası — Meta canonical Dataset V2 write
+
+**Amaç:** Doğrulanmış Meta sonuçlarını Dataset V2'ye aynı dönem yeniden işlendiğinde mükerrer kayıt üretmeden güvenli biçimde yazmak.
+
+**Mevcut durum:** E4-T4 `Done`; Meta adapter canonical sonuç üretiyor fakat provider akışı canonical write boundary üzerinden Dataset V2 repository semantiğine bağlanmamıştı.
+
+**Planlanan durum:** Meta sonuçları ownership, canonical contract, hierarchy ve entity key kontrollerinden sonra yalnız ortak write boundary üzerinden UPSERT edilir; tekrar aynı canonical identity'yi değiştirir, çoğaltmaz.
+
+**Kapsam:** Meta dataset writer, user/account ownership, canonical/entity-key doğrulaması, tek boundary delegation, sonuç cardinality kontrolü ve in-memory idempotent repository testleri.
+
+**Kapsam dışı:** Production Supabase write, runtime route/job binding, refresh retry/telemetry, dual-write, deployment ve UI.
+
+**Bağımlılıklar:** E4-T1–T4 `Done`; E3 canonical write boundary ve E2 Dataset V2 repository sözleşmesi hazır.
+
+**Uygulama adımları:** Adapter sonuçlarını doğrula; input user/account ile row ownership parity kur; entity key'i yeniden üret; canonical boundary'ye bir kez devret; tekrar ve düzeltme senaryolarını doğrula.
+
+**Kabul kriterleri:** Provider DTO yazılamaz; wrong user/account reddedilir; invalid canonical/hierarchy/key yazılmaz; aynı period retry tek satır; corrected result aynı identity'yi günceller; write sonucu cardinality saparsa başarı raporlanmaz.
+
+**Test planı:** İlk write, aynı input retry, corrected facts, ownership/canonical/key negatifleri ve cardinality fail-closed; full/security/architecture/canonical suite.
+
+**Rollback planı:** Production binding yoktur; commit revert Meta dataset writer ve testlerini kaldırır, mevcut Dataset V2 repository değişmez.
+
+**Gözlemlenebilirlik:** Sonuç yalnız attempted/persisted adetleri ve canonical repository sonucunu taşır; credential veya provider raw DTO loglamaz.
+
+**Güvenlik ve veri etkisi:** Sentetik fixture ve in-memory repository; production request/write, müşteri verisi ve credential yok.
+
+**Planlanan:** Meta verisinin Dataset V2'ye güvenli ve tekrarlanabilir giriş kapısını kurmak.
+
+**Gerçekleşen:** Ownership kontrollü canonical writer ve idempotent/corrective executable testler hazır; runtime henüz bağlanmadı.
+
+**Sapmalar:** Production Supabase entegrasyonu çalıştırılmadı; açık production onayı gerektirir.
+
+**Evidence:** `src/providers/meta/dataset-writer.js`, `tests/e4-t5-meta-idempotent-write.test.js`.
+
+**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T5 `Done` değildir.
 
 ### Kabul kriterleri
 

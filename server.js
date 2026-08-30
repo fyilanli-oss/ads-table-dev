@@ -2895,7 +2895,7 @@ async function handleMetaSnapshotWrite(req,res){
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
-    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"meta",platformAccountId,datePreset,snapshotDate,jobMetadata:{limit,...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION},write:jobContext=>{stage="meta_api";return META_V2_PRIMARY_REFRESH_ENABLED?metaV2LiveRefresh.run({userId:user.id,accessToken:conn.access_token,accountId:platformAccountId,since:snapshotDate,until:snapshotDate,sourceJobId:jobContext.sourceJobId,limit:Number(limit)}):writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,platformTimeZone,adminTimeSync,...jobContext})}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"meta",platformAccountId,datePreset,snapshotDate,jobMetadata:{limit,...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION},complete:(result,job)=>({snapshot_id:result.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:result.performance_spread_result||null,meta_v2_evidence:result.meta_v2_evidence||null}}),write:jobContext=>{stage="meta_api";return META_V2_PRIMARY_REFRESH_ENABLED?metaV2LiveRefresh.run({userId:user.id,accessToken:conn.access_token,accountId:platformAccountId,since:snapshotDate,until:snapshotDate,sourceJobId:jobContext.sourceJobId,limit:Number(limit)}):writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,platformTimeZone,adminTimeSync,...jobContext})}});
     job=execution.job;
     const writeResult=execution.result;
     stage="snapshot";

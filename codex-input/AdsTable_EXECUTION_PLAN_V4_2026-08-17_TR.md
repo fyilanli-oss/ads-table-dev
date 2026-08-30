@@ -952,7 +952,7 @@ src/
 - **E4-T6 — `Done`:** Refresh job retry/idempotency/telemetry sözleşmesi kabul edildi.
 - **E4-T7 — `Done`:** Kullanıcı/account allowlist ile V1+V2 shadow dual-write boundary kabul edildi.
 - **E4-T8 — `Done`:** Provider→canonical→FX→V2→Formula sentetik expected totals parity kabul edildi.
-- **E4 canlı kabul — `Verification`:** Meta Refresh V2-primary runtime bağlantısı `Done`; açık insan production onayı sonrası activation PR review bekleniyor.
+- **E4 canlı kabul — `Verification`:** Meta Refresh V2-primary runtime bağlantısı ve activation `Done`; ilk canlı iş sıfır satırla tamamlandı. Business-date Refresh için kalıcı redacted kanıt doğrulanmadan E4 kapanmaz.
 
 #### E4-T1 task aynası — Meta alan ve mevcut fetch karakterizasyonu
 
@@ -1248,27 +1248,29 @@ src/
 
 **Amaç:** Kullanıcının mevcut Meta Refresh işlemini gerçek Meta verisiyle Dataset V2'ye bağlamak ve Google'a geçmeden önce canlı V2 sonucunu birlikte doğrulamak.
 
-**Mevcut durum:** E4-T1–T8 kod/sentetik kabul `Done`; gerçek runtime `server.js` bağlantısı ve production activation yapılmamıştı.
+**Mevcut durum:** E4-T1–T8 kod/sentetik kabul `Done`; V2-primary runtime production'da aktiftir. 2026-08-30 ilk canlı Refresh tamamlandı fakat V1 ve V2 satır sayısı sıfır kaldı; o job provider cevap sayısı ve mapping sonucunu kalıcı metadata olarak taşımadığı için bu sonuç canlı veri kabulünü tek başına kanıtlamaz.
 
 **Planlanan durum:** Açık insan production onayı sonrası `META_V2_PRIMARY_REFRESH_ENABLED` checked-in default `true` olur. Explicit `false` rollback sağlar; aktifken aynı Refresh job gerçek Meta Ad daily insights'ı doğrudan canonical→FX→Dataset V2 UPSERT zincirine gönderir ve V1 snapshot yazmaz.
 
-**Kapsam:** Gerçek account discovery, cursor pagination, account/currency/timezone parity, source job lineage, server-side Supabase repository, V2 primary handler wiring ve güvenli zero-row sonuç kanıtı.
+**Kapsam:** Gerçek account discovery, yalnız seçili business date için günlük Meta sorgusu, cursor pagination, business-date FX tarihi, account/currency/timezone parity, source job lineage, server-side Supabase repository, V2 primary handler wiring ve güvenli zero-row sonuç kanıtı.
 
-**Kapsam dışı:** Bu PR içinde production flag açılması, canlı Refresh çalıştırılması, Google E5, sentetik/fake empty row, V1 migration veya UI redesign.
+**Kapsam dışı:** Bu PR içinde canlı Refresh çalıştırılması veya geçmiş dönem backfill, Google E5, sentetik/fake empty row, V1 migration veya UI redesign.
 
 **Teknik karar — boş veri:** Meta gerçek Ad insight döndürmezse işlem başarılı `persisted=0` ve `empty_provider_result=true` üretir; Dataset V2'ye sahte reklam satırı yazılmaz. Meta gerçek satır döndürürse yalnız bu gerçek satırlar UPSERT edilir.
 
 **Kabul kriterleri:** Production-approved gate default true; explicit false rollback; enabled path V2-primary; V1 write yok; tüm cursor sayfaları aynı güvenli endpoint/cursor ile alınır; provider `next` URL/token izlenmez; gerçek satır V2 UPSERT; empty result zero-row/fake-free; response V2 outcome taşır; source job id persist edilir.
 
-**Canlı kabul sırası:** PR/CI → merge onayı → ayrı production activation onayı → kullanıcının Meta Refresh'i → V2 row/count/ownership/date/currency/provenance kontrolü → ikinci Refresh idempotency → Formula parity → E4 closeout. E5 bu sıra tamamlanmadan başlamaz.
+**Canlı kabul sırası:** business-date evidence PR ve CI → merge onayı → kullanıcının normal Meta Refresh'i → job metadata içindeki request/response/mapping/V2 kanıtı ile V2 row/ownership/date/currency/provenance kontrolü → gerekirse ayrı onaylı idempotency kontrolü → Formula parity → E4 closeout. E5 bu sıra tamamlanmadan başlamaz.
 
 **Rollback:** Production gate kapatılır; V2-primary çağrı anında durur ve mevcut V1 fallback yolu kodda korunur.
 
-**Güvenlik ve veri etkisi:** Kod bağlantısı production-capable; açık insan production onayı alınmıştır. Activation PR merge/deploy sonrasında kullanıcının Meta Refresh işlemi beklenir; PR kendi başına API çağrısı yapmaz.
+**Güvenlik ve veri etkisi:** Kod bağlantısı production-capable; mevcut V2-primary activation daha önce açık insan onayıyla tamamlanmıştır. Bu PR kendi başına Meta API çağrısı veya production write yapmaz.
+
+**Kalıcı redacted kanıt:** Refresh job metadata yalnız sorgu tarih aralığı/gün sayısı/level/time increment/alan adlarını, provider page/row sayılarını, accepted/rejected sayılarını ve Dataset V2 attempted/persisted sonucunu taşır. Token, kullanıcı/reklam hesabı/varlık kimliği ve ham metrik değeri taşımaz. Başarılı mapping fail-closed olduğu için `rejected=0`; herhangi bir mapping hatası tüm işi başarısız yapar ve kısmi başarı raporlanmaz.
 
 **Evidence:** `src/providers/meta/live-refresh.js`, `src/providers/meta/client.js`, `server.js`, `tests/e4-live-meta-v2-primary.test.js`, `tests/e4-live-meta-runtime-wiring.test.js`.
 
-**Durum:** `Verification` — production activation onayı alındı; activation PR merge/CI/deploy bekleniyor, ardından kullanıcı Refresh yapacak.
+**Durum:** `Verification` — production activation tamamlandı ve ilk canlı zero-row sonuç gözlendi. Bu paket production backfill çalıştırmaz; merge/deploy sonrasında kullanıcı normal business-date Refresh çalıştıracaktır; geçmiş dönem backfill bu akışa bağlanmaz.
 
 ### Kabul kriterleri
 

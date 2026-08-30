@@ -17,6 +17,7 @@ function metaError(message, safeCode) { const error = new Error(message); error.
 
 function createMetaClient({ accessToken, graphVersion = 'v23.0', transport = globalThis.fetch, baseUrl = 'https://graph.facebook.com' } = {}) {
   const token = required(accessToken, 'accessToken');
+  let lastInsightsEvidence = null;
   if (typeof transport !== 'function') throw new TypeError('transport is required');
   async function get(pathname, params = {}) {
     const url = new URL(`${baseUrl}/${graphVersion}/${pathname.replace(/^\//, '')}`);
@@ -44,7 +45,10 @@ function createMetaClient({ accessToken, graphVersion = 'v23.0', transport = glo
       if (!Array.isArray(body.data)) throw new Error('Meta insights response must contain data[]');
       data.push(...body.data);
       const after = body.paging?.next ? body.paging?.cursors?.after : null;
-      if (!after) return { data };
+      if (!after) {
+        lastInsightsEvidence = Object.freeze({ data_is_array: true, page_count: page, row_count: data.length, has_next_page: false });
+        return { data };
+      }
       if (cursors.has(after)) throw new Error('Meta insights pagination cursor repeated');
       cursors.add(after); params.after = after;
     }
@@ -52,7 +56,8 @@ function createMetaClient({ accessToken, graphVersion = 'v23.0', transport = glo
   }
   return Object.freeze({
     listAccounts: () => get('me/adaccounts', { fields: ACCOUNT_FIELDS.join(','), limit: 100 }),
-    fetchAdInsights
+    fetchAdInsights,
+    getLastInsightsEvidence: () => lastInsightsEvidence
   });
 }
 

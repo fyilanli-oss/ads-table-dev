@@ -938,7 +938,7 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1–T7 `Done`; E4-T8 `Verification`.
+**Durum:** `In progress` — E4-T1–T8 `Done`; gerçek Meta→Dataset V2 canlı kabul bağlantısı `Verification`. E5 bu kabul tamamlanana kadar blokeli.
 
 ### Planlanan işler
 
@@ -951,7 +951,8 @@ src/
 - **E4-T5 — `Done`:** Canonical validation ve Dataset V2 idempotent write boundary kabul edildi.
 - **E4-T6 — `Done`:** Refresh job retry/idempotency/telemetry sözleşmesi kabul edildi.
 - **E4-T7 — `Done`:** Kullanıcı/account allowlist ile V1+V2 shadow dual-write boundary kabul edildi.
-- **E4-T8 — `Verification`:** Provider→canonical→FX→V2→Formula expected totals parity hazır; PR/CI review bekleniyor.
+- **E4-T8 — `Done`:** Provider→canonical→FX→V2→Formula sentetik expected totals parity kabul edildi.
+- **E4 canlı kabul — `Verification`:** Meta Refresh için default-off V2-primary runtime bağlantısı hazır; merge ve ayrı production activation onayı bekleniyor.
 
 #### E4-T1 task aynası — Meta alan ve mevcut fetch karakterizasyonu
 
@@ -1239,7 +1240,35 @@ src/
 
 **Evidence:** `artifacts/e4-meta/e4-t8-expected-parity.json`, `tests/e4-t8-meta-end-to-end-parity.test.js`.
 
-**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T8 ve E4 `Done` değildir.
+**Durum:** `Done` — PR #105, CI ve insan merge onayıyla sentetik E4-T8 tamamlandı; E4 kapanışı gerçek Meta canlı kabulüne bağlıdır.
+
+#### E4 canlı kabul kapısı — Meta Refresh V2-primary runtime bağlantısı
+
+**İş kararı:** Uygulama geliştirme aşamasında ve tek kullanıcı vardır; V1 dashboard/dataset artık hedef değildir. Meta Refresh, production gate açıldığında V2'ye doğrudan yazacaktır; dual-write kullanılmayacaktır.
+
+**Amaç:** Kullanıcının mevcut Meta Refresh işlemini gerçek Meta verisiyle Dataset V2'ye bağlamak ve Google'a geçmeden önce canlı V2 sonucunu birlikte doğrulamak.
+
+**Mevcut durum:** E4-T1–T8 kod/sentetik kabul `Done`; gerçek runtime `server.js` bağlantısı ve production activation yapılmamıştı.
+
+**Planlanan durum:** Tek `META_V2_PRIMARY_REFRESH_ENABLED` gate default kapalıdır. Kapalıyken mevcut V1 davranışı korunur; açıkken aynı Refresh job gerçek Meta Ad daily insights'ı doğrudan canonical→FX→Dataset V2 UPSERT zincirine gönderir ve V1 snapshot yazmaz.
+
+**Kapsam:** Gerçek account discovery, cursor pagination, account/currency/timezone parity, source job lineage, server-side Supabase repository, V2 primary handler wiring ve güvenli zero-row sonuç kanıtı.
+
+**Kapsam dışı:** Bu PR içinde production flag açılması, canlı Refresh çalıştırılması, Google E5, sentetik/fake empty row, V1 migration veya UI redesign.
+
+**Teknik karar — boş veri:** Meta gerçek Ad insight döndürmezse işlem başarılı `persisted=0` ve `empty_provider_result=true` üretir; Dataset V2'ye sahte reklam satırı yazılmaz. Meta gerçek satır döndürürse yalnız bu gerçek satırlar UPSERT edilir.
+
+**Kabul kriterleri:** Gate default false; enabled path V2-primary; V1 write yok; tüm cursor sayfaları aynı güvenli endpoint/cursor ile alınır; provider `next` URL/token izlenmez; gerçek satır V2 UPSERT; empty result zero-row/fake-free; response V2 outcome taşır; source job id persist edilir.
+
+**Canlı kabul sırası:** PR/CI → merge onayı → ayrı production activation onayı → kullanıcının Meta Refresh'i → V2 row/count/ownership/date/currency/provenance kontrolü → ikinci Refresh idempotency → Formula parity → E4 closeout. E5 bu sıra tamamlanmadan başlamaz.
+
+**Rollback:** Production gate kapatılır; V2-primary çağrı anında durur ve mevcut V1 fallback yolu kodda korunur.
+
+**Güvenlik ve veri etkisi:** Kod bağlantısı production-capable fakat gate default off; bu PR canlı Meta request veya Supabase write çalıştırmaz. Activation açık insan onayı gerektirir.
+
+**Evidence:** `src/providers/meta/live-refresh.js`, `src/providers/meta/client.js`, `server.js`, `tests/e4-live-meta-v2-primary.test.js`, `tests/e4-live-meta-runtime-wiring.test.js`.
+
+**Durum:** `Verification` — merge sonrası ayrıca production activation onayı olmadan canlı işlem yapılmaz.
 
 ### Kabul kriterleri
 

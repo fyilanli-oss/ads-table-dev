@@ -73,7 +73,7 @@ function mapMetaInsight(insight, context) {
     time: { source_timezone: text(context.sourceTimezone, 'context.sourceTimezone'), business_date: identity.date,
       time_engine_version: text(context.timeEngineVersion || 'v1', 'context.timeEngineVersion') },
     provenance: { source_system: 'meta_ads', adapter_version: ADAPTER_VERSION, source_confidence: hasUnknown ? 'partial' : hasFallback ? 'fallback' : 'real', synthetic: false,
-      ga4_property_id: null, raw_reference: { date_start: insight.date_start || null, date_stop: insight.date_stop || null, metric_sources: metricSources } }
+      ga4_property_id: null, source_job_id: context.sourceJobId || null, raw_reference: { date_start: insight.date_start || null, date_stop: insight.date_stop || null, metric_sources: metricSources } }
   };
   validateCanonicalRow(row); validateEntityHierarchy(identity, entity);
   return Object.freeze({ row, entityKey: buildEntityKey(identity, entity) });

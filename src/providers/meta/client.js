@@ -32,12 +32,27 @@ function createMetaClient({ accessToken, graphVersion = 'v23.0', transport = glo
     }
     return body;
   }
-  return Object.freeze({
-    listAccounts: () => get('me/adaccounts', { fields: ACCOUNT_FIELDS.join(','), limit: 100 }),
-    fetchAdInsights: ({ accountId, since, until, limit = 100 }) => get(`${required(accountId, 'accountId')}/insights`, {
+  async function fetchAdInsights({ accountId, since, until, limit = 100, maxPages = 100 }) {
+    if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > 100) throw new RangeError('maxPages must be between 1 and 100');
+    const params = {
       level: 'ad', time_range: JSON.stringify({ since: required(since, 'since'), until: required(until, 'until') }),
       time_increment: 1, fields: AD_INSIGHT_FIELDS.join(','), limit
-    })
+    };
+    const data = [], cursors = new Set();
+    for (let page = 1; page <= maxPages; page += 1) {
+      const body = await get(`${required(accountId, 'accountId')}/insights`, params);
+      if (!Array.isArray(body.data)) throw new Error('Meta insights response must contain data[]');
+      data.push(...body.data);
+      const after = body.paging?.next ? body.paging?.cursors?.after : null;
+      if (!after) return { data };
+      if (cursors.has(after)) throw new Error('Meta insights pagination cursor repeated');
+      cursors.add(after); params.after = after;
+    }
+    throw new Error('Meta insights pagination exceeded maxPages');
+  }
+  return Object.freeze({
+    listAccounts: () => get('me/adaccounts', { fields: ACCOUNT_FIELDS.join(','), limit: 100 }),
+    fetchAdInsights
   });
 }
 

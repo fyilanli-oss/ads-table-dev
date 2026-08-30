@@ -13,6 +13,8 @@ function required(value, name) {
   return value.trim();
 }
 
+function metaError(message, safeCode) { const error = new Error(message); error.safeCode = safeCode; return error; }
+
 function createMetaClient({ accessToken, graphVersion = 'v23.0', transport = globalThis.fetch, baseUrl = 'https://graph.facebook.com' } = {}) {
   const token = required(accessToken, 'accessToken');
   if (typeof transport !== 'function') throw new TypeError('transport is required');
@@ -21,10 +23,13 @@ function createMetaClient({ accessToken, graphVersion = 'v23.0', transport = glo
     for (const [key, value] of Object.entries(params)) if (value !== null && value !== undefined && value !== '') url.searchParams.set(key, String(value));
     let response;
     try { response = await transport(url, { headers: { authorization: `Bearer ${token}`, accept: 'application/json' } }); }
-    catch { throw new Error('Meta API transport failed'); }
+    catch { throw metaError('Meta API transport failed', 'META_TRANSPORT_FAILED'); }
     let body;
     try { body = await response.json(); } catch { throw new Error('Meta API response was not JSON'); }
-    if (!response.ok) throw new Error(`Meta API request failed (${response.status})`);
+    if (!response.ok) {
+      const code = response.status === 429 ? 'META_RATE_LIMITED' : response.status >= 500 ? 'META_SERVICE_UNAVAILABLE' : response.status === 401 || response.status === 403 ? 'META_AUTH_REJECTED' : 'META_REQUEST_REJECTED';
+      throw metaError(`Meta API request failed (${response.status})`, code);
+    }
     return body;
   }
   return Object.freeze({
@@ -36,4 +41,4 @@ function createMetaClient({ accessToken, graphVersion = 'v23.0', transport = glo
   });
 }
 
-module.exports = Object.freeze({ ACCOUNT_FIELDS, AD_INSIGHT_FIELDS, createMetaClient });
+module.exports = Object.freeze({ ACCOUNT_FIELDS, AD_INSIGHT_FIELDS, createMetaClient, metaError });

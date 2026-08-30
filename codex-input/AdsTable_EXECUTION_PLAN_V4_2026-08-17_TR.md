@@ -938,7 +938,7 @@ src/
 
 ## 8. E4 — Meta referans vertical slice
 
-**Durum:** `In progress` — E4-T1–T4 `Done`; E4-T5 `Verification`.
+**Durum:** `In progress` — E4-T1–T5 `Done`; E4-T6 `Verification`.
 
 ### Planlanan işler
 
@@ -948,8 +948,8 @@ src/
 - **E4-T2B — `Done`:** Meta output yedi bloklu canonical envelope'a normalize ediliyor; provider DTO adapter sınırının dışına çıkmıyor.
 - **E4-T3 — `Done`:** ATC/Checkout/Purchase count/value mapping ve provenance kabul edildi.
 - **E4-T4 — `Done`:** Account timezone/currency doğrulaması ve Time/FX service binding kabul edildi.
-- **E4-T5 — `Verification`:** Canonical validation ve Dataset V2 idempotent write boundary hazır; PR/CI review bekleniyor.
-- **E4-T6:** Refresh job retry/idempotency/telemetry.
+- **E4-T5 — `Done`:** Canonical validation ve Dataset V2 idempotent write boundary kabul edildi.
+- **E4-T6 — `Verification`:** Refresh job retry/idempotency/telemetry sözleşmesi hazır; PR/CI review bekleniyor.
 - **E4-T7:** Kullanıcı/account allowlist ile V1+V2 dual-write.
 - **E4-T8:** Provider→canonical→FX→V2→Formula→expected totals parity.
 
@@ -1131,7 +1131,43 @@ src/
 
 **Evidence:** `src/providers/meta/dataset-writer.js`, `tests/e4-t5-meta-idempotent-write.test.js`.
 
-**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T5 `Done` değildir.
+**Durum:** `Done` — PR #102, CI ve insan merge onayı tamamlandı.
+
+#### E4-T6 task aynası — Meta refresh güvenilirliği
+
+**Amaç:** Meta yenileme işinin geçici servis sorunlarını kontrollü atlatmasını, kalıcı hatalarda durmasını ve operasyon sonucunun hassas veri taşımadan izlenmesini sağlamak.
+
+**Mevcut durum:** E4-T5 `Done`; idempotent writer hazır fakat job lifecycle, sınırlı retry ve güvenli telemetry tek Meta refresh akışında birleşmemişti.
+
+**Planlanan durum:** Bir refresh job altında yalnız transient transport/429/5xx hataları sınırlı exponential backoff ile tekrar edilir; auth/contract hataları tekrar edilmez; T5 idempotency her denemede duplicate'i önler.
+
+**Kapsam:** Meta API safe error classification, 1–5 bounded attempt, 100/200ms exponential backoff baseline, job boundary delegation, allowlisted telemetry ve sanitized terminal failure.
+
+**Kapsam dışı:** Production scheduler, canlı Meta tokenı, Supabase write, queue worker, deployment, dual-write ve UI.
+
+**Bağımlılıklar:** E4-T1–T5 `Done`; ortak refresh job boundary hazır.
+
+**Uygulama adımları:** HTTP/transport hatalarını sınıflandır; transient allowlist kur; tek job içinde bounded retry çalıştır; tamamlanma metadata'sına attempts/rows_written yaz; ham hata mesajını dışarı çıkarma.
+
+**Kabul kriterleri:** 429/5xx/transport retry; auth/request/contract no-retry; attempt üst sınırı; tek job lifecycle; deterministic backoff; telemetry yalnız job/attempt/count/safe-code; terminal hata provider body/credential taşımaz.
+
+**Test planı:** İki transient sonrası başarı, permanent no-retry, exhaustion, HTTP classification/no-body-leak, invalid config/input; full/security/architecture/canonical suite.
+
+**Rollback planı:** Runtime binding yoktur; commit revert refresh runner ve client classification genişlemesini kaldırır, E4-T5 writer değişmez.
+
+**Gözlemlenebilirlik:** `meta_refresh_attempt|retry|completed|failed` event'leri yalnız job id, attempt, limit, rows_written ve safe_code taşır.
+
+**Güvenlik ve veri etkisi:** Sentetik/mocked çalışma; production request/write, token, müşteri verisi ve raw provider body yok.
+
+**Planlanan:** Geçici Meta kesintilerinde gereksiz kullanıcı müdahalesini azaltırken kalıcı hataları hızla görünür kılmak.
+
+**Gerçekleşen:** Bounded retry, safe classification, sanitized telemetry ve job completion metadata hazır; runtime henüz bağlanmadı.
+
+**Sapmalar:** Production scheduler/queue entegrasyonu yapılmadı; açık production onayı gerektirir.
+
+**Evidence:** `src/providers/meta/refresh-runner.js`, `src/providers/meta/client.js`, `tests/e4-t6-meta-refresh-reliability.test.js`.
+
+**Durum:** `Verification` — PR/CI ve review tamamlanmadan E4-T6 `Done` değildir.
 
 ### Kabul kriterleri
 

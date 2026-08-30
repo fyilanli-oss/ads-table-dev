@@ -1058,7 +1058,7 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
 const refreshJobBoundary=createRefreshJobBoundary({getClient:()=>supabaseAdmin,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION});
 const createRefreshJob=(userId,platform,platformAccountId,metadata={})=>refreshJobBoundary.create({userId,platform,platformAccountId,metadata});
 const setRefreshJobStatus=(jobId,status,extra={})=>refreshJobBoundary.transition(jobId,status,extra);
-const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});const metaV2LiveRefresh=createMetaLiveRefresh({supabaseClient:supabaseAdmin,graphVersion:META_GRAPH_VERSION,resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate});
+const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});const metaV2LiveRefresh=supabaseAdmin?createMetaLiveRefresh({supabaseClient:supabaseAdmin,graphVersion:META_GRAPH_VERSION,resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate}):null;
 const automationSnapshotOrchestrator=createAutomationSnapshotOrchestrator({jobBoundary:refreshJobBoundary});
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}

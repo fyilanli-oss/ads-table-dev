@@ -99,7 +99,7 @@ Her paket koordinasyon özetinde önce tek cümlelik **iş çıktısı** ve öl�
 | Phase 1 | Funnel Core iskeleti | Canonical contract, hierarchy, analysis scope, Formula/Time/FX servisleri, repository arayüzü ve Query Service uygulanmış; yerel senaryolar mevcut | **Tamamlandı — koruma/regresyon kapsamı** |
 | Phase 2 | Dataset V2 migration | Migration, corrective migration ve Supabase repository uygulanmış; canlı tablo mevcut | **Kod artefaktı tamam; canlı kabul E2'de açık** |
 | Phase 3 | Meta adapter | Provider→canonical→V2 production vertical slice | **Açık — E4** |
-| Phase 4 | Google adapter | Standard mapping; PMax contract hazırlığı | **Açık — E5; PMax gerçek adapter kapsamına yükseltildi** |
+| Phase 4 | Google adapter | Standard mapping; PMax contract hazırlığı | **Done — E5 canlı V2-primary kabulü tamamlandı** |
 | Phase 5 | TikTok adapter | Gerçek metrics ve synthetic ayrımı | **Açık — E6** |
 | Phase 6 | Klaviyo adapter | Campaign/Flow/Message ve Email/SMS | **Açık — E7** |
 | Phase 7 | GA4 Organic | Property/domain/timezone/currency/provenance | **Açık — E8** |
@@ -1311,7 +1311,7 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E5-T1–T6 `Done`; E5-T7 repository ve merge tamamlandı, Meta ile aynı canlı zero-row/no-error kabul sonucu bekleniyor.
+**Durum:** `Done` — E5-T1–T7 tamamlandı; Google canlı V2-primary Refresh, Meta ile aynı zero-row/no-error sonucu ve kalıcı redacted V2 evidence ile kabul edildi.
 
 ### Planlanan işler
 
@@ -1322,7 +1322,7 @@ src/
 - **E5-T4A — `Done`:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
 - **E5-T5 — `Done`:** Time/FX/V2/job/telemetry entegrasyonu.
 - **E5-T6 — `Done`:** V2-primary koordinasyon; Standard/PMax ayrı completeness; V1 write/fallback yok.
-- **E5-T7 — `Verification`:** Manuel Google Refresh'i business-date Standard/PMax sorgularıyla doğrudan V2'ye bağla; Meta ile aynı canlı kabul kanıtı bekleniyor.
+- **E5-T7 — `Done`:** Manuel Google Refresh business-date Standard/PMax sorgularıyla doğrudan V2'ye bağlandı; Meta ile aynı canlı zero-row/no-error kabulü doğrulandı.
 
 #### E5-T1 task aynası — Google conversion count/value ve provenance
 
@@ -1450,7 +1450,7 @@ src/
 
 **Evidence:** `src/providers/google/live-refresh.js`, `server.js`, `.env.example`, `docs/E5_T7_GOOGLE_LIVE_V2_RUNTIME.md`, `tests/e5-live-google-v2-primary.test.js`, `tests/e5-live-google-runtime-wiring.test.js`.
 
-**Durum:** `Verification` — PR #117 merge edildi ve `main` kontrolleri başarılıdır. PR #118–#120 sonrası test reklam hesapları seçildi ve modal döngüsü kapandı. PR #121/#122 UUID varsayımları production'da hatayı çözmedi; PR #123 güvenli aşama kanıtı ilk gerçek hata noktasını `GOOGLE_CUSTOMER_METADATA` olarak belirledi. PR #124 object search çağrısını root fonksiyonun dört positional değerine uyarladı ve sonraki canlı job `GOOGLE_PROVIDER_ADAPTER` aşamasına ilerledi. Yeni kesin kanıt, başarılı zero-row Google ProtoJSON cevabında tekrarlanan `results` alanının bulunmaması nedeniyle runtime'ın boş sonucu hatalı saydığını gösterdi. Corrective ayrım eksik alanı zero-row kabul eder, mevcut fakat dizi olmayan alanı reddeder. Completed/no-error canlı kabul doğrulanmadan E5-T7 `Done` sayılmaz; E6 başlamaz.
+**Durum:** `Done` — PR #117–#125 corrective zinciri merge edildi ve `main` kontrolleri başarılıdır. PR #123 ile eklenen güvenli aşama kanıtı önce object/positional search imza uyuşmazlığını, ardından geçerli zero-row ProtoJSON cevabındaki eksik `results` alanını gerçek sınırlarında gösterdi. PR #124 imzayı uyarladı; PR #125 eksik `results` alanını zero-row kabul ederken mevcut fakat dizi olmayan alanı fail-closed bıraktı. Kullanıcının 2026-08-31 tarihli manuel Refresh'i `completed`, hata mesajı ve failure stage olmadan, kalıcı `google_v2_evidence` ile sonuçlandı. E5 canlı kabulü tamamlandı; E6 artık uygulanabilir sıradaki provider epic'idir.
 
 ### Kabul kriterleri
 

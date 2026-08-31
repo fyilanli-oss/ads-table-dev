@@ -1311,12 +1311,12 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E4 `Done`; E5-T1 repository paketi `Verification`.
+**Durum:** `In progress` — E4 `Done`; E5-T1 `Done`, E5-T2 repository paketi `Verification`.
 
 ### Planlanan işler
 
-- **E5-T1 — `Verification`:** Conversion action count/value mapping ve provenance.
-- **E5-T2:** Gerçek customer currency/timezone.
+- **E5-T1 — `Done`:** Conversion action count/value mapping ve provenance.
+- **E5-T2 — `Verification`:** Gerçek customer currency/timezone.
 - **E5-T3:** Standard Campaign→AdGroup→Ad adapter.
 - **E5-T4:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
 - **E5-T4A:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
@@ -1336,6 +1336,22 @@ src/
 **Kabul kriterleri:** Lead purchase olmaz; category exact-name fallback'ten önce gelir; geniş isim eşleşmesi yoktur; missing `null`, measured zero `0`; provenance ham action adı/resource/customer/value taşımaz; full/security/architecture/canonical CI PASS.
 
 **Evidence:** `src/providers/google/conversion-mapping.js`, `artifacts/e5-google/e5-t1-conversion-fixture.json`, `docs/E5_T1_GOOGLE_CONVERSION_CHARACTERIZATION.md`, `tests/e5-t1-google-conversion-mapping.test.js`.
+
+**Durum:** `Done` — PR #110, CI ve insan merge kabulü tamamlandı.
+
+#### E5-T2 task aynası — Google customer currency, timezone ve business date
+
+**Amaç:** Google rapor gününü ve kaynak para birimini browser/server varsayımından değil, seçili Google Ads customer metadata'sından güvenilir biçimde üretmek.
+
+**Sözleşme:** Exact provider sorgusu yalnız `customer.id`, `customer.currency_code` ve `customer.time_zone` ister. Dönen customer requested customer ile aynı olmalı; currency ISO-3, timezone IANA olmalı; business date bu timezone içindeki gözlem günüdür. Eksik metadata UTC/default fallback ile devam etmez.
+
+**Kapsam:** Metadata query sözleşmesi, camel/snake provider shape, identity parity, currency/timezone validation, timezone-crossing business date ve identity-free evidence.
+
+**Kapsam dışı:** Production Google API çağrısı, OAuth/customer seçimi değişikliği, conversion mapping entegrasyonu, Standard/PMax adapter, Dataset V2 write, runtime/deployment ve dual-write.
+
+**Kabul kriterleri:** Wrong customer fail-closed; invalid/missing currency/timezone fail-closed; UTC/server/browser fallback yok; DST-capable IANA timezone; evidence customer identity ve raw response taşımaz; full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/google/account-metadata.js`, `artifacts/e5-google/e5-t2-customer-metadata-fixture.json`, `docs/E5_T2_GOOGLE_CUSTOMER_TIME_CURRENCY.md`, `tests/e5-t2-google-customer-metadata.test.js`.
 
 **Durum:** `Verification` — repository paketi production işlemi yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 

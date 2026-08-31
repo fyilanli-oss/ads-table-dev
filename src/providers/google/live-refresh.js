@@ -11,14 +11,15 @@ function rows(response) {
   if (!response || !Array.isArray(response.results)) throw new Error('Google search response must contain results[]');
   return response.results;
 }
-function sourceJobIdentity(value) {
+function uuidIdentity(value, field) {
   if (value === null || value === undefined) return null;
   const candidate = typeof value === 'string' ? value : value?.id ?? value?.sourceJobId ?? value?.source_job_id;
   if (typeof candidate !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate)) {
-    throw new Error('Google source job identity is invalid');
+    throw new Error(`${field} identity is invalid`);
   }
   return candidate;
 }
+function sourceJobIdentity(value) { return uuidIdentity(value, 'Google source job'); }
 function leafKey(row, campaignType) {
   const campaignId=String(row?.campaign?.id||'');
   const leafId=campaignType==='standard'?String((row?.adGroupAd||row?.ad_group_ad)?.ad?.id||''):String((row?.assetGroup||row?.asset_group)?.id||'');
@@ -59,8 +60,9 @@ function createGoogleLiveRefresh({supabaseClient,search,resolveTargetCurrency,re
   if(typeof resolveFxRate!=='function')throw new TypeError('FX resolver is required');
   const repository=new SupabaseDatasetRepository(supabaseClient),writeBoundary=new CanonicalWriteBoundary({repository});
   return Object.freeze({async run({userId,customerId,loginCustomerId,sourceJobId}={}){
+    const userUuid=uuidIdentity(userId,'Google user');
     const sourceJobUuid=sourceJobIdentity(sourceJobId);
-    const request=query=>search({userId,customerId,loginCustomerId,query});
+    const request=query=>search({userId:userUuid,customerId,loginCustomerId,query});
     const metadata=await request(GOOGLE_CUSTOMER_METADATA_QUERY);
     const customer=normalizeGoogleCustomerMetadata(metadata,{requestedCustomerId:customerId,observedAt:now()});
     const client={
@@ -69,12 +71,12 @@ function createGoogleLiveRefresh({supabaseClient,search,resolveTargetCurrency,re
     };
     const adapter=createGoogleAdapter({client}),writer=createGoogleDatasetWriter({adapter,writeBoundary,resolveFxRate});
     const coordinator=createGoogleV2PrimaryCoordinator({runBranch:async({campaignType})=>{
-      const targetCurrency=await resolveTargetCurrency(userId);
-      const write=await writer.ingest({campaignType,customerId,context:{userId,customer,targetCurrency,sourceJobId:sourceJobUuid}});
+      const targetCurrency=await resolveTargetCurrency(userUuid);
+      const write=await writer.ingest({campaignType,customerId,context:{userId:userUuid,customer,targetCurrency,sourceJobId:sourceJobUuid}});
       return{dataset_v2:{attempted:write.attempted,persisted:write.persisted,empty_provider_result:write.persisted===0}};
     }});
-    return coordinator.run({userId,customerId});
+    return coordinator.run({userId:userUuid,customerId});
   }});
 }
 
-module.exports=Object.freeze({createGoogleLiveRefresh,mergeConversions,querySet,sourceJobIdentity});
+module.exports=Object.freeze({createGoogleLiveRefresh,mergeConversions,querySet,sourceJobIdentity,uuidIdentity});

@@ -20,6 +20,15 @@ function uuidIdentity(value, field) {
   return candidate;
 }
 function sourceJobIdentity(value) { return uuidIdentity(value, 'Google source job'); }
+async function atStage(stage, work) {
+  try { return await work(); }
+  catch (error) {
+    if (error && typeof error === 'object' && Object.isExtensible(error) && !error.safe_stage) {
+      Object.defineProperty(error, 'safe_stage', { value: stage, enumerable: false });
+    }
+    throw error;
+  }
+}
 function leafKey(row, campaignType) {
   const campaignId=String(row?.campaign?.id||'');
   const leafId=campaignType==='standard'?String((row?.adGroupAd||row?.ad_group_ad)?.ad?.id||''):String((row?.assetGroup||row?.asset_group)?.id||'');
@@ -63,7 +72,7 @@ function createGoogleLiveRefresh({supabaseClient,search,resolveTargetCurrency,re
     const userUuid=uuidIdentity(userId,'Google user');
     const sourceJobUuid=sourceJobIdentity(sourceJobId);
     const request=query=>search({userId:userUuid,customerId,loginCustomerId,query});
-    const metadata=await request(GOOGLE_CUSTOMER_METADATA_QUERY);
+    const metadata=await atStage('GOOGLE_CUSTOMER_METADATA',()=>request(GOOGLE_CUSTOMER_METADATA_QUERY));
     const customer=normalizeGoogleCustomerMetadata(metadata,{requestedCustomerId:customerId,observedAt:now()});
     const client={
       fetchStandardAdRows:async()=>{const queries=querySet('standard',customer.business_date),performance=rows(await request(queries.performance)),conversions=rows(await request(queries.conversions));return{results:mergeConversions(performance,conversions,'standard')};},
@@ -71,12 +80,12 @@ function createGoogleLiveRefresh({supabaseClient,search,resolveTargetCurrency,re
     };
     const adapter=createGoogleAdapter({client}),writer=createGoogleDatasetWriter({adapter,writeBoundary,resolveFxRate});
     const coordinator=createGoogleV2PrimaryCoordinator({runBranch:async({campaignType})=>{
-      const targetCurrency=await resolveTargetCurrency(userUuid);
-      const write=await writer.ingest({campaignType,customerId,context:{userId:userUuid,customer,targetCurrency,sourceJobId:sourceJobUuid}});
+      const targetCurrency=await atStage('GOOGLE_TARGET_CURRENCY',()=>resolveTargetCurrency(userUuid));
+      const write=await atStage(campaignType==='standard'?'GOOGLE_STANDARD_INGEST':'GOOGLE_PMAX_INGEST',()=>writer.ingest({campaignType,customerId,context:{userId:userUuid,customer,targetCurrency,sourceJobId:sourceJobUuid}}));
       return{dataset_v2:{attempted:write.attempted,persisted:write.persisted,empty_provider_result:write.persisted===0}};
     }});
     return coordinator.run({userId:userUuid,customerId});
   }});
 }
 
-module.exports=Object.freeze({createGoogleLiveRefresh,mergeConversions,querySet,sourceJobIdentity,uuidIdentity});
+module.exports=Object.freeze({atStage,createGoogleLiveRefresh,mergeConversions,querySet,sourceJobIdentity,uuidIdentity});

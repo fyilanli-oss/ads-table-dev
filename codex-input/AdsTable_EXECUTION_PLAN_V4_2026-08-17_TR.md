@@ -1311,7 +1311,7 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E5-T1–T4 `Done`; E5-T4A repository paketi `Verification`.
+**Durum:** `In progress` — E5-T1–T4A `Done`; E5-T5 repository paketi `Verification`.
 
 ### Planlanan işler
 
@@ -1319,8 +1319,8 @@ src/
 - **E5-T2 — `Done`:** Gerçek customer currency/timezone.
 - **E5-T3 — `Done`:** Standard Campaign→AdGroup→Ad adapter.
 - **E5-T4 — `Done`:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
-- **E5-T4A — `Verification`:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
-- **E5-T5:** Time/FX/V2/job/telemetry entegrasyonu.
+- **E5-T4A — `Done`:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
+- **E5-T5 — `Verification`:** Time/FX/V2/job/telemetry entegrasyonu.
 - **E5-T6:** Dual-write, Standard/PMax ayrı completeness ve parity.
 
 #### E5-T1 task aynası — Google conversion count/value ve provenance
@@ -1400,6 +1400,22 @@ src/
 **Kabul kriterleri:** Tek provider adapter girişi; exact one-path delegation; unknown no-fetch; Standard/PMax aynı envelope; fark yalnız capability/entity değerleri; provider DTO dışarı çıkmaz; full/security/architecture/canonical CI PASS.
 
 **Evidence:** `src/providers/google/adapter.js`, `src/providers/google/capabilities.js`, `docs/E5_T4A_GOOGLE_UNIFIED_ENVELOPE.md`, `tests/e5-t4a-google-unified-adapter.test.js`.
+
+**Durum:** `Done` — PR #114, CI ve insan merge kabulü tamamlandı.
+
+#### E5-T5 task aynası — Google Time/FX/V2/job/telemetry entegrasyonu
+
+**Amaç:** Google customer metadata, business date, unified adapter, günlük FX, canonical validation, Dataset V2 write ve refresh job evidence adımlarını tek fail-closed zincirde birleştirmek.
+
+**Sözleşme:** Job exact user/customer/type ile açılır; customer metadata aynı işte doğrulanır; adapter yalnız seçilen type'ı map eder; dört parasal fact business-date FX ile bir kez çevrilir; ownership/hierarchy/entity key yeniden doğrulanır; tüm satırlar ortak write boundary'ye verilir; cardinality sapması başarı sayılmaz.
+
+**Kapsam:** Google dataset writer, refresh runner, Standard path entegrasyon fixture'ı, cross-currency dönüşüm, same-currency guard, source job lineage, zero-row/fake-free sonuç ve redacted completion evidence.
+
+**Kapsam dışı:** Production Google API/runtime route, real token/customer request, scheduler, retry policy/dual-write, feature flag, UI ve canlı V2 write.
+
+**Kabul kriterleri:** Exact customer/date/type; four monetary facts once-only FX; counts unchanged; source job persisted; ownership/key/cardinality fail-closed; empty result fake-free; evidence identity/token/raw value taşımaz; full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/google/dataset-writer.js`, `src/providers/google/refresh-runner.js`, `docs/E5_T5_GOOGLE_V2_REFRESH.md`, `tests/e5-t5-google-v2-refresh.test.js`.
 
 **Durum:** `Verification` — repository paketi production işlemi yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 

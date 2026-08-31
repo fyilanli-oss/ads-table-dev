@@ -4345,9 +4345,9 @@ app.get("/api/platform/google/status",async(req,res)=>{
     const user=await requireUser(req,res);
     if(!user)return;
 
-    const conn=await getConnection(user.id,"google");
+    const status=await connectionStatus(user.id,"google");
     res.json({
-      state: conn ? "CONNECTED" : "NOT_CONNECTED"
+      state: status.connected ? "CONNECTED" : "NOT_CONNECTED"
     });
   }catch(e){
     res.status(500).json({error:e.message});

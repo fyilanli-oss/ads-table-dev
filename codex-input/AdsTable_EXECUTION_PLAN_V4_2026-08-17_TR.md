@@ -1311,7 +1311,7 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E5-T1–T5 `Done`; E5-T6 V2-primary repository paketi `Verification`.
+**Durum:** `In progress` — E5-T1–T6 `Done`; E5-T7 canlı V2-primary runtime paketi `Verification`.
 
 ### Planlanan işler
 
@@ -1321,7 +1321,8 @@ src/
 - **E5-T4 — `Done`:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
 - **E5-T4A — `Done`:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
 - **E5-T5 — `Done`:** Time/FX/V2/job/telemetry entegrasyonu.
-- **E5-T6 — `Verification`:** V2-primary koordinasyon; Standard/PMax ayrı completeness; V1 write/fallback yok.
+- **E5-T6 — `Done`:** V2-primary koordinasyon; Standard/PMax ayrı completeness; V1 write/fallback yok.
+- **E5-T7 — `Verification`:** Manuel Google Refresh'i business-date Standard/PMax sorgularıyla doğrudan V2'ye bağla.
 
 #### E5-T1 task aynası — Google conversion count/value ve provenance
 
@@ -1433,7 +1434,23 @@ src/
 
 **Evidence:** `src/providers/google/v2-primary.js`, `docs/E5_T6_GOOGLE_V2_PRIMARY.md`, `tests/e5-t6-google-v2-primary.test.js`.
 
-**Durum:** `Verification` — repository paketi production işlemi yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
+**Durum:** `Done` — PR #116, CI ve insan merge kabulü tamamlandı.
+
+#### E5-T7 task aynası — Google canlı V2-primary runtime
+
+**Amaç:** Kullanıcının manuel Google Refresh işlemini V1 snapshot üretmeden Standard ve PMax verisini doğrudan Dataset V2'ye yazan production-capable runtime'a bağlamak.
+
+**Sözleşme:** Customer metadata aynı Google hesabından alınır; customer timezone'ındaki tek business date sorgulanır; Standard Ad ve PMax Asset Group ayrı map/write edilir; branch completeness birleşik redacted evidence ile döner. V2 hatasında V1 fallback ve V1 Google Sheets sync yoktur.
+
+**Kapsam:** Default-on explicit runtime gate, canlı Google search client binding, exact business-date Standard/PMax performance ve conversion sorguları, canonical write boundary, response/job evidence, zero-row ve V1 no-write wiring testleri.
+
+**Kapsam dışı:** Bu PR sırasında canlı refresh çalıştırmak, kullanıcı adına UI aksiyonu almak, backfill ve scheduler dönüşümü. Canlı manuel refresh merge/Vercel sonrası kullanıcı tarafından yapılır.
+
+**Kabul kriterleri:** Refresh date-range isteğinden bağımsız tek customer business date; Standard/PMax direct V2; `attempted == persisted`; zero-row fake-free; V1 snapshot/write/fallback ve stale V1 Sheets sync yok; identity/raw-provider-free evidence; full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/google/live-refresh.js`, `server.js`, `.env.example`, `docs/E5_T7_GOOGLE_LIVE_V2_RUNTIME.md`, `tests/e5-live-google-v2-primary.test.js`, `tests/e5-live-google-runtime-wiring.test.js`.
+
+**Durum:** `Verification` — repository paketi canlı refresh çalıştırmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 
 ### Kabul kriterleri
 

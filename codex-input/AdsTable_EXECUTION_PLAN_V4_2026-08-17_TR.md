@@ -1311,13 +1311,13 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E4 `Done`; E5-T1 `Done`, E5-T2 repository paketi `Verification`.
+**Durum:** `In progress` — E5-T1–T2 `Done`; E5-T3 repository paketi `Verification`.
 
 ### Planlanan işler
 
 - **E5-T1 — `Done`:** Conversion action count/value mapping ve provenance.
-- **E5-T2 — `Verification`:** Gerçek customer currency/timezone.
-- **E5-T3:** Standard Campaign→AdGroup→Ad adapter.
+- **E5-T2 — `Done`:** Gerçek customer currency/timezone.
+- **E5-T3 — `Verification`:** Standard Campaign→AdGroup→Ad adapter.
 - **E5-T4:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
 - **E5-T4A:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
 - **E5-T5:** Time/FX/V2/job/telemetry entegrasyonu.
@@ -1352,6 +1352,22 @@ src/
 **Kabul kriterleri:** Wrong customer fail-closed; invalid/missing currency/timezone fail-closed; UTC/server/browser fallback yok; DST-capable IANA timezone; evidence customer identity ve raw response taşımaz; full/security/architecture/canonical CI PASS.
 
 **Evidence:** `src/providers/google/account-metadata.js`, `artifacts/e5-google/e5-t2-customer-metadata-fixture.json`, `docs/E5_T2_GOOGLE_CUSTOMER_TIME_CURRENCY.md`, `tests/e5-t2-google-customer-metadata.test.js`.
+
+**Durum:** `Done` — PR #111, CI ve insan merge kabulü tamamlandı.
+
+#### E5-T3 task aynası — Google Standard Campaign→AdGroup→Ad adapter
+
+**Amaç:** Google Standard reklam performansını Campaign ve AdGroup bağlamını kaybetmeden tek Ad leaf canonical satırına çevirmek ve hierarchy-level double count riskini kaldırmak.
+
+**Sözleşme:** Yalnız Ad leaf fact üretilir; Campaign root, AdGroup parent, Ad leaf olarak taşınır. Google AdGroup semantiği Meta AdSet'e çevrilmez. PMax açıkça reddedilir. E5-T1 conversion ve E5-T2 customer metadata aynı yedi bloklu envelope içinde birleşir.
+
+**Kapsam:** Standard mapper/adapter, deterministic entity key, ten raw facts, metric support, conversion provenance, same-currency baseline, business-date parity, wrong date/PMax/missing hierarchy negatifleri.
+
+**Kapsam dışı:** Google API client/runtime, production request/write, PMax, cross-currency FX provider, Dataset V2 writer/job/retry, dual-write ve UI.
+
+**Kabul kriterleri:** Campaign→AdGroup→Ad exact; yalnız Ad leaf fact; PMax reddedilir; missing `null+unknown`, session `null+unsupported`, real zero korunur; provider DTO adapter dışına çıkmaz; canonical/hierarchy/key validation PASS; full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/google/standard-mapper.js`, `src/providers/google/standard-adapter.js`, `artifacts/e5-google/e5-t3-standard-ad-fixture.json`, `docs/E5_T3_GOOGLE_STANDARD_ADAPTER.md`, `tests/e5-t3-google-standard-adapter.test.js`.
 
 **Durum:** `Verification` — repository paketi production işlemi yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 

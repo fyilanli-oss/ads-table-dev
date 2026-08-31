@@ -8962,6 +8962,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
         }
       }
     }catch(error){
+      cleanReconnectUrl();
       openSelection(platform,[]);
       if(desc)desc.textContent=error.message||"Account selection could not be loaded.";
       if(action){

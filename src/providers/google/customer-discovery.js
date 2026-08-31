@@ -49,7 +49,10 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
   const managers = [];
   for (const resourceName of resourceNames) {
     const loginCustomerId = customerId(resourceName);
-    const response = await search({ customerId: loginCustomerId, loginCustomerId, query: CUSTOMER_CLIENT_QUERY });
+    // The root is directly accessible by definition. Query it without a
+    // login-customer-id header; the root becomes the login context only for
+    // requests made against discovered child accounts.
+    const response = await search({ customerId: loginCustomerId, query: CUSTOMER_CLIENT_QUERY });
     const rows = Array.isArray(response?.results) ? response.results : [];
     for (const row of rows) {
       const client = mapClient(row, loginCustomerId);

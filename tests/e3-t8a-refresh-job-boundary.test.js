@@ -48,7 +48,17 @@ test("run records a safe failed terminal transition and rethrows", async () => {
   const boundary = createRefreshJobBoundary({ getClient: () => database, lifecycleVersion: "v1", now: () => "now" });
   const failure = new Error("provider unavailable");
   await assert.rejects(boundary.run({ userId: "user", platform: "tiktok", platformAccountId: "account", work: async () => { throw failure; } }), error => error === failure && error.refreshJob.id === "job-1");
-  assert.deepEqual(database.calls.filter(([name]) => name === "update").at(-1)[1], { status: "failed", updated_at: "now", error_message: "provider unavailable", finished_at: "now" });
+  assert.deepEqual(database.calls.filter(([name]) => name === "update").at(-1)[1], { status: "failed", updated_at: "now", error_message: "provider unavailable", metadata: { failure_stage: "UNCLASSIFIED" }, finished_at: "now" });
+});
+
+test("run persists an allowlisted safe failure stage without exposing extra error data", async () => {
+  const database = client();
+  const boundary = createRefreshJobBoundary({ getClient: () => database, lifecycleVersion: "v1", now: () => "now" });
+  const failure = new Error("raw detail");
+  Object.defineProperty(failure, "safe_stage", { value: "GOOGLE_DATASET_V2_WRITE" });
+  await assert.rejects(boundary.run({ userId: "user", platform: "google", platformAccountId: "account", metadata: { trigger: "manual" }, work: async () => { throw failure; } }), failure);
+  const patch = database.calls.filter(([name]) => name === "update").at(-1)[1];
+  assert.deepEqual(patch.metadata, { failure_stage: "GOOGLE_DATASET_V2_WRITE" });
 });
 
 test("fails closed for invalid composition dependencies", async () => {

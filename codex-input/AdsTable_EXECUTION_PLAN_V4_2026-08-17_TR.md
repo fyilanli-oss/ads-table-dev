@@ -1311,14 +1311,14 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E5-T1–T2 `Done`; E5-T3 repository paketi `Verification`.
+**Durum:** `In progress` — E5-T1–T3 `Done`; E5-T4 repository paketi `Verification`.
 
 ### Planlanan işler
 
 - **E5-T1 — `Done`:** Conversion action count/value mapping ve provenance.
 - **E5-T2 — `Done`:** Gerçek customer currency/timezone.
-- **E5-T3 — `Verification`:** Standard Campaign→AdGroup→Ad adapter.
-- **E5-T4:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
+- **E5-T3 — `Done`:** Standard Campaign→AdGroup→Ad adapter.
+- **E5-T4 — `Verification`:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
 - **E5-T4A:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
 - **E5-T5:** Time/FX/V2/job/telemetry entegrasyonu.
 - **E5-T6:** Dual-write, Standard/PMax ayrı completeness ve parity.
@@ -1368,6 +1368,22 @@ src/
 **Kabul kriterleri:** Campaign→AdGroup→Ad exact; yalnız Ad leaf fact; PMax reddedilir; missing `null+unknown`, session `null+unsupported`, real zero korunur; provider DTO adapter dışına çıkmaz; canonical/hierarchy/key validation PASS; full/security/architecture/canonical CI PASS.
 
 **Evidence:** `src/providers/google/standard-mapper.js`, `src/providers/google/standard-adapter.js`, `artifacts/e5-google/e5-t3-standard-ad-fixture.json`, `docs/E5_T3_GOOGLE_STANDARD_ADAPTER.md`, `tests/e5-t3-google-standard-adapter.test.js`.
+
+**Durum:** `Done` — PR #112, CI ve insan merge kabulü tamamlandı.
+
+#### E5-T4 task aynası — Google PMax Campaign→Asset Group adapter
+
+**Amaç:** Performance Max performansını Standard AdGroup/Ad hiyerarşisine zorlamadan Campaign→Asset Group canonical yapısına çevirmek ve sahte entity üretimini engellemek.
+
+**Sözleşme:** `campaign_type=performance_max`; Campaign root, Asset Group leaf; parent alanları null. AdGroup/Ad varlığı fail-closed olur. Standard channel bu adapter'a giremez. PMax ve Standard aynı yedi bloklu envelope/raw metric/support anahtarlarını kullanır; fark yalnız campaign/entity değerleridir.
+
+**Kapsam:** PMax mapper/adapter, Asset Group deterministic key, E5-T1 conversion, E5-T2 metadata, ten facts/support, Standard/PMax envelope parity ve negative hierarchy/date/channel testleri.
+
+**Kapsam dışı:** Production Google API/runtime, Dataset V2 write, cross-currency provider, job/retry/dual-write, E5-T4A kapanışı ve UI.
+
+**Kabul kriterleri:** Fake AdGroup/Ad yok; parent null; only Asset Group leaf; Standard reddedilir; missing/unsupported/zero semantiği korunur; provider DTO dışarı çıkmaz; Standard ile aynı envelope; canonical/hierarchy/key ve full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/google/pmax-mapper.js`, `src/providers/google/pmax-adapter.js`, `artifacts/e5-google/e5-t4-pmax-asset-group-fixture.json`, `docs/E5_T4_GOOGLE_PMAX_ADAPTER.md`, `tests/e5-t4-google-pmax-adapter.test.js`.
 
 **Durum:** `Verification` — repository paketi production işlemi yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 

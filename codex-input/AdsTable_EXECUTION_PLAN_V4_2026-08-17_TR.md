@@ -1311,7 +1311,7 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E5-T1–T4A `Done`; E5-T5 repository paketi `Verification`.
+**Durum:** `In progress` — E5-T1–T5 `Done`; E5-T6 V2-primary repository paketi `Verification`.
 
 ### Planlanan işler
 
@@ -1320,8 +1320,8 @@ src/
 - **E5-T3 — `Done`:** Standard Campaign→AdGroup→Ad adapter.
 - **E5-T4 — `Done`:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
 - **E5-T4A — `Done`:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
-- **E5-T5 — `Verification`:** Time/FX/V2/job/telemetry entegrasyonu.
-- **E5-T6:** Dual-write, Standard/PMax ayrı completeness ve parity.
+- **E5-T5 — `Done`:** Time/FX/V2/job/telemetry entegrasyonu.
+- **E5-T6 — `Verification`:** V2-primary koordinasyon; Standard/PMax ayrı completeness; V1 write/fallback yok.
 
 #### E5-T1 task aynası — Google conversion count/value ve provenance
 
@@ -1417,6 +1417,22 @@ src/
 
 **Evidence:** `src/providers/google/dataset-writer.js`, `src/providers/google/refresh-runner.js`, `docs/E5_T5_GOOGLE_V2_REFRESH.md`, `tests/e5-t5-google-v2-refresh.test.js`.
 
+**Durum:** `Done` — PR #115, CI ve insan merge kabulü tamamlandı.
+
+#### E5-T6 task aynası — Google V2-primary koordinasyon ve completeness
+
+**Amaç:** Google Standard ve PMax refresh sonuçlarını, kullanım değeri kalmayan Dataset V1/Dashboard V1 yoluna uğratmadan doğrudan Dataset V2 hedefinde tamamlamak.
+
+**İş kararı:** Google yolu Meta ile aynı V2-primary modelini izler. V1 satırı yazılmaz ve V2 hatasında V1'e sessiz fallback yapılmaz. Standard ile PMax ayrı branch olarak çalışır; gerçek zero-row sonuç geçerlidir ve sahte satır üretilmez.
+
+**Kapsam:** Standard→PMax exact branch sırası, branch başına `attempted == persisted` completeness, birleşik V2 sayaçları, zero-row kanıtı, V1 yazılmadığını gösteren allowlisted ve identity-free evidence.
+
+**Kapsam dışı:** Production route/API, canlı Google çağrısı veya V2 write, runtime gate, deployment, scheduler ve canlı kabul. Bunlar ayrı PR ve açık production onayı gerektirir.
+
+**Kabul kriterleri:** V1 callback/fallback yok; iki branch de ayrı completeness verir; terminal Standard hatasından sonra PMax başlatılmaz; count veya empty-result tutarsızlığı fail-closed olur; zero-row fake-free kabul edilir; evidence customer/entity/token/raw payload/metrik değeri taşımaz; full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/google/v2-primary.js`, `docs/E5_T6_GOOGLE_V2_PRIMARY.md`, `tests/e5-t6-google-v2-primary.test.js`.
+
 **Durum:** `Verification` — repository paketi production işlemi yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 
 ### Kabul kriterleri
@@ -1426,15 +1442,15 @@ src/
 - PMax satırı yalnız desteklenen Asset Group capability'sini taşır.
 - Standard ve PMax ayrı canonical şema üretmez; aynı envelope ve validator'ı kullanır.
 - Unsupported alanlar `null + metric_support` kalır.
-- Retry/idempotency, ownership ve legacy no-change testleri geçer.
+- Retry/idempotency ve ownership testleri geçer; Google V2-primary yolunda legacy write/fallback bulunmaz.
 
 ### Test planı
 
-Golden fixtures, conversion mapping, Standard/PMax hierarchy, timezone/FX, ownership, retry, dual-write ve parity testleri.
+Golden fixtures, conversion mapping, Standard/PMax hierarchy, timezone/FX, ownership, retry, V2 completeness ve provider→canonical→V2 parity testleri.
 
 ### Rollback planı
 
-Standard ve PMax için ayrı flags; V1 korunur; adapter version/run ID ile hedefli geri alma yapılır.
+Production activation ayrı ve default-off gate ile yapılır; rollback gate'i kapatır, V1 fallback başlatmaz; idempotent V2 upsert aynı iş günü için güvenli yeniden çalıştırılır.
 
 ### Bağımlılıklar
 

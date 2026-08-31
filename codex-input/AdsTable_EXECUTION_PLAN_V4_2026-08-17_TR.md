@@ -1311,7 +1311,7 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E5-T1–T6 `Done`; E5-T7 canlı V2-primary runtime paketi `Verification`.
+**Durum:** `In progress` — E5-T1–T6 `Done`; E5-T7 repository ve merge tamamlandı, Meta ile aynı canlı zero-row/no-error kabul sonucu bekleniyor.
 
 ### Planlanan işler
 
@@ -1322,7 +1322,7 @@ src/
 - **E5-T4A — `Done`:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
 - **E5-T5 — `Done`:** Time/FX/V2/job/telemetry entegrasyonu.
 - **E5-T6 — `Done`:** V2-primary koordinasyon; Standard/PMax ayrı completeness; V1 write/fallback yok.
-- **E5-T7 — `Verification`:** Manuel Google Refresh'i business-date Standard/PMax sorgularıyla doğrudan V2'ye bağla.
+- **E5-T7 — `Verification`:** Manuel Google Refresh'i business-date Standard/PMax sorgularıyla doğrudan V2'ye bağla; Meta ile aynı canlı kabul kanıtı bekleniyor.
 
 #### E5-T1 task aynası — Google conversion count/value ve provenance
 
@@ -1450,7 +1450,7 @@ src/
 
 **Evidence:** `src/providers/google/live-refresh.js`, `server.js`, `.env.example`, `docs/E5_T7_GOOGLE_LIVE_V2_RUNTIME.md`, `tests/e5-live-google-v2-primary.test.js`, `tests/e5-live-google-runtime-wiring.test.js`.
 
-**Durum:** `Verification` — repository paketi canlı refresh çalıştırmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
+**Durum:** `Verification` — PR #117 merge edildi ve `main` kontrolleri başarılıdır. İlk post-merge deneme `Manual refresh missing Google login customer id` ile job açılmadan durdu: account discovery yalnız doğrudan erişilebilir manager root'u listeliyor, `customer_client` altındaki test reklam hesabını ve manager→ad-account login bağlamını taşımıyordu. Corrective revizyon accessible root'ları hierarchy sorgusuyla genişletir, yalnız ad account'ları seçilebilir yapar ve `customerId + loginCustomerId` çiftini lifecycle metadata'sında korur. Meta ile aynı completed/no-error canlı kabul sonucu doğrulanmadan E6 başlamaz.
 
 ### Kabul kriterleri
 

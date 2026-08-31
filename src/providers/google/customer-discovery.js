@@ -8,12 +8,9 @@ const CUSTOMER_CLIENT_QUERY = `
     customer_client.currency_code,
     customer_client.time_zone,
     customer_client.manager,
-    customer_client.level,
-    customer_client.status,
-    customer_client.test_account
+    customer_client.level
   FROM customer_client
-  WHERE customer_client.status != 'CANCELED'
-  ORDER BY customer_client.level, customer_client.id
+  WHERE customer_client.level <= 1
 `;
 
 function customerId(resourceName) {
@@ -47,12 +44,21 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
   if (typeof search !== 'function') throw new TypeError('Google customer hierarchy search is required');
   const accounts = new Map();
   const managers = [];
+  let queriedRootCount = 0;
+  let failedRootCount = 0;
   for (const resourceName of resourceNames) {
     const loginCustomerId = customerId(resourceName);
     // The root is directly accessible by definition. Query it without a
     // login-customer-id header; the root becomes the login context only for
     // requests made against discovered child accounts.
-    const response = await search({ customerId: loginCustomerId, query: CUSTOMER_CLIENT_QUERY });
+    let response;
+    try {
+      response = await search({ customerId: loginCustomerId, query: CUSTOMER_CLIENT_QUERY });
+      queriedRootCount += 1;
+    } catch {
+      failedRootCount += 1;
+      continue;
+    }
     const rows = Array.isArray(response?.results) ? response.results : [];
     for (const row of rows) {
       const client = mapClient(row, loginCustomerId);
@@ -60,7 +66,12 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
       else if (!accounts.has(client.customerId)) accounts.set(client.customerId, client);
     }
   }
-  return Object.freeze({ customers: Object.freeze([...accounts.values()]), managers: Object.freeze(managers) });
+  if (resourceNames.length && queriedRootCount === 0) throw new Error('Google Ads customer hierarchy discovery failed');
+  return Object.freeze({
+    customers: Object.freeze([...accounts.values()]),
+    managers: Object.freeze(managers),
+    discovery: Object.freeze({ accessible_root_count: resourceNames.length, queried_root_count: queriedRootCount, failed_root_count: failedRootCount })
+  });
 }
 
 module.exports = Object.freeze({ CUSTOMER_CLIENT_QUERY, discoverGoogleCustomers });

@@ -1,0 +1,20 @@
+{
+  "fixture_version": "e6-t1-v1",
+  "synthetic": true,
+  "report_level": "ad",
+  "expected_data_level": "AUCTION_AD",
+  "expected_dimensions": ["ad_id"],
+  "expected_metrics": [
+    "spend",
+    "impressions",
+    "clicks",
+    "add_to_cart",
+    "initiate_checkout",
+    "complete_payment",
+    "total_complete_payment_value"
+  ],
+  "generic_conversion_row": {
+    "dimensions": { "ad_id": "synthetic-ad" },
+    "metrics": { "conversion": "4" }
+  }
+}

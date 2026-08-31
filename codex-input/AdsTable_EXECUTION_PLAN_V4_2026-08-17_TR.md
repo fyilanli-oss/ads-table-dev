@@ -1311,7 +1311,7 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E5-T1–T6 `Done`; E5-T7 canlı V2-primary runtime paketi `Verification`.
+**Durum:** `Done` — E5-T1–T7 repository, PR/CI ve merge kabulü tamamlandı; canlı kullanıcı doğrulaması production onayı sınırında ayrıca izlenir.
 
 ### Planlanan işler
 
@@ -1450,7 +1450,7 @@ src/
 
 **Evidence:** `src/providers/google/live-refresh.js`, `server.js`, `.env.example`, `docs/E5_T7_GOOGLE_LIVE_V2_RUNTIME.md`, `tests/e5-live-google-v2-primary.test.js`, `tests/e5-live-google-runtime-wiring.test.js`.
 
-**Durum:** `Verification` — repository paketi canlı refresh çalıştırmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
+**Durum:** `Done` — PR #117 merge edildi ve `main` Security regression/Vercel kontrolleri başarılı tamamlandı; bu iş sırasında canlı refresh çalıştırılmadı.
 
 ### Kabul kriterleri
 
@@ -1475,11 +1475,11 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 ## 10. E6 — TikTok adapter
 
-**Durum:** `Not started`
+**Durum:** `In progress` — E6-T1 production metrics contract paketi `Verification`; E6-T2–T6 `Not started`.
 
 ### Planlanan işler
 
-- **E6-T1:** Production metrics contract'ını resmi provider kaynağıyla freeze et.
+- **E6-T1 — `Verification`:** Production metrics contract'ını resmi provider kaynağıyla freeze et.
 - **E6-T2:** Generic conversion→purchase fallback'ini kaldır.
 - **E6-T3:** ATC/Checkout/Purchase count/value mapping.
 - **E6-T4:** Campaign/AdGroup/Ad double-count önleme.
@@ -1487,6 +1487,22 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T4B:** TikTok output'unu aynı yedi bloklu canonical envelope'a normalize et.
 - **E6-T5:** Synthetic fallback'i canonical production Dataset'ten ayır.
 - **E6-T6:** Time/FX/V2, dual-write ve parity.
+
+#### E6-T1 task aynası — TikTok production metrics contract
+
+**Amaç:** TikTok performansının hangi resmi rapor yüzeyinden, hangi seviyede ve hangi metric adlarıyla alınacağını downstream mapping başlamadan önce versiyonlu ve fail-closed bir sözleşmeye bağlamak.
+
+**İş kararı:** Marketing API v1.3 integrated BASIC report kullanılır. Production canonical leaf `AUCTION_AD / ad_id` olur; Campaign, AdGroup ve Ad toplamları additive değildir. `conversion`, `conversions` veya `conversion_value` purchase kanıtı sayılamaz. Eksik tracking-dependent metric ölçülmüş sıfıra çevrilemez.
+
+**Kapsam:** Resmi provider referansı, endpoint/report type, Campaign/AdGroup/Ad seviye matrisi, production Ad leaf kararı, spend/impression/click ve commerce metric envanteri, generic conversion negatif guard'ı, sentetik fixture ve kimliksiz evidence.
+
+**Kapsam dışı:** Production API çağrısı, advertiser/token kullanımı, canlı metric doğrulaması, conversion mapping implementasyonu, canonical adapter, Dataset V2 write, synthetic ayırma, Time/FX ve dual-write.
+
+**Kabul kriterleri:** Contract versionlı ve immutable; yalnız tanımlı seviye kabul edilir; Ad production leaf'tir; hierarchy toplamları birleştirilmez; generic conversion purchase olmaz; missing-zero ayrımı korunur; fixture secret/identity içermez; full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/tiktok/report-contract.js`, `artifacts/e6-tiktok/e6-t1-report-contract-fixture.json`, `docs/E6_T1_TIKTOK_REPORT_CONTRACT.md`, `tests/e6-t1-tiktok-report-contract.test.js`.
+
+**Durum:** `Verification` — repository paketi production çağrısı yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 
 ### Kabul kriterleri
 

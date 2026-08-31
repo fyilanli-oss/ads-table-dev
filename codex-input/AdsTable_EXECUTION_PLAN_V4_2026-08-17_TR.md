@@ -1322,7 +1322,7 @@ src/
 - **E5-T4A — `Done`:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
 - **E5-T5 — `Done`:** Time/FX/V2/job/telemetry entegrasyonu.
 - **E5-T6 — `Done`:** V2-primary koordinasyon; Standard/PMax ayrı completeness; V1 write/fallback yok.
-- **E5-T7 — `Verification`:** Manuel Google Refresh'i business-date Standard/PMax sorgularıyla doğrudan V2'ye bağla.
+- **E5-T7 — `Done`:** Manuel Google Refresh'i business-date Standard/PMax sorgularıyla doğrudan V2'ye bağla.
 
 #### E5-T1 task aynası — Google conversion count/value ve provenance
 

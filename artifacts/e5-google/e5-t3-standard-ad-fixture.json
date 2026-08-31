@@ -1,0 +1,6 @@
+{
+  "fixture_version":"e5-t3-google-standard-ad-v1","synthetic":true,
+  "customer":{"id":"1234567890","source_currency":"USD","source_timezone":"America/Los_Angeles","business_date":"2026-08-30","time_engine_version":"v1"},
+  "row":{"segments":{"date":"2026-08-30"},"campaign":{"id":"100","name":"Search Campaign","advertisingChannelType":"SEARCH"},"adGroup":{"id":"200","name":"Brand AdGroup"},"adGroupAd":{"ad":{"id":"300","name":"Brand Ad"}},"metrics":{"impressions":"1000","clicks":"75","costMicros":"125500000"},"conversion_actions":[{"category":"ADD_TO_CART","name":"Cart","conversions":10,"conversions_value":500},{"category":"BEGIN_CHECKOUT","name":"Checkout","conversions":6,"conversions_value":420},{"category":"PURCHASE","name":"Sale","conversions":4,"conversions_value":360}]},
+  "expected":{"impression":1000,"ad_click":75,"spend_value":125.5,"add_to_cart":10,"checkout":6,"purchase":4,"purchase_value":360}
+}

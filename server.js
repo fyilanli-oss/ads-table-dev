@@ -96,7 +96,7 @@ async function saveConnection(userId,platform,payload){
   if(error)throw new Error(error.message)
 }
 async function getConnection(userId,platform){if(!supabaseAdmin||!userId)return null;const {data,error}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",platform).eq("connected",true).maybeSingle();if(error)throw new Error(error.message);if(!data||!providerTokenStore)return data;const tokens=await providerTokenStore.resolve({userId,platform,legacyAccessToken:data.access_token,legacyRefreshToken:data.refresh_token});return{...data,access_token:tokens.accessToken,refresh_token:tokens.refreshToken,token_storage_source:tokens.source,token_rotation_required:tokens.needsRotation}}
-async function connectionStatus(userId,platform){const r=await getConnection(userId,platform).catch(()=>null);return{connected:Boolean(r&&(r.access_token||r.refresh_token)),source:r?"database":"none",updatedAt:r?.updated_at||null}}
+async function connectionStatus(userId,platform){const r=await getConnection(userId,platform).catch(()=>null),selectionRequired=r?.metadata?.accountSelectionRequired===true;return{connected:Boolean(r&&(r.access_token||r.refresh_token)&&!selectionRequired),source:r?"database":"none",updatedAt:r?.updated_at||null}}
 async function canRunScheduledRefresh(userId){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);return Boolean(!access.blocked&&access.dailySync)}
 
 // ===== PHASE 1 CONSTITUTION PACK HELPERS =====

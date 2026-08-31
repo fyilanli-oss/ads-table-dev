@@ -12,3 +12,9 @@ Google manuel Refresh, onaylanan Meta modeliyle aynı şekilde doğrudan Dataset
 Runtime gate `GOOGLE_V2_PRIMARY_REFRESH_ENABLED=true` ile Meta V2-primary kararıyla aynı biçimde açık gelir. Rollback yalnız gate'i kapatır; hata anında V1'e fallback yapmaz.
 
 Bu repository paketi canlı refresh çalıştırmaz. Merge ve Vercel kontrollerinden sonra refresh kullanıcı tarafından başlatılır.
+
+## Manager account discovery düzeltmesi
+
+`customers:listAccessibleCustomers` yalnız OAuth kullanıcısının doğrudan erişebildiği customer resource adlarını verir; bir manager hesabının altındaki reklam hesaplarını listelemez. Account picker bu nedenle her erişilebilir root için resmi `customer_client` hierarchy sorgusunu çalıştırır, manager satırlarını seçim listesinden ayırır ve yalnız reklam hesaplarını seçilebilir döndürür.
+
+Her seçilebilir reklam hesabı kendi `customerId` değeriyle birlikte onu açan manager hesabın `loginCustomerId` değerini taşır. Seçim lifecycle'ı bu çifti ownership ve connection metadata'sında korur. Manuel refresh böylece hedef reklam hesabını Google Ads API path'inde, manager hesabını ise `login-customer-id` header'ında kullanır; manager hesabı yanlışlıkla performans customer'ı olmaz.

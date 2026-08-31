@@ -1450,7 +1450,7 @@ src/
 
 **Evidence:** `src/providers/google/live-refresh.js`, `server.js`, `.env.example`, `docs/E5_T7_GOOGLE_LIVE_V2_RUNTIME.md`, `tests/e5-live-google-v2-primary.test.js`, `tests/e5-live-google-runtime-wiring.test.js`.
 
-**Durum:** `Verification` — PR #117 merge edildi ve `main` kontrolleri başarılıdır; ancak post-merge canlı Google Refresh job'ı henüz oluşmamış, Dataset V2 Google satırı oluşmamış ve Meta ile aynı completed/no-error zero-row kabul sonucu doğrulanmamıştır. E6 bu canlı kabul tamamlanana kadar başlamaz.
+**Durum:** `Verification` — PR #117 merge edildi ve `main` kontrolleri başarılıdır. İlk post-merge deneme `Manual refresh missing Google login customer id` ile job açılmadan durdu: account discovery yalnız doğrudan erişilebilir manager root'u listeliyor, `customer_client` altındaki test reklam hesabını ve manager→ad-account login bağlamını taşımıyordu. Corrective revizyon accessible root'ları hierarchy sorgusuyla genişletir, yalnız ad account'ları seçilebilir yapar ve `customerId + loginCustomerId` çiftini lifecycle metadata'sında korur. Meta ile aynı completed/no-error canlı kabul sonucu doğrulanmadan E6 başlamaz.
 
 ### Kabul kriterleri
 

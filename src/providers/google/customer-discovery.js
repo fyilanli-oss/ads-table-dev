@@ -1,0 +1,63 @@
+'use strict';
+
+const CUSTOMER_CLIENT_QUERY = `
+  SELECT
+    customer_client.client_customer,
+    customer_client.id,
+    customer_client.descriptive_name,
+    customer_client.currency_code,
+    customer_client.time_zone,
+    customer_client.manager,
+    customer_client.level,
+    customer_client.status,
+    customer_client.test_account
+  FROM customer_client
+  WHERE customer_client.status != 'CANCELED'
+  ORDER BY customer_client.level, customer_client.id
+`;
+
+function customerId(resourceName) {
+  const match = String(resourceName || '').match(/^customers\/(\d+)$/);
+  if (!match) throw new Error('Google accessible customer resource name is invalid');
+  return match[1];
+}
+
+function mapClient(row, loginCustomerId) {
+  const client = row?.customerClient || row?.customer_client;
+  if (!client || typeof client !== 'object') throw new Error('Google customer_client row is invalid');
+  const id = String(client.id || customerId(client.clientCustomer || client.client_customer));
+  return Object.freeze({
+    resourceName: `customers/${id}`,
+    customerId: id,
+    platform_account_id: id,
+    loginCustomerId,
+    login_customer_id: loginCustomerId,
+    account_name: client.descriptiveName || client.descriptive_name || `Google Ads ${id}`,
+    currency: client.currencyCode || client.currency_code || null,
+    timezone: client.timeZone || client.time_zone || null,
+    manager: Boolean(client.manager),
+    level: Number(client.level || 0),
+    status: client.status || null,
+    test_account: Boolean(client.testAccount ?? client.test_account)
+  });
+}
+
+async function discoverGoogleCustomers({ resourceNames, search } = {}) {
+  if (!Array.isArray(resourceNames)) throw new TypeError('Google accessible customer resource names must be an array');
+  if (typeof search !== 'function') throw new TypeError('Google customer hierarchy search is required');
+  const accounts = new Map();
+  const managers = [];
+  for (const resourceName of resourceNames) {
+    const loginCustomerId = customerId(resourceName);
+    const response = await search({ customerId: loginCustomerId, loginCustomerId, query: CUSTOMER_CLIENT_QUERY });
+    const rows = Array.isArray(response?.results) ? response.results : [];
+    for (const row of rows) {
+      const client = mapClient(row, loginCustomerId);
+      if (client.manager) managers.push(client);
+      else if (!accounts.has(client.customerId)) accounts.set(client.customerId, client);
+    }
+  }
+  return Object.freeze({ customers: Object.freeze([...accounts.values()]), managers: Object.freeze(managers) });
+}
+
+module.exports = Object.freeze({ CUSTOMER_CLIENT_QUERY, discoverGoogleCustomers });

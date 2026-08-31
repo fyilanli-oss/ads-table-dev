@@ -1311,15 +1311,15 @@ src/
 
 ## 9. E5 — Google Standard ve PMax adapter
 
-**Durum:** `In progress` — E5-T1–T3 `Done`; E5-T4 repository paketi `Verification`.
+**Durum:** `In progress` — E5-T1–T4 `Done`; E5-T4A repository paketi `Verification`.
 
 ### Planlanan işler
 
 - **E5-T1 — `Done`:** Conversion action count/value mapping ve provenance.
 - **E5-T2 — `Done`:** Gerçek customer currency/timezone.
 - **E5-T3 — `Done`:** Standard Campaign→AdGroup→Ad adapter.
-- **E5-T4 — `Verification`:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
-- **E5-T4A:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
+- **E5-T4 — `Done`:** PMax Campaign→Asset Group adapter; fake AdGroup/Ad yasağı.
+- **E5-T4A — `Verification`:** Standard ve PMax output'larını aynı yedi bloklu envelope'a normalize et; farkı yalnız capability/entity değerlerinde koru.
 - **E5-T5:** Time/FX/V2/job/telemetry entegrasyonu.
 - **E5-T6:** Dual-write, Standard/PMax ayrı completeness ve parity.
 
@@ -1384,6 +1384,22 @@ src/
 **Kabul kriterleri:** Fake AdGroup/Ad yok; parent null; only Asset Group leaf; Standard reddedilir; missing/unsupported/zero semantiği korunur; provider DTO dışarı çıkmaz; Standard ile aynı envelope; canonical/hierarchy/key ve full/security/architecture/canonical CI PASS.
 
 **Evidence:** `src/providers/google/pmax-mapper.js`, `src/providers/google/pmax-adapter.js`, `artifacts/e5-google/e5-t4-pmax-asset-group-fixture.json`, `docs/E5_T4_GOOGLE_PMAX_ADAPTER.md`, `tests/e5-t4-google-pmax-adapter.test.js`.
+
+**Durum:** `Done` — PR #113, CI ve insan merge kabulü tamamlandı.
+
+#### E5-T4A task aynası — Google Standard/PMax ortak adapter ve envelope closeout
+
+**Amaç:** Standard ve PMax yollarını tek Google provider girişinde doğru mapper'a yönlendirmek ve iki campaign modelinin ayrı canonical şemalara ayrılmadığını merkezi olarak kanıtlamak.
+
+**Sözleşme:** Caller yalnız `standard|performance_max` seçebilir. Standard fetch yalnız Standard mapper'a, PMax fetch yalnız PMax mapper'a bir kez delege edilir. Unknown/missing type provider fetch öncesi reddedilir. Capability farkı root/parent/leaf ve campaign type değerleriyle sınırlıdır.
+
+**Kapsam:** Unified adapter, immutable capability matrix, exact delegation, shared seven-block/raw metric/support/currency/time/provenance key parity, DTO boundary ve unknown-type negatifleri.
+
+**Kapsam dışı:** Production Google client/API/runtime, Dataset V2 write, Time/FX live binding, job/retry/dual-write ve UI.
+
+**Kabul kriterleri:** Tek provider adapter girişi; exact one-path delegation; unknown no-fetch; Standard/PMax aynı envelope; fark yalnız capability/entity değerleri; provider DTO dışarı çıkmaz; full/security/architecture/canonical CI PASS.
+
+**Evidence:** `src/providers/google/adapter.js`, `src/providers/google/capabilities.js`, `docs/E5_T4A_GOOGLE_UNIFIED_ENVELOPE.md`, `tests/e5-t4a-google-unified-adapter.test.js`.
 
 **Durum:** `Verification` — repository paketi production işlemi yapmadan hazırlandı; PR/CI ve insan merge kabulü beklenir.
 

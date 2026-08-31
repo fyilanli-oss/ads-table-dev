@@ -1,5 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const { CUSTOMER_CLIENT_QUERY, discoverGoogleCustomers } = require('../src/providers/google/customer-discovery');
 
@@ -15,7 +17,7 @@ test('manager-accessible root expands to selectable ad accounts with its login c
       ] };
     }
   });
-  assert.deepEqual(calls, [{ customerId: '100', loginCustomerId: '100', query: CUSTOMER_CLIENT_QUERY }]);
+  assert.deepEqual(calls, [{ customerId: '100', query: CUSTOMER_CLIENT_QUERY }]);
   assert.equal(result.customers.length, 1);
   assert.equal(result.customers[0].customerId, '200');
   assert.equal(result.customers[0].loginCustomerId, '100');
@@ -31,4 +33,11 @@ test('directly accessible ad account remains selectable and uses itself as login
 test('malformed provider shapes fail closed instead of returning a manager as an ad account', async () => {
   await assert.rejects(discoverGoogleCustomers({ resourceNames: ['customers/not-an-id'], search: async () => ({}) }), /resource name/);
   await assert.rejects(discoverGoogleCustomers({ resourceNames: ['customers/100'], search: async () => ({ results: [{}] }) }), /row is invalid/);
+});
+
+test('account-selection discovery failure consumes reconnect URL before Close reloads', () => {
+  for (const file of ['dashboard.html', 'dashboard-patch17H-fixed.html', 'dashboard-patch17H-fixed-v2.html']) {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'public', file), 'utf8');
+    assert.match(source, /catch\(error\)\{\s*cleanReconnectUrl\(\);\s*openSelection\(platform,\[\]\);/);
+  }
 });

@@ -9165,6 +9165,7 @@ body.ads-operation-locked{overflow:hidden !important;}
         if(modal)modal.dataset.selectionComplete="true";
       }
     }catch(error){
+      cleanReconnectUrl();
       openSelection(platform,[]);
       if(desc)desc.textContent=error.message||"Account selection could not be loaded.";
       if(action){

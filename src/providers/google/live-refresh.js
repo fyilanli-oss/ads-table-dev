@@ -8,7 +8,11 @@ const { createGoogleDatasetWriter } = require('./dataset-writer');
 const { createGoogleV2PrimaryCoordinator } = require('./v2-primary');
 
 function rows(response) {
-  if (!response || !Array.isArray(response.results)) throw new Error('Google search response must contain results[]');
+  if (!response || typeof response !== 'object' || Array.isArray(response)) throw new Error('Google search response must be an object');
+  // ProtoJSON omits empty repeated fields. A successful Google Ads response can
+  // therefore have no `results` property when the query matched zero rows.
+  if (!Object.prototype.hasOwnProperty.call(response, 'results')) return [];
+  if (!Array.isArray(response.results)) throw new Error('Google search response results must be an array');
   return response.results;
 }
 function uuidIdentity(value, field) {

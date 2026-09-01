@@ -18,6 +18,12 @@ E6-T2/E6-T3 gerçek event karakterizasyonuna başlamadan önce iş kararı gerek
 
 Production startup sandbox switch, token veya advertiser değişkenlerinden herhangi birini görürse fail-closed kalır. Normal OAuth advertiser discovery yolu kaldırılmadı ve sandbox switch'leri kapalıyken aynen çalışır.
 
+## Preview doğrulama sonucu — başarısız
+
+PR #130 Preview denemesi kabul edilmedi ve PR merge edilmeden kapatıldı. Preview hostname ayrı olmasına rağmen aynı Supabase projesini kullandığı için kullanıcı oturumu hostname değişiminde taşınmadı; girişten sonra da mevcut TikTok connection kaydı `Disconnect` olarak göründü. Sandbox readiness tamamlanmadığından `Connect` sandbox yoluna girmedi, OAuth fallback çalıştı ve aynı boş advertiser listesi döndü.
+
+Bu sonuç, yalnız ayrı Vercel URL'sinin ayrı sandbox ortamı olmadığını kanıtlar. Gerçek izolasyon için ayrı non-production Supabase auth/data plane'i ve eksiksiz Preview sandbox yapılandırması gerekir. Bunlar olmadan yeni retry yapılmaz; shared production data üzerinde test connection üretmek ayrı ortam kabul edilmez.
+
 ## Modal düzeltmesi
 
 Advertiser listesi başarılı fakat boş döndüğünde reconnect URL parametreleri artık modal gösterilirken tüketilir. `Close` sayfayı yenilese bile aynı account-selection akışı tekrar açılmaz.

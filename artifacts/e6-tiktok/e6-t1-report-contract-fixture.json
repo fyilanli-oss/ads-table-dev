@@ -1,0 +1,20 @@
+{
+  "synthetic": true,
+  "purpose": "E6-T1 contract verification only; not production evidence",
+  "contract_version": "e6-t1-v1",
+  "request": {
+    "report_type": "BASIC",
+    "service_type": "AUCTION",
+    "data_level": "AUCTION_AD",
+    "dimensions": ["ad_id"],
+    "metrics": ["spend", "impressions", "clicks"]
+  },
+  "response_row": {
+    "dimensions": { "ad_id": "synthetic-ad-1" },
+    "metrics": { "spend": "12.50", "impressions": "1000", "clicks": "25" }
+  },
+  "forbidden_interpretation": {
+    "conversion": "purchase",
+    "missing_purchase": 0
+  }
+}

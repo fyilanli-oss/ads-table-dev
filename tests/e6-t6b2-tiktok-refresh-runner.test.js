@@ -35,3 +35,7 @@ test('evidence reports event_metrics_written zero regardless of isolated rows',a
   const result=(await harness({response:{rows:[fixture.input,{synthetic:true}]},writerResult:{attempted:1,persisted:1,isolated_synthetic_rows:1,synthetic_written_to_canonical:0}}).runner.run(request)).result;
   assert.equal(result.tiktok_v2_evidence.mapping.provider_row_count,2);assert.equal(result.tiktok_v2_evidence.mapping.isolated_synthetic_rows,1);assert.equal(result.tiktok_v2_evidence.mapping.event_metrics_written,0);
 });
+
+test('writer counters and synthetic invariant are validated before job evidence',async()=>{
+  for(const writerResult of [{attempted:1,persisted:0,isolated_synthetic_rows:0,synthetic_written_to_canonical:0},{attempted:0,persisted:0,isolated_synthetic_rows:0,synthetic_written_to_canonical:0},{attempted:1,persisted:1,isolated_synthetic_rows:0,synthetic_written_to_canonical:1},{attempted:'1',persisted:1,isolated_synthetic_rows:0,synthetic_written_to_canonical:0}])await assert.rejects(()=>harness({writerResult}).runner.run(request),/writer .*mismatch|synthetic invariant|non-negative integer/);
+});

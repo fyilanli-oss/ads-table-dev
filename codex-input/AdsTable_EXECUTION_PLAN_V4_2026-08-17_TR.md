@@ -1566,7 +1566,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kapsam dışı:** Express route/production flag activation, legacy dual-write ve parity kabulü.
 
-**Durum:** `Verification` — beş executable test normal V2 composition'ı, omitted zero-row'u, malformed/identity/date fail-closed davranışını, provider safe stage'ini ve event/synthetic zero-write evidence invariant'larını doğrular.
+**Durum:** `Verification` — altı executable test normal V2 composition'ı, omitted zero-row'u, malformed/identity/date fail-closed davranışını, provider safe stage'ini, event/synthetic zero-write evidence invariant'larını ve writer count/cardinality doğrulamasını kapsar.
 
 ### Kabul kriterleri
 

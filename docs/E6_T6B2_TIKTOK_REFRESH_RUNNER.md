@@ -12,5 +12,6 @@ TikTok advertiser metadata, yalnız `AUCTION_AD` delivery raporu, E6-T6B1 writer
 - Job evidence yalnız count/boolean ve sabit contract alanları taşır; advertiser, job kimliği, metric değeri veya provider payload içermez.
 - Provider failure `TIKTOK_PROVIDER_REPORT` safe stage'iyle job failure boundary'ye ulaşır.
 - Evidence `event_metrics_written=0` ve `synthetic_written_to_canonical=0` invariant'larını taşır.
+- Writer count'ları non-negative integer, persisted=attempted ve attempted+isolated=provider row count olmalıdır; sentetik invariant evidence oluşturulmadan fail-closed doğrulanır.
 
 Bu paket Express route'a veya production flag'e bağlanmaz. Server composition/dual-write parity E6-T6C, production activation E6-T6D kapsamındadır.

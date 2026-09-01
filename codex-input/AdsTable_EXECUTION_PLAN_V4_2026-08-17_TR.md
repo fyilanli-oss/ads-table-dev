@@ -1475,11 +1475,11 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 ## 10. E6 — TikTok adapter
 
-**Durum:** `Not started`
+**Durum:** `In progress` — E6-T1 `Verification`; E6-T2–T6 başlamadı.
 
 ### Planlanan işler
 
-- **E6-T1:** Production metrics contract'ını resmi provider kaynağıyla freeze et.
+- **E6-T1 — `Verification`:** Resmî TikTok Business API SDK commit'iyle v1.3 synchronous BASIC `AUCTION_AD` report yüzeyi, Ad-leaf additive grain, delivery metrics ve fail-closed event kuralları donduruldu; CI ve merge kabulü bekleniyor.
 - **E6-T2:** Generic conversion→purchase fallback'ini kaldır.
 - **E6-T3:** ATC/Checkout/Purchase count/value mapping.
 - **E6-T4:** Campaign/AdGroup/Ad double-count önleme.
@@ -1487,6 +1487,18 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T4B:** TikTok output'unu aynı yedi bloklu canonical envelope'a normalize et.
 - **E6-T5:** Synthetic fallback'i canonical production Dataset'ten ayır.
 - **E6-T6:** Time/FX/V2, dual-write ve parity.
+
+#### E6-T1 task aynası — TikTok production report contract
+
+**Amaç:** Provider mapping başlamadan önce TikTok production rapor yüzeyini resmî, pinlenmiş kaynakla sınırlandırmak ve legacy generic conversion→purchase yorumunu yasaklamak.
+
+**Sözleşme:** `/open_api/v1.3/report/integrated/get/`, `GET`, `BASIC`, `AUCTION_AD`, `ad_id`; doğrulanmış delivery alanları `spend`, `impressions`, `clicks`. Production fact yalnız Ad leaf'te additive olur; Campaign ve AdGroup lineage'dır. Event count/value alanları gerçek advertiser karakterizasyonuna kadar `unknown` kalır ve eksik değer sıfır değildir.
+
+**Kapsam dışı:** Canlı TikTok isteği, event mapping, canonical mapper, Dataset V2 write, synthetic temizliği ve production activation.
+
+**Evidence:** `src/providers/tiktok/report-contract.js`, `artifacts/e6-tiktok/e6-t1-report-contract-fixture.json`, `docs/E6_T1_TIKTOK_REPORT_CONTRACT.md`, `tests/e6-t1-tiktok-report-contract.test.js`.
+
+**Durum:** `Verification` — resmî TikTok SDK repository commit'i `f809c396520df2d7b201a9ccc5378d822b728ed3` pinlendi. SDK endpoint/report type/data-level sözleşmesini doğrular; event metric isimlerini kapalı enum olarak yayımlamadığı için ATC/Checkout/Purchase hakkında tahmin yapılmadı. CI ve merge kabulü bekleniyor.
 
 ### Kabul kriterleri
 

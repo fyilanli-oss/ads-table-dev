@@ -24,6 +24,34 @@ PR #130 Preview denemesi kabul edilmedi ve PR merge edilmeden kapatıldı. Previ
 
 Bu sonuç, yalnız ayrı Vercel URL'sinin ayrı sandbox ortamı olmadığını kanıtlar. Gerçek izolasyon için ayrı non-production Supabase auth/data plane'i ve eksiksiz Preview sandbox yapılandırması gerekir. Bunlar olmadan yeni retry yapılmaz; shared production data üzerinde test connection üretmek ayrı ortam kabul edilmez.
 
+## Onaylanan geçici read-only characterization
+
+Ayrı veritabanı yerine insan onayıyla dar kapsamlı geçici yol seçildi. Authenticated `/api/tiktok/sandbox/characterize` yalnız non-production feature flag ile açılır; server-held sandbox token ve advertiser ID kullanarak event metric adaylarını tek günlük, Ad-level BASIC raporda ayrı ayrı probe eder. Endpoint connection, ownership, snapshot, refresh job veya Dataset V1/V2 yazmaz. Ham response, metric değeri, token ve advertiser kimliği dönmez; yalnız aday alanın provider tarafından kabul edilip edilmediği, cevapta bulunup bulunmadığı ve zero-row/non-empty şekli döner.
+
+TikTok test sayfasındaki `Run Server Characterization` düğmesi bu endpoint'i çağırır. Karakterizasyon tamamlanınca route/flag kapatılır. Bu geçici review mekanizması production OAuth advertiser keşfinin veya nihai production TikTok bağlantısının yerine geçmez.
+
 ## Modal düzeltmesi
 
 Advertiser listesi başarılı fakat boş döndüğünde reconnect URL parametreleri artık modal gösterilirken tüketilir. `Close` sayfayı yenilese bile aynı account-selection akışı tekrar açılmaz.
+
+## Preview giriş kapısı — production onayı verildi
+
+1 Eylül 2026 tarihli insan kararıyla, shared Supabase Auth dönüş adreslerinin read-only denetimi ve gerekiyorsa yalnız AdsTable Vercel Preview adresini kapsayan sınırlı izin değişikliği onaylandı. Bu onay TikTok production aktivasyonu, Dataset write veya production deployment onayı değildir.
+
+Uygulama Google sign-in çağrısında Preview origin üzerindeki `/dashboard` adresini açıkça `redirectTo` olarak gönderir. Gözlenen landing dönüşü bu çağrıdan sonra oluştuğu için yeni TikTok veya login tahmini yapılmayacaktır. Önce Supabase Auth `site_url` ve redirect allow-list gerçek değerleri okunacaktır; Preview adresi listede yoksa yalnız bu adres eklenip yeniden okunarak doğrulanacaktır.
+
+Koordinatör ortamından Supabase Management API'ye proxy üzerinden ve proxy bypass ile yapılan read-only erişim denemeleri ağ katmanında başarısız oldu; herhangi bir auth ayarı değişmedi. Yönetim yüzeyi okunmadan kullanıcıdan yeni login denemesi istenmeyecektir.
+
+İnsan tarafından gönderilen Supabase URL Configuration ekranı kesin nedeni doğruladı: allow-list yalnız `https://dev.adstable.app/*` içeriyordu; AdsTable Preview `/dashboard` dönüş adresi yoktu. Onaylanan dar kapsam doğrultusunda tam Preview `/dashboard` adresinin eklendiği 1 Eylül 2026 tarihinde insan tarafından bildirildi. Site URL ve mevcut production wildcard değiştirilmedi. Auth kapısı şimdi tek kontrollü Preview login doğrulamasını bekler; başarılı olmadan characterization çalıştırılmaz.
+
+Tek kontrollü Google sign-in doğrulaması başarıyla Preview `/dashboard` sayfasına döndü. Auth kapısı kabul edildi; önceki landing dönüşünün nedeni eksik redirect allow-list kaydı olarak kapatıldı. Sıradaki ve tek açık insan doğrulaması, authenticated Preview test sayfasından `Run Server Characterization` çalıştırılarak yalnız redacted field-presence sonucunun alınmasıdır.
+
+## Characterization sonucu ve geçici yüzeyin kapatılması
+
+Tek read-only çalışma başarıyla tamamlandı. Dokuz aday metric'in tamamı provider tarafından kabul edildi; ancak tek günlük sandbox sorgusu sıfır satır döndürdüğü için hiçbir alan response içinde gözlenmedi. Bu sonuç metric adlarının sorguda kabul edildiğini kanıtlar, fakat ATC/Checkout/Purchase anlamını, count/value eşleşmesini veya gerçek değer davranışını kanıtlamaz. Bu nedenle event alanları `unknown` kalır; eksik alan sıfır veya purchase olarak yorumlanmaz. Redacted sonuç `artifacts/e6-tiktok/e6-t2-t3-sandbox-characterization-result.json` altında saklandı.
+
+Kanıt alındıktan sonra geçici `/api/tiktok/sandbox/characterize` route'u, test sayfası düğmesi ve yalnız bu route'a ait feature flag wiring'i aynı PR üzerinde kaldırıldı. Böylece server-held sandbox token'ı kullanan geçici probe yüzeyi merge paketinde açık bırakılmaz. Sıradaki iş kararı, kontrollü sandbox event verisi üretip non-empty kanıt almak veya delivery-only mapping ile ilerleyip tüm event alanlarını unsupported/null bırakmaktır.
+
+## Delivery-only iş kararı
+
+İnsan kararıyla delivery-only ilerleme seçildi. Sonraki adapter işi yalnız doğrulanmış `spend`, `impressions` ve `clicks` alanlarını Ad leaf'te additive fact olarak map edecek; Campaign ve AdGroup yalnız lineage olacak. ATC, Checkout, Purchase ve bunların value alanları non-empty provider kanıtı gelene kadar `unsupported/null` kalacak. Generic conversion fallback, eksik→sıfır dönüşümü ve sentetik purchase yasaktır. Bu karar E6-T3 event semantiğini tamamlamaz; onu açık fakat delivery mapping için bloklamayan ayrı bir evidence gate olarak bırakır.

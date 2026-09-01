@@ -1475,13 +1475,13 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 ## 10. E6 — TikTok adapter
 
-**Durum:** `In progress` — E6-T1 `Done`; E6-T2 sandbox ortam izolasyonu `Verification`; E6-T3–T6 başlamadı.
+**Durum:** `In progress` — E6-T1 `Done`; E6-T2 + E6-T3 read-only sandbox characterization `Verification`; E6-T4–T6 başlamadı.
 
 ### Planlanan işler
 
 - **E6-T1 — `Done`:** Resmî TikTok Business API SDK commit'iyle v1.3 synchronous BASIC `AUCTION_AD` report yüzeyi, Ad-leaf additive grain, delivery metrics ve fail-closed event kuralları PR #127 ve başarılı CI ile donduruldu.
-- **E6-T2 — `Verification`:** Generic conversion→purchase fallback'ini kaldırmadan önce OAuth advertiser discovery/sandbox sınırı denetlendi; boş-list modal döngüsü düzeltildi, gerçek advertiser erişimi için iş kararı bekleniyor.
-- **E6-T3:** ATC/Checkout/Purchase count/value mapping.
+- **E6-T2 — `Verification / Merge approval`:** OAuth/sandbox sınırı, Preview auth düzeltmesi ve zero-row characterization tamamlandı. İnsan kararıyla delivery-only ilerleme seçildi; PR #132 merge onayı bekliyor.
+- **E6-T3 — `Deferred evidence gate`:** Dokuz ATC/Checkout/Purchase count/value adayı provider tarafından kabul edildi ancak sandbox tek günlük sorgusu zero-row döndü. Event alanları `unknown` ve sonraki delivery adapter'da `unsupported/null` kalacak; non-empty kanıt ayrı gate olarak açık kalır.
 - **E6-T4:** Campaign/AdGroup/Ad double-count önleme.
 - **E6-T4A:** `Campaign → AdGroup → Ad` root/parent/leaf lineage ve deterministic entity key mappingi.
 - **E6-T4B:** TikTok output'unu aynı yedi bloklu canonical envelope'a normalize et.
@@ -1510,7 +1510,9 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Evidence:** `docs/E6_T2_TIKTOK_ACCOUNT_DISCOVERY_AUDIT.md`, `tests/e6-t2-tiktok-account-selection.test.js`, `public/dashboard.html` ve iki korunmuş dashboard patch'i.
 
-**Durum:** `Verification` — PR #128 modal corrective ve PR #129 sandbox source merge edildi. PR #130 Preview doğrulaması başarısız oldu: ayrı hostname aynı Supabase auth/data plane'ini kullandı, mevcut connection `Disconnect` göründü ve eksik sandbox readiness nedeniyle OAuth fallback yeniden boş advertiser listesi verdi. PR #130 merge edilmeden kapatıldı. Ayrı non-production Supabase ve eksiksiz Preview sandbox configuration için insan iş/harcama onayı olmadan retry yapılmaz; sandbox advertiser raporu görülmeden E6-T2/E6-T3 mapping başlamaz.
+**Durum:** `Verification / Merge approval` — PR #128 modal corrective ve PR #129 sandbox source merge edildi. PR #130 Preview doğrulaması başarısız oldu ve merge edilmeden kapatıldı. PR #132 auth kapısını düzeltti ve read-only characterization'ı tamamladı. Dokuz aday metric sorguda kabul edildi fakat sonuç zero-row olduğundan field/value semantiği kanıtlanmadı. İnsan kararıyla delivery-only ilerleme seçildi: sonraki adapter yalnız `spend/impressions/clicks` map edecek; event alanları non-empty kanıta kadar `unsupported/null` kalacak. Redacted evidence repository'ye alındı ve geçici route/flag/UI düğmesi kaldırıldı. PR #132 merge onayı bekler.
+
+**Geçici corrective sonucu:** İnsan onayıyla ayrı database kurulmadan read-only characterization çalıştırıldı. Endpoint hiçbir connection/ownership/job/snapshot/Dataset write yapmadı ve yalnız safe field-presence evidence döndürdü. Çalışma zero-row olduğu için event semantiği fail-closed biçimde kabul edilmedi; geçici endpoint kanıt alındıktan sonra kaldırıldı.
 
 ### Kabul kriterleri
 

@@ -1492,7 +1492,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T6C1 — `Done`:** PR #138 ile legacy ve canonical V2 Ad nüfusları entity-level spend/impressions/clicks, event-null ve synthetic policy için redacted parity evidence ile karşılaştırılır.
 - **E6-T6C2 — `Done`:** PR #139 ile legacy-authoritative write, V2 shadow runner ve parity fail-isolated/no-change coordinator'da compose edilmiştir.
 - **E6-T6D1 — `Verification / BLOCKED`:** Kod/main hazır; shadow rollout onayı, runtime registration ve üç clean live parity sonucu yoktur. Primary activation ayrı açık onay gerektirir.
-- **E6-T6D2:** Onaylı shadow runtime registration ve live evidence capture.
+- **E6-T6D2 — `Implementation / live evidence pending`:** İnsan onaylı, default-off TikTok shadow runtime legacy-authoritative refresh'e kaydedildi; üç ardışık deployed live `PASS` henüz toplanmadı.
 - **E6-T6D3:** Ayrı primary production activation kararı.
 
 #### E6-T1 task aynası — TikTok production report contract

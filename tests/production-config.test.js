@@ -18,6 +18,12 @@ test("review and sandbox switches default to disabled",()=>{
   assert.equal(config.tiktokTestPageEnabled,false);
 });
 
+test("TikTok V2 shadow is an explicit production-safe runtime flag",()=>{
+  assert.equal(createRuntimeFlags({NODE_ENV:"production"}).tiktokV2ShadowEnabled,false);
+  assert.equal(validateProductionConfig({NODE_ENV:"production",TIKTOK_V2_SHADOW_ENABLED:"true"}).tiktokV2ShadowEnabled,true);
+  assert.throws(()=>createRuntimeFlags({TIKTOK_V2_SHADOW_ENABLED:"yes"}),error=>error instanceof ProductionConfigError&&error.variables.includes("TIKTOK_V2_SHADOW_ENABLED"));
+});
+
 test("boolean parsing is strict and production detection gives VERCEL_ENV precedence",()=>{
   for(const value of ["true","TRUE","1"])assert.equal(parseExplicitBoolean(value),true);
   for(const value of [undefined,"","false","FALSE","0"])assert.equal(parseExplicitBoolean(value),false);

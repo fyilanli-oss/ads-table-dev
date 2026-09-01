@@ -1,0 +1,28 @@
+{
+  "input": {
+    "level": "AUCTION_AD",
+    "dimensions": {
+      "campaign_id": "campaign-1",
+      "campaign_name": "Delivery Campaign",
+      "adgroup_id": "adgroup-1",
+      "adgroup_name": "Delivery AdGroup",
+      "ad_id": "ad-1",
+      "ad_name": "Delivery Ad"
+    },
+    "metrics": {
+      "impressions": "1250",
+      "clicks": "75",
+      "spend": "42.50",
+      "conversion": "99",
+      "complete_payment": "88"
+    }
+  },
+  "context": {
+    "userId": "user-fixture",
+    "advertiserId": "advertiser-fixture",
+    "businessDate": "2026-09-01",
+    "sourceCurrency": "USD",
+    "sourceTimezone": "UTC",
+    "sourceJobId": "job-fixture"
+  }
+}

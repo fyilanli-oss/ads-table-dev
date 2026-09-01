@@ -1480,11 +1480,11 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 ### Planlanan işler
 
 - **E6-T1 — `Done`:** Resmî TikTok Business API SDK commit'iyle v1.3 synchronous BASIC `AUCTION_AD` report yüzeyi, Ad-leaf additive grain, delivery metrics ve fail-closed event kuralları PR #127 ve başarılı CI ile donduruldu.
-- **E6-T2 — `Verification / Merge approval`:** OAuth/sandbox sınırı, Preview auth düzeltmesi ve zero-row characterization tamamlandı. İnsan kararıyla delivery-only ilerleme seçildi; PR #132 merge onayı bekliyor.
+- **E6-T2 — `Done`:** OAuth/sandbox sınırı, Preview auth düzeltmesi ve zero-row characterization PR #132 ile merge edildi. İnsan kararıyla delivery-only ilerleme seçildi.
 - **E6-T3 — `Deferred evidence gate`:** Dokuz ATC/Checkout/Purchase count/value adayı provider tarafından kabul edildi ancak sandbox tek günlük sorgusu zero-row döndü. Event alanları `unknown` ve sonraki delivery adapter'da `unsupported/null` kalacak; non-empty kanıt ayrı gate olarak açık kalır.
-- **E6-T4:** Campaign/AdGroup/Ad double-count önleme.
-- **E6-T4A:** `Campaign → AdGroup → Ad` root/parent/leaf lineage ve deterministic entity key mappingi.
-- **E6-T4B:** TikTok output'unu aynı yedi bloklu canonical envelope'a normalize et.
+- **E6-T4 — `Verification`:** Production fact yalnız `AUCTION_AD` leaf'ten üretilir; duplicate business-date/entity-key batch'i fail-closed reddedilir.
+- **E6-T4A — `Verification`:** Zorunlu `Campaign → AdGroup → Ad` lineage ve deterministic entity key delivery mapper'da uygulanmıştır.
+- **E6-T4B — `Verification`:** TikTok delivery output'u yedi bloklu canonical envelope'a normalize edilir; event facts `unsupported/null`, eksik delivery facts `unknown/null` kalır.
 - **E6-T5:** Synthetic fallback'i canonical production Dataset'ten ayır.
 - **E6-T6:** Time/FX/V2, dual-write ve parity.
 
@@ -1513,6 +1513,16 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 **Durum:** `Verification / Merge approval` — PR #128 modal corrective ve PR #129 sandbox source merge edildi. PR #130 Preview doğrulaması başarısız oldu ve merge edilmeden kapatıldı. PR #132 auth kapısını düzeltti ve read-only characterization'ı tamamladı. Dokuz aday metric sorguda kabul edildi fakat sonuç zero-row olduğundan field/value semantiği kanıtlanmadı. İnsan kararıyla delivery-only ilerleme seçildi: sonraki adapter yalnız `spend/impressions/clicks` map edecek; event alanları non-empty kanıta kadar `unsupported/null` kalacak. Redacted evidence repository'ye alındı ve geçici route/flag/UI düğmesi kaldırıldı. PR #132 merge onayı bekler.
 
 **Geçici corrective sonucu:** İnsan onayıyla ayrı database kurulmadan read-only characterization çalıştırıldı. Endpoint hiçbir connection/ownership/job/snapshot/Dataset write yapmadı ve yalnız safe field-presence evidence döndürdü. Çalışma zero-row olduğu için event semantiği fail-closed biçimde kabul edilmedi; geçici endpoint kanıt alındıktan sonra kaldırıldı.
+
+#### E6-T4 + E6-T4A + E6-T4B task aynası — delivery-only adapter
+
+**Amaç:** İnsan onaylı delivery-only kararıyla TikTok `spend/impressions/clicks` alanlarını yalnız Ad leaf'te canonical fact'a dönüştürmek; Campaign/AdGroup'u lineage olarak korumak ve hierarchy toplamlarının iki kez sayılmasını engellemek.
+
+**Kapsam:** `src/providers/tiktok/delivery-mapper.js`, deterministic entity key, yedi canonical blok, duplicate leaf guard, sentetik/negatif/non-leaf rejection ve delivery-only metric support.
+
+**Kapsam dışı:** Runtime fetch wiring, Dataset V2 write, FX conversion, production activation ve event semantic mapping.
+
+**Durum:** `Verification` — fixture ve beş executable test Campaign→AdGroup→Ad lineage'ını, yalnız Ad-leaf additive fact'ı, generic conversion ignore kuralını, event `unsupported/null` davranışını, missing-is-not-zero kuralını ve duplicate double-count rejection'ı doğrular. PR #133 full/security/architecture/canonical kontrolleri başarılıdır; merge onayı beklenir.
 
 ### Kabul kriterleri
 

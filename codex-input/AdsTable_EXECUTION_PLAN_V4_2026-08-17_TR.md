@@ -1485,8 +1485,11 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T4 — `Done`:** PR #133 ile production fact yalnız `AUCTION_AD` leaf'ten üretilir; duplicate business-date/entity-key batch'i fail-closed reddedilir.
 - **E6-T4A — `Done`:** PR #133 ile zorunlu `Campaign → AdGroup → Ad` lineage ve deterministic entity key delivery mapper'da uygulanmıştır.
 - **E6-T4B — `Done`:** PR #133 ile TikTok delivery output'u yedi bloklu canonical envelope'a normalize edilir; event facts `unsupported/null`, eksik delivery facts `unknown/null` kalır.
-- **E6-T5 — `Verification`:** Legacy fallback marker'ları canonical mapper öncesinde izole edilir; synthetic-only input boş canonical sonuç ve `synthetic_written_to_canonical=0` evidence üretir.
-- **E6-T6:** Time/FX/V2, dual-write ve parity.
+- **E6-T5 — `Done`:** PR #134 ile legacy fallback marker'ları canonical mapper öncesinde izole edilir; synthetic-only input boş canonical sonuç ve `synthetic_written_to_canonical=0` evidence üretir.
+- **E6-T6A — `Verification`:** Advertiser timezone/currency metadata'sı, provider business date ve fail-closed same/cross-currency FX delivery mapper'a bağlanmıştır.
+- **E6-T6B:** Dataset V2 writer ve runtime wiring.
+- **E6-T6C:** Dual-write no-change ve parity evidence.
+- **E6-T6D:** Production activation gate.
 
 #### E6-T1 task aynası — TikTok production report contract
 
@@ -1532,7 +1535,17 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kapsam dışı:** Legacy dashboard snapshot davranışını kaldırmak, Dataset V2 write, runtime flag activation, FX ve production rollout.
 
-**Durum:** `Verification` — beş executable test karışık input'ta yalnız gerçek Ad leaf'in map edildiğini, tüm fallback marker ailelerinin izole edildiğini, synthetic-only input'un boş canonical sonuç verdiğini ve `synthetic_written_to_canonical=0` invariant'ını doğrular.
+**Durum:** `Done` — beş executable test karışık input'ta yalnız gerçek Ad leaf'in map edildiğini, tüm fallback marker ailelerinin izole edildiğini, synthetic-only input'un boş canonical sonuç verdiğini ve `synthetic_written_to_canonical=0` invariant'ını doğruladı. PR #134 insan onayıyla merge edildi ve main Security regression başarılıdır.
+
+#### E6-T6A task aynası — Time/FX binding
+
+**Amaç:** Advertiser metadata'sındaki timezone/source currency ile provider daily date'i canonical time'a bağlamak ve supported delivery monetary fact'ini onaylı FX oranıyla tam bir kez normalize etmek.
+
+**Kapsam:** Advertiser identity binding, IANA timezone, daily business date, ISO currency, same/cross-currency rate kuralları, synthetic isolation ve normalized duplicate guard.
+
+**Kapsam dışı:** Dataset V2 write/runtime wiring, dual-write, parity ve production activation.
+
+**Durum:** `Verification` — beş executable test same-currency metadata'yı, cross-currency spend dönüşümünü, event value `unsupported/null` korunmasını, invalid identity/timezone/date/currency/rate rejection'ını ve isolation/dedup invariant'ını doğrular.
 
 ### Kabul kriterleri
 

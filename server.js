@@ -15,7 +15,7 @@ const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
 const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
-const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");
+const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser,sandboxReadiness}=require("./src/providers/tiktok/sandbox-account-source");const {createTikTokSandboxConnectHandler}=require("./src/providers/tiktok/sandbox-connect-handler");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
 const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
@@ -4721,8 +4721,8 @@ async function bootstrapTikTokFromReport(userId,conn,advertiserId,context={}){
 const {start:handleTikTokOAuthStart,callback:handleTikTokOAuthCallback}=createTikTokOAuthHandlers({
   config:{clientId:tiktokClientId(),clientSecret:tiktokClientSecret(),redirectUri:tiktokRedirectUri(),authorizationBase:TIKTOK_AUTH_BASE},requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getConnection,normalizeAccountId:normalizePlatformAccountId,
   exchangeToken:async({code,clientId,clientSecret})=>{const response=await fetch(`${TIKTOK_API_BASE}/v1.3/oauth2/access_token/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({app_id:clientId,secret:clientSecret,auth_code:String(code)})});const payload=await response.json().catch(()=>({}));if(!response.ok||payload.code!==0||!payload.data?.access_token)throw new Error(payload.message||payload.error?.message||"TikTok token exchange failed");return payload.data},saveConnection,parseExpiry:parseTikTokExpiry
-});
-registerOAuthProviderRoutes({app,provider:"tiktok",startHandler:handleTikTokOAuthStart,callbackHandler:handleTikTokOAuthCallback});
+});const handleTikTokConnect=createTikTokSandboxConnectHandler({readiness:()=>sandboxReadiness({productionConfig,accessToken:process.env.TIKTOK_SANDBOX_ACCESS_TOKEN,advertiserId:TIKTOK_SANDBOX_ADVERTISER_ID}),requireConnectAccess:requireConnectAccessForOAuth,saveConnection,accessToken:process.env.TIKTOK_SANDBOX_ACCESS_TOKEN,sandboxBase:TIKTOK_SANDBOX_API_BASE,fallback:handleTikTokOAuthStart});
+registerOAuthProviderRoutes({app,provider:"tiktok",startHandler:handleTikTokConnect,callbackHandler:handleTikTokOAuthCallback});
 app.get("/api/tiktok/status",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
@@ -4732,7 +4732,7 @@ app.get("/api/tiktok/status",async(req,res)=>{
       account_id:conn?.account_id||null,
       account_name:conn?.account_name||null,
       token_expires_at:conn?.token_expires_at||null,
-      metadata:conn?.metadata||{}
+      metadata:conn?.metadata||{},sandbox:sandboxReadiness({productionConfig,accessToken:process.env.TIKTOK_SANDBOX_ACCESS_TOKEN,advertiserId:TIKTOK_SANDBOX_ADVERTISER_ID})
     });
   }catch(e){res.status(500).json({error:e.message})}
 });

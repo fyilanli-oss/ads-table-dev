@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
-const { sandboxAdvertiser } = require('../src/providers/tiktok/sandbox-account-source');
+const { sandboxAdvertiser, sandboxReadiness } = require('../src/providers/tiktok/sandbox-account-source');
 
 const enabled = Object.freeze({ production: false, tiktokSandboxEnabled: true, tiktokForceSandboxReports: true });
 
@@ -26,4 +26,11 @@ test('selection persists sandbox routing metadata and normal OAuth discovery rem
   assert.match(server, /advertiser_source:"non_production_sandbox"/);
   assert.match(server, /reportBase:primary\?\.reportBase\|\|null,tokenSource:primary\?\.tokenSource\|\|null,sandbox:primary\?\.sandbox===true/);
   assert.match(server, /endpoint:"\/v1\.3\/oauth2\/advertiser\/get\/"/);
+});
+
+test('readiness reports booleans only and never returns sandbox credentials', () => {
+  assert.deepEqual(sandboxReadiness({ productionConfig: enabled, accessToken: 'hidden-token', advertiserId: 'hidden-id' }), { non_production: true, enabled: true, ready: true });
+  assert.deepEqual(sandboxReadiness({ productionConfig: enabled, accessToken: 'hidden-token' }), { non_production: true, enabled: true, ready: false });
+  assert.deepEqual(sandboxReadiness({ productionConfig: { ...enabled, production: true }, accessToken: 'hidden-token', advertiserId: 'hidden-id' }), { non_production: false, enabled: false, ready: false });
+  assert.doesNotMatch(JSON.stringify(sandboxReadiness({ productionConfig: enabled, accessToken: 'hidden-token', advertiserId: 'hidden-id' })), /hidden/);
 });

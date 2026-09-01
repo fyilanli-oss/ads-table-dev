@@ -1510,7 +1510,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Evidence:** `docs/E6_T2_TIKTOK_ACCOUNT_DISCOVERY_AUDIT.md`, `tests/e6-t2-tiktok-account-selection.test.js`, `public/dashboard.html` ve iki korunmuş dashboard patch'i.
 
-**Durum:** `Verification` — PR #128 modal corrective merge edildi. Onaylanan non-production sandbox account source hazırlanmıştır; CI/merge ve ayrı preview environment credential doğrulaması beklenir. E6-T2/E6-T3 event mapping, sandbox advertiser raporu görülmeden başlamaz.
+**Durum:** `Verification` — PR #128 modal corrective ve PR #129 non-production sandbox account source merge edildi. Kullanıcı Vercel'e sandbox token ekledi; secret-free readiness alanlarını içeren yeni Preview deployment ve sandbox advertiser doğrulaması beklenir. E6-T2/E6-T3 event mapping, sandbox advertiser raporu görülmeden başlamaz.
 
 ### Kabul kriterleri
 

@@ -13,4 +13,10 @@ function sandboxAdvertiser({productionConfig, advertiserId, advertiserName, sand
   });
 }
 
-module.exports = Object.freeze({ sandboxAdvertiser });
+function sandboxReadiness({productionConfig, accessToken, advertiserId} = {}) {
+  const nonProduction = Boolean(productionConfig && !productionConfig.production);
+  const enabled = Boolean(nonProduction && productionConfig.tiktokSandboxEnabled && productionConfig.tiktokForceSandboxReports);
+  return Object.freeze({ non_production: nonProduction, enabled, ready: Boolean(enabled && String(accessToken || '').trim() && String(advertiserId || '').trim()) });
+}
+
+module.exports = Object.freeze({ sandboxAdvertiser, sandboxReadiness });

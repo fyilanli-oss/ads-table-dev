@@ -18,6 +18,10 @@ E6-T2/E6-T3 gerçek event karakterizasyonuna başlamadan önce iş kararı gerek
 
 Production startup sandbox switch, token veya advertiser değişkenlerinden herhangi birini görürse fail-closed kalır. Normal OAuth advertiser discovery yolu kaldırılmadı ve sandbox switch'leri kapalıyken aynen çalışır.
 
+Sandbox token'ın Vercel'e eklenmesinden sonra yeni Preview deployment gerekir. Authenticated `/api/tiktok/status` cevabı credential değeri veya advertiser kimliği göstermeden yalnız `sandbox.non_production`, `sandbox.enabled` ve `sandbox.ready` boolean alanlarını döndürür. Böylece eksik dış ortam yapılandırması tahmin edilmeden doğrulanır.
+
+Preview readiness `ready=true` olduğunda normal TikTok `Connect` düğmesi OAuth'a gitmez: server-side sandbox connection oluşturur ve doğrudan sandbox advertiser seçim modalına döner. Readiness false ise mevcut OAuth start handler aynen korunur. Sandbox token browser'a taşınmaz.
+
 ## Modal düzeltmesi
 
 Advertiser listesi başarılı fakat boş döndüğünde reconnect URL parametreleri artık modal gösterilirken tüketilir. `Close` sayfayı yenilese bile aynı account-selection akışı tekrar açılmaz.

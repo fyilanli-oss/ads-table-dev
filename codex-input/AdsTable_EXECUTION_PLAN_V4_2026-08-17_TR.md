@@ -1487,8 +1487,8 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T4B — `Done`:** PR #133 ile TikTok delivery output'u yedi bloklu canonical envelope'a normalize edilir; event facts `unsupported/null`, eksik delivery facts `unknown/null` kalır.
 - **E6-T5 — `Done`:** PR #134 ile legacy fallback marker'ları canonical mapper öncesinde izole edilir; synthetic-only input boş canonical sonuç ve `synthetic_written_to_canonical=0` evidence üretir.
 - **E6-T6A — `Done`:** PR #135 ile advertiser timezone/currency metadata'sı, provider business date ve fail-closed same/cross-currency FX delivery mapper'a bağlanmıştır.
-- **E6-T6B1 — `Verification`:** Dataset V2 writer ownership/entity/synthetic/cardinality guard'ları ve safe failure stage'leriyle canonical boundary'ye bağlanmıştır.
-- **E6-T6B2:** Live refresh route composition ve job evidence.
+- **E6-T6B1 — `Done`:** PR #136 ile Dataset V2 writer ownership/entity/synthetic/cardinality guard'ları ve safe failure stage'leriyle canonical boundary'ye bağlanmıştır.
+- **E6-T6B2 — `Verification`:** Advertiser metadata, delivery-only AUCTION_AD read, Dataset V2 writer ve refresh job evidence injectable runner'da compose edilmiştir.
 - **E6-T6C:** Dual-write no-change ve parity evidence.
 - **E6-T6D:** Production activation gate.
 
@@ -1556,7 +1556,17 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kapsam dışı:** Express/live refresh route composition, dual-write, parity ve production activation.
 
-**Durum:** `Verification` — beş executable test gerçek delivery write'ını, zero-row/synthetic-only boş write'ı, ownership/cardinality fail-closed davranışını, safe stage sınıflandırmasını ve redacted count evidence'ını doğrular.
+**Durum:** `Done` — beş executable test gerçek delivery write'ını, zero-row/synthetic-only boş write'ı, ownership/cardinality fail-closed davranışını, safe stage sınıflandırmasını ve redacted count evidence'ını doğruladı. PR #136 insan onayıyla merge edildi ve main Security regression başarılıdır.
+
+#### E6-T6B2 task aynası — live refresh job composition
+
+**Amaç:** Advertiser metadata, yalnız AUCTION_AD delivery read, E6-T6B1 writer ve ortak refresh job boundary'yi kimlik/metric sızdırmayan evidence ile compose etmek.
+
+**Kapsam:** Delivery-only provider request, omitted zero-row kabulü, malformed response/identity rejection, source job binding, redacted completed metadata ve safe provider stage.
+
+**Kapsam dışı:** Express route/production flag activation, legacy dual-write ve parity kabulü.
+
+**Durum:** `Verification` — altı executable test normal V2 composition'ı, omitted zero-row'u, malformed/identity/date fail-closed davranışını, provider safe stage'ini, event/synthetic zero-write evidence invariant'larını ve writer count/cardinality doğrulamasını kapsar.
 
 ### Kabul kriterleri
 

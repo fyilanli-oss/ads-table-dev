@@ -33,3 +33,11 @@ TikTok test sayfasındaki `Run Server Characterization` düğmesi bu endpoint'i 
 ## Modal düzeltmesi
 
 Advertiser listesi başarılı fakat boş döndüğünde reconnect URL parametreleri artık modal gösterilirken tüketilir. `Close` sayfayı yenilese bile aynı account-selection akışı tekrar açılmaz.
+
+## Preview giriş kapısı — production onayı verildi
+
+1 Eylül 2026 tarihli insan kararıyla, shared Supabase Auth dönüş adreslerinin read-only denetimi ve gerekiyorsa yalnız AdsTable Vercel Preview adresini kapsayan sınırlı izin değişikliği onaylandı. Bu onay TikTok production aktivasyonu, Dataset write veya production deployment onayı değildir.
+
+Uygulama Google sign-in çağrısında Preview origin üzerindeki `/dashboard` adresini açıkça `redirectTo` olarak gönderir. Gözlenen landing dönüşü bu çağrıdan sonra oluştuğu için yeni TikTok veya login tahmini yapılmayacaktır. Önce Supabase Auth `site_url` ve redirect allow-list gerçek değerleri okunacaktır; Preview adresi listede yoksa yalnız bu adres eklenip yeniden okunarak doğrulanacaktır.
+
+Koordinatör ortamından Supabase Management API'ye proxy üzerinden ve proxy bypass ile yapılan read-only erişim denemeleri ağ katmanında başarısız oldu; herhangi bir auth ayarı değişmedi. Yönetim yüzeyi okunmadan kullanıcıdan yeni login denemesi istenmeyecektir.

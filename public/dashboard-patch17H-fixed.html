@@ -8955,10 +8955,11 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       const accounts=await discover(platform);
       openSelection(platform,accounts);
       if(!accounts.length){
+        cleanReconnectUrl();
         if(desc)desc.textContent="No accessible account was found.";
         if(action){
           action.disabled=false;
-          action.textContent="Continue";
+          action.textContent="Close";
         }
       }
     }catch(error){

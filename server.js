@@ -15,7 +15,7 @@ const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
 const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
-const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");
+const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
 const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
@@ -47,7 +47,7 @@ const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
 const TIKTOK_REVIEW_ADVERTISER_ID=process.env.TIKTOK_REVIEW_ADVERTISER_ID||"";
-const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"";
+const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"";const TIKTOK_SANDBOX_ADVERTISER_ID=process.env.TIKTOK_SANDBOX_ADVERTISER_ID||"";const TIKTOK_SANDBOX_ADVERTISER_NAME=process.env.TIKTOK_SANDBOX_ADVERTISER_NAME||"";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const providerTokenEncryptionEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_ENCRYPTION_ENABLED,false,"PROVIDER_TOKEN_ENCRYPTION_ENABLED");
 const providerTokenLegacyReadsEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_LEGACY_READ_ENABLED,true,"PROVIDER_TOKEN_LEGACY_READ_ENABLED");
@@ -862,7 +862,7 @@ async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccoun
     await supabaseAdmin.from("platform_ad_accounts").upsert(row,{onConflict:"user_id,platform,platform_account_id"});
     const schedule=await ensureSnapshotSchedule(userId,validation.platform,row.platform_account_id,{accountSelectionGuardVersion:"v2-explicit-selection",selectedByUserAt:now,account_type:phase1ReportableAccountType(validation.platform)});
     const backfill=await requestLifecycleBackfill({userId,platform:validation.platform,platformAccountId:row.platform_account_id,reason:"account_initial_connect"});
-    results.push({platform:validation.platform,platform_account_id:row.platform_account_id,account_name:row.account_name,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null,backfill_30d:backfill,currency:row.currency||null,loginCustomerId:normalizeCustomerId(account.loginCustomerId||account.login_customer_id||"")||null});
+    results.push({platform:validation.platform,platform_account_id:row.platform_account_id,account_name:row.account_name,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null,backfill_30d:backfill,currency:row.currency||null,loginCustomerId:normalizeCustomerId(account.loginCustomerId||account.login_customer_id||"")||null,reportBase:account.reportBase||null,tokenSource:account.tokenSource||null,sandbox:account.sandbox===true});
   }
 
   const primary=results[0];
@@ -873,7 +873,7 @@ async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccoun
       selectedPlatformAccountId:primary?.platform_account_id||null,
       lastOwnedPlatformAccountId:primary?.platform_account_id||null,
       selectedPlatformAccountIds:results.map(account=>account.platform_account_id),
-      selectedPlatformAccounts:results.map(account=>({platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null,loginCustomerId:account.loginCustomerId||null})),loginCustomerId:primary?.loginCustomerId||null,login_customer_id:primary?.loginCustomerId||null,
+      selectedPlatformAccounts:results.map(account=>({platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null,loginCustomerId:account.loginCustomerId||null,reportBase:account.reportBase||null,tokenSource:account.tokenSource||null,sandbox:account.sandbox===true})),loginCustomerId:primary?.loginCustomerId||null,login_customer_id:primary?.loginCustomerId||null,reportBase:primary?.reportBase||null,tokenSource:primary?.tokenSource||null,sandbox:primary?.sandbox===true,
       baseCurrency:primary?.currency||null,
       accountSelectionRequired:false,
       accountSelectionGuardVersion:"v2-explicit-selection",
@@ -4747,7 +4747,7 @@ app.get("/api/tiktok/truth-contract",async(req,res)=>{
 app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
-    const {conn}=result;
+    const {conn}=result,sandboxAccount=sandboxAdvertiser({productionConfig,advertiserId:TIKTOK_SANDBOX_ADVERTISER_ID,advertiserName:TIKTOK_SANDBOX_ADVERTISER_NAME,sandboxBase:TIKTOK_SANDBOX_API_BASE});if(sandboxAccount)return res.json({platform:"tiktok",advertisers:[sandboxAccount],advertiser_source:"non_production_sandbox",sandbox:true});
     if(!conn?.access_token)return res.status(400).json({error:"TikTok access token is required for advertiser resolution"});
     const data=await tiktokApiFetch({
       base:TIKTOK_API_BASE,

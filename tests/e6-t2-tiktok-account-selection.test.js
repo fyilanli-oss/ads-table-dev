@@ -14,7 +14,7 @@ test('OAuth advertiser discovery uses the official connected-token endpoint, not
   assert.match(route, /base:TIKTOK_API_BASE/);
   assert.match(route, /endpoint:"\/v1\.3\/oauth2\/advertiser\/get\/"/);
   assert.match(route, /headers:\{"Access-Token":conn\.access_token\}/);
-  assert.doesNotMatch(route, /TIKTOK_SANDBOX_API_BASE|TIKTOK_SANDBOX_ACCESS_TOKEN|TIKTOK_TEST_ACCESS_TOKEN/);
+  assert.doesNotMatch(route, /TIKTOK_SANDBOX_ACCESS_TOKEN|TIKTOK_TEST_ACCESS_TOKEN/);
 });
 
 test('an empty account result consumes reconnect parameters before Close', () => {

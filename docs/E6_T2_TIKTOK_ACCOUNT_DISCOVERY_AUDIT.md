@@ -12,6 +12,12 @@ Repository'deki sandbox yolu OAuth advertiser discovery'nin alternatifi değildi
 
 E6-T2/E6-T3 gerçek event karakterizasyonuna başlamadan önce iş kararı gerekir: mevcut OAuth review advertiser yetkisi TikTok tarafında düzeltilmeli veya ayrı, production olmayan sandbox deployment/token akışı açıkça onaylanmalıdır. Bu karar verilmeden kimlik hard-code edilmeyecek ve production güvenlik guard'ı gevşetilmeyecektir.
 
+## Onaylanan non-production sandbox akışı
+
+İnsan iş kararıyla ayrı non-production sandbox yolu seçildi. Yalnız `VERCEL_ENV=preview|development` ortamında, sandbox ve force-report switch'leri birlikte açıkken server-configured sandbox advertiser account picker'a döner. Token browser'a veya API cevabına girmez. Hesap seçildiğinde yalnız `reportBase=sandbox-ads.tiktok.com`, `tokenSource=server_sandbox_access_token` ve sandbox işareti connection metadata'sına yazılır; report runtime token'ı server environment'tan alır.
+
+Production startup sandbox switch, token veya advertiser değişkenlerinden herhangi birini görürse fail-closed kalır. Normal OAuth advertiser discovery yolu kaldırılmadı ve sandbox switch'leri kapalıyken aynen çalışır.
+
 ## Modal düzeltmesi
 
 Advertiser listesi başarılı fakat boş döndüğünde reconnect URL parametreleri artık modal gösterilirken tüketilir. `Close` sayfayı yenilese bile aynı account-selection akışı tekrar açılmaz.

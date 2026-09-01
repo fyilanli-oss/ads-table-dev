@@ -1486,8 +1486,9 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T4A — `Done`:** PR #133 ile zorunlu `Campaign → AdGroup → Ad` lineage ve deterministic entity key delivery mapper'da uygulanmıştır.
 - **E6-T4B — `Done`:** PR #133 ile TikTok delivery output'u yedi bloklu canonical envelope'a normalize edilir; event facts `unsupported/null`, eksik delivery facts `unknown/null` kalır.
 - **E6-T5 — `Done`:** PR #134 ile legacy fallback marker'ları canonical mapper öncesinde izole edilir; synthetic-only input boş canonical sonuç ve `synthetic_written_to_canonical=0` evidence üretir.
-- **E6-T6A — `Verification`:** Advertiser timezone/currency metadata'sı, provider business date ve fail-closed same/cross-currency FX delivery mapper'a bağlanmıştır.
-- **E6-T6B:** Dataset V2 writer ve runtime wiring.
+- **E6-T6A — `Done`:** PR #135 ile advertiser timezone/currency metadata'sı, provider business date ve fail-closed same/cross-currency FX delivery mapper'a bağlanmıştır.
+- **E6-T6B1 — `Verification`:** Dataset V2 writer ownership/entity/synthetic/cardinality guard'ları ve safe failure stage'leriyle canonical boundary'ye bağlanmıştır.
+- **E6-T6B2:** Live refresh route composition ve job evidence.
 - **E6-T6C:** Dual-write no-change ve parity evidence.
 - **E6-T6D:** Production activation gate.
 
@@ -1545,7 +1546,17 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kapsam dışı:** Dataset V2 write/runtime wiring, dual-write, parity ve production activation.
 
-**Durum:** `Verification` — beş executable test same-currency metadata'yı, cross-currency spend dönüşümünü, event value `unsupported/null` korunmasını, invalid identity/timezone/date/currency/rate rejection'ını ve isolation/dedup invariant'ını doğrular.
+**Durum:** `Done` — beş executable test same-currency metadata'yı, cross-currency spend dönüşümünü, event value `unsupported/null` korunmasını, invalid identity/timezone/date/currency/rate rejection'ını ve isolation/dedup invariant'ını doğruladı. PR #135 insan onayıyla merge edildi ve main Security regression başarılıdır.
+
+#### E6-T6B1 task aynası — Dataset V2 writer boundary
+
+**Amaç:** TikTok delivery-only canonical satırlarını FX resolver ve canonical write boundary üzerinden Dataset V2'ye hazır hale getirmek; write öncesi ownership, entity key, synthetic ve cardinality invariant'larını doğrulamak.
+
+**Kapsam:** FX lookup, E6-T6A normalization, E6-T5 isolation, canonical validation, write cardinality ve allowlisted safe failure stage'leri.
+
+**Kapsam dışı:** Express/live refresh route composition, dual-write, parity ve production activation.
+
+**Durum:** `Verification` — beş executable test gerçek delivery write'ını, zero-row/synthetic-only boş write'ı, ownership/cardinality fail-closed davranışını, safe stage sınıflandırmasını ve redacted count evidence'ını doğrular.
 
 ### Kabul kriterleri
 

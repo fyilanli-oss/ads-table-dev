@@ -1475,7 +1475,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 ## 10. E6 — TikTok adapter
 
-**Durum:** `In progress` — E6-T1 `Done`; E6-T2 account-discovery hazırlığı `Verification`; E6-T3–T6 başlamadı.
+**Durum:** `In progress` — E6-T1 `Done`; E6-T2 non-production sandbox account source `Verification`; E6-T3–T6 başlamadı.
 
 ### Planlanan işler
 
@@ -1504,13 +1504,13 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kesin kanıt:** OAuth sonrası account picker, connected OAuth token ile resmî production host'taki `/v1.3/oauth2/advertiser/get/` endpoint'ini sorgular. Redacted canlı connection metadata da token kaynağını `platform_connections.access_token`, report base'i `https://business-api.tiktok.com/open_api` olarak doğruladı. Liste sandbox'tan değil OAuth advertiser discovery'den boş dönmüştür.
 
-**Sandbox kararı:** Sandbox ayrı host ve ayrı manuel token gerektirir; E1-T5 gereği production runtime'da kapalıdır. OAuth token sandbox host'una taşınmaz, review advertiser kimliği hard-code edilmez ve production guard iş kararı olmadan gevşetilmez.
+**Sandbox kararı:** İnsan iş kararıyla ayrı non-production sandbox akışı onaylandı. Sandbox ayrı host ve server-held token kullanır; OAuth token sandbox host'una taşınmaz. Yalnız preview/development ortamında iki explicit switch, server-held token ve advertiser ID birlikte mevcutsa account picker sandbox advertiser'ı döndürür. Production guard değişkenlerin tamamını reddetmeye devam eder.
 
 **UI corrective:** Başarılı fakat boş advertiser listesi modalı açıldığında reconnect URL hemen tüketilir; `Close` aynı modalı tekrar açmaz.
 
 **Evidence:** `docs/E6_T2_TIKTOK_ACCOUNT_DISCOVERY_AUDIT.md`, `tests/e6-t2-tiktok-account-selection.test.js`, `public/dashboard.html` ve iki korunmuş dashboard patch'i.
 
-**Durum:** `Verification` — modal corrective CI/merge bekliyor. E6-T2/E6-T3 gerçek event çalışması, OAuth review advertiser erişiminin düzeltilmesi veya ayrı non-production sandbox akışının insan iş kararıyla seçilmesine kadar ilerlemez.
+**Durum:** `Verification` — PR #128 modal corrective merge edildi. Onaylanan non-production sandbox account source hazırlanmıştır; CI/merge ve ayrı preview environment credential doğrulaması beklenir. E6-T2/E6-T3 event mapping, sandbox advertiser raporu görülmeden başlamaz.
 
 ### Kabul kriterleri
 

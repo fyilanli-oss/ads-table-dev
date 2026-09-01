@@ -1475,12 +1475,12 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 ## 10. E6 — TikTok adapter
 
-**Durum:** `In progress` — E6-T1 `Verification`; E6-T2–T6 başlamadı.
+**Durum:** `In progress` — E6-T1 `Done`; E6-T2 account-discovery hazırlığı `Verification`; E6-T3–T6 başlamadı.
 
 ### Planlanan işler
 
-- **E6-T1 — `Verification`:** Resmî TikTok Business API SDK commit'iyle v1.3 synchronous BASIC `AUCTION_AD` report yüzeyi, Ad-leaf additive grain, delivery metrics ve fail-closed event kuralları donduruldu; CI ve merge kabulü bekleniyor.
-- **E6-T2:** Generic conversion→purchase fallback'ini kaldır.
+- **E6-T1 — `Done`:** Resmî TikTok Business API SDK commit'iyle v1.3 synchronous BASIC `AUCTION_AD` report yüzeyi, Ad-leaf additive grain, delivery metrics ve fail-closed event kuralları PR #127 ve başarılı CI ile donduruldu.
+- **E6-T2 — `Verification`:** Generic conversion→purchase fallback'ini kaldırmadan önce OAuth advertiser discovery/sandbox sınırı denetlendi; boş-list modal döngüsü düzeltildi, gerçek advertiser erişimi için iş kararı bekleniyor.
 - **E6-T3:** ATC/Checkout/Purchase count/value mapping.
 - **E6-T4:** Campaign/AdGroup/Ad double-count önleme.
 - **E6-T4A:** `Campaign → AdGroup → Ad` root/parent/leaf lineage ve deterministic entity key mappingi.
@@ -1498,7 +1498,19 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Evidence:** `src/providers/tiktok/report-contract.js`, `artifacts/e6-tiktok/e6-t1-report-contract-fixture.json`, `docs/E6_T1_TIKTOK_REPORT_CONTRACT.md`, `tests/e6-t1-tiktok-report-contract.test.js`.
 
-**Durum:** `Verification` — resmî TikTok SDK repository commit'i `f809c396520df2d7b201a9ccc5378d822b728ed3` pinlendi. SDK endpoint/report type/data-level sözleşmesini doğrular; event metric isimlerini kapalı enum olarak yayımlamadığı için ATC/Checkout/Purchase hakkında tahmin yapılmadı. CI ve merge kabulü bekleniyor.
+**Durum:** `Done` — resmî TikTok SDK repository commit'i `f809c396520df2d7b201a9ccc5378d822b728ed3` pinlendi. SDK endpoint/report type/data-level sözleşmesini doğrular; event metric isimlerini kapalı enum olarak yayımlamadığı için ATC/Checkout/Purchase hakkında tahmin yapılmadı. PR #127 merge edildi ve kontroller başarılıdır.
+
+#### E6-T2 hazırlık aynası — TikTok OAuth advertiser discovery
+
+**Kesin kanıt:** OAuth sonrası account picker, connected OAuth token ile resmî production host'taki `/v1.3/oauth2/advertiser/get/` endpoint'ini sorgular. Redacted canlı connection metadata da token kaynağını `platform_connections.access_token`, report base'i `https://business-api.tiktok.com/open_api` olarak doğruladı. Liste sandbox'tan değil OAuth advertiser discovery'den boş dönmüştür.
+
+**Sandbox kararı:** Sandbox ayrı host ve ayrı manuel token gerektirir; E1-T5 gereği production runtime'da kapalıdır. OAuth token sandbox host'una taşınmaz, review advertiser kimliği hard-code edilmez ve production guard iş kararı olmadan gevşetilmez.
+
+**UI corrective:** Başarılı fakat boş advertiser listesi modalı açıldığında reconnect URL hemen tüketilir; `Close` aynı modalı tekrar açmaz.
+
+**Evidence:** `docs/E6_T2_TIKTOK_ACCOUNT_DISCOVERY_AUDIT.md`, `tests/e6-t2-tiktok-account-selection.test.js`, `public/dashboard.html` ve iki korunmuş dashboard patch'i.
+
+**Durum:** `Verification` — modal corrective CI/merge bekliyor. E6-T2/E6-T3 gerçek event çalışması, OAuth review advertiser erişiminin düzeltilmesi veya ayrı non-production sandbox akışının insan iş kararıyla seçilmesine kadar ilerlemez.
 
 ### Kabul kriterleri
 

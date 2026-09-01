@@ -9157,6 +9157,7 @@ body.ads-operation-locked{overflow:hidden !important;}
       const accounts=await discover(platform);
       openSelection(platform,accounts);
       if(!accounts.length){
+        cleanReconnectUrl();
         if(desc)desc.textContent="No accessible account was found.";
         if(action){
           action.disabled=false;

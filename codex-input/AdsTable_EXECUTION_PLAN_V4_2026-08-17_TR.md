@@ -1475,7 +1475,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 ## 10. E6 — TikTok adapter
 
-**Durum:** `In progress` — E6-T1 `Done`; E6-T2 non-production sandbox account source `Verification`; E6-T3–T6 başlamadı.
+**Durum:** `In progress` — E6-T1 `Done`; E6-T2 sandbox ortam izolasyonu `Verification`; E6-T3–T6 başlamadı.
 
 ### Planlanan işler
 
@@ -1510,7 +1510,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Evidence:** `docs/E6_T2_TIKTOK_ACCOUNT_DISCOVERY_AUDIT.md`, `tests/e6-t2-tiktok-account-selection.test.js`, `public/dashboard.html` ve iki korunmuş dashboard patch'i.
 
-**Durum:** `Verification` — PR #128 modal corrective merge edildi. Onaylanan non-production sandbox account source hazırlanmıştır; CI/merge ve ayrı preview environment credential doğrulaması beklenir. E6-T2/E6-T3 event mapping, sandbox advertiser raporu görülmeden başlamaz.
+**Durum:** `Verification` — PR #128 modal corrective ve PR #129 sandbox source merge edildi. PR #130 Preview doğrulaması başarısız oldu: ayrı hostname aynı Supabase auth/data plane'ini kullandı, mevcut connection `Disconnect` göründü ve eksik sandbox readiness nedeniyle OAuth fallback yeniden boş advertiser listesi verdi. PR #130 merge edilmeden kapatıldı. Ayrı non-production Supabase ve eksiksiz Preview sandbox configuration için insan iş/harcama onayı olmadan retry yapılmaz; sandbox advertiser raporu görülmeden E6-T2/E6-T3 mapping başlamaz.
 
 ### Kabul kriterleri
 

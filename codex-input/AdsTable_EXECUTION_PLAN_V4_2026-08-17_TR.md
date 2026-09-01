@@ -1482,9 +1482,9 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T1 — `Done`:** Resmî TikTok Business API SDK commit'iyle v1.3 synchronous BASIC `AUCTION_AD` report yüzeyi, Ad-leaf additive grain, delivery metrics ve fail-closed event kuralları PR #127 ve başarılı CI ile donduruldu.
 - **E6-T2 — `Done`:** OAuth/sandbox sınırı, Preview auth düzeltmesi ve zero-row characterization PR #132 ile merge edildi. İnsan kararıyla delivery-only ilerleme seçildi.
 - **E6-T3 — `Deferred evidence gate`:** Dokuz ATC/Checkout/Purchase count/value adayı provider tarafından kabul edildi ancak sandbox tek günlük sorgusu zero-row döndü. Event alanları `unknown` ve sonraki delivery adapter'da `unsupported/null` kalacak; non-empty kanıt ayrı gate olarak açık kalır.
-- **E6-T4 — `Verification`:** Production fact yalnız `AUCTION_AD` leaf'ten üretilir; duplicate business-date/entity-key batch'i fail-closed reddedilir.
-- **E6-T4A — `Verification`:** Zorunlu `Campaign → AdGroup → Ad` lineage ve deterministic entity key delivery mapper'da uygulanmıştır.
-- **E6-T4B — `Verification`:** TikTok delivery output'u yedi bloklu canonical envelope'a normalize edilir; event facts `unsupported/null`, eksik delivery facts `unknown/null` kalır.
+- **E6-T4 — `Done`:** PR #133 ile production fact yalnız `AUCTION_AD` leaf'ten üretilir; duplicate business-date/entity-key batch'i fail-closed reddedilir.
+- **E6-T4A — `Done`:** PR #133 ile zorunlu `Campaign → AdGroup → Ad` lineage ve deterministic entity key delivery mapper'da uygulanmıştır.
+- **E6-T4B — `Done`:** PR #133 ile TikTok delivery output'u yedi bloklu canonical envelope'a normalize edilir; event facts `unsupported/null`, eksik delivery facts `unknown/null` kalır.
 - **E6-T5 — `Verification`:** Legacy fallback marker'ları canonical mapper öncesinde izole edilir; synthetic-only input boş canonical sonuç ve `synthetic_written_to_canonical=0` evidence üretir.
 - **E6-T6:** Time/FX/V2, dual-write ve parity.
 
@@ -1522,7 +1522,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kapsam dışı:** Runtime fetch wiring, Dataset V2 write, FX conversion, production activation ve event semantic mapping.
 
-**Durum:** `Verification` — fixture ve beş executable test Campaign→AdGroup→Ad lineage'ını, yalnız Ad-leaf additive fact'ı, generic conversion ignore kuralını, event `unsupported/null` davranışını, missing-is-not-zero kuralını ve duplicate double-count rejection'ı doğrular. PR #133 full/security/architecture/canonical kontrolleri başarılıdır; merge onayı beklenir.
+**Durum:** `Done` — fixture ve beş executable test Campaign→AdGroup→Ad lineage'ını, yalnız Ad-leaf additive fact'ı, generic conversion ignore kuralını, event `unsupported/null` davranışını, missing-is-not-zero kuralını ve duplicate double-count rejection'ı doğruladı. PR #133 full/security/architecture/canonical kontrolleri ve insan onayıyla merge edildi; main Security regression başarılıdır.
 
 #### E6-T5 task aynası — synthetic fallback isolation
 

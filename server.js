@@ -15,7 +15,7 @@ const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
 const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
-const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");
+const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");const {createTikTokLiveShadow}=require("./src/providers/tiktok/live-shadow");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
 const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
@@ -1058,7 +1058,7 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
 const refreshJobBoundary=createRefreshJobBoundary({getClient:()=>supabaseAdmin,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION});
 const createRefreshJob=(userId,platform,platformAccountId,metadata={})=>refreshJobBoundary.create({userId,platform,platformAccountId,metadata});
 const setRefreshJobStatus=(jobId,status,extra={})=>refreshJobBoundary.transition(jobId,status,extra);
-const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});const metaV2LiveRefresh=supabaseAdmin?createMetaLiveRefresh({supabaseClient:supabaseAdmin,graphVersion:META_GRAPH_VERSION,resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate}):null;const googleV2LiveRefresh=supabaseAdmin?createGoogleLiveRefresh({supabaseClient:supabaseAdmin,search:({userId,customerId,query,loginCustomerId})=>googleAdsSearch(userId,customerId,query,loginCustomerId),resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate}):null;
+const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});const metaV2LiveRefresh=supabaseAdmin?createMetaLiveRefresh({supabaseClient:supabaseAdmin,graphVersion:META_GRAPH_VERSION,resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate}):null;const googleV2LiveRefresh=supabaseAdmin?createGoogleLiveRefresh({supabaseClient:supabaseAdmin,search:({userId,customerId,query,loginCustomerId})=>googleAdsSearch(userId,customerId,query,loginCustomerId),resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate}):null;const tiktokV2LiveShadow=supabaseAdmin&&productionConfig.tiktokV2ShadowEnabled?createTikTokLiveShadow({supabaseClient:supabaseAdmin,resolveFxRate}):null;
 const automationSnapshotOrchestrator=createAutomationSnapshotOrchestrator({jobBoundary:refreshJobBoundary});
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
@@ -5075,11 +5075,11 @@ async function handleTikTokSnapshotWrite(req,res){
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,null);
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
     stage="job";
-    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"tiktok",platformAccountId,datePreset,snapshotDate,write:jobContext=>{stage="snapshot";return writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,...jobContext})}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"tiktok",platformAccountId,datePreset,snapshotDate,complete:(result,currentJob)=>{const legacy=result.legacy_result||result;return{snapshot_id:legacy.snapshot?.id||null,metadata:{...(currentJob.metadata||{}),performance_spread_result:legacy.performance_spread_result||null,tiktok_shadow_evidence:result.shadow_evidence||null}}},write:async jobContext=>{stage="snapshot";if(!tiktokV2LiveShadow)return writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,...jobContext});const timezone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,null),targetCurrency=await getUserAccountCurrency(user.id)||DEFAULT_REPORTING_CURRENCY,sourceCurrency=normalizeCurrency(conn?.metadata?.baseCurrency)||targetCurrency;return tiktokV2LiveShadow.run({request:{userId:user.id,advertiserId:platformAccountId,providerDate:snapshotDate},advertiser:{id:platformAccountId,currency:sourceCurrency,timezone},targetCurrency,sourceJobId:jobContext.sourceJobId,legacyWrite:()=>writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,...jobContext})})}});
     job=execution.job;
-    const writeResult=execution.result;
+    const shadowEvidence=execution.result.shadow_evidence||null,writeResult=execution.result.legacy_result||execution.result;
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
-    res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
+    res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,tiktok_shadow:shadowEvidence,google_sheets_sync:googleSheetsSync});
   }catch(e){job=e.refreshJob||job;res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
 }
 

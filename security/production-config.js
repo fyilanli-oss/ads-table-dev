@@ -12,7 +12,8 @@ const PRODUCTION_CONFIG_VARIABLES=Object.freeze([
   "TIKTOK_SANDBOX_ADVERTISER_NAME",
   "TIKTOK_SANDBOX_ACCESS_TOKEN",
   "TIKTOK_SANDBOX_ENABLED",
-  "TIKTOK_TEST_ACCESS_TOKEN"
+  "TIKTOK_TEST_ACCESS_TOKEN",
+  "TIKTOK_V2_SHADOW_ENABLED"
 ]);
 const PRODUCTION_CONFIG_VARIABLE_SET=new Set(PRODUCTION_CONFIG_VARIABLES);
 
@@ -65,12 +66,14 @@ function createRuntimeFlags(env={}){
   const tiktokReviewFallbackEnabled=parseExplicitBoolean(env.TIKTOK_REVIEW_FALLBACK_ENABLED,false,"TIKTOK_REVIEW_FALLBACK_ENABLED");
   const tiktokSandboxEnabled=parseExplicitBoolean(env.TIKTOK_SANDBOX_ENABLED,false,"TIKTOK_SANDBOX_ENABLED");
   const tiktokForceSandboxReports=parseExplicitBoolean(env.TIKTOK_FORCE_SANDBOX_REPORTS,false,"TIKTOK_FORCE_SANDBOX_REPORTS");
+  const tiktokV2ShadowEnabled=parseExplicitBoolean(env.TIKTOK_V2_SHADOW_ENABLED,false,"TIKTOK_V2_SHADOW_ENABLED");
   return Object.freeze({
     production,
     googleReviewHardRouteEnabled,
     tiktokReviewFallbackEnabled,
     tiktokSandboxEnabled,
     tiktokForceSandboxReports:tiktokSandboxEnabled&&tiktokForceSandboxReports,
+    tiktokV2ShadowEnabled,
     tiktokTestPageEnabled:!production&&tiktokSandboxEnabled
   });
 }

@@ -1481,7 +1481,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 - **E6-T1 — `Done`:** Resmî TikTok Business API SDK commit'iyle v1.3 synchronous BASIC `AUCTION_AD` report yüzeyi, Ad-leaf additive grain, delivery metrics ve fail-closed event kuralları PR #127 ve başarılı CI ile donduruldu.
 - **E6-T2 — `Verification`:** Generic conversion→purchase fallback'ini kaldırmadan önce OAuth advertiser discovery/sandbox sınırı denetlendi; boş-list modal döngüsü düzeltildi, gerçek advertiser erişimi için iş kararı bekleniyor.
-- **E6-T3 — `Verification`:** ATC/Checkout/Purchase count/value adayları geçici read-only sandbox endpoint'inde değer/kimlik sızdırmadan probe edilecek; gerçek acceptance sonucu bekleniyor.
+- **E6-T3 — `Verification / Inconclusive`:** Dokuz ATC/Checkout/Purchase count/value adayı provider tarafından kabul edildi ancak sandbox tek günlük sorgusu zero-row döndü; field/value semantiği kanıtlanmadı ve event alanları `unknown` kaldı. Geçici probe yüzeyi kanıt alındıktan sonra kaldırıldı.
 - **E6-T4:** Campaign/AdGroup/Ad double-count önleme.
 - **E6-T4A:** `Campaign → AdGroup → Ad` root/parent/leaf lineage ve deterministic entity key mappingi.
 - **E6-T4B:** TikTok output'unu aynı yedi bloklu canonical envelope'a normalize et.
@@ -1510,9 +1510,9 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Evidence:** `docs/E6_T2_TIKTOK_ACCOUNT_DISCOVERY_AUDIT.md`, `tests/e6-t2-tiktok-account-selection.test.js`, `public/dashboard.html` ve iki korunmuş dashboard patch'i.
 
-**Durum:** `Verification / Characterization gate` — PR #128 modal corrective ve PR #129 sandbox source merge edildi. PR #130 Preview doğrulaması başarısız oldu ve merge edilmeden kapatıldı. PR #132 read-only characterization açık durumdadır. Supabase URL Configuration ekran kanıtı eksik Preview dönüşünü doğruladı; yalnız tam AdsTable Preview `/dashboard` adresi eklendi ve tek kontrollü Google sign-in doğrulaması başarıyla Preview dashboard'a döndü. Auth kapısı kabul edildi. Şimdi yalnız authenticated `Run Server Characterization` redacted sonucu beklenir; sonuç review edilmeden E6-T2/E6-T3 mapping başlamaz.
+**Durum:** `Verification / Business decision` — PR #128 modal corrective ve PR #129 sandbox source merge edildi. PR #130 Preview doğrulaması başarısız oldu ve merge edilmeden kapatıldı. PR #132 auth kapısını düzeltti ve read-only characterization'ı tamamladı. Dokuz aday metric sorguda kabul edildi fakat sonuç zero-row olduğundan field/value semantiği kanıtlanmadı; event alanları `unknown` kalır. Redacted evidence repository'ye alındı ve geçici route/flag/UI düğmesi aynı PR'da kaldırıldı. Sıradaki karar: kontrollü non-empty sandbox event kanıtı üretmek veya delivery-only mapping ile event alanlarını unsupported/null bırakmak.
 
-**Geçici corrective karar:** İnsan onayıyla ayrı database kurulmadan read-only characterization seçildi. Endpoint yalnız authenticated non-production flag altında server-held sandbox credential ile bounded metric probe yapar; hiçbir connection/ownership/job/snapshot/Dataset write dependency'si yoktur ve yalnız safe field-presence evidence döner. Kod/CI/merge sonrası kullanıcı test sayfasında tek characterization çalıştırır; kanıt review edilmeden mapping kararı verilmez.
+**Geçici corrective sonucu:** İnsan onayıyla ayrı database kurulmadan read-only characterization çalıştırıldı. Endpoint hiçbir connection/ownership/job/snapshot/Dataset write yapmadı ve yalnız safe field-presence evidence döndürdü. Çalışma zero-row olduğu için event semantiği fail-closed biçimde kabul edilmedi; geçici endpoint kanıt alındıktan sonra kaldırıldı.
 
 ### Kabul kriterleri
 

@@ -28,7 +28,7 @@ test("boolean parsing is strict and production detection gives VERCEL_ENV preced
 });
 
 test("production rejects every unsafe review or sandbox setting without exposing values",()=>{
-  for(const key of ["GOOGLE_REVIEW_HARD_ROUTE_ENABLED","GOOGLE_TEST_CUSTOMER_ID","GOOGLE_TEST_LOGIN_CUSTOMER_ID","TIKTOK_REVIEW_FALLBACK_ENABLED","TIKTOK_REVIEW_CHARACTERIZATION_ENABLED","TIKTOK_REVIEW_ADVERTISER_ID","TIKTOK_REVIEW_ADVERTISER_NAME","TIKTOK_SANDBOX_ENABLED","TIKTOK_SANDBOX_ACCESS_TOKEN","TIKTOK_SANDBOX_ADVERTISER_ID","TIKTOK_SANDBOX_ADVERTISER_NAME","TIKTOK_TEST_ACCESS_TOKEN","TIKTOK_FORCE_SANDBOX_REPORTS"]){
+  for(const key of ["GOOGLE_REVIEW_HARD_ROUTE_ENABLED","GOOGLE_TEST_CUSTOMER_ID","GOOGLE_TEST_LOGIN_CUSTOMER_ID","TIKTOK_REVIEW_FALLBACK_ENABLED","TIKTOK_REVIEW_ADVERTISER_ID","TIKTOK_REVIEW_ADVERTISER_NAME","TIKTOK_SANDBOX_ENABLED","TIKTOK_SANDBOX_ACCESS_TOKEN","TIKTOK_SANDBOX_ADVERTISER_ID","TIKTOK_SANDBOX_ADVERTISER_NAME","TIKTOK_TEST_ACCESS_TOKEN","TIKTOK_FORCE_SANDBOX_REPORTS"]){
     const secret="do-not-print-this-value";
     assert.throws(
       ()=>validateProductionConfig({NODE_ENV:"production",[key]:key.endsWith("ENABLED")||key==="TIKTOK_FORCE_SANDBOX_REPORTS"?"true":secret}),
@@ -116,8 +116,6 @@ test("non-production review modes require complete explicit configuration",()=>{
   assert.throws(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_FORCE_SANDBOX_REPORTS:"true"}),/TIKTOK_SANDBOX_ENABLED/);
   assert.throws(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true"}),/TIKTOK_SANDBOX_ACCESS_TOKEN/);
   assert.doesNotThrow(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret",TIKTOK_SANDBOX_ADVERTISER_ID:"111"}));
-  assert.throws(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_REVIEW_CHARACTERIZATION_ENABLED:"true"}),/TIKTOK_SANDBOX_ACCESS_TOKEN/);
-  assert.doesNotThrow(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_REVIEW_CHARACTERIZATION_ENABLED:"true",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret",TIKTOK_SANDBOX_ADVERTISER_ID:"111"}));
 });
 
 test("the test page requires explicit non-production sandbox mode",()=>{

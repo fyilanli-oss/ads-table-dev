@@ -1,0 +1,18 @@
+{
+  "platform": "tiktok",
+  "mode": "sandbox_read_only_characterization",
+  "date_scope": "single_day",
+  "writes_performed": false,
+  "raw_response_included": false,
+  "probes": [
+    { "metric": "add_to_cart", "accepted": true, "field_present": false, "result_shape": "zero_row" },
+    { "metric": "add_to_cart_value", "accepted": true, "field_present": false, "result_shape": "zero_row" },
+    { "metric": "checkout", "accepted": true, "field_present": false, "result_shape": "zero_row" },
+    { "metric": "checkout_value", "accepted": true, "field_present": false, "result_shape": "zero_row" },
+    { "metric": "initiate_checkout", "accepted": true, "field_present": false, "result_shape": "zero_row" },
+    { "metric": "initiate_checkout_value", "accepted": true, "field_present": false, "result_shape": "zero_row" },
+    { "metric": "complete_payment", "accepted": true, "field_present": false, "result_shape": "zero_row" },
+    { "metric": "complete_payment_count", "accepted": true, "field_present": false, "result_shape": "zero_row" },
+    { "metric": "complete_payment_value", "accepted": true, "field_present": false, "result_shape": "zero_row" }
+  ]
+}

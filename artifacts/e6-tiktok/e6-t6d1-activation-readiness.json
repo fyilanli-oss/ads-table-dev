@@ -1,0 +1,19 @@
+{
+  "evidence_version": "e6-tiktok-activation-readiness-v1",
+  "status": "BLOCKED",
+  "code_ready": true,
+  "shadow_ready": false,
+  "live_evidence_ready": false,
+  "minimum_live_parity_passes": 3,
+  "live_shadow_runs": 0,
+  "live_parity_passes": 0,
+  "live_synthetic_writes_zero": true,
+  "primary_activation_approved": false,
+  "production_activation_performed": false,
+  "reason_codes": [
+    "SHADOW_ROLLOUT_APPROVAL_REQUIRED",
+    "SHADOW_RUNTIME_NOT_REGISTERED",
+    "LIVE_PARITY_EVIDENCE_REQUIRED",
+    "PRIMARY_ACTIVATION_APPROVAL_REQUIRED"
+  ]
+}

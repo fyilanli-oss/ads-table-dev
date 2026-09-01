@@ -1489,8 +1489,8 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T6A — `Done`:** PR #135 ile advertiser timezone/currency metadata'sı, provider business date ve fail-closed same/cross-currency FX delivery mapper'a bağlanmıştır.
 - **E6-T6B1 — `Done`:** PR #136 ile Dataset V2 writer ownership/entity/synthetic/cardinality guard'ları ve safe failure stage'leriyle canonical boundary'ye bağlanmıştır.
 - **E6-T6B2 — `Done`:** PR #137 ile advertiser metadata, delivery-only AUCTION_AD read, Dataset V2 writer ve refresh job evidence injectable runner'da compose edilmiştir.
-- **E6-T6C1 — `Verification`:** Legacy ve canonical V2 Ad nüfusları entity-level spend/impressions/clicks, event-null ve synthetic policy için redacted parity evidence ile karşılaştırılır.
-- **E6-T6C2:** Server dual-write no-change composition.
+- **E6-T6C1 — `Done`:** PR #138 ile legacy ve canonical V2 Ad nüfusları entity-level spend/impressions/clicks, event-null ve synthetic policy için redacted parity evidence ile karşılaştırılır.
+- **E6-T6C2 — `Verification`:** Legacy-authoritative write, V2 shadow runner ve parity fail-isolated/no-change coordinator'da compose edilmiştir.
 - **E6-T6D:** Production activation gate.
 
 #### E6-T1 task aynası — TikTok production report contract
@@ -1577,7 +1577,17 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kapsam dışı:** Write, server dual-write composition ve production activation.
 
-**Durum:** `Verification` — beş executable test PASS evidence, metric drift, synthetic placeholder isolation, entity/event-policy mismatch, duplicate/malformed rejection ve input no-change davranışını doğrular.
+**Durum:** `Done` — beş executable test PASS evidence, metric drift, synthetic placeholder isolation, entity/event-policy mismatch, duplicate/malformed rejection ve input no-change davranışını doğruladı. PR #138 insan onayıyla merge edildi ve main Security regression başarılıdır.
+
+#### E6-T6C2 task aynası — shadow dual-write no-change composition
+
+**Amaç:** Legacy write'ı otoriter tutarak V2 runner ve parity'yi shadow modda çalıştırmak; V2/parity başarısızlığını legacy sonuçtan izole etmek ve production activation'ı kapalı tutmak.
+
+**Kapsam:** Legacy-first order, V2 shadow failure isolation, allowlisted stage, parity evidence, request no-mutation ve `production_activation=false` invariant'ı.
+
+**Kapsam dışı:** Express route registration ve production activation.
+
+**Durum:** `Verification` — beş executable test PASS shadow akışını, V2 failure isolation'ını, parity drift görünürlüğünü, legacy failure short-circuit'ini, request isolation ve redacted stage davranışını doğrular.
 
 ### Kabul kriterleri
 

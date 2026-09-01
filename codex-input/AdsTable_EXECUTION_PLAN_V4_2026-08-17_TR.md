@@ -1480,7 +1480,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 ### Planlanan işler
 
 - **E6-T1 — `Done`:** Resmî TikTok Business API SDK commit'iyle v1.3 synchronous BASIC `AUCTION_AD` report yüzeyi, Ad-leaf additive grain, delivery metrics ve fail-closed event kuralları PR #127 ve başarılı CI ile donduruldu.
-- **E6-T2 — `Verification / Merge approval`:** OAuth/sandbox sınırı, Preview auth düzeltmesi ve zero-row characterization tamamlandı. İnsan kararıyla delivery-only ilerleme seçildi; PR #132 merge onayı bekliyor.
+- **E6-T2 — `Done`:** OAuth/sandbox sınırı, Preview auth düzeltmesi ve zero-row characterization PR #132 ile merge edildi. İnsan kararıyla delivery-only ilerleme seçildi.
 - **E6-T3 — `Deferred evidence gate`:** Dokuz ATC/Checkout/Purchase count/value adayı provider tarafından kabul edildi ancak sandbox tek günlük sorgusu zero-row döndü. Event alanları `unknown` ve sonraki delivery adapter'da `unsupported/null` kalacak; non-empty kanıt ayrı gate olarak açık kalır.
 - **E6-T4 — `Verification`:** Production fact yalnız `AUCTION_AD` leaf'ten üretilir; duplicate business-date/entity-key batch'i fail-closed reddedilir.
 - **E6-T4A — `Verification`:** Zorunlu `Campaign → AdGroup → Ad` lineage ve deterministic entity key delivery mapper'da uygulanmıştır.
@@ -1522,7 +1522,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kapsam dışı:** Runtime fetch wiring, Dataset V2 write, FX conversion, production activation ve event semantic mapping.
 
-**Durum:** `Verification` — fixture ve beş executable test Campaign→AdGroup→Ad lineage'ını, yalnız Ad-leaf additive fact'ı, generic conversion ignore kuralını, event `unsupported/null` davranışını, missing-is-not-zero kuralını ve duplicate double-count rejection'ı doğrular. Merge öncesi full/security CI beklenir.
+**Durum:** `Verification` — fixture ve beş executable test Campaign→AdGroup→Ad lineage'ını, yalnız Ad-leaf additive fact'ı, generic conversion ignore kuralını, event `unsupported/null` davranışını, missing-is-not-zero kuralını ve duplicate double-count rejection'ı doğrular. PR #133 full/security/architecture/canonical kontrolleri başarılıdır; merge onayı beklenir.
 
 ### Kabul kriterleri
 

@@ -15,7 +15,7 @@ const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
 const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
-const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");
+const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");const {registerTikTokCharacterizationRoute}=require("./src/providers/tiktok/characterization-route");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
 const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
@@ -4744,7 +4744,7 @@ app.get("/api/tiktok/truth-contract",async(req,res)=>{
   }catch(e){res.status(500).json({error:e.message})}
 });
 
-app.get("/api/tiktok/advertisers",async(req,res)=>{
+registerTikTokCharacterizationRoute({app,requireUser,fetchReport:tiktokApiFetch,enabled:productionConfig.tiktokReviewCharacterizationEnabled,sandboxBase:TIKTOK_SANDBOX_API_BASE,accessToken:process.env.TIKTOK_SANDBOX_ACCESS_TOKEN,advertiserId:TIKTOK_SANDBOX_ADVERTISER_ID});app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
     const {conn}=result,sandboxAccount=sandboxAdvertiser({productionConfig,advertiserId:TIKTOK_SANDBOX_ADVERTISER_ID,advertiserName:TIKTOK_SANDBOX_ADVERTISER_NAME,sandboxBase:TIKTOK_SANDBOX_API_BASE});if(sandboxAccount)return res.json({platform:"tiktok",advertisers:[sandboxAccount],advertiser_source:"non_production_sandbox",sandbox:true});

@@ -24,6 +24,12 @@ PR #130 Preview denemesi kabul edilmedi ve PR merge edilmeden kapatıldı. Previ
 
 Bu sonuç, yalnız ayrı Vercel URL'sinin ayrı sandbox ortamı olmadığını kanıtlar. Gerçek izolasyon için ayrı non-production Supabase auth/data plane'i ve eksiksiz Preview sandbox yapılandırması gerekir. Bunlar olmadan yeni retry yapılmaz; shared production data üzerinde test connection üretmek ayrı ortam kabul edilmez.
 
+## Onaylanan geçici read-only characterization
+
+Ayrı veritabanı yerine insan onayıyla dar kapsamlı geçici yol seçildi. Authenticated `/api/tiktok/sandbox/characterize` yalnız non-production feature flag ile açılır; server-held sandbox token ve advertiser ID kullanarak event metric adaylarını tek günlük, Ad-level BASIC raporda ayrı ayrı probe eder. Endpoint connection, ownership, snapshot, refresh job veya Dataset V1/V2 yazmaz. Ham response, metric değeri, token ve advertiser kimliği dönmez; yalnız aday alanın provider tarafından kabul edilip edilmediği, cevapta bulunup bulunmadığı ve zero-row/non-empty şekli döner.
+
+TikTok test sayfasındaki `Run Server Characterization` düğmesi bu endpoint'i çağırır. Karakterizasyon tamamlanınca route/flag kapatılır. Bu geçici review mekanizması production OAuth advertiser keşfinin veya nihai production TikTok bağlantısının yerine geçmez.
+
 ## Modal düzeltmesi
 
 Advertiser listesi başarılı fakat boş döndüğünde reconnect URL parametreleri artık modal gösterilirken tüketilir. `Close` sayfayı yenilese bile aynı account-selection akışı tekrar açılmaz.

@@ -1490,8 +1490,10 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 - **E6-T6B1 — `Done`:** PR #136 ile Dataset V2 writer ownership/entity/synthetic/cardinality guard'ları ve safe failure stage'leriyle canonical boundary'ye bağlanmıştır.
 - **E6-T6B2 — `Done`:** PR #137 ile advertiser metadata, delivery-only AUCTION_AD read, Dataset V2 writer ve refresh job evidence injectable runner'da compose edilmiştir.
 - **E6-T6C1 — `Done`:** PR #138 ile legacy ve canonical V2 Ad nüfusları entity-level spend/impressions/clicks, event-null ve synthetic policy için redacted parity evidence ile karşılaştırılır.
-- **E6-T6C2 — `Verification`:** Legacy-authoritative write, V2 shadow runner ve parity fail-isolated/no-change coordinator'da compose edilmiştir.
-- **E6-T6D:** Production activation gate.
+- **E6-T6C2 — `Done`:** PR #139 ile legacy-authoritative write, V2 shadow runner ve parity fail-isolated/no-change coordinator'da compose edilmiştir.
+- **E6-T6D1 — `Verification / BLOCKED`:** Kod/main hazır; shadow rollout onayı, runtime registration ve üç clean live parity sonucu yoktur. Primary activation ayrı açık onay gerektirir.
+- **E6-T6D2:** Onaylı shadow runtime registration ve live evidence capture.
+- **E6-T6D3:** Ayrı primary production activation kararı.
 
 #### E6-T1 task aynası — TikTok production report contract
 
@@ -1587,7 +1589,17 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Kapsam dışı:** Express route registration ve production activation.
 
-**Durum:** `Verification` — beş executable test PASS shadow akışını, V2 failure isolation'ını, parity drift görünürlüğünü, legacy failure short-circuit'ini, request isolation ve redacted stage davranışını doğrular.
+**Durum:** `Done` — beş executable test PASS shadow akışını, V2 failure isolation'ını, parity drift görünürlüğünü, legacy failure short-circuit'ini, request isolation ve redacted stage davranışını doğruladı. PR #139 insan onayıyla merge edildi ve main Security regression başarılıdır.
+
+#### E6-T6D1 task aynası — production activation readiness gate
+
+**Amaç:** Kod/main, shadow rollout, live parity ve primary approval kapılarını birbirinden ayırmak; hiçbir değerlendirme fonksiyonunun production activation çalıştırmamasını garanti etmek.
+
+**Kapsam:** Yedi code gate, main/rollback readiness, ayrı shadow onayı, runtime registration, minimum üç clean live parity, zero synthetic write ve ayrı primary approval reason-code evidence'ı.
+
+**Kapsam dışı:** Shadow route registration, live write/parity çalıştırma ve primary production activation.
+
+**Durum:** `Verification / BLOCKED` — committed evidence shadow onayı/runtime/live parity/primary approval eksiklerini gösterir ve `production_activation_performed=false` taşır. Altı executable test onay ayrımını, minimum parity eşiğini, invalid counters/code gates fail-closed davranışını ve redacted artifact'ı doğrular.
 
 ### Kabul kriterleri
 

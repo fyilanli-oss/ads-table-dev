@@ -47,7 +47,7 @@ const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
 const TIKTOK_REVIEW_ADVERTISER_ID=process.env.TIKTOK_REVIEW_ADVERTISER_ID||"";
-const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"";const TIKTOK_SANDBOX_ADVERTISER_ID=process.env.TIKTOK_SANDBOX_ADVERTISER_ID||"";const TIKTOK_SANDBOX_ADVERTISER_NAME=process.env.TIKTOK_SANDBOX_ADVERTISER_NAME||"";
+const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"";const TIKTOK_REVIEW_ACCESS_TOKEN=process.env.TIKTOK_REVIEW_ACCESS_TOKEN||"";const TIKTOK_SANDBOX_ADVERTISER_ID=process.env.TIKTOK_SANDBOX_ADVERTISER_ID||"";const TIKTOK_SANDBOX_ADVERTISER_NAME=process.env.TIKTOK_SANDBOX_ADVERTISER_NAME||"";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const providerTokenEncryptionEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_ENCRYPTION_ENABLED,false,"PROVIDER_TOKEN_ENCRYPTION_ENABLED");
 const providerTokenLegacyReadsEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_LEGACY_READ_ENABLED,true,"PROVIDER_TOKEN_LEGACY_READ_ENABLED");
@@ -4773,7 +4773,7 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
         advertiser_name:TIKTOK_REVIEW_ADVERTISER_NAME,
         status:"active",
         currency:null,
-        review_fallback:true
+        review_fallback:true,sandbox:true,reportBase:TIKTOK_SANDBOX_API_BASE,tokenSource:"server_review_access_token"
       });
     }
 
@@ -4963,15 +4963,15 @@ function tiktokSnapshotRow(row,level,platformAccountId,synthetic=false){
 
 async function fetchTikTokSnapshotRows(conn,platformAccountId,datePreset){
   const sandboxToken=productionConfig.tiktokSandboxEnabled?(process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||""):"";
-  const useSandbox=Boolean(productionConfig.tiktokSandboxEnabled&&sandboxToken&&(conn?.metadata?.tokenSource==="manual_sandbox_access_token"||conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE||productionConfig.tiktokForceSandboxReports));
-  const token=useSandbox?sandboxToken:conn.access_token;
-  const base=useSandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
+  const useSandbox=Boolean(productionConfig.tiktokSandboxEnabled&&sandboxToken&&(conn?.metadata?.tokenSource==="manual_sandbox_access_token"||conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE||productionConfig.tiktokForceSandboxReports));const useReviewBridge=Boolean(productionConfig.tiktokReviewFallbackEnabled&&TIKTOK_REVIEW_ACCESS_TOKEN&&conn?.metadata?.tokenSource==="server_review_access_token"&&conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE);
+  const token=useReviewBridge?TIKTOK_REVIEW_ACCESS_TOKEN:(useSandbox?sandboxToken:conn.access_token);
+  const base=useReviewBridge||useSandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
   const endpoint="/v1.3/report/integrated/get/";
   const headers={"Access-Token":token};
   const w=tiktokDateWindow(datePreset||"today");
   const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
   const levels=["campaign","adgroup","ad"];
-  const result={rows:[],raw:{},counts:{campaign:0,adgroup:0,ad:0},tokenSource:useSandbox?"manual_sandbox_access_token":"platform_connections.access_token",base};
+  const result={rows:[],raw:{},counts:{campaign:0,adgroup:0,ad:0},tokenSource:useReviewBridge?"server_review_access_token":(useSandbox?"manual_sandbox_access_token":"platform_connections.access_token"),base};
   for(const level of levels){
     const levelInfo=resolveTikTokReportLevel(level);
     const data=await tiktokApiFetch({base,endpoint,headers,params:{report_type:"BASIC",data_level:levelInfo.dataLevel,advertiser_id:platformAccountId,start_date:w.start,end_date:w.end,dimensions:[levelInfo.dimension],metrics,page:1,page_size:100}});
@@ -4981,7 +4981,7 @@ async function fetchTikTokSnapshotRows(conn,platformAccountId,datePreset){
     result.counts[levelInfo.level]=rows.length;
     result.rows.push(...rows);
   }
-  const shouldCreateFallbackRows=useSandbox||levels.some(level=>Number(result.counts[level]||0)===0);
+  const shouldCreateFallbackRows=useReviewBridge||useSandbox||levels.some(level=>Number(result.counts[level]||0)===0);
   if(shouldCreateFallbackRows){
     const fallbackBase={raw:{fallback_reason:useSandbox?"sandbox_empty_report":"empty_report_level_fallback",token_source:result.tokenSource}};
     const fallbackRows=[

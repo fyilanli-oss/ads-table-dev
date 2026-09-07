@@ -17,7 +17,7 @@ This baseline freezes the current OAuth surface before security behavior is chan
 | Google Ads | `/auth/google` | `/auth/google/callback` | Verified bearer user | Atomic transaction | No | Active |
 | Google Sheets | `/auth/google-sheets` | `/auth/google-sheets/callback` | Verified bearer user | Atomic transaction | No | Active |
 | GA4 Organic | `/auth/organic` | `/auth/organic/callback` | Verified bearer user | Atomic transaction | No | Active |
-| Pinterest | `/auth/pinterest` | `/auth/pinterest/callback` | None; passive legacy redirect | None | No | Passive |
+| Pinterest | `/auth/pinterest` | `/auth/pinterest/callback` | Bearer-authenticated handshake + server transaction | OAuth code | Yes | Active / explicit account selection |
 | Klaviyo | `/auth/klaviyo` | `/auth/klaviyo/callback` | Verified bearer user | Atomic transaction + verifier | Yes | Active |
 | TikTok | `/auth/tiktok` | `/auth/tiktok/callback` | Verified bearer user | Atomic transaction | No | Active |
 
@@ -63,7 +63,7 @@ The shared start guard makes the verified bearer identity authoritative. E1-T3 c
 3. The shared guard resolves the verified bearer user and rejects legacy query-user input.
 4. Every active start/callback uses the transaction store and callbacks contain no OAuth session identity/state fields.
 5. Runtime and package guards prove the session middleware, session access, secret dependency, known fallback and package dependency are absent.
-6. Pinterest remains a passive legacy dashboard redirect and never accesses a session object.
+6. Pinterest uses the shared OAuth transaction boundary and never accepts a caller-selected user identity or accesses a session object.
 
 The original assertions described current debt rather than the desired end state. E1-T2 replaced the query-user assertion with executable bearer-user, unauthenticated and tamper rejection acceptance tests. E1-T4 replaced the session-debt characterization with executable elimination guards.
 

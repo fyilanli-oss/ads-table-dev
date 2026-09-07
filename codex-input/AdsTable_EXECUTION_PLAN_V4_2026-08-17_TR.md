@@ -1769,6 +1769,16 @@ GA4 Organic V2 ve Blend ayrı flag'lerle kapatılabilir; mevcut selection/bindin
 
 E4; domain match ve classification policy; property metadata erişimi.
 
+### Pinterest üç paketlik kabul yolu — Paket 1/3
+
+**Durum:** `Verification — OAuth/account access implemented; live provider acceptance pending`
+
+Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handshake ve tek kullanımlık transaction state sınırına alınmıştır. Callback kimliği caller girdisinden değil tüketilen transaction'dan gelir. OAuth sonrasında explicit advertiser seçimi zorunludur; account discovery yalnız gerçek ID, ad, currency ve timezone dörtlüsünü seçime sunar. Token exchange/refresh server tarafındadır; ham provider veya HTML hata cevabı kullanıcıya taşınmaz. Paket 1 Dataset V2 write, analytics metric kabulü veya production primary activation yapmaz.
+
+**Kalan sabit paketler:** Paket 2 canonical adapter + Time/FX + Dataset V2 shadow; Paket 3 live parity + activation/rollback. Yeni alt paket açılmaz.
+
+**Evidence:** `src/oauth/pinterest-handlers.js`, `src/providers/pinterest/account-discovery.js`, `tests/pinterest-package-1.test.js`, `docs/PINTEREST_PACKAGE_1_ACCOUNT_ACCESS.md`.
+
 ## 13. E9 — Backfill ve data readiness
 
 **Durum:** `Not started`

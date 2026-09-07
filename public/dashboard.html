@@ -3962,6 +3962,11 @@ function togglePJ(groupName){
   </div>
 
   <div class="drawerRow">
+    <span>Pinterest Ads</span>
+    <button id="pinterestConnectButton" class="drawerConnectBtn" data-platform="pinterest" data-state="loading" disabled>Loading...</button>
+  </div>
+
+  <div class="drawerRow">
     <span>TikTok Ads</span>
     <button id="tiktokConnectButton" class="drawerConnectBtn" data-platform="tiktok" data-state="loading" disabled>Loading...</button>
   </div>
@@ -4018,6 +4023,7 @@ function togglePJ(groupName){
   "use strict";
 
   const services=[
+    {buttonId:"pinterestConnectButton",platform:"pinterest",statusUrl:"/api/platform/pinterest/status",disconnectUrl:"/api/connections/pinterest/disconnect",connectUrl:"/auth/pinterest"},
     {buttonId:"tiktokConnectButton",platform:"tiktok",statusUrl:"/api/tiktok/status",disconnectUrl:"/api/connections/tiktok/disconnect",connectUrl:"/auth/tiktok"},
     {buttonId:"analyticsConnectButton",platform:"organic",statusUrl:"/api/platform/organic/status",disconnectUrl:"/api/platform/organic/disconnect",connectUrl:"/auth/organic"},
     {buttonId:"sheetsConnectButton",platform:"google_sheets",statusUrl:"/api/google-sheets/status",disconnectUrl:"/api/google-sheets/disconnect",connectUrl:"/auth/google-sheets"}
@@ -4134,8 +4140,8 @@ function togglePJ(groupName){
   "use strict";
 
   let activeDrawerButton=null;
-  const managedPlatforms=new Set(["tiktok","organic","google_sheets"]);
-  const labels={tiktok:"TikTok Ads",organic:"Analytics",google_sheets:"Sheets"};
+  const managedPlatforms=new Set(["pinterest","tiktok","organic","google_sheets"]);
+  const labels={pinterest:"Pinterest Ads",tiktok:"TikTok Ads",organic:"Analytics",google_sheets:"Sheets"};
 
   const modal=document.getElementById("connectModal");
   const modalOverlay=document.getElementById("connectModalOverlay");
@@ -8938,6 +8944,7 @@ body.ads-operation-locked{overflow:hidden !important;}
   const CONNECTED_PARAMS={
     meta:"meta_connected",
     google:"google_connected",
+    pinterest:"pinterest_connected",
     tiktok:"tiktok_connected",
     klaviyo:"klaviyo_connected",
     organic:"organic_connected",
@@ -8947,6 +8954,7 @@ body.ads-operation-locked{overflow:hidden !important;}
   const LABELS={
     meta:"Meta",
     google:"Google Ads",
+    pinterest:"Pinterest Ads",
     tiktok:"TikTok",
     klaviyo:"Klaviyo",
     organic:"Google Analytics",
@@ -8991,6 +8999,7 @@ body.ads-operation-locked{overflow:hidden !important;}
     if(platform==="meta")rows=payload.accounts||payload.data||[];
     if(platform==="google")rows=payload.customers||payload.accounts||[];
     if(platform==="tiktok")rows=payload.advertisers||payload.accounts||[];
+    if(platform==="pinterest")rows=payload.accounts||payload.items||payload.data||[];
     if(platform==="klaviyo")rows=payload.accounts||[];
     if(platform==="organic")rows=payload.properties||payload.accounts||[];
 
@@ -9032,6 +9041,7 @@ body.ads-operation-locked{overflow:hidden !important;}
     const urls={
       meta:"/api/meta/adaccounts",
       google:"/api/google/customers",
+      pinterest:"/api/pinterest/adaccounts",
       tiktok:"/api/tiktok/advertisers",
       klaviyo:"/api/klaviyo/accounts",
       organic:"/api/organic/ga4/properties"

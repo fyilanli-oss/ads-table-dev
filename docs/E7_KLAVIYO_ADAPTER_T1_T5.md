@@ -10,7 +10,9 @@ Bu çalışma E7'yi yeni mikro paketlere bölmeden T1–T5 sınırlarını tek c
 - T5 sınırında yalnız SMS `provider_spend` canonical spend olabilir. Eksik SMS spend ve bütün Email spend değerleri `unsupported/null` kalır; tahminî veya manuel maliyet T6 kararı verilmeden okunmaz.
 - GA4/Organic bu mapper'ın girdisi değildir ve Klaviyo Campaign/Flow hierarchy'sine dağıtılmaz.
 
-T6 estimated/manual Email spend fallback'i kullanıcıyla ayrıca kesinleştirilecektir.
+## T6 kararı — usage-weighted spend
+
+Kullanıcı onayıyla takvim gününe eşit bölme kaldırılır. Provider gerçek spend her zaman önceliklidir. Email aylık plan maliyeti `monthly_plan_cost × daily_sent / monthly_sent` ile günlük gönderim payına dağıtılır ve `allocated` olarak işaretlenir; açık ay `provisional`, kapanmış ay `finalized` olur. Overage yalnız kullanıcı açıkça included send ve sözleşmesel unit cost sağlarsa kümülatif kullanım farkından `estimated` hesaplanır. SMS provider spend yoksa yalnız açık kullanıcı unit cost ayarıyla estimated kullanım maliyeti hesaplanabilir. İnternetten veya global sabit birim fiyat kullanılmaz; actual ile estimate aynı gün üst üste toplanmaz.
 
 ## T7 kararı — GA4 Organic güvenli park
 

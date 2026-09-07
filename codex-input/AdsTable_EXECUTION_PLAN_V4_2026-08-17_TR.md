@@ -1601,6 +1601,39 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 **Durum:** `Verification / BLOCKED` — committed evidence shadow onayı/runtime/live parity/primary approval eksiklerini gösterir ve `production_activation_performed=false` taşır. Altı executable test onay ayrımını, minimum parity eşiğini, invalid counters/code gates fail-closed davranışını ve redacted artifact'ı doğrular.
 
+#### E6-T6D2 operasyon aynası — production review bridge ve live shadow evidence
+
+**Doğrulanan engel:** `dev.adstable.app` Vercel Production deployment'ı TikTok production OAuth tokenıyla `/v1.3/oauth2/advertiser/get/` çağrısı yapar. Bu kimlik sandbox advertiser'ı listeleyemediği için başarılı OAuth sonrasında provider `data.list=[]` döndürür ve account-selection modalı `No accessible account was found.` gösterir. Preview-scoped `TIKTOK_SANDBOX_*` değerleri Production deployment'a taşınmaz; ayrıca genel sandbox değişkenleri production startup guard tarafından bilinçli olarak reddedilir.
+
+**Geçici çözümün amacı:** TikTok review süresince yalnız önceden tanımlanmış tek sandbox advertiser'ı, tokenı browser'a veya API cevabına koymadan mevcut account-selection ve legacy-authoritative refresh yaşam döngüsüne bağlamak. Bu bridge genel müşteri sandbox desteği, OAuth bypass veya TikTok V2-primary activation değildir.
+
+**Açma sözleşmesi:** Production review bridge yalnız aşağıdaki server-side Vercel Production değişkenleri birlikte tanımlandığında açılır:
+
+- `TIKTOK_REVIEW_FALLBACK_ENABLED=true`
+- `TIKTOK_REVIEW_ACCESS_TOKEN=<server-only sandbox token>`
+- `TIKTOK_REVIEW_ADVERTISER_ID=<approved sandbox advertiser id>`
+- `TIKTOK_REVIEW_ADVERTISER_NAME=<optional display label>`
+
+Flag açıkken token veya advertiser ID eksikse startup fail-closed olur. Flag kapalıyken review token/id/name bırakılırsa startup yine fail-closed olur. `TIKTOK_SANDBOX_ENABLED`, `TIKTOK_SANDBOX_ACCESS_TOKEN`, `TIKTOK_SANDBOX_ADVERTISER_*`, `TIKTOK_TEST_ACCESS_TOKEN` ve `TIKTOK_FORCE_SANDBOX_REPORTS` Production'da yasak kalır. Böylece geçici review istisnası genel sandbox güvenlik sınırını gevşetmez.
+
+**Request ve seçim akışı:** OAuth callback önce normal production tokenını server-side connection'a kaydeder ve explicit account selection ister. `/api/tiktok/advertisers` önce normal production OAuth discovery çağrısını yapar. Gerçek advertiser listesi non-empty ise aynen onu döndürür ve bridge devreye girmez. Liste empty ise ve review sözleşmesi eksiksizse yalnız configured review advertiser; `sandbox=true`, `reportBase=https://sandbox-ads.tiktok.com/open_api` ve `tokenSource=server_review_access_token` routing metadata'sıyla döner. Access token hiçbir response alanında bulunmaz.
+
+**Persistence ve refresh akışı:** Kullanıcı review advertiser'ı seçtiğinde mevcut `/api/accounts/select` lifecycle'ı ownership, platform account, schedule ve connection metadata'sını yazar. Sonraki TikTok refresh, persisted `tokenSource` ve `reportBase` değerlerinin ikisini de doğrular. Eşleşme varsa server-held `TIKTOK_REVIEW_ACCESS_TOKEN` ile sandbox report host'una gider; eşleşme yoksa normal connected OAuth tokenı ve production API host'u kullanılmaya devam eder. Caller query/body/header ile review token veya routing seçemez.
+
+**Shadow sınırı:** `TIKTOK_V2_SHADOW_ENABLED=true` ayrıca açık olduğunda legacy snapshot önce ve otoriter olarak yazılır. Aynı provider-derived gerçek Ad-leaf nüfusu Dataset V2 shadow writer'a geçer; Campaign/AdGroup toplamları ve synthetic fallback'ler canonical fact olamaz. Shadow/parity hatası legacy sonucu başarısız yapmaz. Response ve job metadata yalnız redacted `tiktok_shadow_evidence` taşır; `production_activation=false` kalır.
+
+**Production operasyon sırası:** (1) Review bridge PR'ı merge edilir. (2) Dört review değişkeni Vercel Production scope'a eklenir; mevcut sandbox token aynı değerle `TIKTOK_REVIEW_ACCESS_TOKEN` adı altında server-only tutulur. (3) Production redeploy yapılır. (4) TikTok reconnect/account selection tekrar çalıştırılır ve configured advertiser seçilir. (5) `TIKTOK_V2_SHADOW_ENABLED=true` ile en az üç ardışık manual refresh çalıştırılır. (6) Her koşuda legacy başarı, shadow `PASS`, entity/delivery parity true ve `synthetic_written_to_canonical=0` doğrulanır. Bu altı adım tamamlanmadan E6-T6D2 `Done` olmaz.
+
+**Kabul kriterleri:** Empty OAuth listesi yalnız eksiksiz review config ile tek allowlisted advertiser üretir; normal non-empty OAuth listesi override edilmez; token hiçbir browser cevabına/log/evidence'a girmez; seçilen routing metadata server-side persist edilir; refresh sandbox host ve review tokenını birlikte kullanır; legacy otoritesi korunur; üç ardışık live parity `PASS` ve zero synthetic write kanıtı alınır.
+
+**Rollback:** Önce `TIKTOK_V2_SHADOW_ENABLED=false` yapılarak shadow write durdurulur. Review erişimini kapatmak için `TIKTOK_REVIEW_FALLBACK_ENABLED=false` yapılırken aynı deployment'ta review token/id/name değişkenleri de kaldırılır; aksi hâlde startup bilinçli olarak fail-closed olur. Redeploy sonrası production OAuth discovery ve legacy refresh normal token/host yoluna döner. Mevcut legacy snapshot'lar silinmez; Dataset V2 shadow satırları primary read kaynağı olmadığından dashboard otoritesini etkilemez.
+
+**Geçicilik ve kaldırma kriteri:** TikTok App Review tamamlanıp production OAuth gerçek advertiser'ı non-empty listelediğinde bridge kullanılmaz; kalıcı kaldırma PR'ında review flag/token/id/name, sandbox routing dalı ve bu geçici runbook birlikte silinir. Primary activation yalnız üç clean live evidence incelendikten sonra E6-T6D3'te ayrıca insan onayıyla kararlaştırılır.
+
+**Evidence:** `docs/E6_T6D2_TIKTOK_REVIEW_BRIDGE.md`, `docs/E6_T6D2_TIKTOK_LIVE_SHADOW.md`, `server.js`, `security/production-config.js`, `tests/e6-t2-tiktok-account-selection.test.js`, `tests/production-config.test.js`, `tests/e6-t6d2-tiktok-live-shadow.test.js`.
+
+**Durum:** `Implementation / live evidence pending` — review bridge kodu ve fail-closed testleri hazırdır; merge, Production env/redeploy, account selection ve üç live shadow `PASS` henüz tamamlanmamıştır. Bu çalışma yeni bir E6 paketi değildir; mevcut E6-T6D2'nin doğrulanmış production account-selection engelini giderir. Sonraki ve tek kalan paket E6-T6D3 primary activation/rollback kararıdır.
+
 ### Kabul kriterleri
 
 - Synthetic row gerçek performance olarak görünmez.

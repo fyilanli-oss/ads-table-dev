@@ -21,3 +21,7 @@ Pinterest'in eski Passive/Legacy kilidi kaldırılır; ancak bu paket performans
 ## Paket sınırı
 
 Bu paket OAuth/account access hazırlığıdır. Analytics metric semantiği gerçek provider cevabıyla ayrıca karakterize edilmeden mevcut legacy normalizer production contract sayılmaz. Snapshot/Dataset V2, Time/FX, parity ve primary activation Paket 2–3 kapsamındadır.
+
+## İlk canlı bağlantı düzeltmesi
+
+İlk canlı `Connect` isteğinin environment kontrolünü geçtiği, fakat OAuth state kaydı oluşmadan durduğu doğrulandı. Kök neden provider dokümanı veya yetkilendirme URL'si değil, `oauth_transactions` tablosundaki izin listesinin Pinterest'i içermemesiydi. Pinterest aynı tek kullanımlık transaction sınırını kullandığı için veritabanı constraint'i `pinterest` provider'ını kabul edecek şekilde genişletildi. Yetkilendirme adresi ve token adresi Pinterest'in resmi V5 OpenAPI tanımıyla karşılaştırıldı; mevcut adresler değişmeden korundu.

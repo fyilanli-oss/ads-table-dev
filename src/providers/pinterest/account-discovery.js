@@ -6,7 +6,7 @@ function discoverPinterestAdAccounts(payload){
   const seen=new Set(),accounts=[];
   for(const row of rows){
     if(!row||typeof row!=="object"||Array.isArray(row))continue;
-    const id=text(row.id||row.ad_account_id),name=text(row.name||row.account_name),currency=text(row.currency||row.currency_code).toUpperCase(),timezone=text(row.timezone||row.timezone_name);
+    const id=text(row.id||row.ad_account_id),name=text(row.name||row.account_name),currency=text(row.currency||row.currency_code).toUpperCase(),timezone=text(row.time_zone||row.timezone||row.timezone_name);
     if(!id||!name||!currency||!timezone||seen.has(id))continue;
     seen.add(id);accounts.push(Object.freeze({platform:"pinterest",platform_account_id:id,account_name:name,currency,timezone}));
   }

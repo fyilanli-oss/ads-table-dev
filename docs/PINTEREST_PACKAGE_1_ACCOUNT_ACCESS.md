@@ -25,3 +25,7 @@ Bu paket OAuth/account access hazırlığıdır. Analytics metric semantiği ger
 ## İlk canlı bağlantı düzeltmesi
 
 İlk canlı `Connect` isteğinin environment kontrolünü geçtiği, fakat OAuth state kaydı oluşmadan durduğu doğrulandı. Kök neden provider dokümanı veya yetkilendirme URL'si değil, `oauth_transactions` tablosundaki izin listesinin Pinterest'i içermemesiydi. Pinterest aynı tek kullanımlık transaction sınırını kullandığı için veritabanı constraint'i `pinterest` provider'ını kabul edecek şekilde genişletildi. Yetkilendirme adresi ve token adresi Pinterest'in resmi V5 OpenAPI tanımıyla karşılaştırıldı; mevcut adresler değişmeden korundu.
+
+## İlk canlı advertiser keşfi düzeltmesi
+
+OAuth callback'i tamamlandı ve Pinterest connection kaydı oluştu; dolayısıyla önceki transaction engeli kapandı. Sonraki boş account picker'ın kök nedeni resmi V5 `AdAccount` şemasındaki IANA alanının `time_zone` olmasına rağmen normalizer'ın yalnız `timezone`/`timezone_name` okumasıydı. Normalizer artık önce resmi `time_zone` alanını okur; kimlik, ad, currency veya timezone eksikse hesabı yine fail-closed biçimde seçime sunmaz.

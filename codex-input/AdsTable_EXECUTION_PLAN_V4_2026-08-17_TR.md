@@ -1661,7 +1661,7 @@ E4; TikTok production reporting contract kararı.
 
 ## 11. E7 — Klaviyo adapter
 
-**Durum:** `In progress — T1–T7 implemented/parked; T8 pending`
+**Durum:** `Code complete — T1–T8 implemented/parked; live provider evidence pending`
 
 ### Planlanan işler
 
@@ -1674,7 +1674,7 @@ E4; TikTok production reporting contract kararı.
 - **E7-T5:** SMS provider spend; unsupported ise `null`, uydurma `0` yok.
 - **E7-T6:** `Done` — Email monthly plan sent-volume allocation, explicit overage estimate ve actual-first provenance.
 - **E7-T7:** `Done/Parked` — UTM güvenilirliği nedeniyle GA4 Organic ingestion kapalı; Blend capability korunur.
-- **E7-T8:** Time/FX/V2, dual-write ve channel-branch parity.
+- **E7-T8:** `Done` — Time/FX/V2 writer, legacy-authoritative shadow ve channel-branch parity.
 
 ### Kabul kriterleri
 
@@ -1715,6 +1715,12 @@ Kullanıcı UTM kurulumunun eksik veya hatalı olması paid/organic attribution'
 Kullanıcı aylık plan/currency girişini korur; ancak bedel artık takvim günlerine eşit bölünmez. Günlük Email allocation, o günün `Sent Email` adedinin ay toplamındaki payı üzerinden hesaplanır. Açık ay değerleri `provisional`, kapanmış ay değerleri `finalized` provenance taşır. SMS provider actual spend bütün tahminlerden önceliklidir. Overage yalnız included send ve kullanıcıya ait sözleşmesel unit cost birlikte sağlanırsa kümülatif günlük farktan estimate edilir. SMS actual provider spend yoksa kullanıcı açıkça unit cost tanımlamadıkça spend `unsupported/null` kalır. Global/internet örnek fiyatı ve actual+estimate double count yasaktır.
 
 **Evidence:** `src/providers/klaviyo/mapper.js`, `tests/e7-klaviyo-adapter.test.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
+
+### E7-T8 birleşik runtime kapanış kaydı
+
+Account identity/timezone/provider date doğrulaması, ortak FX normalization, tek Dataset V2 write boundary, Campaign/Flow + Email/SMS duplicate koruması, zero-row no-fake-write, exact branch/channel/fact/support parity ve legacy-authoritative shadow failure isolation `src/providers/klaviyo/runtime.js` içinde tamamlandı. Production primary activation yapılmaz. E7 için yeni alt paket açılmaz; gerçek provider message/report DTO'su ile live evidence alınana kadar mevcut legacy Klaviyo snapshot otoritesi korunur.
+
+**Evidence:** `src/providers/klaviyo/runtime.js`, `tests/e7-t8-klaviyo-runtime.test.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
 
 ## 12. E8 — GA4 Organic adapter
 

@@ -17,3 +17,7 @@ Kullanıcı onayıyla takvim gününe eşit bölme kaldırılır. SMS provider g
 ## T7 kararı — GA4 Organic güvenli park
 
 GA4 Organic attribution kullanıcı UTM kalitesine bağımlı olduğu ve yanlış/eksik UTM paid/organic sınıflandırmasını güvenilmez yaptığı için ingestion süresiz park edilmiştir. Yeni OAuth transaction, property discovery/binding, manual snapshot ve automation çalışmaz; mevcut bağlantı veya snapshot verisi silinmez. Park sabit kod politikasıdır ve environment ile yanlışlıkla açılamaz. `Paid`, `Organic` ve `Blend` analysis-scope/formula capability'leri kaldırılmaz; ileride güvenilir backend source kararıyla tekrar kullanılabilir.
+
+## T8 — Time/FX, Dataset V2 ve parity
+
+Account identity, IANA timezone ve provider business date tek normalization sınırında doğrulanır. Bütün supported monetary facts ortak FX service ile tam bir kez çevrilir; unsupported/unknown değerler `null` kalır. Campaign/Flow ve Email/SMS aynı canonical writer'dan geçer, business-date + entity key duplicate'ı reddedilir ve zero-row boş write olarak korunur. Shadow akışı legacy sonucu otoriter tutar, V2 hatasını güvenli aşama koduyla izole eder ve production activation yapmaz. Parity ancak non-empty entity set, branch/channel, metric support ve raw fact'ler birebir eşleşirse `PASS` olur.

@@ -28,4 +28,8 @@ Kullanıcı ekranı ve production kayıtları birlikte incelendi. Account select
 
 T6 onayından önce kalan `Estimated Monthly Spend` metni yanıltıcıydı. Alan, mevcut uyumluluk endpoint'i korunarak `Email Monthly Plan Cost` olarak adlandırılır ve kayıt `allocated_email_plan / monthly_sent_volume_share` provenance'ı taşır. Bu değer provider'ın gerçek günlük faturası değildir.
 
+Bu ad değişikliği T6'nın canlı akışa bağlandığı anlamına gelmez. Production denetiminde formun yazdığı `estimated_monthly_spend` nesnesi ile legacy refresh'in okuduğu `estimatedMonthlySpend` alanının farklı olduğu; legacy hesabın maliyeti hâlâ 30 güne eşit bölen `normalizeKlaviyoInsight` yolunda kaldığı doğrulandı. Usage-weighted mapper şu anda contract/test seviyesindedir ve production refresh composition'ına bağlı değildir.
+
 Son production refresh job'ı hatasız tamamlanmış olsa da provider campaign satırı dönmedi. Legacy writer bu durumda bir adet `klaviyo_empty_period_fallback` Campaign satırı ve ölçülmüş gibi görünen sıfırlar üretmişti. Bu davranış canonical null/zero sözleşmesiyle çeliştiği için kaldırıldı: geçerli boş provider sonucu `rows=[]`, `empty_result=true` olarak saklanır; sentetik Campaign veya sıfır performans üretilmez. Bu düzeltmeler doğrulanmadan E9 başlatılmaz.
+
+Production V2 sorgusunda Klaviyo satırı bulunmaması ve job metadata'sında Klaviyo shadow evidence olmaması, `src/providers/klaviyo/runtime.js` modülünün canlı refresh'e henüz bağlanmadığını ayrıca gösterir. Dolayısıyla E7-T8 için doğru durum `implementation available, production wiring/evidence pending` biçimindedir; legacy refresh'in `completed` olması parity veya V2 kabulü değildir.

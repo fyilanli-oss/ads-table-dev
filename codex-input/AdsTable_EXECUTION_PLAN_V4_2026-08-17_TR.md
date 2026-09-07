@@ -1661,7 +1661,7 @@ E4; TikTok production reporting contract kararı.
 
 ## 11. E7 — Klaviyo adapter
 
-**Durum:** `Code complete — T1–T8 implemented/parked; live provider evidence pending`
+**Durum:** `Verification blocked — live legacy path still bypasses T6/T8 runtime`
 
 ### Planlanan işler
 
@@ -1672,9 +1672,9 @@ E4; TikTok production reporting contract kararı.
 - **E7-T3B:** Campaign/Flow ve Email/SMS sonuçlarını aynı yedi bloklu envelope'a normalize et; ayrımı entity/channel değerleriyle taşı.
 - **E7-T4:** Open≠Click düzeltmesi ve journey count/value support.
 - **E7-T5:** SMS provider spend; unsupported ise `null`, uydurma `0` yok.
-- **E7-T6:** `Done` — Email monthly plan sent-volume allocation, explicit overage estimate ve actual-first provenance.
+- **E7-T6:** `Verification blocked` — contract hazır; live refresh hâlâ eski 30-gün dağıtım yolunda.
 - **E7-T7:** `Done/Parked` — UTM güvenilirliği nedeniyle GA4 Organic ingestion kapalı; Blend capability korunur.
-- **E7-T8:** `Done` — Time/FX/V2 writer, legacy-authoritative shadow ve channel-branch parity.
+- **E7-T8:** `Verification blocked` — runtime sınırları hazır; production composition ve live evidence yok.
 
 ### Kabul kriterleri
 
@@ -1710,15 +1710,19 @@ Kullanıcı UTM kurulumunun eksik veya hatalı olması paid/organic attribution'
 
 **Evidence:** `src/providers/organic/ingest-policy.js`, `tests/e7-t7-organic-park.test.js`, `src/oauth/organic-handlers.js`, `server.js`.
 
-### E7-T6 karar ve uygulama kaydı — usage-weighted maliyet
+### E7-T6 karar ve contract kaydı — usage-weighted maliyet
 
 Kullanıcı aylık plan/currency girişini korur; ancak bedel artık takvim günlerine eşit bölünmez. Günlük Email allocation, o günün `Sent Email` adedinin ay toplamındaki payı üzerinden hesaplanır. Açık ay değerleri `provisional`, kapanmış ay değerleri `finalized` provenance taşır. SMS provider actual spend bütün tahminlerden önceliklidir. Overage yalnız included send ve kullanıcıya ait sözleşmesel unit cost birlikte sağlanırsa kümülatif günlük farktan estimate edilir. SMS actual provider spend yoksa kullanıcı açıkça unit cost tanımlamadıkça spend `unsupported/null` kalır. Global/internet örnek fiyatı ve actual+estimate double count yasaktır.
 
-**Evidence:** `src/providers/klaviyo/mapper.js`, `tests/e7-klaviyo-adapter.test.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
+Bu formül canonical mapper ve unit test düzeyinde uygulanmıştır. 2026-09-07 canlı denetimi, production refresh'in hâlâ `normalizeKlaviyoInsight` içindeki eski `estimatedMonthlySpend / 30` yolunu kullandığını ve yeni `estimated_monthly_spend` kaydını okumadığını göstermiştir. Bu nedenle T6 production wiring tamamlanmış sayılmaz; kullanıcı arayüzünün yeniden adlandırılması tek başına kabul kanıtı değildir.
+
+**Evidence:** `src/providers/klaviyo/mapper.js`, `tests/e7-klaviyo-adapter.test.js`, `server.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
 
 ### E7 canlı corrective kapısı — account selection / spend ekranı / empty refresh
 
 2026-09-07 production denetiminde account selection'ın ilk Save çağrısı Supabase `522` HTML gövdesini modalda gösterdi, tekrar Save ise hesabı başarıyla kaydetti. Aynı denetimde eski `Estimated Monthly Spend` ekranının T6 sonrası yanlış adla kaldığı ve hatasız boş refresh'in `klaviyo_empty_period_fallback` adlı sentetik Campaign satırı ürettiği doğrulandı. Corrective sınır: upstream HTML hiçbir kullanıcı/evidence/metadata yüzeyine taşınmaz; account discovery sentetik ID üretmez; form `Email Monthly Plan Cost` ve allocated provenance ile sunulur; boş provider sonucu `rows=[] / empty_result=true` olur. Bu corrective doğrulanmadan E9 başlamaz.
+
+Canlı kayıt denetimi ayrıca son manual job'ın `completed` olduğunu fakat snapshot'ın tek `empty_period_fallback` satırı taşıdığını ve Klaviyo V2 tablosunda hiç satır bulunmadığını doğruladı. Bu, hatasız refresh'in yeni E7 runtime/parity akışından geçtiğini kanıtlamaz; yalnız eski snapshot yolunun hatasız tamamlandığını gösterir. E7-T8 modülü `server.js` production composition'ına bağlanmadan ve gerçek/boş provider sonucu aynı sınırda gözlenmeden E7 code-complete olarak kapatılamaz.
 
 ### E7-T8 birleşik runtime kapanış kaydı
 

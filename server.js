@@ -1974,15 +1974,15 @@ async function klaviyoFetch(conn,endpoint,options={}){
       ...options,
       headers:{Authorization:`Bearer ${activeConn.access_token}`,Accept:"application/json",Revision:process.env.KLAVIYO_REVISION||"2024-10-15","Content-Type":"application/json",...(options.headers||{})}
     });
-    const text=await response.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
-    if(response.ok)return data;
+    const text=await response.text();let data=null;try{data=text?JSON.parse(text):{}}catch{}
+    if(response.ok){if(!data||typeof data!=="object")throw Object.assign(new Error("Klaviyo returned an invalid response."),{status:502,code:"KLAVIYO_INVALID_RESPONSE"});return data;}
 
     if(attempt===0&&isKlaviyoAuthenticationError(response,data)){
       activeConn=await getFreshKlaviyoConnection(activeConn,{forceRefresh:true});
       continue;
     }
 
-    const error=Object.assign(new Error(data.errors?.[0]?.detail||data.errors?.[0]?.title||data.error_description||data.error||data.message||text||`Klaviyo API error ${response.status}`),{status:response.status});
+    const providerMessage=data?.errors?.[0]?.detail||data?.errors?.[0]?.title||data?.error_description||data?.error||data?.message,error=Object.assign(new Error(providerMessage||`Klaviyo request failed (${response.status}).`),{status:response.status});
     throw error;
   }
   throw Object.assign(new Error("Klaviyo authentication failed after token refresh"),{status:401});
@@ -1997,8 +1997,9 @@ async function resolveKlaviyoAccountIdentity(conn){
   if(!id)throw Object.assign(new Error("Klaviyo account response did not include an account id."),{status:502,code:"KLAVIYO_ACCOUNT_ID_MISSING"});
   return {
     platform_account_id:id,
-    account_name:attr.name||attr.company_name||conn?.account_name||`Klaviyo Account ${id}`,
-    currency:conn?.metadata?.spendCurrency||conn?.metadata?.currency||null,
+    account_name:attr.contact_information?.organization_name||attr.name||attr.company_name||conn?.account_name||`Klaviyo Account ${id}`,
+    currency:attr.preferred_currency||conn?.metadata?.spendCurrency||conn?.metadata?.currency||null,
+    timezone:attr.timezone||null,
     raw_account:null
   };
 }
@@ -2047,9 +2048,8 @@ function klaviyoCampaignSendTime(c){return c.attributes?.send_time||c.attributes
 function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}}){
   const attr=report?.attributes||report||{};
   const stats=attr.statistics||attr.stats||attr;
-  const estimatedMonthlySpend=Number(settings.estimatedMonthlySpend||0);
-  const estimatedPeriodSpend=(estimatedMonthlySpend/30)*window.selected_day_count;
-  const spend=estimatedPeriodSpend||0;
+  // This legacy report lacks T6 sent-volume inputs; never revive calendar-day estimates here.
+  const spend=null;
   const delivered=deepFindNumber(stats,["delivered","emails_delivered","DELIVERED"])??0;
   const opens=deepFindNumber(stats,["opens","open","opened","OPENED_EMAIL"])??null;
   const clicks=deepFindNumber(stats,["clicks","click","CLICKED_EMAIL"])??0;
@@ -2073,10 +2073,10 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     emails_delivered:delivered,
     clicks,
     ctr:clickRate!==null?Number(clickRate)*100:null,
-    cpc:clicks?spend/clicks:null,
+    cpc:spend!==null&&clicks?spend/clicks:null,
     spend,
-    estimated_monthly_spend:estimatedMonthlySpend,
-    estimated_period_spend:spend,
+    estimated_monthly_spend:null,
+    estimated_period_spend:null,
     selected_day_count:window.selected_day_count,
     sales,
     revenue:sales,
@@ -2089,7 +2089,7 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     site_visit:siteVisit,
     landing_page_views:siteVisit,
     traffic_score:trafficScore,
-    real_cpc:siteVisit?spend/siteVisit:null,
+    real_cpc:spend!==null&&siteVisit?spend/siteVisit:null,
     add_to_cart:addToCart,
     checkout,
     purchase:purchaseCount,
@@ -2108,7 +2108,7 @@ const {start:handleKlaviyoOAuthStart,callback:handleKlaviyoOAuthCallback}=create
 });
 registerOAuthProviderRoutes({app,provider:"klaviyo",startHandler:handleKlaviyoOAuthStart,callbackHandler:handleKlaviyoOAuthCallback});
 app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");res.json({connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),setupRequired:Boolean(conn?.metadata?.requiresSetup),estimatedMonthlySpend:conn?.metadata?.estimatedMonthlySpend||null,spendCurrency:conn?.metadata?.spendCurrency||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:e.message})}});
-app.get("/api/klaviyo/accounts",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const account=await resolveKlaviyoAccountIdentity(result.conn);res.json({platform:"klaviyo",accounts:[{platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null}]})}catch(e){res.status(e.status||500).json({error:e.message})}});
+app.get("/api/klaviyo/accounts",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const account=await resolveKlaviyoAccountIdentity(result.conn);res.json({platform:"klaviyo",accounts:[{platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null,timezone:account.timezone||null}]})}catch(e){res.status(e.status||500).json({error:e.status>=500?"Klaviyo accounts could not be loaded. Please try again.":e.message})}});
 app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/klaviyo/campaigns",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const channel=String(req.query.channel||"email");const filter=`equals(messages.channel,\'${channel}\'),greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const data=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);res.json(data)}catch(e){res.status(500).json({error:e.message})}});
 

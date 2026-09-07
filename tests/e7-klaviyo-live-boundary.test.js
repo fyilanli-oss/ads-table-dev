@@ -11,6 +11,12 @@ test('Klaviyo account discovery fails closed and never persists raw account payl
   assert.match(server,/raw_account:null/);
   assert.doesNotMatch(server,/raw=\{error:e\.message\}/);
   assert.doesNotMatch(server,/const fallbackId=id\|\|`klaviyo_/);
+  assert.match(server,/attr\.contact_information\?\.organization_name/);
+  assert.match(server,/currency:attr\.preferred_currency/);
+  assert.match(server,/timezone:attr\.timezone\|\|null/);
+  assert.match(server,/Klaviyo returned an invalid response\./);
+  const fetchBoundary=server.slice(server.indexOf('async function klaviyoFetch'),server.indexOf('async function resolveKlaviyoAccountIdentity'));
+  assert.doesNotMatch(fetchBoundary,/data=\{raw:text\}/);
 });
 
 test('Klaviyo account-selection server errors are redacted',()=>{
@@ -29,4 +35,10 @@ test('dashboard describes the approved Email allocation instead of estimated dai
     assert.match(html,/allocated by daily sent volume/);
     assert.doesNotMatch(html,/Estimated Monthly Spend/);
   }
+});
+
+test('legacy Klaviyo refresh cannot use the retired calendar-day spend estimate',()=>{
+  assert.doesNotMatch(server,/estimatedMonthlySpend\/30/);
+  assert.match(server,/const spend=null;/);
+  assert.match(server,/estimated_period_spend:null/);
 });

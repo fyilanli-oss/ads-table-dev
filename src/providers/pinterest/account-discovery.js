@@ -1,6 +1,10 @@
 "use strict";
 
 function text(value){return typeof value==="string"?value.trim():"";}
+function pinterestAdAccountIds(payload){
+  const rows=Array.isArray(payload?.items)?payload.items:Array.isArray(payload?.data)?payload.data:[];
+  return Object.freeze([...new Set(rows.map(row=>text(row?.id||row?.ad_account_id)).filter(Boolean))]);
+}
 function discoverPinterestAdAccounts(payload){
   const rows=Array.isArray(payload?.items)?payload.items:Array.isArray(payload?.data)?payload.data:[];
   const seen=new Set(),accounts=[];
@@ -13,4 +17,4 @@ function discoverPinterestAdAccounts(payload){
   return Object.freeze(accounts);
 }
 
-module.exports=Object.freeze({discoverPinterestAdAccounts});
+module.exports=Object.freeze({pinterestAdAccountIds,discoverPinterestAdAccounts});

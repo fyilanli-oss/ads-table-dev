@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test"),assert=require("node:assert/strict");
 const{createPinterestOAuthHandlers}=require("../src/oauth/pinterest-handlers");
-const{discoverPinterestAdAccounts}=require("../src/providers/pinterest/account-discovery");
+const{pinterestAdAccountIds,discoverPinterestAdAccounts}=require("../src/providers/pinterest/account-discovery");
 const{createPinterestClient}=require("../src/providers/pinterest/client");
 const fs=require("node:fs"),path=require("node:path"),server=fs.readFileSync(path.join(__dirname,"..","server.js"),"utf8");
 function response(){return{code:200,body:null,location:null,status(v){this.code=v;return this},send(v){this.body=v;return this},json(v){this.body=v;return this},redirect(v){this.location=v;return this}}}
@@ -15,3 +15,5 @@ test("Pinterest client renews an expired token once and never exposes provider b
 test("Pinterest client rejects HTML and redacts provider error content",async()=>{const client=createPinterestClient({apiBase:"https://api.pinterest.com/v5",clientCredentials:"credentials",saveConnection:async()=>{},getConnection:async()=>null,parseExpiry:()=>null,fetchImpl:async()=>({ok:false,status:502,text:async()=>"<html>secret upstream error</html>"})});await assert.rejects(()=>client.request({access_token:"access"},"/ad_accounts"),error=>error.message==="Pinterest request failed (502)."&&!error.message.includes("secret"))});
 test("Pinterest status and dashboard require explicit account selection",()=>{assert.match(server,/normalizePlatformAccountId\(conn\.account_id\|\|conn\.metadata\?\.selectedPlatformAccountId\)/);assert.match(server,/conn\.metadata\?\.accountSelectionRequired!==true/);for(const file of ["dashboard.html","dashboard-patch17H-fixed.html","dashboard-patch17H-fixed-v2.html"]){const html=fs.readFileSync(path.join(__dirname,"..","public",file),"utf8");assert.match(html,/id="pinterestConnectButton"/);assert.match(html,/pinterest:"pinterest_connected"/);assert.match(html,/pinterest:"\/api\/pinterest\/adaccounts"/)}});
 test("Pinterest is allowed by the OAuth transaction database constraint",()=>{const migration=fs.readFileSync(path.join(__dirname,"..","supabase","migrations","20260907213000_allow_pinterest_oauth_transactions.sql"),"utf8");assert.match(migration,/oauth_transactions_provider_check/);assert.match(migration,/['"]pinterest['"]/);assert.match(migration,/drop constraint if exists/);assert.match(migration,/add constraint oauth_transactions_provider_check/)});
+
+test("Pinterest discovery hydrates ID-only list results from the official account detail route",()=>{assert.deepEqual(pinterestAdAccountIds({items:[{id:"123"},{id:"123"},{id:"456"}]}),["123","456"]);assert.match(server,/\/ad_accounts\?include_shared_accounts=true/);assert.match(server,/\/ad_accounts\/\$\{encodeURIComponent\(id\)\}/);assert.match(server,/ids\.slice\(0,PHASE1_PLATFORM_LIMITS\.pinterest\)/)});

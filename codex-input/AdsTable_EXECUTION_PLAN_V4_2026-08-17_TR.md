@@ -1702,7 +1702,7 @@ E4; Klaviyo event/spend mapping kararları; matched platform account kuralı.
 
 `src/providers/klaviyo/mapper.js` Email/SMS channel contract'ını, Campaign Message ve Flow Message sibling branch hierarchy'sini, branch-aware deterministic key'i, Open≠Click kuralını, journey support/null semantiğini ve yalnız provider kaynaklı SMS spend sınırını tek mapper'da uygular. Email spend T6 kararı öncesinde, Organic ayrımı da T7 kararı öncesinde bilinçli olarak açılmaz. Bu noktaya gelindiğinde kullanıcı uyarılacak; T6 ve T7 kullanıcı açıklaması alınmadan uygulanmayacaktır.
 
-**Evidence:** `docs/E7_KLAVIYO_ADAPTER_T1_T5.md`, `tests/e7-klaviyo-adapter.test.js`, `src/providers/klaviyo/mapper.js`.
+**Evidence:** `docs/E7_KLAVIYO_ADAPTER.md`, `tests/e7-klaviyo-adapter.test.js`, `src/providers/klaviyo/mapper.js`.
 
 ### E7-T7 karar kaydı — GA4 Organic park
 
@@ -1712,9 +1712,9 @@ Kullanıcı UTM kurulumunun eksik veya hatalı olması paid/organic attribution'
 
 ### E7-T6 karar ve uygulama kaydı — usage-weighted maliyet
 
-Kullanıcı aylık plan/currency girişini korur; ancak bedel artık takvim günlerine eşit bölünmez. Günlük Email allocation, o günün `Sent Email` adedinin ay toplamındaki payı üzerinden hesaplanır. Açık ay değerleri `provisional`, kapanmış ay değerleri `finalized` provenance taşır. Provider actual spend bütün tahminlerden önceliklidir. Overage yalnız included send ve kullanıcıya ait sözleşmesel unit cost birlikte sağlanırsa kümülatif günlük farktan estimate edilir. SMS actual provider spend yoksa kullanıcı açıkça unit cost tanımlamadıkça spend `unsupported/null` kalır. Global/internet örnek fiyatı ve actual+estimate double count yasaktır.
+Kullanıcı aylık plan/currency girişini korur; ancak bedel artık takvim günlerine eşit bölünmez. Günlük Email allocation, o günün `Sent Email` adedinin ay toplamındaki payı üzerinden hesaplanır. Açık ay değerleri `provisional`, kapanmış ay değerleri `finalized` provenance taşır. SMS provider actual spend bütün tahminlerden önceliklidir. Overage yalnız included send ve kullanıcıya ait sözleşmesel unit cost birlikte sağlanırsa kümülatif günlük farktan estimate edilir. SMS actual provider spend yoksa kullanıcı açıkça unit cost tanımlamadıkça spend `unsupported/null` kalır. Global/internet örnek fiyatı ve actual+estimate double count yasaktır.
 
-**Evidence:** `src/providers/klaviyo/mapper.js`, `tests/e7-klaviyo-adapter.test.js`, `docs/E7_KLAVIYO_ADAPTER_T1_T5.md`.
+**Evidence:** `src/providers/klaviyo/mapper.js`, `tests/e7-klaviyo-adapter.test.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
 
 ## 12. E8 — GA4 Organic adapter
 

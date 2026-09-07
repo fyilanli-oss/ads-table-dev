@@ -17,6 +17,14 @@ test('OAuth advertiser discovery uses the official connected-token endpoint, not
   assert.doesNotMatch(route, /TIKTOK_SANDBOX_ACCESS_TOKEN|TIKTOK_TEST_ACCESS_TOKEN/);
 });
 
+test('empty OAuth discovery can expose only the explicitly configured server-side review advertiser', () => {
+  const route = server.slice(server.indexOf('app.get("/api/tiktok/advertisers"'), server.indexOf('app.get("/api/tiktok/campaigns"'));
+  assert.match(route, /productionConfig\.tiktokReviewFallbackEnabled&&TIKTOK_REVIEW_ADVERTISER_ID/);
+  assert.match(route, /reportBase:TIKTOK_SANDBOX_API_BASE,tokenSource:"server_review_access_token"/);
+  assert.doesNotMatch(route, /TIKTOK_REVIEW_ACCESS_TOKEN/);
+  assert.match(server, /useReviewBridge=Boolean\(productionConfig\.tiktokReviewFallbackEnabled&&TIKTOK_REVIEW_ACCESS_TOKEN/);
+});
+
 test('an empty account result consumes reconnect parameters before Close', () => {
   for (const file of dashboards) {
     const html = fs.readFileSync(path.join(root, file), 'utf8');

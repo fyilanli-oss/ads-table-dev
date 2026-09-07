@@ -33,14 +33,22 @@ test("boolean parsing is strict and production detection gives VERCEL_ENV preced
   assert.equal(isProductionRuntime({NODE_ENV:"production"}),true);
 });
 
-test("production rejects every unsafe review or sandbox setting without exposing values",()=>{
-  for(const key of ["GOOGLE_REVIEW_HARD_ROUTE_ENABLED","GOOGLE_TEST_CUSTOMER_ID","GOOGLE_TEST_LOGIN_CUSTOMER_ID","TIKTOK_REVIEW_FALLBACK_ENABLED","TIKTOK_REVIEW_ADVERTISER_ID","TIKTOK_REVIEW_ADVERTISER_NAME","TIKTOK_SANDBOX_ENABLED","TIKTOK_SANDBOX_ACCESS_TOKEN","TIKTOK_SANDBOX_ADVERTISER_ID","TIKTOK_SANDBOX_ADVERTISER_NAME","TIKTOK_TEST_ACCESS_TOKEN","TIKTOK_FORCE_SANDBOX_REPORTS"]){
+test("production rejects incomplete review bridge or unsafe sandbox settings without exposing values",()=>{
+  for(const key of ["GOOGLE_REVIEW_HARD_ROUTE_ENABLED","GOOGLE_TEST_CUSTOMER_ID","GOOGLE_TEST_LOGIN_CUSTOMER_ID","TIKTOK_REVIEW_ADVERTISER_ID","TIKTOK_REVIEW_ADVERTISER_NAME","TIKTOK_REVIEW_ACCESS_TOKEN","TIKTOK_SANDBOX_ENABLED","TIKTOK_SANDBOX_ACCESS_TOKEN","TIKTOK_SANDBOX_ADVERTISER_ID","TIKTOK_SANDBOX_ADVERTISER_NAME","TIKTOK_TEST_ACCESS_TOKEN","TIKTOK_FORCE_SANDBOX_REPORTS"]){
     const secret="do-not-print-this-value";
     assert.throws(
       ()=>validateProductionConfig({NODE_ENV:"production",[key]:key.endsWith("ENABLED")||key==="TIKTOK_FORCE_SANDBOX_REPORTS"?"true":secret}),
       error=>error.code==="UNSAFE_PRODUCTION_CONFIG"&&error.message.includes(key)&&!error.message.includes(secret)
     );
   }
+  assert.throws(()=>validateProductionConfig({NODE_ENV:"production",TIKTOK_REVIEW_FALLBACK_ENABLED:"true"}),error=>error.variables.join(",")==="TIKTOK_REVIEW_ACCESS_TOKEN,TIKTOK_REVIEW_ADVERTISER_ID");
+});
+
+test("production review bridge requires the explicit flag, advertiser and server-only token",()=>{
+  const env={VERCEL_ENV:"production",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_REVIEW_ADVERTISER_ID:"review-advertiser",TIKTOK_REVIEW_ACCESS_TOKEN:"server-secret"};
+  assert.equal(validateProductionConfig(env).tiktokReviewFallbackEnabled,true);
+  assert.throws(()=>validateProductionConfig({...env,TIKTOK_REVIEW_ADVERTISER_ID:""}),error=>error.variables.includes("TIKTOK_REVIEW_ADVERTISER_ID")&&!error.message.includes("server-secret"));
+  assert.throws(()=>validateProductionConfig({...env,TIKTOK_REVIEW_ACCESS_TOKEN:""}),error=>error.variables.includes("TIKTOK_REVIEW_ACCESS_TOKEN"));
 });
 
 test("unsafe production variables are reported in deterministic order",()=>{
@@ -118,7 +126,7 @@ test("non-production review modes require complete explicit configuration",()=>{
   assert.throws(()=>validateProductionConfig({NODE_ENV:"development",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true"}),/GOOGLE_TEST_CUSTOMER_ID/);
   assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true",GOOGLE_TEST_CUSTOMER_ID:"111",GOOGLE_TEST_LOGIN_CUSTOMER_ID:"222"}));
   assert.throws(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true"}),/TIKTOK_REVIEW_ADVERTISER_ID/);
-  assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_REVIEW_ADVERTISER_ID:"111"}));
+  assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_REVIEW_ADVERTISER_ID:"111",TIKTOK_REVIEW_ACCESS_TOKEN:"secret"}));
   assert.throws(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_FORCE_SANDBOX_REPORTS:"true"}),/TIKTOK_SANDBOX_ENABLED/);
   assert.throws(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true"}),/TIKTOK_SANDBOX_ACCESS_TOKEN/);
   assert.doesNotThrow(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret",TIKTOK_SANDBOX_ADVERTISER_ID:"111"}));

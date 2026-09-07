@@ -50,11 +50,11 @@ test("production quarantines legacy TikTok sandbox variables without taking down
   assert.equal(config.tiktokTestPageEnabled,false);
 });
 
-test("incomplete review configuration disables only the bridge and never the sign-in service",()=>{
-  const env={VERCEL_ENV:"production",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_REVIEW_ADVERTISER_ID:"review-advertiser",TIKTOK_REVIEW_ACCESS_TOKEN:"server-secret"};
+test("review bridge reuses the existing sandbox advertiser and token variables",()=>{
+  const env={VERCEL_ENV:"production",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_SANDBOX_ADVERTISER_ID:"review-advertiser",TIKTOK_SANDBOX_ACCESS_TOKEN:"server-secret"};
   assert.equal(validateProductionConfig(env).tiktokReviewFallbackEnabled,true);
-  assert.equal(validateProductionConfig({...env,TIKTOK_REVIEW_ADVERTISER_ID:""}).tiktokReviewFallbackEnabled,false);
-  assert.equal(validateProductionConfig({...env,TIKTOK_REVIEW_ACCESS_TOKEN:""}).tiktokReviewFallbackEnabled,false);
+  assert.equal(validateProductionConfig({...env,TIKTOK_SANDBOX_ADVERTISER_ID:""}).tiktokReviewFallbackEnabled,false);
+  assert.equal(validateProductionConfig({...env,TIKTOK_SANDBOX_ACCESS_TOKEN:""}).tiktokReviewFallbackEnabled,false);
   assert.equal(validateProductionConfig({...env,TIKTOK_REVIEW_FALLBACK_ENABLED:"false"}).tiktokReviewFallbackEnabled,false);
 });
 
@@ -133,7 +133,7 @@ test("non-production review modes require complete explicit configuration",()=>{
   assert.throws(()=>validateProductionConfig({NODE_ENV:"development",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true"}),/GOOGLE_TEST_CUSTOMER_ID/);
   assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true",GOOGLE_TEST_CUSTOMER_ID:"111",GOOGLE_TEST_LOGIN_CUSTOMER_ID:"222"}));
   assert.equal(validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true"}).tiktokReviewFallbackEnabled,false);
-  assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_REVIEW_ADVERTISER_ID:"111",TIKTOK_REVIEW_ACCESS_TOKEN:"secret"}));
+  assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_SANDBOX_ADVERTISER_ID:"111",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret"}));
   assert.throws(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_FORCE_SANDBOX_REPORTS:"true"}),/TIKTOK_SANDBOX_ENABLED/);
   assert.throws(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true"}),/TIKTOK_SANDBOX_ACCESS_TOKEN/);
   assert.doesNotThrow(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret",TIKTOK_SANDBOX_ADVERTISER_ID:"111"}));

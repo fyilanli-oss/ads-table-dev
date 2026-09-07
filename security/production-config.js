@@ -5,9 +5,6 @@ const PRODUCTION_CONFIG_VARIABLES=Object.freeze([
   "GOOGLE_TEST_CUSTOMER_ID",
   "GOOGLE_TEST_LOGIN_CUSTOMER_ID",
   "TIKTOK_FORCE_SANDBOX_REPORTS",
-  "TIKTOK_REVIEW_ADVERTISER_ID",
-  "TIKTOK_REVIEW_ADVERTISER_NAME",
-  "TIKTOK_REVIEW_ACCESS_TOKEN",
   "TIKTOK_REVIEW_FALLBACK_ENABLED",
   "TIKTOK_SANDBOX_ADVERTISER_ID",
   "TIKTOK_SANDBOX_ADVERTISER_NAME",
@@ -65,7 +62,7 @@ function createRuntimeFlags(env={}){
   const production=isProductionRuntime(env);
   const googleReviewHardRouteEnabled=parseExplicitBoolean(env.GOOGLE_REVIEW_HARD_ROUTE_ENABLED,false,"GOOGLE_REVIEW_HARD_ROUTE_ENABLED");
   const tiktokReviewFallbackRequested=parseExplicitBoolean(env.TIKTOK_REVIEW_FALLBACK_ENABLED,false,"TIKTOK_REVIEW_FALLBACK_ENABLED");
-  const tiktokReviewConfigurationReady=isPresent(env.TIKTOK_REVIEW_ADVERTISER_ID)&&isPresent(env.TIKTOK_REVIEW_ACCESS_TOKEN);
+  const tiktokReviewConfigurationReady=isPresent(env.TIKTOK_SANDBOX_ADVERTISER_ID)&&isPresent(env.TIKTOK_SANDBOX_ACCESS_TOKEN);
   const tiktokSandboxRequested=parseExplicitBoolean(env.TIKTOK_SANDBOX_ENABLED,false,"TIKTOK_SANDBOX_ENABLED");
   const tiktokForceSandboxReports=parseExplicitBoolean(env.TIKTOK_FORCE_SANDBOX_REPORTS,false,"TIKTOK_FORCE_SANDBOX_REPORTS");
   const tiktokV2ShadowEnabled=parseExplicitBoolean(env.TIKTOK_V2_SHADOW_ENABLED,false,"TIKTOK_V2_SHADOW_ENABLED");

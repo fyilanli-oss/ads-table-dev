@@ -1661,7 +1661,7 @@ E4; TikTok production reporting contract kararı.
 
 ## 11. E7 — Klaviyo adapter
 
-**Durum:** `Not started`
+**Durum:** `In progress — T1–T5 implemented; T6/T7 user decision required`
 
 ### Planlanan işler
 
@@ -1697,6 +1697,12 @@ Channel/branch bazlı flags; mevcut Email spend compatibility path korunur; otom
 ### Bağımlılıklar
 
 E4; Klaviyo event/spend mapping kararları; matched platform account kuralı.
+
+### E7 T1–T5 birleşik uygulama kaydı — 2026-09-07
+
+`src/providers/klaviyo/mapper.js` Email/SMS channel contract'ını, Campaign Message ve Flow Message sibling branch hierarchy'sini, branch-aware deterministic key'i, Open≠Click kuralını, journey support/null semantiğini ve yalnız provider kaynaklı SMS spend sınırını tek mapper'da uygular. Email spend T6 kararı öncesinde, Organic ayrımı da T7 kararı öncesinde bilinçli olarak açılmaz. Bu noktaya gelindiğinde kullanıcı uyarılacak; T6 ve T7 kullanıcı açıklaması alınmadan uygulanmayacaktır.
+
+**Evidence:** `docs/E7_KLAVIYO_ADAPTER_T1_T5.md`, `tests/e7-klaviyo-adapter.test.js`, `src/providers/klaviyo/mapper.js`.
 
 ## 12. E8 — GA4 Organic adapter
 

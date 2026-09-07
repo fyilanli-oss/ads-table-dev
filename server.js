@@ -13,7 +13,7 @@ const {registerOAuthProviderRoutes}=require("./src/oauth/provider-routes");
 const {createMetaOAuthHandlers}=require("./src/oauth/meta-handlers");
 const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
-const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
+const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");const {ORGANIC_GA4_INGEST_ENABLED,ORGANIC_GA4_PARK_REASON,requireOrganicGa4Ingest}=require("./src/providers/organic/ingest-policy");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
 const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");const {createTikTokLiveShadow}=require("./src/providers/tiktok/live-shadow");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
@@ -1297,7 +1297,7 @@ function organicGoogleOAuthClient(req){
   if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)throw new Error("Missing Google OAuth env");
   return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,organicGoogleRedirectUri(req));
 }
-const {start:handleOrganicOAuthStart,callback:handleOrganicOAuthCallback}=createOrganicOAuthHandlers({scopes:ORGANIC_GOOGLE_SCOPES,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:organicGoogleRedirectUri,createClient:organicGoogleOAuthClient,getConnection,saveConnection});
+const {start:handleOrganicOAuthStart,callback:handleOrganicOAuthCallback}=createOrganicOAuthHandlers({scopes:ORGANIC_GOOGLE_SCOPES,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:organicGoogleRedirectUri,createClient:organicGoogleOAuthClient,getConnection,saveConnection,ingestEnabled:ORGANIC_GA4_INGEST_ENABLED});
 registerOAuthProviderRoutes({app,provider:"organic",startHandler:handleOrganicOAuthStart,callbackHandler:handleOrganicOAuthCallback});
 
 // ===== ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
@@ -1351,7 +1351,7 @@ function normalizeGa4PropertySummary(accountSummary,propertySummary){
     raw:{accountSummary,propertySummary}
   };
 }
-async function listOrganicGa4Properties(userId){
+async function listOrganicGa4Properties(userId){requireOrganicGa4Ingest();
   const data=await organicGoogleFetch(userId,`${GA4_ADMIN_API_BASE}/accountSummaries?pageSize=200`);
   const accounts=Array.isArray(data.accountSummaries)?data.accountSummaries:[];
   const properties=[];
@@ -1377,7 +1377,7 @@ function pickOrganicGa4Property(input){
     raw:input
   };
 }
-async function bindOrganicGa4Property(userId,body={}){
+async function bindOrganicGa4Property(userId,body={}){requireOrganicGa4Ingest();
   const now=new Date().toISOString();
   const conn=await getConnection(userId,"organic");
   if(!conn)throw Object.assign(new Error("Organic OAuth connection is required before property binding"),{status:404});
@@ -1459,8 +1459,8 @@ async function bindOrganicGa4Property(userId,body={}){
 }
 app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
 app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
-app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,parked:true,setupStage:"parked",reason:ORGANIC_GA4_PARK_REASON,ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,parked:true,setupStage:"parked",reason:ORGANIC_GA4_PARK_REASON,ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
 
 
 // ===== ORGANIC SNAPSHOT v1 =====
@@ -1764,8 +1764,8 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,property}
     }
   };
 }
-
 async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
+  requireOrganicGa4Ingest();
   const conn=await getConnection(user.id,"organic");
   if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
   if(!conn.metadata?.configured)throw Object.assign(new Error("Organic GA4 property binding is required before snapshot"),{status:400});
@@ -1845,7 +1845,7 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
 
 async function handleOrganicSnapshotWrite(req,res){
   let job=null,stage="connection";
-  try{
+  try{requireOrganicGa4Ingest();
     const result=await requireRefreshConnection(req,res,"organic");if(!result)return;
     const {user,conn}=result;
     if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
@@ -1974,36 +1974,33 @@ async function klaviyoFetch(conn,endpoint,options={}){
       ...options,
       headers:{Authorization:`Bearer ${activeConn.access_token}`,Accept:"application/json",Revision:process.env.KLAVIYO_REVISION||"2024-10-15","Content-Type":"application/json",...(options.headers||{})}
     });
-    const text=await response.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
-    if(response.ok)return data;
+    const text=await response.text();let data=null;try{data=text?JSON.parse(text):{}}catch{}
+    if(response.ok){if(!data||typeof data!=="object")throw Object.assign(new Error("Klaviyo returned an invalid response."),{status:502,code:"KLAVIYO_INVALID_RESPONSE"});return data;}
 
     if(attempt===0&&isKlaviyoAuthenticationError(response,data)){
       activeConn=await getFreshKlaviyoConnection(activeConn,{forceRefresh:true});
       continue;
     }
 
-    const error=Object.assign(new Error(data.errors?.[0]?.detail||data.errors?.[0]?.title||data.error_description||data.error||data.message||text||`Klaviyo API error ${response.status}`),{status:response.status});
+    const providerMessage=data?.errors?.[0]?.detail||data?.errors?.[0]?.title||data?.error_description||data?.error||data?.message,error=Object.assign(new Error(providerMessage||`Klaviyo request failed (${response.status}).`),{status:response.status});
     throw error;
   }
   throw Object.assign(new Error("Klaviyo authentication failed after token refresh"),{status:401});
 }
 
 async function resolveKlaviyoAccountIdentity(conn){
-  let raw=null;
-  try{
-    raw=await klaviyoFetch(conn,"/api/accounts/");
-  }catch(e){
-    raw={error:e.message};
-  }
+  const raw=await klaviyoFetch(conn,"/api/accounts/");
   const item=Array.isArray(raw?.data)?raw.data[0]:raw?.data;
+  if(!item||typeof item!=="object")throw Object.assign(new Error("Klaviyo did not return an accessible account."),{status:502,code:"KLAVIYO_ACCOUNT_NOT_FOUND"});
   const attr=item?.attributes||{};
   const id=String(item?.id||attr.account_id||conn?.account_id||conn?.metadata?.accountId||conn?.metadata?.account_id||"").trim();
-  const fallbackId=id||`klaviyo_${String(conn?.user_id||"account").slice(0,8)}`;
+  if(!id)throw Object.assign(new Error("Klaviyo account response did not include an account id."),{status:502,code:"KLAVIYO_ACCOUNT_ID_MISSING"});
   return {
-    platform_account_id:fallbackId,
-    account_name:attr.name||attr.company_name||conn?.account_name||`Klaviyo Account ${fallbackId}`,
-    currency:conn?.metadata?.spendCurrency||conn?.metadata?.currency||null,
-    raw_account:raw
+    platform_account_id:id,
+    account_name:attr.contact_information?.organization_name||attr.name||attr.company_name||conn?.account_name||`Klaviyo Account ${id}`,
+    currency:attr.preferred_currency||conn?.metadata?.spendCurrency||conn?.metadata?.currency||null,
+    timezone:attr.timezone||null,
+    raw_account:null
   };
 }
 
@@ -2051,9 +2048,8 @@ function klaviyoCampaignSendTime(c){return c.attributes?.send_time||c.attributes
 function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}}){
   const attr=report?.attributes||report||{};
   const stats=attr.statistics||attr.stats||attr;
-  const estimatedMonthlySpend=Number(settings.estimatedMonthlySpend||0);
-  const estimatedPeriodSpend=(estimatedMonthlySpend/30)*window.selected_day_count;
-  const spend=estimatedPeriodSpend||0;
+  // This legacy report lacks T6 sent-volume inputs; never revive calendar-day estimates here.
+  const spend=null;
   const delivered=deepFindNumber(stats,["delivered","emails_delivered","DELIVERED"])??0;
   const opens=deepFindNumber(stats,["opens","open","opened","OPENED_EMAIL"])??null;
   const clicks=deepFindNumber(stats,["clicks","click","CLICKED_EMAIL"])??0;
@@ -2077,10 +2073,10 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     emails_delivered:delivered,
     clicks,
     ctr:clickRate!==null?Number(clickRate)*100:null,
-    cpc:clicks?spend/clicks:null,
+    cpc:spend!==null&&clicks?spend/clicks:null,
     spend,
-    estimated_monthly_spend:estimatedMonthlySpend,
-    estimated_period_spend:spend,
+    estimated_monthly_spend:null,
+    estimated_period_spend:null,
     selected_day_count:window.selected_day_count,
     sales,
     revenue:sales,
@@ -2093,7 +2089,7 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     site_visit:siteVisit,
     landing_page_views:siteVisit,
     traffic_score:trafficScore,
-    real_cpc:siteVisit?spend/siteVisit:null,
+    real_cpc:spend!==null&&siteVisit?spend/siteVisit:null,
     add_to_cart:addToCart,
     checkout,
     purchase:purchaseCount,
@@ -2112,7 +2108,7 @@ const {start:handleKlaviyoOAuthStart,callback:handleKlaviyoOAuthCallback}=create
 });
 registerOAuthProviderRoutes({app,provider:"klaviyo",startHandler:handleKlaviyoOAuthStart,callbackHandler:handleKlaviyoOAuthCallback});
 app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");res.json({connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),setupRequired:Boolean(conn?.metadata?.requiresSetup),estimatedMonthlySpend:conn?.metadata?.estimatedMonthlySpend||null,spendCurrency:conn?.metadata?.spendCurrency||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:e.message})}});
-app.get("/api/klaviyo/accounts",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const account=await resolveKlaviyoAccountIdentity(result.conn);res.json({platform:"klaviyo",accounts:[{platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null}]})}catch(e){res.status(e.status||500).json({error:e.message})}});
+app.get("/api/klaviyo/accounts",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const account=await resolveKlaviyoAccountIdentity(result.conn);res.json({platform:"klaviyo",accounts:[{platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null,timezone:account.timezone||null}]})}catch(e){res.status(e.status||500).json({error:e.status>=500?"Klaviyo accounts could not be loaded. Please try again.":e.message})}});
 app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/klaviyo/campaigns",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const channel=String(req.query.channel||"email");const filter=`equals(messages.channel,\'${channel}\'),greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const data=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);res.json(data)}catch(e){res.status(500).json({error:e.message})}});
 
@@ -3657,7 +3653,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic"),googleSheets=await connectionStatus(user.id,"google_sheets");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,google_sheets:googleSheets.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source,google_sheets:googleSheets.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:googleSheets.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"skeleton",label:"Organic",message:"Organic platform skeleton is available. GA4 and Search Console OAuth will be added in the next patch."}}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic"),googleSheets=await connectionStatus(user.id,"google_sheets");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:false,google_sheets:googleSheets.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:"parked",google_sheets:googleSheets.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:googleSheets.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"parked",label:"Organic",message:"GA4 Organic ingestion is parked; Paid/Organic Blend capability remains available for a future backend source."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic","google_sheets"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -4292,7 +4288,11 @@ app.post("/api/accounts/select",async(req,res)=>{
     const selectedAccounts=req.body?.accounts||req.body?.selectedAccounts||[];
     const result=await selectPlatformAccountsForLifecycle(user.id,platform,selectedAccounts);
     res.json(result);
-  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,code:e.code||null,limit:e.limit||null,activeCount:e.activeCount||null,selectedCount:e.selectedCount||null})}
+  }catch(e){
+    const status=e.status||500;
+    const safeError=status>=500?"Account selection could not be saved. Please try again.":e.message;
+    res.status(status).json({ok:false,error:safeError,code:e.code||null,limit:e.limit||null,activeCount:e.activeCount||null,selectedCount:e.selectedCount||null});
+  }
 });
 
 app.get("/api/accounts/selection-status",async(req,res)=>{
@@ -4450,7 +4450,9 @@ app.post("/api/platform/klaviyo/estimated-spend",async(req,res)=>{
       ...(conn.metadata||{}),
       estimated_monthly_spend:{
         amount,
-        currency
+        currency,
+        spend_kind:"allocated_email_plan",
+        allocation_method:"monthly_sent_volume_share"
       }
     };
 
@@ -5102,13 +5104,10 @@ async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePr
     const n=normalizeKlaviyoInsight({campaign,report,settings:conn.metadata||{},window:w});
     rows.push({platform:"Klaviyo",level:"campaign",id:String(n.campaign_id||campaign.id),id_in_platform:String(n.campaign_id||campaign.id),campaign_id:String(n.campaign_id||campaign.id),campaign_name:n.campaign_name,campaign_status:n.campaign_status,currency:n.currency||conn.metadata?.spendCurrency||null,spend:n.spend,impressions:n.impressions,reach:null,clicks:n.clicks,ctr:n.ctr,cpc:n.cpc,sales:n.sales,revenue:n.revenue,roas:n.roas,conversions:n.purchase,purchase:n.purchase,purchases:n.purchase,conversion_value:n.revenue,ad_clicks:n.opened_email||n.clicks,link_clicks:n.link_clicks,landing_page_views:n.landing_page_views||0,add_to_cart:n.add_to_cart||0,checkout:n.checkout||0,purchase_value:n.revenue,abandoned:n.abandoned,source_confidence:"klaviyo_api_or_estimated_spend",raw:n.raw});
   }
-  if(!rows.length){
-    const spend=Number(conn.metadata?.estimatedPeriodSpend||0)||0;
-    rows.push({platform:"Klaviyo",level:"campaign",id:normalized,id_in_platform:normalized,campaign_id:normalized,campaign_name:conn.account_name||`Klaviyo Account ${normalized}`,campaign_status:"empty_period_fallback",currency:conn.metadata?.spendCurrency||null,spend,impressions:0,clicks:0,ctr:null,cpc:null,sales:0,revenue:0,roas:null,conversions:0,purchase:0,purchases:0,conversion_value:0,ad_clicks:0,link_clicks:0,landing_page_views:0,add_to_cart:0,checkout:0,purchase_value:0,abandoned:0,source_confidence:"klaviyo_empty_period_fallback",raw:{fallback_reason:"no_campaign_rows_for_period"}});
-  }
   const platformBaseCurrency=rows.find(r=>r.currency)?.currency||conn.metadata?.spendCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
   const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"klaviyo",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:{campaign:rows.length,adgroup:0,ad:0},sourceConfidence:"snapshot_layer_klaviyo_v1"});
+  snapshot.performance_summary.empty_result=rows.length===0;
   return insertSnapshotAndSpread({user,platform:"klaviyo",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
 }
 
@@ -5160,7 +5159,7 @@ async function ensureConfiguredOrganicSchedules(){
   return {ok:true,count:results.length,results};
 }
 
-async function runOrganicAutoRefreshForSchedule(schedule){
+async function runOrganicAutoRefreshForSchedule(schedule){if(!ORGANIC_GA4_INGEST_ENABLED)return {ok:true,skipped:true,platform:"organic",reason:ORGANIC_GA4_PARK_REASON,schedule_id:schedule.id};
   const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",schedule.user_id).maybeSingle();
   if(userError)throw userError;
   if(!user)throw new Error("Auto refresh user not found");

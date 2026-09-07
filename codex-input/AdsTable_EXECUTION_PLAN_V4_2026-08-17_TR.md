@@ -1661,7 +1661,7 @@ E4; TikTok production reporting contract kararı.
 
 ## 11. E7 — Klaviyo adapter
 
-**Durum:** `Not started`
+**Durum:** `Verification blocked — live legacy path still bypasses T6/T8 runtime`
 
 ### Planlanan işler
 
@@ -1672,9 +1672,9 @@ E4; TikTok production reporting contract kararı.
 - **E7-T3B:** Campaign/Flow ve Email/SMS sonuçlarını aynı yedi bloklu envelope'a normalize et; ayrımı entity/channel değerleriyle taşı.
 - **E7-T4:** Open≠Click düzeltmesi ve journey count/value support.
 - **E7-T5:** SMS provider spend; unsupported ise `null`, uydurma `0` yok.
-- **E7-T6:** Email estimated/manual spend fallback ve provenance.
-- **E7-T7:** Klaviyo Organic'i GA4 platform-level olarak ayır.
-- **E7-T8:** Time/FX/V2, dual-write ve channel-branch parity.
+- **E7-T6:** `Verification blocked` — contract hazır; live refresh hâlâ eski 30-gün dağıtım yolunda.
+- **E7-T7:** `Done/Parked` — UTM güvenilirliği nedeniyle GA4 Organic ingestion kapalı; Blend capability korunur.
+- **E7-T8:** `Verification blocked` — runtime sınırları hazır; production composition ve live evidence yok.
 
 ### Kabul kriterleri
 
@@ -1698,9 +1698,41 @@ Channel/branch bazlı flags; mevcut Email spend compatibility path korunur; otom
 
 E4; Klaviyo event/spend mapping kararları; matched platform account kuralı.
 
+### E7 T1–T5 birleşik uygulama kaydı — 2026-09-07
+
+`src/providers/klaviyo/mapper.js` Email/SMS channel contract'ını, Campaign Message ve Flow Message sibling branch hierarchy'sini, branch-aware deterministic key'i, Open≠Click kuralını, journey support/null semantiğini ve yalnız provider kaynaklı SMS spend sınırını tek mapper'da uygular. Email spend T6 kararı öncesinde, Organic ayrımı da T7 kararı öncesinde bilinçli olarak açılmaz. Bu noktaya gelindiğinde kullanıcı uyarılacak; T6 ve T7 kullanıcı açıklaması alınmadan uygulanmayacaktır.
+
+**Evidence:** `docs/E7_KLAVIYO_ADAPTER.md`, `tests/e7-klaviyo-adapter.test.js`, `src/providers/klaviyo/mapper.js`.
+
+### E7-T7 karar kaydı — GA4 Organic park
+
+Kullanıcı UTM kurulumunun eksik veya hatalı olması paid/organic attribution'ı güvenilmez kıldığı için GA4 Organic ingest'ten vazgeçildi. OAuth başlangıç/callback, GA4 property discovery/binding, manual snapshot ve automation sabit fail-closed politika ile park edildi; environment flag ile açılamaz. Mevcut connection/snapshot kayıtları destructive biçimde silinmez. `PAID`, `ORGANIC` ve `BLEND` analysis scope ile aggregate/formula capability korunur; ileride güvenilir backend attribution kaynağı kararı bu capability'yi yeniden besleyebilir.
+
+**Evidence:** `src/providers/organic/ingest-policy.js`, `tests/e7-t7-organic-park.test.js`, `src/oauth/organic-handlers.js`, `server.js`.
+
+### E7-T6 karar ve contract kaydı — usage-weighted maliyet
+
+Kullanıcı aylık plan/currency girişini korur; ancak bedel artık takvim günlerine eşit bölünmez. Günlük Email allocation, o günün `Sent Email` adedinin ay toplamındaki payı üzerinden hesaplanır. Açık ay değerleri `provisional`, kapanmış ay değerleri `finalized` provenance taşır. SMS provider actual spend bütün tahminlerden önceliklidir. Overage yalnız included send ve kullanıcıya ait sözleşmesel unit cost birlikte sağlanırsa kümülatif günlük farktan estimate edilir. SMS actual provider spend yoksa kullanıcı açıkça unit cost tanımlamadıkça spend `unsupported/null` kalır. Global/internet örnek fiyatı ve actual+estimate double count yasaktır.
+
+Bu formül canonical mapper ve unit test düzeyinde uygulanmıştır. 2026-09-07 canlı denetimi, production refresh'in hâlâ `normalizeKlaviyoInsight` içindeki eski `estimatedMonthlySpend / 30` yolunu kullandığını ve yeni `estimated_monthly_spend` kaydını okumadığını göstermiştir. Bu nedenle T6 production wiring tamamlanmış sayılmaz; kullanıcı arayüzünün yeniden adlandırılması tek başına kabul kanıtı değildir.
+
+**Evidence:** `src/providers/klaviyo/mapper.js`, `tests/e7-klaviyo-adapter.test.js`, `server.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
+
+### E7 canlı corrective kapısı — account selection / spend ekranı / empty refresh
+
+2026-09-07 production denetiminde account selection'ın ilk Save çağrısı Supabase `522` HTML gövdesini modalda gösterdi, tekrar Save ise hesabı başarıyla kaydetti. Aynı denetimde eski `Estimated Monthly Spend` ekranının T6 sonrası yanlış adla kaldığı ve hatasız boş refresh'in `klaviyo_empty_period_fallback` adlı sentetik Campaign satırı ürettiği doğrulandı. Corrective sınır: upstream HTML hiçbir kullanıcı/evidence/metadata yüzeyine taşınmaz; account discovery sentetik ID üretmez; form `Email Monthly Plan Cost` ve allocated provenance ile sunulur; boş provider sonucu `rows=[] / empty_result=true` olur. Bu corrective doğrulanmadan E9 başlamaz.
+
+Canlı kayıt denetimi ayrıca son manual job'ın `completed` olduğunu fakat snapshot'ın tek `empty_period_fallback` satırı taşıdığını ve Klaviyo V2 tablosunda hiç satır bulunmadığını doğruladı. Bu, hatasız refresh'in yeni E7 runtime/parity akışından geçtiğini kanıtlamaz; yalnız eski snapshot yolunun hatasız tamamlandığını gösterir. E7-T8 modülü `server.js` production composition'ına bağlanmadan ve gerçek/boş provider sonucu aynı sınırda gözlenmeden E7 code-complete olarak kapatılamaz.
+
+### E7-T8 birleşik runtime kapanış kaydı
+
+Account identity/timezone/provider date doğrulaması, ortak FX normalization, tek Dataset V2 write boundary, Campaign/Flow + Email/SMS duplicate koruması, zero-row no-fake-write, exact branch/channel/fact/support parity ve legacy-authoritative shadow failure isolation `src/providers/klaviyo/runtime.js` içinde tamamlandı. Production primary activation yapılmaz. E7 için yeni alt paket açılmaz; gerçek provider message/report DTO'su ile live evidence alınana kadar mevcut legacy Klaviyo snapshot otoritesi korunur.
+
+**Evidence:** `src/providers/klaviyo/runtime.js`, `tests/e7-t8-klaviyo-runtime.test.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
+
 ## 12. E8 — GA4 Organic adapter
 
-**Durum:** `Not started`
+**Durum:** `Parked — GA4 Organic ingestion is not an active delivery dependency; Blend capability is retained`
 
 ### Planlanan işler
 

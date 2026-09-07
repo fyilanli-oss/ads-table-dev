@@ -19,8 +19,9 @@ function evaluateTikTokDeliveryParity({legacyRows,v2Rows}={}){
   for(const row of v2Rows){validateCanonicalRow(row);validateEntityHierarchy(row.identity,row.entity);if(row.identity.platform!=='tiktok'||row.entity.entity_type!=='ad')throw new Error('Parity accepts only canonical TikTok Ad rows');const id=row.entity.entity_id;if(canonical.has(id))throw new Error('Duplicate canonical TikTok Ad row');syntheticOk=syntheticOk&&row.provenance.synthetic===false;eventsOk=eventsOk&&eventPolicy(row);canonical.set(id,Object.freeze({impressions:number(row.raw_metrics.impression,'raw_metrics.impression'),clicks:number(row.raw_metrics.ad_click,'raw_metrics.ad_click'),spend:number(row.raw_metrics.spend_value,'raw_metrics.spend_value')}));}
   const entitySetMatch=legacy.size===canonical.size&&[...legacy.keys()].every(id=>canonical.has(id));
   const deliveryFactsMatch=entitySetMatch&&[...legacy].every(([id,left])=>{const right=canonical.get(id);return close(left.impressions,right.impressions)&&close(left.clicks,right.clicks)&&close(left.spend,right.spend);});
-  const passed=entitySetMatch&&deliveryFactsMatch&&eventsOk&&syntheticOk;
-  return Object.freeze({evidence_version:'e6-tiktok-delivery-parity-v1',status:passed?'PASS':'FAIL',legacy_ad_rows:legacy.size,v2_ad_rows:canonical.size,isolated_legacy_synthetic_rows:isolated,entity_set_match:entitySetMatch,delivery_facts_match:deliveryFactsMatch,event_policy_match:eventsOk,synthetic_policy_match:syntheticOk,synthetic_written_to_canonical:syntheticOk?0:1});
+  const nonEmptyEvidence=legacy.size>0&&canonical.size>0;
+  const passed=nonEmptyEvidence&&entitySetMatch&&deliveryFactsMatch&&eventsOk&&syntheticOk;
+  return Object.freeze({evidence_version:'e6-tiktok-delivery-parity-v1',status:passed?'PASS':'FAIL',legacy_ad_rows:legacy.size,v2_ad_rows:canonical.size,non_empty_evidence:nonEmptyEvidence,isolated_legacy_synthetic_rows:isolated,entity_set_match:entitySetMatch,delivery_facts_match:deliveryFactsMatch,event_policy_match:eventsOk,synthetic_policy_match:syntheticOk,synthetic_written_to_canonical:syntheticOk?0:1});
 }
 
 function assertTikTokDeliveryParity(input){const evidence=evaluateTikTokDeliveryParity(input);if(evidence.status!=='PASS'){const error=new Error('TikTok delivery parity failed');Object.defineProperty(error,'parity_evidence',{value:evidence,enumerable:false});throw error;}return evidence;}

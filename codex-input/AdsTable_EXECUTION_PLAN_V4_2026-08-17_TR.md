@@ -1632,7 +1632,11 @@ Flag, token ve advertiser ID üçlüsü eksikse yalnız review bridge fail-close
 
 **Evidence:** `docs/E6_T6D2_TIKTOK_REVIEW_BRIDGE.md`, `docs/E6_T6D2_TIKTOK_LIVE_SHADOW.md`, `server.js`, `security/production-config.js`, `tests/e6-t2-tiktok-account-selection.test.js`, `tests/production-config.test.js`, `tests/e6-t6d2-tiktok-live-shadow.test.js`.
 
-**Durum:** `Implementation / live evidence pending` — review bridge kodu ve fail-closed testleri hazırdır; merge, Production env/redeploy, account selection ve üç live shadow `PASS` henüz tamamlanmamıştır. Bu çalışma yeni bir E6 paketi değildir; mevcut E6-T6D2'nin doğrulanmış production account-selection engelini giderir. Sonraki ve tek kalan paket E6-T6D3 primary activation/rollback kararıdır.
+**E6 kapanış sadeleştirmesi (2026-09-07):** Review advertiser discovery ve manual refresh production üzerinde doğrulandı. İlk live koşu teknik olarak tamamlandı fakat campaign/adgroup raporları boş, Ad raporu TikTok `40100` QPS limitli ve legacy sonuç üç sentetik fallback entity idi; canonical V2'ye sentetik satır yazılmadı. Bu nedenle zero-to-zero parity artık `PASS` sayılmaz. Report level çağrıları 1 QPS sınırına göre en az 1100 ms aralıklı çalışır, `40100`/429 bounded backoff ile en çok üç kez denenir ve devam eden provider hatası refresh'i fail eder. Geçerli empty response doğrudan `rows: []` kalır; sahte Campaign/AdGroup/Ad üretilmez ve ham provider payload snapshot'a persist edilmez.
+
+**Kapanış sınırı:** Test/review hesabından delivery verisi beklenmez; bu ortam auth, advertiser erişimi, empty-result semantiği ve sentetik-write izolasyonunu kanıtlar. Yeni E6 modülü veya alt paketi açılmayacaktır. Kod akışı bu sadeleştirme ile kapanır. Geriye yalnız gerçek delivery verili normal advertiser üzerinde, her iki tarafta en az bir gerçek Ad satırı içeren üç ardışık shadow `PASS` ve ayrı primary activation/rollback insan kararı kalır; bu operasyonel kanıt oluşana kadar `production_activation=false` korunur.
+
+**Durum:** `Code complete / non-empty production evidence pending` — account selection ve empty-result güvenliği tamamlandı; test hesabında veri oluşmasını beklemek E6 işi değildir.
 
 ### Kabul kriterleri
 

@@ -8,6 +8,8 @@ Shadow kaynak veriyi ikinci kez tahminî bir TikTok sorgusuyla üretmez. Legacy 
 
 ## Evidence ve tamamlanma sınırı
 
-Her refresh cevabı ve snapshot job metadata'sı redacted `tiktok_shadow_evidence` taşır. `production_activation` daima `false` kalır. T6D2'nin live evidence kısmı, deploy edilen runtime'da en az üç ardışık `PASS` görülmeden tamamlanmış sayılmaz.
+Her refresh cevabı ve snapshot job metadata'sı redacted `tiktok_shadow_evidence` taşır. `production_activation` daima `false` kalır. Zero-row ile zero-row eşleşmesi `PASS` değildir: live evidence sayılabilmesi için iki tarafta da en az bir gerçek Ad satırı bulunmalıdır. Production API üzerinde gerçek delivery verisi oluşana kadar test/review hesabının görevi yalnız auth, advertiser erişimi, geçerli empty-result ve sentetik-write izolasyonunu doğrulamaktır.
 
-Bu değişiklik E6'nın sondan bir önceki paketidir. Kalan tek paket E6-T6D3'tür: üç live PASS incelendikten sonra ayrı primary activation/rollback kararı.
+Report seviyeleri TikTok'un 1 QPS review limitine uygun biçimde en az 1100 ms aralıkla okunur. Provider `40100` veya HTTP 429 döndürürse bounded backoff ile en çok üç deneme yapılır; limit devam ederse refresh fail olur. Başarılı boş response `rows: []` olarak korunur, sahte Campaign/AdGroup/Ad fallback entity üretilmez ve ham provider response snapshot'a yazılmaz.
+
+Bu değişiklikten sonra yeni E6 alt paketi açılmaz. Kod akışı kapanmıştır; kalan tek operasyonel kapı, gerçek delivery verili normal advertiser üzerinde üç ardışık non-empty shadow `PASS` ve ayrı primary activation/rollback kararıdır.

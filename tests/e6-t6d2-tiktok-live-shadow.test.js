@@ -24,3 +24,9 @@ test('server registration is explicit flag-gated and reports shadow evidence wit
   const server=fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');const config=fs.readFileSync(path.join(__dirname,'..','security','production-config.js'),'utf8');
   assert.match(config,/TIKTOK_V2_SHADOW_ENABLED/);assert.match(server,/productionConfig\.tiktokV2ShadowEnabled\?createTikTokLiveShadow/);assert.match(server,/tiktok_shadow:shadowEvidence/);assert.doesNotMatch(server,/TIKTOK_V2_PRIMARY_REFRESH_ENABLED/);
 });
+
+test('live refresh throttles report levels, retries provider QPS responses and never creates empty fallback entities',()=>{
+  const server=fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
+  assert.match(server,/providerCode===40100\|\|r\.status===429/);assert.match(server,/setTimeout\(resolve,1100\*attempt\)/);assert.match(server,/1100-\(Date\.now\(\)-previousRequestStartedAt\)/);
+  assert.match(server,/empty_result:rows\.length===0/);assert.doesNotMatch(server,/const shouldCreateFallbackRows=/);assert.doesNotMatch(server,/snapshot\.performance_summary\.raw_report=fetched\.raw/);
+});

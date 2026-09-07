@@ -1661,7 +1661,7 @@ E4; TikTok production reporting contract kararı.
 
 ## 11. E7 — Klaviyo adapter
 
-**Durum:** `In progress — T1–T5 implemented; T6/T7 user decision required`
+**Durum:** `In progress — T1–T5 implemented; T7 parked; T6 user decision required`
 
 ### Planlanan işler
 
@@ -1712,7 +1712,7 @@ Kullanıcı UTM kurulumunun eksik veya hatalı olması paid/organic attribution'
 
 ## 12. E8 — GA4 Organic adapter
 
-**Durum:** `Not started`
+**Durum:** `Parked — GA4 Organic ingestion is not an active delivery dependency; Blend capability is retained`
 
 ### Planlanan işler
 

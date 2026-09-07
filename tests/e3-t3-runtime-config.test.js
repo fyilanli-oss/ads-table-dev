@@ -75,14 +75,13 @@ test("does not expose mutable security config through the runtime boundary", () 
   assert.equal(Object.isFrozen(config.production), true);
 });
 
-test("preserves the existing production security validator", () => {
-  assert.throws(
-    () =>
-      loadRuntimeConfig({
-        env: { NODE_ENV: "production", TIKTOK_SANDBOX_ENABLED: "true" },
-        rootDirectory,
-        logger: { error() {} },
-      }),
-    (error) => error && error.code === "UNSAFE_PRODUCTION_CONFIG",
-  );
+test("quarantines optional TikTok sandbox config without taking down runtime", () => {
+  const config = loadRuntimeConfig({
+    env: { NODE_ENV: "production", TIKTOK_SANDBOX_ENABLED: "true" },
+    rootDirectory,
+    logger: { error() {} },
+  });
+  assert.equal(config.production.production, true);
+  assert.equal(config.production.tiktokSandboxEnabled, false);
+  assert.equal(config.production.tiktokTestPageEnabled, false);
 });

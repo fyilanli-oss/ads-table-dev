@@ -33,3 +33,7 @@ OAuth callback'i tamamlandı ve Pinterest connection kaydı oluştu; dolayısıy
 ## ID-only list yanıtı ve detay zenginleştirmesi
 
 Resmi V5 OpenAPI sözleşmesinde `GET /ad_accounts` içindeki `AdAccount` nesnesinde yalnız `id` zorunludur; `name`, `currency` ve `time_zone` opsiyoneldir. Bu nedenle liste yanıtını tam hesap profili varsaymak hatalıdır. Runtime artık önce erişilebilir gerçek ID'leri alır, Paket 1 hesap limiti içinde her ID için resmi `GET /ad_accounts/{ad_account_id}` detay çağrısını yapar ve yalnız detay cevabı identity/currency/timezone sözleşmesini tamamlayan hesapları seçime sunar. İsim, para birimi veya timezone uydurulmaz.
+
+## 2026-09-07 ürün kararı — Parked
+
+Kullanıcı kararıyla Pinterest çalışması durduruldu. Yeni OAuth başlangıcı `PINTEREST_INTEGRATION_PARKED` ile kapanır, callback token değişimi veya connection yazımı yapmaz ve dashboard Pinterest'i `Parked` olarak gösterir. Mevcut connection, encrypted token, ownership veya tarihsel snapshot kayıtları bu değişiklikle silinmez. Paket 2–3 başlatılmaz; yeniden açma ancak ayrı bir kullanıcı iş kararıyla mümkündür.

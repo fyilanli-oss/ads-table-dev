@@ -1989,21 +1989,17 @@ async function klaviyoFetch(conn,endpoint,options={}){
 }
 
 async function resolveKlaviyoAccountIdentity(conn){
-  let raw=null;
-  try{
-    raw=await klaviyoFetch(conn,"/api/accounts/");
-  }catch(e){
-    raw={error:e.message};
-  }
+  const raw=await klaviyoFetch(conn,"/api/accounts/");
   const item=Array.isArray(raw?.data)?raw.data[0]:raw?.data;
+  if(!item||typeof item!=="object")throw Object.assign(new Error("Klaviyo did not return an accessible account."),{status:502,code:"KLAVIYO_ACCOUNT_NOT_FOUND"});
   const attr=item?.attributes||{};
   const id=String(item?.id||attr.account_id||conn?.account_id||conn?.metadata?.accountId||conn?.metadata?.account_id||"").trim();
-  const fallbackId=id||`klaviyo_${String(conn?.user_id||"account").slice(0,8)}`;
+  if(!id)throw Object.assign(new Error("Klaviyo account response did not include an account id."),{status:502,code:"KLAVIYO_ACCOUNT_ID_MISSING"});
   return {
-    platform_account_id:fallbackId,
-    account_name:attr.name||attr.company_name||conn?.account_name||`Klaviyo Account ${fallbackId}`,
+    platform_account_id:id,
+    account_name:attr.name||attr.company_name||conn?.account_name||`Klaviyo Account ${id}`,
     currency:conn?.metadata?.spendCurrency||conn?.metadata?.currency||null,
-    raw_account:raw
+    raw_account:null
   };
 }
 
@@ -4292,7 +4288,11 @@ app.post("/api/accounts/select",async(req,res)=>{
     const selectedAccounts=req.body?.accounts||req.body?.selectedAccounts||[];
     const result=await selectPlatformAccountsForLifecycle(user.id,platform,selectedAccounts);
     res.json(result);
-  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,code:e.code||null,limit:e.limit||null,activeCount:e.activeCount||null,selectedCount:e.selectedCount||null})}
+  }catch(e){
+    const status=e.status||500;
+    const safeError=status>=500?"Account selection could not be saved. Please try again.":e.message;
+    res.status(status).json({ok:false,error:safeError,code:e.code||null,limit:e.limit||null,activeCount:e.activeCount||null,selectedCount:e.selectedCount||null});
+  }
 });
 
 app.get("/api/accounts/selection-status",async(req,res)=>{
@@ -4450,7 +4450,9 @@ app.post("/api/platform/klaviyo/estimated-spend",async(req,res)=>{
       ...(conn.metadata||{}),
       estimated_monthly_spend:{
         amount,
-        currency
+        currency,
+        spend_kind:"allocated_email_plan",
+        allocation_method:"monthly_sent_volume_share"
       }
     };
 
@@ -5102,13 +5104,10 @@ async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePr
     const n=normalizeKlaviyoInsight({campaign,report,settings:conn.metadata||{},window:w});
     rows.push({platform:"Klaviyo",level:"campaign",id:String(n.campaign_id||campaign.id),id_in_platform:String(n.campaign_id||campaign.id),campaign_id:String(n.campaign_id||campaign.id),campaign_name:n.campaign_name,campaign_status:n.campaign_status,currency:n.currency||conn.metadata?.spendCurrency||null,spend:n.spend,impressions:n.impressions,reach:null,clicks:n.clicks,ctr:n.ctr,cpc:n.cpc,sales:n.sales,revenue:n.revenue,roas:n.roas,conversions:n.purchase,purchase:n.purchase,purchases:n.purchase,conversion_value:n.revenue,ad_clicks:n.opened_email||n.clicks,link_clicks:n.link_clicks,landing_page_views:n.landing_page_views||0,add_to_cart:n.add_to_cart||0,checkout:n.checkout||0,purchase_value:n.revenue,abandoned:n.abandoned,source_confidence:"klaviyo_api_or_estimated_spend",raw:n.raw});
   }
-  if(!rows.length){
-    const spend=Number(conn.metadata?.estimatedPeriodSpend||0)||0;
-    rows.push({platform:"Klaviyo",level:"campaign",id:normalized,id_in_platform:normalized,campaign_id:normalized,campaign_name:conn.account_name||`Klaviyo Account ${normalized}`,campaign_status:"empty_period_fallback",currency:conn.metadata?.spendCurrency||null,spend,impressions:0,clicks:0,ctr:null,cpc:null,sales:0,revenue:0,roas:null,conversions:0,purchase:0,purchases:0,conversion_value:0,ad_clicks:0,link_clicks:0,landing_page_views:0,add_to_cart:0,checkout:0,purchase_value:0,abandoned:0,source_confidence:"klaviyo_empty_period_fallback",raw:{fallback_reason:"no_campaign_rows_for_period"}});
-  }
   const platformBaseCurrency=rows.find(r=>r.currency)?.currency||conn.metadata?.spendCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
   const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"klaviyo",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:{campaign:rows.length,adgroup:0,ad:0},sourceConfidence:"snapshot_layer_klaviyo_v1"});
+  snapshot.performance_summary.empty_result=rows.length===0;
   return insertSnapshotAndSpread({user,platform:"klaviyo",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
 }
 

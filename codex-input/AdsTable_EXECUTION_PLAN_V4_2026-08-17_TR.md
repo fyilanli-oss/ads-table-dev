@@ -1716,6 +1716,10 @@ Kullanıcı aylık plan/currency girişini korur; ancak bedel artık takvim gün
 
 **Evidence:** `src/providers/klaviyo/mapper.js`, `tests/e7-klaviyo-adapter.test.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
 
+### E7 canlı corrective kapısı — account selection / spend ekranı / empty refresh
+
+2026-09-07 production denetiminde account selection'ın ilk Save çağrısı Supabase `522` HTML gövdesini modalda gösterdi, tekrar Save ise hesabı başarıyla kaydetti. Aynı denetimde eski `Estimated Monthly Spend` ekranının T6 sonrası yanlış adla kaldığı ve hatasız boş refresh'in `klaviyo_empty_period_fallback` adlı sentetik Campaign satırı ürettiği doğrulandı. Corrective sınır: upstream HTML hiçbir kullanıcı/evidence/metadata yüzeyine taşınmaz; account discovery sentetik ID üretmez; form `Email Monthly Plan Cost` ve allocated provenance ile sunulur; boş provider sonucu `rows=[] / empty_result=true` olur. Bu corrective doğrulanmadan E9 başlamaz.
+
 ### E7-T8 birleşik runtime kapanış kaydı
 
 Account identity/timezone/provider date doğrulaması, ortak FX normalization, tek Dataset V2 write boundary, Campaign/Flow + Email/SMS duplicate koruması, zero-row no-fake-write, exact branch/channel/fact/support parity ve legacy-authoritative shadow failure isolation `src/providers/klaviyo/runtime.js` içinde tamamlandı. Production primary activation yapılmaz. E7 için yeni alt paket açılmaz; gerçek provider message/report DTO'su ile live evidence alınana kadar mevcut legacy Klaviyo snapshot otoritesi korunur.

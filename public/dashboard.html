@@ -3562,7 +3562,7 @@ body.account-mode .accountSettingsView{
 
 
 <style id="modal-family-alignment-final">
-/* Shared light blocking layer: same visual language as Currency / Estimated Monthly Spend */
+/* Shared light blocking layer: same visual language as Currency / Email Monthly Plan Cost */
 #connectModalOverlay.open,
 .adsOperationOverlay.open{
   background:rgba(244,244,244,.76) !important;
@@ -7823,8 +7823,8 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
 <!-- D.2B.1 KLAVIYO ESTIMATED MONTHLY SPEND MODAL -->
 <div id="klaviyoSpendOverlay" class="klaviyoSpendOverlay" aria-hidden="true">
   <div class="klaviyoSpendModal" role="dialog" aria-modal="true" aria-labelledby="klaviyoSpendTitle">
-    <div id="klaviyoSpendTitle" class="klaviyoSpendTitle">Estimated Monthly Spend</div>
-    <div class="klaviyoSpendText">Enter your estimated monthly Klaviyo spend.</div>
+    <div id="klaviyoSpendTitle" class="klaviyoSpendTitle">Email Monthly Plan Cost</div>
+    <div class="klaviyoSpendText">Enter your monthly Klaviyo Email plan cost. It will be allocated by daily sent volume, not treated as a provider-billed daily charge.</div>
     <div class="klaviyoSpendRow">
       <select id="klaviyoSpendCurrency" class="klaviyoSpendSelect">
         <option value="" selected>Currency</option>
@@ -8492,7 +8492,7 @@ body:not(.account-mode):not(.help-mode):not(.ai-mode) .filters .filter:nth-child
       setAccountSpendFields(data.estimated_monthly_spend);
 
       // D.2B.1 FIX:
-      // Do not open Estimated Monthly Spend modal on generic dashboard load.
+      // Do not open Email Monthly Plan Cost modal on generic dashboard load.
       // The modal is opened only after a Klaviyo connect-success signal or explicit Klaviyo check.
       if(shouldPromptForKlaviyoSpend() && data.state==="CONNECTED" && !data.estimated_monthly_spend){
         sessionStorage.removeItem("klaviyo_spend_after_account_selection");

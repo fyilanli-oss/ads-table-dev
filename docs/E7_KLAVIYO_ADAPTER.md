@@ -21,3 +21,11 @@ GA4 Organic attribution kullanıcı UTM kalitesine bağımlı olduğu ve yanlı�
 ## T8 — Time/FX, Dataset V2 ve parity
 
 Account identity, IANA timezone ve provider business date tek normalization sınırında doğrulanır. Bütün supported monetary facts ortak FX service ile tam bir kez çevrilir; unsupported/unknown değerler `null` kalır. Campaign/Flow ve Email/SMS aynı canonical writer'dan geçer, business-date + entity key duplicate'ı reddedilir ve zero-row boş write olarak korunur. Shadow akışı legacy sonucu otoriter tutar, V2 hatasını güvenli aşama koduyla izole eder ve production activation yapmaz. Parity ancak non-empty entity set, branch/channel, metric support ve raw fact'ler birebir eşleşirse `PASS` olur.
+
+## 2026-09-07 canlı bağlantı ve refresh denetimi
+
+Kullanıcı ekranı ve production kayıtları birlikte incelendi. Account selection sırasındaki ilk Save denemesi, Supabase'in geçici `522 Connection timed out` HTML cevabını kullanıcıya ham olarak gösterdi; ikinci deneme kalıcı hesabı başarıyla seçti. Provider veya persistence HTML gövdeleri bundan sonra kullanıcıya ya da account metadata'sına taşınmaz. Klaviyo account discovery başarısızsa sentetik account ID üretmek yerine güvenli ve tekrar denenebilir bir hata verir.
+
+T6 onayından önce kalan `Estimated Monthly Spend` metni yanıltıcıydı. Alan, mevcut uyumluluk endpoint'i korunarak `Email Monthly Plan Cost` olarak adlandırılır ve kayıt `allocated_email_plan / monthly_sent_volume_share` provenance'ı taşır. Bu değer provider'ın gerçek günlük faturası değildir.
+
+Son production refresh job'ı hatasız tamamlanmış olsa da provider campaign satırı dönmedi. Legacy writer bu durumda bir adet `klaviyo_empty_period_fallback` Campaign satırı ve ölçülmüş gibi görünen sıfırlar üretmişti. Bu davranış canonical null/zero sözleşmesiyle çeliştiği için kaldırıldı: geçerli boş provider sonucu `rows=[]`, `empty_result=true` olarak saklanır; sentetik Campaign veya sıfır performans üretilmez. Bu düzeltmeler doğrulanmadan E9 başlatılmaz.

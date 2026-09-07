@@ -8,7 +8,7 @@ const baseline = { server: { max_lines: 2, max_named_functions: 0, max_async_fun
 test("repository satisfies the frozen E3 architecture baseline", () => {
   const result = runArchitectureGuard();
   assert.equal(result.ok, true, result.violations.join(","));
-  assert.deepEqual(result.actual, { lines: 5261, named_functions: 237, async_functions: 83, route_registrations: 89 });
+  assert.deepEqual(result.actual, { lines: 5260, named_functions: 237, async_functions: 83, route_registrations: 89 });
 });
 
 test("rejects root server growth for every guarded responsibility metric", () => {

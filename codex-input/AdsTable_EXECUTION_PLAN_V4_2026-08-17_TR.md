@@ -1779,6 +1779,8 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 
 **Evidence:** `src/oauth/pinterest-handlers.js`, `src/providers/pinterest/account-discovery.js`, `tests/pinterest-package-1.test.js`, `docs/PINTEREST_PACKAGE_1_ACCOUNT_ACCESS.md`.
 
+2026-09-08 ilk production Connect denemesi OAuth transaction oluşmadan `OAuth could not be started` mesajıyla durdu. Bu, provider çağrısından önce production OAuth config kapısında durulduğunu doğrular. Corrective olarak start/readiness cevabı artık secret değerleri göstermeden eksik environment adlarını açıkça bildirir; yeni tahminî provider değişikliği yapılmaz. Production ayarı okunup tamamlanmadan Paket 1 kabulü verilmez.
+
 ## 13. E9 — Backfill ve data readiness
 
 **Durum:** `Not started`

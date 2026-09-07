@@ -4661,11 +4661,20 @@ async function tiktokApiFetch({base=TIKTOK_API_BASE,endpoint,token,headers={},pa
     if(v===undefined||v===null||v==="")continue;
     url.searchParams.set(k,Array.isArray(v)||typeof v==="object"?JSON.stringify(v):String(v));
   }
-  const r=await fetch(url,{headers:{...headers}});
-  const text=await r.text();
-  let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
-  if(!r.ok)throw new Error(data.message||data.error?.message||text||`TikTok API error ${r.status}`);
-  return data;
+  const maxAttempts=3;
+  for(let attempt=1;attempt<=maxAttempts;attempt+=1){
+    const r=await fetch(url,{headers:{...headers}});
+    const text=await r.text();
+    let data,parsed=true;try{data=text?JSON.parse(text):{}}catch{parsed=false;data={}}
+    const providerCode=Number(data?.code??0);
+    const qpsLimited=providerCode===40100||r.status===429;
+    if(r.ok&&parsed&&(data?.code===undefined||providerCode===0))return data;
+    if(qpsLimited&&attempt<maxAttempts){await new Promise(resolve=>setTimeout(resolve,1100*attempt));continue;}
+    const error=new Error(data.message||data.error?.message||(parsed?`TikTok API error ${r.status}`:'TikTok API returned malformed JSON'));
+    error.status=qpsLimited?429:(r.ok?502:r.status);
+    error.safe_stage="provider_fetch";
+    throw error;
+  }
 }
 
 async function bootstrapTikTokFromReport(userId,conn,advertiserId,context={}){
@@ -4971,38 +4980,19 @@ async function fetchTikTokSnapshotRows(conn,platformAccountId,datePreset){
   const w=tiktokDateWindow(datePreset||"today");
   const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
   const levels=["campaign","adgroup","ad"];
-  const result={rows:[],raw:{},counts:{campaign:0,adgroup:0,ad:0},tokenSource:useReviewBridge?"server_review_access_token":(useSandbox?"manual_sandbox_access_token":"platform_connections.access_token"),base};
+  const result={rows:[],reportEvidence:{},counts:{campaign:0,adgroup:0,ad:0},tokenSource:useReviewBridge?"server_review_access_token":(useSandbox?"manual_sandbox_access_token":"platform_connections.access_token"),base};
+  let previousRequestStartedAt=0;
   for(const level of levels){
+    const waitMs=Math.max(0,1100-(Date.now()-previousRequestStartedAt));
+    if(waitMs)await new Promise(resolve=>setTimeout(resolve,waitMs));
+    previousRequestStartedAt=Date.now();
     const levelInfo=resolveTikTokReportLevel(level);
     const data=await tiktokApiFetch({base,endpoint,headers,params:{report_type:"BASIC",data_level:levelInfo.dataLevel,advertiser_id:platformAccountId,start_date:w.start,end_date:w.end,dimensions:[levelInfo.dimension],metrics,page:1,page_size:100}});
     const normalized=normalizeTikTokRows(data,levelInfo.level);
     const rows=normalized.map(r=>tiktokSnapshotRow(r,levelInfo.level,platformAccountId,false));
-    result.raw[level]=data;
+    result.reportEvidence[level]={status:"ok",row_count:rows.length,empty:rows.length===0};
     result.counts[levelInfo.level]=rows.length;
     result.rows.push(...rows);
-  }
-  const shouldCreateFallbackRows=useReviewBridge||useSandbox||levels.some(level=>Number(result.counts[level]||0)===0);
-  if(shouldCreateFallbackRows){
-    const fallbackBase={raw:{fallback_reason:useSandbox?"sandbox_empty_report":"empty_report_level_fallback",token_source:result.tokenSource}};
-    const fallbackRows=[
-      {
-        level:"campaign",
-        row:{...fallbackBase,campaign_id:platformAccountId,name:`TikTok Campaign ${platformAccountId}`,campaign_name:`TikTok Campaign ${platformAccountId}`,campaign_status:"empty_period_fallback"}
-      },
-      {
-        level:"adgroup",
-        row:{...fallbackBase,campaign_id:platformAccountId,adgroup_id:`${platformAccountId}_adgroup_fallback`,adgroup_name:`TikTok AdGroup ${platformAccountId}`,adgroup_status:"empty_period_fallback"}
-      },
-      {
-        level:"ad",
-        row:{...fallbackBase,campaign_id:platformAccountId,adgroup_id:`${platformAccountId}_adgroup_fallback`,ad_id:`${platformAccountId}_ad_fallback`,ad_name:`TikTok Ad ${platformAccountId}`,ad_status:"empty_period_fallback"}
-      }
-    ];
-    for(const fallback of fallbackRows){
-      if(Number(result.counts[fallback.level]||0)>0)continue;
-      result.rows.push(tiktokSnapshotRow(fallback.row,fallback.level,platformAccountId,true));
-      result.counts[fallback.level]=1;
-    }
   }
   return result;
 }
@@ -5021,7 +5011,7 @@ function buildSnapshotPayloadFromPerformanceRows({platform,snapshotDate,accountC
     kpis:{spend:totals.spend,sales:totals.sales,revenue:totals.revenue,impressions:totals.impressions,clicks:totals.clicks,ctr:totals.impressions>0?totals.clicks/totals.impressions*100:null,cpc:totals.clicks>0?totals.spend/totals.clicks:null,roas:totals.spend>0?totals.revenue/totals.spend:null},
     purchase_journey:{add_to_cart:addToCart,checkout,abandoned:checkout&&purchase!==null?Math.max(checkout-purchase,0):0,purchase,purchases:purchase,purchase_value:totals.revenue},
     click_journey:{ad_clicks:totals.clicks,link_clicks:linkClicks,landing_page_views:lpv,traffic_score:linkClicks>0&&lpv>0?lpv/linkClicks*100:null,real_cpc:lpv>0?totals.spend/lpv:null},
-    performance_summary:{rows,counts,truth_contract:truthContract,source_confidence:sourceConfidence,null_policy:"Fields are present even when values are zero/null; fallback rows are explicitly marked in raw/source_confidence."}
+    performance_summary:{rows,counts,truth_contract:truthContract,source_confidence:sourceConfidence,empty_result:rows.length===0,null_policy:"A successful empty provider report remains an empty row set; measured zero is never synthesized."}
   };
 }
 
@@ -5058,7 +5048,7 @@ async function writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePre
   const platformBaseCurrency=fetched.rows.find(r=>r.currency)?.currency||conn?.metadata?.baseCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
   const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"tiktok",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:fetched.rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:fetched.counts,sourceConfidence:"snapshot_layer_tiktok_v2",truthContract:tiktokTruthContract()});
-  snapshot.performance_summary.raw_report=fetched.raw;
+  snapshot.performance_summary.report_evidence=fetched.reportEvidence;
   snapshot.performance_summary.token_source=fetched.tokenSource;
   return insertSnapshotAndSpread({user,platform:"tiktok",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
 }

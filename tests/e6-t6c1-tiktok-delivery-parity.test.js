@@ -32,6 +32,11 @@ test('entity mismatch and event-policy violation produce FAIL evidence',()=>{
   const event=structuredClone(canonical());event.raw_metrics.purchase=1;event.metric_support.purchase='supported';const evidence=evaluateTikTokDeliveryParity({legacyRows:[legacy()],v2Rows:[event]});assert.equal(evidence.status,'FAIL');assert.equal(evidence.event_policy_match,false);
 });
 
+test('zero-to-zero comparison is not activation parity evidence',()=>{
+  const evidence=evaluateTikTokDeliveryParity({legacyRows:[],v2Rows:[]});
+  assert.equal(evidence.status,'FAIL');assert.equal(evidence.non_empty_evidence,false);assert.equal(evidence.entity_set_match,true);assert.equal(evidence.delivery_facts_match,true);
+});
+
 test('duplicate and malformed inputs fail closed without mutating either side',()=>{
   const left=[legacy()],right=[canonical()],before=JSON.stringify({left,right});
   assert.throws(()=>evaluateTikTokDeliveryParity({legacyRows:[legacy(),legacy()],v2Rows:right}),/Duplicate legacy/);

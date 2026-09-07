@@ -15,6 +15,7 @@ const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
 const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");const {ORGANIC_GA4_INGEST_ENABLED,ORGANIC_GA4_PARK_REASON,requireOrganicGa4Ingest}=require("./src/providers/organic/ingest-policy");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
+const {createPinterestOAuthHandlers}=require("./src/oauth/pinterest-handlers");const {discoverPinterestAdAccounts}=require("./src/providers/pinterest/account-discovery");const {createPinterestClient}=require("./src/providers/pinterest/client");
 const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");const {createTikTokLiveShadow}=require("./src/providers/tiktok/live-shadow");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
 const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
@@ -100,10 +101,11 @@ async function connectionStatus(userId,platform){const r=await getConnection(use
 async function canRunScheduledRefresh(userId){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);return Boolean(!access.blocked&&access.dailySync)}
 
 // ===== PHASE 1 CONSTITUTION PACK HELPERS =====
-const PHASE1_PLATFORM_LIMITS={meta:3,google:3,klaviyo:3,tiktok:3,organic:1};
+const PHASE1_PLATFORM_LIMITS={meta:3,google:3,pinterest:3,klaviyo:3,tiktok:3,organic:1};
 const PHASE1_REPORTABLE_ACCOUNT_TYPES={
   meta:"meta_ads_account",
   google:"google_ads_customer_account",
+  pinterest:"pinterest_ad_account",
   tiktok:"tiktok_advertiser_account",
   klaviyo:"klaviyo_account",
   organic:"organic_property"
@@ -112,13 +114,7 @@ function phase1ReportableAccountType(platform){return PHASE1_REPORTABLE_ACCOUNT_
 function normalizePlatformAccountId(value){return String(value||"").trim()}
 function activeOwnershipStatuses(){return ["connected","active"]}
 
-const PASSIVE_LEGACY_PLATFORMS={
-  pinterest:{
-    status:"passive_legacy",
-    label:"Pinterest",
-    message:"Pinterest is currently Passive / Legacy. New Pinterest connections are disabled; existing data remains available."
-  }
-};
+const PASSIVE_LEGACY_PLATFORMS={};
 function passiveLegacyPlatform(platform){return PASSIVE_LEGACY_PLATFORMS[String(platform||"").toLowerCase()]||null}
 function passiveLegacyPlatformStatus(platform){const cfg=passiveLegacyPlatform(platform);return cfg?{platform:String(platform||"").toLowerCase(),status:cfg.status,label:cfg.label,message:cfg.message}:null}
 function assertPlatformNotPassiveLegacy(platform){
@@ -1872,14 +1868,9 @@ app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await 
 
 
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
-app.get("/auth/pinterest",async(req,res)=>{
-  const status=passiveLegacyPlatformStatus("pinterest");
-  res.redirect(`/dashboard?pinterest_legacy=1&platform_status=${encodeURIComponent(status.status)}&message=${encodeURIComponent(status.message)}`);
-});
-app.get("/auth/pinterest/callback",async(req,res)=>{
-  const status=passiveLegacyPlatformStatus("pinterest");
-  res.redirect(`/dashboard?pinterest_legacy=1&platform_status=${encodeURIComponent(status.status)}&message=${encodeURIComponent(status.message)}`);
-});
+const {start:handlePinterestOAuthStart,callback:handlePinterestOAuthCallback}=createPinterestOAuthHandlers({config:{clientId:process.env.PINTEREST_CLIENT_ID,clientSecret:process.env.PINTEREST_CLIENT_SECRET,redirectUri:process.env.PINTEREST_REDIRECT_URI,scopes:process.env.PINTEREST_SCOPES||"ads:read,user_accounts:read",authorizationBase:"https://www.pinterest.com/oauth/"},requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,exchangeToken:async({code,redirectUri})=>{const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:redirectUri});const response=await fetch(`${PINTEREST_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${pinterestBasic()}`,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},body:body.toString()}),data=await response.json().catch(()=>null);if(!response.ok||!data||typeof data!=="object")throw new Error("Pinterest token exchange failed");return data},saveConnection,parseExpiry});
+registerOAuthProviderRoutes({app,provider:"pinterest",startHandler:handlePinterestOAuthStart,callbackHandler:handlePinterestOAuthCallback});
+app.get("/api/platform/pinterest/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"pinterest"),connected=Boolean(conn&&(conn.access_token||conn.refresh_token)&&normalizePlatformAccountId(conn.account_id||conn.metadata?.selectedPlatformAccountId)&&conn.metadata?.accountSelectionRequired!==true);res.json({state:connected?"CONNECTED":"NOT_CONNECTED",connected,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:"Pinterest status could not be loaded."})}});
 
 function base64Url(input){return Buffer.from(input).toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 function klaviyoBasic(){return Buffer.from(`${process.env.KLAVIYO_CLIENT_ID}:${process.env.KLAVIYO_CLIENT_SECRET}`).toString("base64")}
@@ -4224,7 +4215,7 @@ app.get("/api/refresh/google",handleGoogleSnapshotWrite);
 app.post("/api/refresh/google",handleGoogleSnapshotWrite);
 // ===== END GOOGLE SNAPSHOT WRITE v1 =====
 
-async function pinterestFetch(conn,endpoint,options={}){const r=await fetch(`${PINTEREST_API_BASE}${endpoint}`,{...options,headers:{Authorization:`Bearer ${conn.access_token}`,"Content-Type":"application/json",...(options.headers||{})}});const text=await r.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}if(!r.ok)throw new Error(data.message||text||`Pinterest API error ${r.status}`);return data}
+const pinterestClient=createPinterestClient({apiBase:PINTEREST_API_BASE,clientCredentials:pinterestBasic(),saveConnection,getConnection,parseExpiry});const pinterestFetch=(conn,endpoint,options)=>pinterestClient.request(conn,endpoint,options);
 
 function dateRangeToPinterestDates(range){
   const end=new Date();
@@ -4278,7 +4269,7 @@ function normalizePinterestRows(data,level){
 }
 app.get("/api/pinterest/insights",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{conn}=result;const adAccountId=req.query.adAccountId||req.query.ad_account_id;if(!adAccountId)return res.status(400).json({error:"Missing adAccountId"});const level=["account","campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const dates=req.query.start_date&&req.query.end_date?{start_date:String(req.query.start_date),end_date:String(req.query.end_date)}:dateRangeToPinterestDates(dateRange);const defaultColumns="SPEND_IN_MICRO_DOLLAR,IMPRESSION_1,CLICKTHROUGH_1,OUTBOUND_CLICK_1,TOTAL_PAGE_VISIT,TOTAL_CLICK_ADD_TO_CART,TOTAL_VIEW_ADD_TO_CART,TOTAL_CHECKOUT,TOTAL_CHECKOUT_VALUE_IN_MICRO_DOLLAR,TOTAL_WEB_CHECKOUT,TOTAL_WEB_CHECKOUT_VALUE_IN_MICRO_DOLLAR";const params=new URLSearchParams({start_date:dates.start_date,end_date:dates.end_date,granularity:String(req.query.granularity||"DAY"),columns:String(req.query.columns||defaultColumns),click_window_days:String(req.query.click_window_days||30),engagement_window_days:String(req.query.engagement_window_days||30),view_window_days:String(req.query.view_window_days||1),conversion_report_time:String(req.query.conversion_report_time||"TIME_OF_AD_ACTION")});const campaignIds=req.query.campaign_ids||req.query.campaignIds||"";const adGroupIds=req.query.ad_group_ids||req.query.adGroupIds||"";const adIds=req.query.ad_ids||req.query.adIds||"";if(level==="campaign"&&!campaignIds)return res.status(400).json({error:"Parameter 'campaign_ids' is required."});if(level==="adgroup"&&!adGroupIds)return res.status(400).json({error:"Parameter 'ad_group_ids' is required."});if(level==="ad"&&!adIds)return res.status(400).json({error:"Parameter 'ad_ids' is required."});if(campaignIds)params.set("campaign_ids",String(campaignIds));if(adGroupIds)params.set("ad_group_ids",String(adGroupIds));if(adIds)params.set("ad_ids",String(adIds));const endpoint=`${pinterestAnalyticsEndpoint(adAccountId,level)}?${params.toString()}`;const data=await pinterestFetch(conn,endpoint);const normalizedRows=normalizePinterestRows(data,level);res.json({platform:"Pinterest",level,adAccountId,date_range:dateRange,start_date:dates.start_date,end_date:dates.end_date,campaign_ids:campaignIds||null,ad_group_ids:adGroupIds||null,ad_ids:adIds||null,rows:normalizedRows,rawCount:normalizedRows.length,raw:data})}catch(e){res.status(500).json({error:e.message})}});
 
-app.get("/api/pinterest/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{user,conn}=result;const data=await pinterestFetch(conn,"/ad_accounts");const accounts=data.items||[];res.json(data)}catch(e){res.status(500).json({error:e.message})}});
+app.get("/api/pinterest/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const data=await pinterestFetch(result.conn,"/ad_accounts"),accounts=discoverPinterestAdAccounts(data);res.json({platform:"pinterest",accounts})}catch(e){res.status(e.status||500).json({error:e.status>=500?"Pinterest accounts could not be loaded. Please try again.":e.message,code:e.code||null})}});
 app.get("/api/accounts",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_ad_accounts").select("*").eq("user_id",user.id).order("platform",{ascending:true});if(error)throw error;res.json({accounts:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 
 app.post("/api/accounts/select",async(req,res)=>{

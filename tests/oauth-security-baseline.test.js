@@ -15,7 +15,8 @@ const sheetsHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oaut
 const organicHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/organic-handlers.js'), 'utf8');
 const klaviyoHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/klaviyo-handlers.js'), 'utf8');
 const tiktokHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/tiktok-handlers.js'), 'utf8');
-const extractedHandlerSources = {ga4_organic: organicHandlerSource, klaviyo: klaviyoHandlerSource, tiktok: tiktokHandlerSource};
+const pinterestHandlerSource = fs.readFileSync(path.join(__dirname, '..', 'src/oauth/pinterest-handlers.js'), 'utf8');
+const extractedHandlerSources = {ga4_organic: organicHandlerSource, pinterest: pinterestHandlerSource, klaviyo: klaviyoHandlerSource, tiktok: tiktokHandlerSource};
 const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 const dashboardSource = fs.readFileSync(path.join(__dirname, '..', 'public', 'dashboard.html'), 'utf8');
 
@@ -164,17 +165,4 @@ test('Express session infrastructure is absent from runtime and dependencies', (
   assert.equal(packageJson.devDependencies?.['express-session'], undefined);
 });
 
-test('Pinterest start and callback remain passive legacy dashboard redirects without session access', () => {
-  for (const route of ROUTES.filter(item => !item.active)) {
-    const start = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthStart=') : serverSource.indexOf(`app.get("${route.start}"`);
-    const callback = route.provider === 'meta' ? serverSource.indexOf('const handleMetaOAuthCallback=', start) : serverSource.indexOf(`app.get("${route.callback}"`, start);
-    const nextRoute = serverSource.indexOf('\n});', callback + 1) + 4;
-    const startBody = serverSource.slice(start, callback);
-    const callbackBody = serverSource.slice(callback, nextRoute);
-    for (const body of [startBody, callbackBody]) {
-      assert.match(body, /passiveLegacyPlatformStatus\("pinterest"\)/);
-      assert.match(body, /res\.redirect\(`\/dashboard\?pinterest_legacy=1/);
-      assert.doesNotMatch(body, /req\.session|createOAuthTransaction|consumeOAuthTransaction/);
-    }
-  }
-});
+test('Pinterest OAuth is active only through the extracted transaction-bound handler',()=>{assert.match(pinterestHandlerSource,/createTransaction\(access\.userId,"pinterest"/);assert.match(pinterestHandlerSource,/consumeTransaction\(state,"pinterest"/);assert.doesNotMatch(pinterestHandlerSource,/req\.session|req\.query\.user_id/)});

@@ -9,6 +9,7 @@ Pinterest'in eski Passive/Legacy kilidi kaldırılır; ancak bu paket performans
 - Token exchange ve refresh server tarafındadır; token browser/account-picker cevabına girmez.
 - OAuth tamamlandıktan sonra connection tek başına `Connected` sayılmaz; explicit advertiser seçimi zorunludur.
 - Scope varsayılanı `ads:read,user_accounts:read` olup environment ile açıkça değiştirilebilir.
+- OAuth ayarı eksikse genel bir hata yerine yalnız eksik environment adları döner; hiçbir secret değeri veya provider cevabı gösterilmez.
 
 ## Advertiser keşfi
 

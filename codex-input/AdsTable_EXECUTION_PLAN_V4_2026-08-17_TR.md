@@ -1673,7 +1673,7 @@ E4; TikTok production reporting contract kararı.
 - **E7-T4:** Open≠Click düzeltmesi ve journey count/value support.
 - **E7-T5:** SMS provider spend; unsupported ise `null`, uydurma `0` yok.
 - **E7-T6:** Email estimated/manual spend fallback ve provenance.
-- **E7-T7:** Klaviyo Organic'i GA4 platform-level olarak ayır.
+- **E7-T7:** `Done/Parked` — UTM güvenilirliği nedeniyle GA4 Organic ingestion kapalı; Blend capability korunur.
 - **E7-T8:** Time/FX/V2, dual-write ve channel-branch parity.
 
 ### Kabul kriterleri
@@ -1703,6 +1703,12 @@ E4; Klaviyo event/spend mapping kararları; matched platform account kuralı.
 `src/providers/klaviyo/mapper.js` Email/SMS channel contract'ını, Campaign Message ve Flow Message sibling branch hierarchy'sini, branch-aware deterministic key'i, Open≠Click kuralını, journey support/null semantiğini ve yalnız provider kaynaklı SMS spend sınırını tek mapper'da uygular. Email spend T6 kararı öncesinde, Organic ayrımı da T7 kararı öncesinde bilinçli olarak açılmaz. Bu noktaya gelindiğinde kullanıcı uyarılacak; T6 ve T7 kullanıcı açıklaması alınmadan uygulanmayacaktır.
 
 **Evidence:** `docs/E7_KLAVIYO_ADAPTER_T1_T5.md`, `tests/e7-klaviyo-adapter.test.js`, `src/providers/klaviyo/mapper.js`.
+
+### E7-T7 karar kaydı — GA4 Organic park
+
+Kullanıcı UTM kurulumunun eksik veya hatalı olması paid/organic attribution'ı güvenilmez kıldığı için GA4 Organic ingest'ten vazgeçildi. OAuth başlangıç/callback, GA4 property discovery/binding, manual snapshot ve automation sabit fail-closed politika ile park edildi; environment flag ile açılamaz. Mevcut connection/snapshot kayıtları destructive biçimde silinmez. `PAID`, `ORGANIC` ve `BLEND` analysis scope ile aggregate/formula capability korunur; ileride güvenilir backend attribution kaynağı kararı bu capability'yi yeniden besleyebilir.
+
+**Evidence:** `src/providers/organic/ingest-policy.js`, `tests/e7-t7-organic-park.test.js`, `src/oauth/organic-handlers.js`, `server.js`.
 
 ## 12. E8 — GA4 Organic adapter
 

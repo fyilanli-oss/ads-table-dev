@@ -13,7 +13,7 @@ const {registerOAuthProviderRoutes}=require("./src/oauth/provider-routes");
 const {createMetaOAuthHandlers}=require("./src/oauth/meta-handlers");
 const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
 const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
-const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");
+const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");const {ORGANIC_GA4_INGEST_ENABLED,ORGANIC_GA4_PARK_REASON,requireOrganicGa4Ingest}=require("./src/providers/organic/ingest-policy");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
 const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");const {createTikTokLiveShadow}=require("./src/providers/tiktok/live-shadow");
 const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
@@ -1297,7 +1297,7 @@ function organicGoogleOAuthClient(req){
   if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)throw new Error("Missing Google OAuth env");
   return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,organicGoogleRedirectUri(req));
 }
-const {start:handleOrganicOAuthStart,callback:handleOrganicOAuthCallback}=createOrganicOAuthHandlers({scopes:ORGANIC_GOOGLE_SCOPES,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:organicGoogleRedirectUri,createClient:organicGoogleOAuthClient,getConnection,saveConnection});
+const {start:handleOrganicOAuthStart,callback:handleOrganicOAuthCallback}=createOrganicOAuthHandlers({scopes:ORGANIC_GOOGLE_SCOPES,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:organicGoogleRedirectUri,createClient:organicGoogleOAuthClient,getConnection,saveConnection,ingestEnabled:ORGANIC_GA4_INGEST_ENABLED});
 registerOAuthProviderRoutes({app,provider:"organic",startHandler:handleOrganicOAuthStart,callbackHandler:handleOrganicOAuthCallback});
 
 // ===== ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
@@ -1351,7 +1351,7 @@ function normalizeGa4PropertySummary(accountSummary,propertySummary){
     raw:{accountSummary,propertySummary}
   };
 }
-async function listOrganicGa4Properties(userId){
+async function listOrganicGa4Properties(userId){requireOrganicGa4Ingest();
   const data=await organicGoogleFetch(userId,`${GA4_ADMIN_API_BASE}/accountSummaries?pageSize=200`);
   const accounts=Array.isArray(data.accountSummaries)?data.accountSummaries:[];
   const properties=[];
@@ -1377,7 +1377,7 @@ function pickOrganicGa4Property(input){
     raw:input
   };
 }
-async function bindOrganicGa4Property(userId,body={}){
+async function bindOrganicGa4Property(userId,body={}){requireOrganicGa4Ingest();
   const now=new Date().toISOString();
   const conn=await getConnection(userId,"organic");
   if(!conn)throw Object.assign(new Error("Organic OAuth connection is required before property binding"),{status:404});
@@ -1459,8 +1459,8 @@ async function bindOrganicGa4Property(userId,body={}){
 }
 app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
 app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
-app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,parked:true,setupStage:"parked",reason:ORGANIC_GA4_PARK_REASON,ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,parked:true,setupStage:"parked",reason:ORGANIC_GA4_PARK_REASON,ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
 
 
 // ===== ORGANIC SNAPSHOT v1 =====
@@ -1764,8 +1764,8 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,property}
     }
   };
 }
-
 async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
+  requireOrganicGa4Ingest();
   const conn=await getConnection(user.id,"organic");
   if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
   if(!conn.metadata?.configured)throw Object.assign(new Error("Organic GA4 property binding is required before snapshot"),{status:400});
@@ -1845,7 +1845,7 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
 
 async function handleOrganicSnapshotWrite(req,res){
   let job=null,stage="connection";
-  try{
+  try{requireOrganicGa4Ingest();
     const result=await requireRefreshConnection(req,res,"organic");if(!result)return;
     const {user,conn}=result;
     if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
@@ -3657,7 +3657,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic"),googleSheets=await connectionStatus(user.id,"google_sheets");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,google_sheets:googleSheets.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source,google_sheets:googleSheets.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:googleSheets.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"skeleton",label:"Organic",message:"Organic platform skeleton is available. GA4 and Search Console OAuth will be added in the next patch."}}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic"),googleSheets=await connectionStatus(user.id,"google_sheets");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:false,google_sheets:googleSheets.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:"parked",google_sheets:googleSheets.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:googleSheets.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"parked",label:"Organic",message:"GA4 Organic ingestion is parked; Paid/Organic Blend capability remains available for a future backend source."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic","google_sheets"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -5160,7 +5160,7 @@ async function ensureConfiguredOrganicSchedules(){
   return {ok:true,count:results.length,results};
 }
 
-async function runOrganicAutoRefreshForSchedule(schedule){
+async function runOrganicAutoRefreshForSchedule(schedule){if(!ORGANIC_GA4_INGEST_ENABLED)return {ok:true,skipped:true,platform:"organic",reason:ORGANIC_GA4_PARK_REASON,schedule_id:schedule.id};
   const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",schedule.user_id).maybeSingle();
   if(userError)throw userError;
   if(!user)throw new Error("Auto refresh user not found");

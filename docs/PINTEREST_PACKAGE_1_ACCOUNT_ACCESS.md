@@ -29,3 +29,7 @@ Bu paket OAuth/account access hazırlığıdır. Analytics metric semantiği ger
 ## İlk canlı advertiser keşfi düzeltmesi
 
 OAuth callback'i tamamlandı ve Pinterest connection kaydı oluştu; dolayısıyla önceki transaction engeli kapandı. Sonraki boş account picker'ın kök nedeni resmi V5 `AdAccount` şemasındaki IANA alanının `time_zone` olmasına rağmen normalizer'ın yalnız `timezone`/`timezone_name` okumasıydı. Normalizer artık önce resmi `time_zone` alanını okur; kimlik, ad, currency veya timezone eksikse hesabı yine fail-closed biçimde seçime sunmaz.
+
+## ID-only list yanıtı ve detay zenginleştirmesi
+
+Resmi V5 OpenAPI sözleşmesinde `GET /ad_accounts` içindeki `AdAccount` nesnesinde yalnız `id` zorunludur; `name`, `currency` ve `time_zone` opsiyoneldir. Bu nedenle liste yanıtını tam hesap profili varsaymak hatalıdır. Runtime artık önce erişilebilir gerçek ID'leri alır, Paket 1 hesap limiti içinde her ID için resmi `GET /ad_accounts/{ad_account_id}` detay çağrısını yapar ve yalnız detay cevabı identity/currency/timezone sözleşmesini tamamlayan hesapları seçime sunar. İsim, para birimi veya timezone uydurulmaz.

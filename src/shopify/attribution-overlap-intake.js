@@ -1,6 +1,6 @@
 "use strict";
 
-const CONTRACT_VERSION = "e10-t5d-v1";
+const CONTRACT_VERSION = "e10-t5b-v2";
 const ROW_KEYS = Object.freeze([
   "platform",
   "platform_purchase_count",

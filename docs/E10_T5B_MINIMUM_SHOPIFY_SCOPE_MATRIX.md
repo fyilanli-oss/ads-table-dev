@@ -34,6 +34,14 @@ Güncel resmi Shopify örnekleri aggregate rapor sorgularını Admin GraphQL `sh
 
 Bu değerler Shopify-observed toplam mağaza satış gerçeği olarak adlandırılmaz. Provider-reported attribution ile toplanmaz, birbirinden çıkarılmaz, kazanan kaynak seçilmez ve frontend'de uzlaştırılmış gerçek gibi gösterilmez. Eşleştirme ve overlap hesabı, ileride ayrıca onaylanacak backend sözleşmesidir.
 
+## Nasıl gösterilecek?
+
+Bu iki Shopify metriği ana Funnel toplamına veya provider hierarchy satırlarına eklenmez. Yalnız Shopify-native bir **Attribution comparison / overlap diagnostic** alanında, seçili tarih aralığı için platform satırlarında gösterilir:
+
+`Platform | Provider Purchase | Shopify-attributed Purchase | Purchase Difference | Provider Sales | Shopify-attributed Sales | Sales Difference | Data status`
+
+Difference değerlerini backend hesaplar. Bir fark veya iki tarafta aynı anda değer bulunması kesin duplicate kanıtı değildir; UI bunu “potential overlap signal” olarak açıklar ve otomatik olarak hiçbir provider değerini düşmez. Sales karşılaştırması aynı raporlama para birimi doğrulanamıyorsa `unavailable` olur; currency bu intake'e sessizce üçüncü metrik olarak eklenmez.
+
 ## Açıkça kapsam dışı
 
 - Total Purchase ve Total Sales

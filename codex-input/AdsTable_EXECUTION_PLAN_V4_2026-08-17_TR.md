@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T1/T2/T3/T4/T5 Done; Shopify output product decision next; E10-T6 deferred`
+**Durum:** `In progress — E10-T5-A/B Done; E10-T5-C product decision required; every later package gated`
 
 ### Ürün ve mimari kararı
 
@@ -1849,7 +1849,7 @@ AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shop
 - **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
 - **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Done — Token, uninstall ve privacy lifecycle:** Shopify token'larını encrypted store sınırına bağla; browser/log erişimini yasakla; doğrulanmış uninstall, shop erişim kaybı ve privacy/compliance olaylarında erişimi fail-closed durdur ve retention/deletion kararlarını executable contract ile kanıtla.
-- **E10-T5 — Done — Ürün/UI ve Shopify attribution intake contract:** Shopify-native UI kararlarını koru. Shopify'dan alınacak ilk veriyi yalnız overlap incelemesine yarayan platform bazlı Purchase Count ve Sales Value ile sınırla; total commerce, Refund, PII, scope, storage ve sync varsayımı üretme. Shopify'a verilecek AdsTable çıktıları sonraki ayrı ürün kararıdır.
+- **E10-T5 — In progress — Revize edilmiş ürün sözleşmesi:** E10-T5-A Shopify kuralları ve E10-T5-B Shopify'dan alınacak/gösterilecek veriler `Done`; E10-T5-C Shopify'a verilecek/gösterilecek AdsTable çıktıları kullanıcıyla okunup onaylanmadan `Done` olamaz. E10-T6 ve diğer paketler T5-C onayından önce açılamaz.
 - **E10-T6 — Deferred pending Shopify output decision — Webhook ve initial sync:** İmza doğrulama, replay/idempotency, sıra dışı/gecikmiş event, checkpoint, retry ve initial sync sınırlarını kur. Webhook provider payload'u canonical doğrulama sınırını atlayarak Dataset V2'ye yazamaz.
 - **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
 - **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
@@ -1906,11 +1906,11 @@ Verified-event allowlist, uninstall/access-loss token revocation sırası, compl
 
 **Amaç:** E10-T5 minimum scope matrisi çıkarılmadan önce Funnel bilgi mimarisi, Shopify embedded görünüm sınırı, filtre/tarih/compare davranışı, metrik adları ve commerce provenance kararlarını kalıcı olarak dondurmak.
 
-#### 9. E10-T5 için revize edilmiş ürün sözleşmesi — tek okuma noktası
+#### 9. E10-T5 için revize edilmiş ürün sözleşmesi — A/B/C tek okuma noktası
 
 Bu bölüm E10-T5'in authoritative ürün özetidir. Aşağıdaki kararlar başka bir belge veya alt başlıktan tahmin edilmez:
 
-**UI kararı**
+**E10-T5-A — Shopify kuralları — `Done`**
 
 - Resmi Shopify embedded shell: **Zorunlu**.
 - Resmi App Bridge: **Zorunlu**.
@@ -1920,7 +1920,7 @@ Bu bölüm E10-T5'in authoritative ürün özetidir. Aşağıdaki kararlar başk
 - Shopify Admin'i taklit eden statik shell: **Yasak**.
 - Iframe/yabancı-site hissi: **Acceptance failure**.
 
-**Shopify'dan alınacak veri kararı**
+**E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek? — `Done`**
 
 | AdsTable contract adı | İnsan dilindeki anlamı | Shopify'daki karşılığı / doğrulama durumu |
 |---|---|---|
@@ -1931,6 +1931,8 @@ Bu bölüm E10-T5'in authoritative ürün özetidir. Aşağıdaki kararlar başk
 Bu üç contract adı **AdsTable'ın iç normalize isimleridir; Shopify API field adı değildir**. Güncel resmi Shopify örnekleri aggregate rapor erişimini Admin GraphQL `shopifyqlQuery` ve `read_reports` scope'u üzerinden göstermektedir; bu yalnız doğrulanacak aday erişim yüzeyidir, scope talebi değildir. Üçünün birlikte ve PII'siz alınabildiği doğrulanamazsa Order/Customer verisine geçilmez ve sahte mapping yapılmaz.
 
 Amaç yalnız Shopify-reported platform attribution ile provider-reported Purchase/Sales arasındaki muhtemel overlap'i sonraki backend kararında incelemektir. Bu intake mağaza totalı üretmez, Revenue hesaplamaz, kullanıcıya gösterilecek AdsTable çıktısını belirlemez ve Dataset V2'ye yazılmaz.
+
+Gösterim yalnız Shopify-native bir **Attribution comparison / overlap diagnostic** alanında, seçili tarih aralığı ve platform grain'inde yapılır. Satırlar platformdur; kolonlar `Provider Purchase`, `Shopify-attributed Purchase`, `Purchase Difference`, `Provider Sales`, `Shopify-attributed Sales`, `Sales Difference` ve veri durumudur. Farklar backend'de hesaplanır; overlap sinyali kesin duplicate kanıtı veya otomatik deduction değildir. Funnel Total satırına, Revenue hesabına veya provider hierarchy içine eklenmez. Sales karşılaştırması aynı raporlama para birimi doğrulanmadan gösterilmez; bunun için sessizce yeni bir Shopify intake metriği eklenmez.
 
 #### Shopify-native embedded kabulü
 
@@ -1968,29 +1970,21 @@ Amaç yalnız Shopify-reported platform attribution ile provider-reported Purcha
 - İlk Funnel metric ailesi: `Impression`, `Click`, `Spend`, `CTR`, `CPC`, `Add to Cart`, `Add to Cart Value`, `Checkout`, `Checkout Value`, `Abandoned`, `Abandoned Value`, `Purchase`, `Sales`, `Revenue`, `ROAS`, `CPS`. Her metric support durumu korunur; missing/unsupported/unknown sıfıra çevrilmez.
 - `Shopify-reported attribution`, `provider-reported attribution`, `AdsTable-calculated` ve `Unattributed` ayrı provenance aileleridir. İlk Shopify intake'i yalnız platform bazlı Purchase Count/Sales Value taşır; total Sales veya Refund almaz. İki attribution kaynağı sessizce toplanmaz, birbirinin yerine geçirilmez ve frontend provenance birleştirme kararı vermez.
 
-#### E10-T5 alt paketleri ve durum
+#### E10-T5 alt paketleri, kanıt ve sıra kapısı
 
-- **E10-T5-A — Done:** Bu Shopify-native UI, Funnel/Table, filter, time/compare, hierarchy, Paid/Organic, metrik adı ve provenance ürün freeze'i.
-- **E10-T5-B — Done:** Her görünür Funnel çıktısı için `UI output → Shopify resource/field → minimum scope → PII class → retention/deletion → provenance` matrisi; doğrulanmamış scope eklenmez.
-- **E10-T5-C — Superseded by T5-D:** Shopify Total Purchase/Sales/Refund'u presentation kaynağı kabul eden erken varsayım geri alındı.
+- **E10-T5-A — Done — Shopify kuralları:** Resmi embedded shell, App Bridge ve genel Shopify UI component zorunlulukları; özel framework/statik shell yasağı; Funnel/Table özel visualization sınırı ve iframe acceptance failure.
+- **E10-T5-B — Done — Shopify'dan ne alınacak, nasıl gösterilecek?:** Yalnız platform bazlı Purchase Count ve Sales Value alınır; yalnız attribution comparison/overlap diagnostic alanında ayrı provenance ile gösterilir. Total commerce, Refund, PII, Dataset V2, otomatik deduction ve Revenue etkisi yoktur.
+- **E10-T5-C — Product decision required — Shopify'a ne verilecek, nasıl gösterilecek?:** AdsTable'ın provider hierarchy, Funnel/Table metrikleri, toolbar/filter/compare ve durum yüzeylerinden hangilerinin merchant'a verileceği; varsayılan görünüm, disclosure ve detay seviyesi kullanıcıyla okunup onaylanacaktır. Bu başlık altında onaylı output matrisi henüz yoktur.
 
-**Tarihsel checkpoint:** E10-T5-A tamamlandıktan sonra T5-B planlanmıştı; T5-B/C varsayımları daha sonra E10-T5-D ile düzeltilmiştir. Bu freeze UI implementasyonu veya production işlemi değildir.
+### E10-T5-B karar kanıtı — Shopify attribution intake ve gösterim
 
-### E10-T5-B karar kanıtı — minimum Shopify scope matrisi
+İlk intake yalnız `platform` boyutunda `platform_purchase_count` ve `platform_sales_value` değerlerini overlap inceleme girdisi olarak kabul eder. Gösterim yalnız Shopify-native attribution comparison/overlap diagnostic alanındadır; Funnel totalı veya Revenue girdisi değildir. Total Purchase/Sales, Refund, currency, timezone, Order/Customer satırı ve PII alınmaz. Güncel resmi API doğrulamasına kadar `read_orders` dahil scope, resource ve field kararı ertelendi; scope listesi boştur. Executable matris `contracts/shopify/e10-t5b-minimum-scope.json`, karar ve gösterim açıklaması `docs/E10_T5B_MINIMUM_SHOPIFY_SCOPE_MATRIX.md`, guard `tests/e10-t5b-minimum-scope-matrix.test.js` içindedir.
 
-Düzeltilmiş ilk intake yalnız `platform` boyutunda `platform_purchase_count` ve `platform_sales_value` değerlerini overlap inceleme girdisi olarak kabul eder. Total Purchase/Sales, Refund, currency, timezone, Order/Customer satırı ve PII alınmaz. Shopify'a verilecek çıktılar belirlenip güncel resmi API erişilebilirliği doğrulanana kadar `read_orders` dahil scope, resource ve field kararı ertelendi; scope listesi boştur. Executable matris `contracts/shopify/e10-t5b-minimum-scope.json`, karar açıklaması `docs/E10_T5B_MINIMUM_SHOPIFY_SCOPE_MATRIX.md`, guard `tests/e10-t5b-minimum-scope-matrix.test.js` içindedir.
+### E10-T5-C sıra kapısı — Shopify'a verilecek AdsTable çıktıları
 
-**Tarihsel checkpoint:** İlk T5-B/C yönü E10-T5-D ile düzeltilmiştir. Güncel kontrat scope talep etmez; credential, Partner Dashboard, migration veya production işlemi yapılmadı.
+`docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` T5-C'nin henüz ürün kararı beklediğini kaydeder. Kullanıcı Execution Plan'daki T5-A, T5-B ve hazırlanacak T5-C output/display matrisini okuyup açıkça onaylamadan T5-C `Done` yapılamaz; E10-T6, E10-T7, E10-T8, E10-T9, E10-T10, E11 veya E12 için yeni uygulama paketi/PR açılamaz. Önceki Shopify Total Purchase/Sales/Refund presentation varsayımı geçersizdir ve yeniden kullanılamaz.
 
-### E10-T5-C karar kanıtı — commerce provenance/presentation
-
-Önceki presentation varsayımı ürün yönünü aştığı için geri alındı; Shopify Total Purchase/Sales/Refund'u Funnel girdisi kabul eden `commerce-presentation.js` kaldırıldı. Düzeltme ve gerekçesi `docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` içindedir.
-
-### E10-T5-D karar kanıtı — Shopify attribution overlap intake düzeltmesi
-
-Shopify intake'i tek pakette kesin olarak `platform + platform_purchase_count + platform_sales_value` ile sınırlandı. `src/shopify/attribution-overlap-intake.js` yalnız bu üç alanı kabul eder; total, refund, currency, timezone veya başka bir alanı fail-closed reddeder. Shopify kaynağıyla provider kaynağını birleştirmez ve Revenue üretmez. API erişilebilirliği doğrulanmadığı ve Shopify'a verilecek çıktılar henüz belirlenmediği için scope, resource ve field kararı ertelendi.
-
-**Durum:** E10-T5-D ve düzeltilmiş parent E10-T5 `Done`; parent E10 `In progress`. Bundan sonraki iş E10-T6 sync değildir; önce Shopify'a verilecek AdsTable çıktıları için iş kararı alınacaktır. Bu paket scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
+**Durum:** E10-T5-A/B `Done`; E10-T5-C `Product decision required`; parent E10-T5 ve E10 `In progress`. Bu paket scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
 
 ## 15. E11 — Funnel API
 

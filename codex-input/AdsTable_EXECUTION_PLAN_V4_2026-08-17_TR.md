@@ -1783,7 +1783,7 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 
 ## 13. E9 — Backfill ve data readiness
 
-**Durum:** `In progress — E9-T1/T2/T3/T4 Done; E9-T5 next`
+**Durum:** `In progress — E9-T1/T2/T3/T4/T5 Done; E9-T6 next`
 
 ### Planlanan işler
 
@@ -1791,7 +1791,7 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 - **E9-T2 — Done:** User/platform/account/business-date/date-key unique checkpoint; opaque cursor; terminal replay engeli; service-role-only persistence.
 - **E9-T3 — Done:** Atomic expiring worker lease; provider-isolated single-flight budgets; Retry-After + bounded backoff; three-attempt ceiling; parked providers excluded.
 - **E9-T4 — Done:** Checkpoint kapsam doğrulaması, batch içi duplicate engeli ve mevcut canonical conflict anahtarıyla idempotent upsert.
-- **E9-T5:** Completeness, duplicate, metric support, timezone, FX, freshness ölçümü.
+- **E9-T5 — Done:** Fail-closed completeness, duplicate, metric support, timezone, FX ve freshness ölçümü.
 - **E9-T6:** Provider bazlı parity/readiness dashboard'u.
 - **E9-T7:** Pause/resume/cancel ve runbook.
 
@@ -1804,6 +1804,8 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 **E9-T3 kanıtı:** `src/backfill/retry-policy.js`, `supabase/migrations/20260908080000_add_backfill_checkpoint_leases.sql`, `tests/e9-t3-lease-retry.test.js`, `docs/E9_T3_LEASE_QUOTA_RETRY.md`. Production migration/provider call/backfill çalıştırılmadı.
 
 **E9-T4 kanıtı:** `src/backfill/idempotent-batch.js`, `tests/e9-t4-idempotent-batch.test.js`, `docs/E9_T4_IDEMPOTENT_CANONICAL_BATCH.md`. Production migration/provider call/backfill çalıştırılmadı.
+
+**E9-T5 kanıtı:** `src/backfill/data-readiness.js`, `tests/e9-t5-data-readiness.test.js`, `docs/E9_T5_DATA_READINESS_MEASUREMENT.md`. Production sorgusu/provider call/backfill çalıştırılmadı.
 
 ### Kabul kriterleri
 

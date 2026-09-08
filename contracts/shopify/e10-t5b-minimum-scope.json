@@ -1,0 +1,20 @@
+{
+  "contract_version": "e10-t5b-v1",
+  "first_slice_scopes": ["read_orders"],
+  "forbidden_first_slice_scopes": ["read_all_orders", "read_customers", "write_customers", "read_products", "write_products", "read_customer_events", "write_pixels"],
+  "pii_policy": "no_customer_pii",
+  "outputs": [
+    {"output":"shop_currency","resource":"Shop","fields":["currencyCode"],"scope":null,"scope_status":"verify_no_additional_scope","pii":"none","retention":"current_metadata","deletion":"shop_redact","provenance":"shopify_observed"},
+    {"output":"shop_timezone","resource":"Shop","fields":["ianaTimezone"],"scope":null,"scope_status":"verify_no_additional_scope","pii":"none","retention":"current_metadata","deletion":"shop_redact","provenance":"shopify_observed"},
+    {"output":"purchase_count","resource":"Order","fields":["id","createdAt","cancelledAt"],"scope":"read_orders","scope_status":"candidate_official_revalidation_required","pii":"none_selected","retention":"daily_aggregate_only","deletion":"shop_redact","provenance":"shopify_observed"},
+    {"output":"sales","resource":"Order","fields":["currentTotalPriceSet.shopMoney.amount","currentTotalPriceSet.shopMoney.currencyCode"],"scope":"read_orders","scope_status":"candidate_official_revalidation_required","pii":"none_selected","retention":"daily_aggregate_only","deletion":"shop_redact","provenance":"shopify_observed"},
+    {"output":"refund_value","resource":"Order.refunds","fields":["createdAt","totalRefundedSet.shopMoney.amount","totalRefundedSet.shopMoney.currencyCode"],"scope":"read_orders","scope_status":"candidate_official_revalidation_required","pii":"none_selected","retention":"daily_aggregate_only","deletion":"shop_redact","provenance":"shopify_observed"}
+  ],
+  "excluded_outputs": [
+    {"output":"add_to_cart","reason":"no_verified_minimum_admin_api_contract","ui_semantics":"unsupported_not_zero"},
+    {"output":"checkout","reason":"no_verified_minimum_admin_api_contract","ui_semantics":"unsupported_not_zero"},
+    {"output":"historical_orders_over_60_days","reason":"read_all_orders_requires_separate_review","ui_semantics":"out_of_scope"},
+    {"output":"customer_identity","reason":"funnel_does_not_require_pii","ui_semantics":"forbidden"},
+    {"output":"organic_attribution","reason":"ga4_utm_ingestion_parked","ui_semantics":"unattributed_not_organic"}
+  ]
+}

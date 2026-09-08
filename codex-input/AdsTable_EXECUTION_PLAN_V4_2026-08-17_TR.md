@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T1/T2/T3/T4 Done; E10-T5-A Done, T5-B next`
+**Durum:** `In progress — E10-T1/T2/T3/T4 Done; E10-T5-A/T5-B Done, T5-C next`
 
 ### Ürün ve mimari kararı
 
@@ -1945,10 +1945,16 @@ Verified-event allowlist, uninstall/access-loss token revocation sırası, compl
 #### E10-T5 alt paketleri ve durum
 
 - **E10-T5-A — Done:** Bu Shopify-native UI, Funnel/Table, filter, time/compare, hierarchy, Paid/Organic, metrik adı ve provenance ürün freeze'i.
-- **E10-T5-B — Next:** Her görünür Funnel çıktısı için `UI output → Shopify resource/field → minimum scope → PII class → retention/deletion → provenance` matrisi; doğrulanmamış scope eklenmez.
-- **E10-T5-C:** Commerce provenance ve `Sales/Spend/Revenue` API/canonical presentation boundary'sini executable contract ile korur; mevcut Formula Engine migration/compatibility kararı explicit olur.
+- **E10-T5-B — Done:** Her görünür Funnel çıktısı için `UI output → Shopify resource/field → minimum scope → PII class → retention/deletion → provenance` matrisi; doğrulanmamış scope eklenmez.
+- **E10-T5-C — Next:** Commerce provenance ve `Sales/Spend/Revenue` API/canonical presentation boundary'sini executable contract ile korur; mevcut Formula Engine migration/compatibility kararı explicit olur.
 
 **Durum:** E10-T5-A `Done`; parent E10-T5 ve E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T5-B minimum Shopify scope matrisidir. Bu freeze UI implementasyonu, Shopify scope talebi, production credential, Partner Dashboard değişikliği veya production işlemi değildir.
+
+### E10-T5-B karar kanıtı — minimum Shopify scope matrisi
+
+İlk dilim yalnız Shop currency/timezone ile Order tabanlı Purchase/Sales/Refund aggregate çıktısını hedefler; tek aday scope `read_orders`dır. Customer PII, `read_all_orders`, customer/product/customer-event/pixel scope'ları ve doğrulanmamış Add to Cart/Checkout kaynakları dışarıdadır. Exact alan/scope/protected-data uygunluğu production öncesi resmi API sürümünde tekrar doğrulanır. Executable matris `contracts/shopify/e10-t5b-minimum-scope.json`, karar açıklaması `docs/E10_T5B_MINIMUM_SHOPIFY_SCOPE_MATRIX.md`, guard `tests/e10-t5b-minimum-scope-matrix.test.js` içindedir.
+
+**Durum:** E10-T5-B `Done`; parent E10-T5 ve E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T5-C commerce provenance/presentation contract'tır. Bu paket Shopify scope talebi veya production query değildir; credential, Partner Dashboard, migration veya production işlemi yapılmadı.
 
 ## 15. E11 — Funnel API
 

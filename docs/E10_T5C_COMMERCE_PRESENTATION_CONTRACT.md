@@ -14,6 +14,17 @@ T5-C tamamlanmadan aşağıdaki konular tek bir okunabilir output/display matris
 - Loading, empty, partial, stale, unsupported, error ve re-auth durumları
 - Desktop/mobile bilgi yoğunluğu, drill-down ve yatay akış
 
+## Provider OAuth montajı — dondurulmuş karar
+
+- Meta, Google, TikTok, Pinterest ve Klaviyo Connect/Disconnect/Reconnect ile account selection kontrolleri Shopify embedded `Data Sources / Platforms` sayfasındadır ve resmi Shopify UI componentleriyle gösterilir.
+- Başlatma isteği embedded session token ile backend'e gider; backend transaction'ı doğrulanmış shop/workspace/user/provider ve `surface=shopify_embedded` bağlamına kilitler.
+- Provider consent üçüncü taraf sayfası olduğu için iframe içinde gösterilmez. Güncel resmi App Bridge dış navigasyon yöntemiyle top-level açılır; exact API sürümü implementation öncesi doğrulanır.
+- Callback provider'a kayıtlı AdsTable HTTPS endpoint'indedir. State tek kullanımlık tüketilir; token exchange ve encrypted persistence backend'de kalır.
+- Callback sonucu bağımsız `/dashboard` yerine Shopify Admin'deki canonical embedded uygulama URL'sine döner; embedded session/status yeniden alınır.
+- Standalone kanal korunursa transaction surface ve dönüş URL'si ayrıdır; iki kanal birbirine yönlenemez.
+
+Mevcut provider OAuth çekirdeği korunur, fakat mevcut `/dashboard?...` callback dönüşleri embedded akışta doğrudan kullanılamaz. Runtime adaptasyonu T5-C output/display onayı sonrasında ayrı contract ile yapılır; bu karar production OAuth ayarı değildir.
+
 UI, resmi Shopify embedded shell, App Bridge ve genel Shopify UI componentleriyle kurulacaktır. AdsTable'a özel görselleştirme yalnız Funnel/Table data presentation alanında kullanılabilir; özel CSS component framework, statik Shopify shell taklidi ve iframe/yabancı-site hissi kabul edilmez.
 
 ## Sıra kapısı

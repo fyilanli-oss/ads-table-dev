@@ -43,3 +43,13 @@ test("T5 A B C and the absolute sequencing gate are explicit", () => {
   assert.match(constitution, /E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek\? — `Product decision required`/);
   assert.match(constitution, /Mutlak sıra kapısı:[\s\S]*E10-T6–T10, E11 veya E12[\s\S]*branch, kod ya da PR açılamaz/);
 });
+
+test("provider OAuth is mounted in Shopify without framing third-party consent", () => {
+  assert.match(constitution, /Data Sources \/ Platforms/);
+  assert.match(constitution, /surface=shopify_embedded/);
+  assert.match(constitution, /consent ekranları[\s\S]*embedded iframe içinde açılmaz/);
+  assert.match(constitution, /App Bridge dış navigasyon yöntemiyle \*\*top-level çıkış\*\*/);
+  assert.match(constitution, /callback[\s\S]*shop\/workspace\/user[\s\S]*embedded surface/);
+  assert.match(constitution, /Mevcut bağımsız `\/dashboard\?\.\.\.` dönüşleri Shopify embedded akışında kullanılamaz/);
+  assert.match(constitution, /Standalone ve Shopify embedded transaction\/callback dönüşleri birbirine düşemez/);
+});

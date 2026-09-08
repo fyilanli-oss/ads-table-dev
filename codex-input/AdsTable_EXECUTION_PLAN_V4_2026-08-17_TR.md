@@ -1855,6 +1855,22 @@ AdsTable, Shopify Admin içinde doğal çalışan bir embedded analytics uygulam
 
 Shop, workspace, user ve entitlement authority server-side doğrulanır; browser claim'i yetki üretmez. Token/secret/PII browser veya loga çıkmaz. Partner Dashboard, credential, scope, billing, migration, webhook registration, App Store submission ve production veri işlemleri ayrı açık insan onayı gerektirir.
 
+##### 2.1 Provider OAuth'ları Shopify içine nasıl monte edilir?
+
+Shopify App install/session OAuth'u ile Meta, Google, TikTok, Pinterest ve Klaviyo provider OAuth'ları iki ayrı authority zinciridir; birbirinin token'ını veya callback'ini kullanmaz.
+
+1. Merchant provider bağlantısını Shopify embedded uygulamasındaki `Data Sources / Platforms` sayfasından, resmi Shopify Button/Card/Banner/Modal bileşenleriyle başlatır. Ayrı AdsTable login sayfasına veya bağımsız dashboard'a gönderilmez.
+2. Connect tıklaması önce embedded session token ile AdsTable backend'e gider. Backend doğrulanmış Shopify session'ından `shop → workspace → user`, entitlement, provider ve dönüş yüzeyini çözer; browser'dan gelen user/workspace/shop query değeri authority olamaz.
+3. Backend tek kullanımlık OAuth transaction oluşturur. Transaction `shop_id`, `workspace_id`, `user_id`, `provider`, exact callback URI, embedded return target, nonce/state, PKCE gereken provider için verifier, oluşturulma/sona erme zamanı ve `surface=shopify_embedded` bağlarını taşır.
+4. Meta/Google/TikTok/Pinterest/Klaviyo consent ekranları üçüncü taraf sayfalarıdır ve embedded iframe içinde açılmaz. Backend'in ürettiği authorization URL'ye, implementation anındaki güncel resmi App Bridge dış navigasyon yöntemiyle **top-level çıkış** yapılır. Özel nested iframe yasaktır; popup ancak güncel resmi Shopify yönlendirmesi ve browser davranışı ayrıca doğrulanırsa kullanılabilir.
+5. Provider callback AdsTable'ın provider'a kayıtlı server-side HTTPS callback endpoint'ine döner. Backend state'i atomik ve tek kullanımlık tüketir; provider, callback URI, shop/workspace/user ve embedded surface bağlarını doğrulamadan code exchange veya token persistence yapmaz.
+6. Token exchange ve encrypted persistence yalnız backend'de yapılır. Provider token'ı, OAuth code'u, secret veya ham provider error'u Shopify browser'ına, URL'ye ya da loga taşınmaz.
+7. Başarılı/başarısız callback sabit allowlist outcome ile Shopify Admin'deki canonical embedded app dönüş URL'sine **top-level** döner. Mevcut bağımsız `/dashboard?...` dönüşleri Shopify embedded akışında kullanılamaz. Uygulama yeniden embedded bağlama girdiğinde App Bridge/session token yenilenir ve connection status backend'den tekrar okunur.
+8. Provider account seçimi, reconnect ve disconnect aynı `Data Sources / Platforms` yüzeyinde resmi Shopify componentleriyle yapılır. Account ownership server-side doğrulanır; görünen account adı veya browser seçimi tek başına yetki üretmez.
+9. Standalone AdsTable OAuth kanalı korunacaksa `surface=standalone` ile ayrı dönüş kontratı kullanır. Standalone ve Shopify embedded transaction/callback dönüşleri birbirine düşemez; callback host allowlist ve redirect target server-side sabittir.
+
+**Mevcut kod için karar:** Repository'deki provider OAuth transaction/HMAC-state, callback exchange, encrypted token store ve account-selection çekirdeği yeniden kullanılır; ancak mevcut handler'ların `/dashboard?...` dönüşleri ve yalnız user/provider/redirect URI bağları Shopify embedded için yeterli değildir. T5-C onayından sonra ayrı bir embedded OAuth surface adapter contract'ı hazırlanacaktır. Bu anayasa değişikliği henüz OAuth route/runtime implementasyonu veya production redirect URI kaydı yapmaz.
+
 #### 3. Shopify Embedded Uygulama Görsel Yaklaşımı
 
 - Resmi Shopify embedded shell ve App Bridge **zorunludur**.
@@ -1888,6 +1904,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T5-A — Shopify Kuralları — `Done`:** Bu anayasanın UI, embedded davranış, hierarchy, metrik ve provenance kurallarıdır.
 - **E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek? — `Done`:** Yalnız `platform`, `platform_purchase_count` ve `platform_sales_value`; yalnız Shopify-native Attribution comparison / overlap diagnostic alanında ve provider verisinden ayrı provenance ile gösterilir. Total commerce, Refund, PII, Funnel totalı, Revenue etkisi veya otomatik deduction yoktur.
 - **E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek? — `Product decision required`:** Output/display matrisi kullanıcıyla okunup açıkça onaylanmadan tamamlanmış sayılamaz.
+- **Provider OAuth montaj kararı:** Connect/account selection/reconnect/disconnect Shopify-native `Data Sources / Platforms` yüzeyindedir; üçüncü taraf consent top-level resmi App Bridge navigasyonuyla açılır ve callback canonical embedded app URL'sine döner. Ayrı AdsTable login/dashboard veya iframe içinde provider consent yoktur.
 - **Mutlak sıra kapısı:** Kullanıcı bu dokuz maddeyi ve hazırlanacak T5-C output/display matrisini Execution Plan içinde okuyup açıkça onaylamadan E10-T6–T10, E11 veya E12 için yeni paket, branch, kod ya da PR açılamaz.
 
 ### Planlanan işler

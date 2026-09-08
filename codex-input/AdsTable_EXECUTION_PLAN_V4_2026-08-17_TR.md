@@ -103,9 +103,10 @@ Her paket koordinasyon özetinde önce tek cümlelik **iş çıktısı** ve öl�
 | Phase 5 | TikTok adapter | Gerçek metrics ve synthetic ayrımı | **Açık — E6** |
 | Phase 6 | Klaviyo adapter | Campaign/Flow/Message ve Email/SMS | **Açık — E7** |
 | Phase 7 | GA4 Organic | Property/domain/timezone/currency/provenance | **Açık — E8** |
-| Phase 8 | Funnel API | Authenticated, scope-aware backend output | **Açık — E10** |
-| Phase 9 | Funnel backend binding | Mock/API flag ve presentation-only UI | **Açık — E11** |
-| Phase 10 | Parity/geçiş | Uçtan uca zincir doğrulaması | **E4–E12 boyunca zorunlu kapı** |
+| Phase 8 | Shopify Public Embedded Foundation | Install/auth, shop-workspace, minimum scope, billing ve review readiness | **Açık — E10** |
+| Phase 9 | Funnel API | Shopify-aware, authenticated ve scope-aware backend output | **Açık — E11** |
+| Phase 10 | Embedded dashboard binding | App Bridge shell ve presentation-only Funnel UI | **Açık — E12** |
+| Phase 11 | Parity/geçiş | Uçtan uca zincir doğrulaması | **E4–E13 boyunca zorunlu kapı** |
 
 > Phase 1 ve Phase 2'nin `Done` işareti yalnız kendi önceki faz sınırları içindir. Canlı DB kabulü, runtime ingest ve production binding'in tamamlandığı anlamına gelmez.
 
@@ -113,7 +114,7 @@ Her paket koordinasyon özetinde önce tek cümlelik **iş çıktısı** ve öl�
 
 V3 §10.2'nin ana kararı yalnız entity seviyelerinin farklılığı değildir. **Meta, Google, TikTok, Klaviyo ve GA4 kaynaklı Organic dahil bütün adapter'ların aynı canonical envelope'a normalize edilmesidir.** Bu standart provider'ların farklı API şekillerini Dataset V2, Formula Engine, Funnel API ve UI için tek dile çeviren mimari omurgadır. Bir adapter'ın bu envelope dışına çıkması provider-specific şemaları yeniden bütün katmanlara sızdırır ve sistemi başlangıç noktasına döndürür.
 
-Bu nedenle aşağıdaki envelope V4'te E0–E13 boyunca **değiştirilemez cross-cutting contract ve acceptance gate** olarak freeze edilmiştir. Adapter'lar yalnız alanların değerini ve provider capability'sine göre support durumunu belirler; blokları kaldırmaz, yeniden adlandırmaz veya provider'a özel paralel payload üretmez.
+Bu nedenle aşağıdaki envelope V4'te E0–E14 boyunca **değiştirilemez cross-cutting contract ve acceptance gate** olarak freeze edilmiştir. Adapter'lar yalnız alanların değerini ve provider capability'sine göre support durumunu belirler; blokları kaldırmaz, yeniden adlandırmaz veya provider'a özel paralel payload üretmez.
 
 Canonical model provider'da bulunmayan bir seviyeyi uydurmaz. Her leaf satır provider'ın gerçekten desteklediği en düşük analytical entity'yi temsil eder; root ve parent lineage açıkça taşınır.
 
@@ -410,7 +411,7 @@ GA4 Organic satırın analytical `platform_account_id` değeri GA4 Property ID d
 - Snapshot capture evidence, job/debug history ve legacy compatibility rolünü korur.
 - Dataset V2 Funnel, Paid/Organic/Blend, Compare, Intent ve Export'un yeni source-of-truth'udur.
 - Operational Dashboard/Auth/Connect/Account/Refresh/Job lifecycle cutover'dan etkilenmez.
-- V1 read ve legacy analysis yalnız parity, consumer-zero ve rollback süresi tamamlanınca E13'te emekli edilir.
+- V1 read ve legacy analysis yalnız parity, consumer-zero ve rollback süresi tamamlanınca E14'te emekli edilir.
 
 #### Dataset kabul/test/rollback kapısı
 
@@ -418,7 +419,7 @@ GA4 Organic satırın analytical `platform_account_id` değeri GA4 Property ID d
 - Organic platform-account/property ayrımı ve unmatched rejection test edilir.
 - Raw tabloda derived KPI veya snapshot-version duplication bulunamaz.
 - Dual-write run'ında V1 no-change ve V1/V2 raw parity evidence üretilir.
-- V2 read flag kapatılabilir; legacy yol stabilizasyon boyunca korunur. Destructive retirement yalnız E13 kapsamındadır.
+- V2 read flag kapatılabilir; legacy yol stabilizasyon boyunca korunur. Destructive retirement yalnız E14 kapsamındadır.
 
 ### 2.5 Backend analysis boundary ve deferred capability — V4 freeze
 
@@ -436,19 +437,19 @@ Bu boundary'lerden sapma yeni provider ihtiyacı gerekçesiyle epic içinde yap�
 | V3 teknik standardı | V4 freeze/gate | Uygulama epic'leri |
 |---|---|---|
 | §10.1 Platform/source/channel | Canonical envelope invariants | E0, E4–E8 |
-| §10.2 Capability-aware hierarchy | Hierarchy matrix, deterministic identity ve sentetik seviye yasağı | E0, E2, E4–E11 |
-| §10.3 Metric Support/NULL | Envelope invariant, support propagation ve UI state | E2, E4–E11 |
+| §10.2 Capability-aware hierarchy | Hierarchy matrix, deterministic identity ve sentetik seviye yasağı | E0, E2, E4–E12 |
+| §10.3 Metric Support/NULL | Envelope invariant, support propagation ve UI state | E2, E4–E12 |
 | §10.4 Organic account mapping | Deterministic AdsTable account + ayrı GA4 provenance | E2, E8, E9 |
 | §10.5–10.7 Klaviyo channel/spend | Ortak envelope, channel ve provenance/fallback ayrımı | E7 |
 | §11 Time Engine | Provider/Property timezone ve UTC fallback yasağı | E4–E9 |
 | §12 FX Engine | Formula öncesi dört monetary fact için tek rate | E4–E9 |
-| §13 Analysis/Formula | Backend-only Paid/Organic/Blend ve versionlı formulas | E10–E11 |
-| §14 Aggregation | Aggregate-first, ratio-average ve double-count yasağı | E4–E11 |
-| §15 Dataset V2 | Raw source-of-truth, canonical grain ve unique upsert | E2, E4–E10 |
-| §16 V1/V2 transition | Dual-write, parity, operational compatibility | E4–E9, E12–E13 |
-| §17 Funnel API | Authenticated backend analysis boundary | E10–E11 |
-| §18 Compare | Aynı engine, previous-zero `null`, versionlı period policy | E10–E11 |
-| §19 Intent/Ranking | Paid-only Intent; Ranking deferred ve capability-aware | E10–E11 |
+| §13 Analysis/Formula | Backend-only Paid/Organic/Blend ve versionlı formulas | E11–E12 |
+| §14 Aggregation | Aggregate-first, ratio-average ve double-count yasağı | E4–E12 |
+| §15 Dataset V2 | Raw source-of-truth, canonical grain ve unique upsert | E2, E4–E11 |
+| §16 V1/V2 transition | Dual-write, parity, operational compatibility | E4–E9, E13–E14 |
+| §17 Funnel API | Authenticated backend analysis boundary | E11–E12 |
+| §18 Compare | Aynı engine, previous-zero `null`, versionlı period policy | E11–E12 |
+| §19 Intent/Ranking | Paid-only Intent; Ranking deferred ve capability-aware | E11–E12 |
 
 Bu matris V3 standardının yalnız “referans” olarak kalıp execution task'larında unutulmasını engeller. Bir V3 standardı uygulanırken ilgili V4 gate'in kabul, test, rollback ve evidence maddeleri task aynasına kopyalanır.
 
@@ -466,19 +467,22 @@ Bu matris V3 standardının yalnız “referans” olarak kalıp execution task'
 | **E7** | Klaviyo adapter | E4 | Campaign/Flow/channel kabulü |
 | **E8** | GA4 Organic adapter | E4 | Organic provenance kabulü |
 | **E9** | Backfill ve data readiness | İlgili adapter | Coverage/parity eşikleri sağlanmış |
-| **E10** | Funnel API | E2 + E3 + gerçek V2 veri | API security/contract kabulü |
-| **E11** | Dashboard modularization ve Funnel UI binding | E10 + parity | UI canary kabulü |
-| **E12** | Production cutover | E4–E11 | Full production GO |
-| **E13** | Legacy retirement ve monolit kapanışı | Stabilizasyon dönemi | V1 consumer sıfır; legacy yüzey kaldırılmış |
+| **E10** | Shopify Public Embedded Foundation | E9 implementation + ürün GO kararı | Review-ready install/auth/tenant/billing/embedded foundation |
+| **E11** | Funnel API | E10 + E2 + E3 + gerçek V2 veri | Shopify-aware API security/contract kabulü |
+| **E12** | Shopify Embedded dashboard ve Funnel UI binding | E10 + E11 + parity | Embedded UI canary kabulü |
+| **E13** | Production cutover | E4–E12 | Full production GO |
+| **E14** | Legacy retirement ve monolit kapanışı | Stabilizasyon dönemi | V1 consumer sıfır; legacy yüzey kaldırılmış |
 
 ### 3.1 Bağımlılık grafiği
 
 ```text
 E0 → E1 ─┬→ E2 ───────────────┬→ E4 → E5/E6/E7/E8 → E9 ─┐
          └→ E3 ───────────────┤                           │
-                              └→ E10 ─────────────────→ E11
-                                                           ↓
-                                                          E12 → E13
+                              └─────────────────────────────┴→ E10 Shopify Foundation
+                                                                  ↓
+                                                         E11 Funnel API → E12 Embedded UI
+                                                                  ↓
+                                                              E13 → E14
 ```
 
 E5–E8, Meta referans vertical slice kabul edildikten sonra kapasiteye göre paralel yürütülebilir. E9 her provider için ayrı cursor ve readiness durumu taşır.
@@ -539,7 +543,7 @@ Mutabakat dışında bağımlılık yoktur.
 - **E1-T3 — `Done` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction store; SHA-256 state özeti, 10 dakika TTL, provider/redirect/user bağları ve Klaviyo PKCE taşımasıyla kuruldu.
 - **E1-T4 — `Done` — Session elimination:** E1-T3 sonrasında runtime session consumer kalmadığı doğrulandığı için kullanılmayan shared store eklemek yerine Express session katmanı tamamen kaldırıldı. Böylece MemoryStore, known fallback secret, session cookie ve multi-instance affinity riski ortadan kaldırıldı.
 - **E1-T5 — `Done` — Unsafe default guard:** Review/test hard-route ve sandbox varsayılanları kapatıldı. Production'daki `UNSAFE_PRODUCTION_CONFIG`, Production scope'undaki `TIKTOK_SANDBOX_ACCESS_TOKEN` değişkeninden kaynaklandı; PR #15'in secret-free structured diagnostic'i yalnız değişken adını gösterdi. Değişken kaldırılıp yeni deployment alındıktan sonra site ve login normale döndü; hiçbir secret değeri loglanmadı ve guard beklendiği gibi fail-closed çalıştı.
-- **E1-T6 — `Done` — Token protection:** E1-T6A vault, E1-T6B canlı schema/RLS/grant acceptance, E1-T6C Production activation, E1-T6D backfill ve orphan cleanup ve E1-T6E plaintext nulling tamamlandı. Final Production değerleri encryption enabled = `true`, legacy read enabled = `false`; final DB acceptance 7 connected, 7 encrypted, 0 auth-orphan, 0 missing encrypted, 0 plaintext access ve 0 plaintext refresh sonucunu verdi. Site ve login çalışıyor; legacy read kapalıyken Refresh Completed ve encrypted-only provider runtime acceptance tamamlandı. Plaintext kolonların fiziksel drop işlemi E13 Legacy Retirement kapsamına taşındı.
+- **E1-T6 — `Done` — Token protection:** E1-T6A vault, E1-T6B canlı schema/RLS/grant acceptance, E1-T6C Production activation, E1-T6D backfill ve orphan cleanup ve E1-T6E plaintext nulling tamamlandı. Final Production değerleri encryption enabled = `true`, legacy read enabled = `false`; final DB acceptance 7 connected, 7 encrypted, 0 auth-orphan, 0 missing encrypted, 0 plaintext access ve 0 plaintext refresh sonucunu verdi. Site ve login çalışıyor; legacy read kapalıyken Refresh Completed ve encrypted-only provider runtime acceptance tamamlandı. Plaintext kolonların fiziksel drop işlemi E14 Legacy Retirement kapsamına taşındı.
 - **E1-T7 — `Done` — Security regression suite:** Auth, IDOR, tamper, replay ve expiry regression suite hazırlandı; dedicated `test:security` komutu eklendi. Security CI pull request ve `main` push üzerinde production secret veya environment kullanmadan security ve full regression testlerini çalıştırır.
 
 ### Kabul kriterleri
@@ -1831,21 +1835,58 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 İlgili provider adapter acceptance; tarih kapsamı; quota ve parity eşikleri.
 
-## 14. E10 — Funnel API
+## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `Not started`
+**Durum:** `Approved GO — planning frozen; implementation not started`
+
+### Ürün ve mimari kararı
+
+AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shopify Public Embedded App yönüne ilerler. Shopify kurulum, doğrulanmış shop identity, embedded dağıtım ve Shopify-origin merchant için mümkünse billing kanalıdır; AdsTable provider adapter'ları, Dataset V2, Formula Engine ve Funnel API business logic'in sahibidir. İlk sürümde bir Shopify shop bir AdsTable workspace'e bağlanır; multi-store/agency üst katmanı ertelenir. Shopify-observed order/revenue ile provider-reported conversion aynı fact olarak birleştirilmez.
 
 ### Planlanan işler
 
-- **E10-T1:** Versionlı `/api/funnel/data` request/response contract.
-- **E10-T2:** Bearer auth, user/account ownership; query user ID yasağı.
-- **E10-T3:** Date/platform/account/entity ve pagination guard'ları.
-- **E10-T4:** Paid/Organic/Blend repository query ve aggregate.
-- **E10-T5:** Formula, Compare ve Paid-only Intent backend output'u.
-- **E10-T6:** Metric support, currency, contract/engine version metadata.
-- **E10-T7:** Freshness, partial ve warnings metadata.
-- **E10-T8:** Contract, security, performance ve observability testleri.
-- **E10-T9:** V4 §2.1 hierarchy contract'ına göre branch-aware root/parent/leaf ve stable `entity_key` response'u.
+- **E10-T1 — Official requirements freeze:** Uygulamaya başlamadan önce güncel resmi Shopify dokümantasyonundan Public App, embedded auth, App Bridge, billing, privacy/protected-data ve App Store review gereksinimlerini linkli decision log ile doğrula; doğrulanmamış varsayımı implementation contract yapma.
+- **E10-T2 — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını dondur. Browser query/body içindeki shop, user veya workspace kimliğini authoritative kabul etme.
+- **E10-T3 — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
+- **E10-T4 — Token, uninstall ve privacy lifecycle:** Shopify token'larını mevcut encrypted vault ilkelerine bağla; browser/log erişimini yasakla; uninstall, shop erişim kaybı ve zorunlu privacy/compliance webhook'larında erişimi fail-closed durdur ve retention/deletion kararlarını kanıtla.
+- **E10-T5 — Minimum scope ve commerce contract:** Mockup/Funnel ekranlarının gerçek veri gereksinimlerinden minimum scope matrisi çıkar. İlk dilimde mümkün olduğunca PII alma; Shopify-observed order, refund, revenue, currency ve timezone facts ile provider-reported attribution'ı ayrı provenance altında tut.
+- **E10-T6 — Webhook ve initial sync:** İmza doğrulama, replay/idempotency, sıra dışı/gecikmiş event, checkpoint, retry ve initial sync sınırlarını kur. Webhook provider payload'u canonical doğrulama sınırını atlayarak Dataset V2'ye yazamaz.
+- **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
+- **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
+- **E10-T9 — App Store review-first workstream:** Listing, minimum-scope gerekçesi, test store, reviewer erişimi ve talimatları, privacy/support/data-deletion yüzeyleri, install-to-value videosu ve provider bağlı değilken incelenebilir demo/empty-state paketini geliştirmeyle paralel yürüt. Review hazırlığını sona bırakma.
+- **E10-T10 — Acceptance package:** Install/reinstall/uninstall, session/IDOR, webhook HMAC/replay, token redaction, scope, billing, CSP, mobile embedded UX ve review checklist için otomatik test ve redacted evidence paketi üret.
+
+### Kabul kriterleri
+
+- Shopify tarafından doğrulanmamış shop/user/workspace kimliği hiçbir backend yetkisi vermez.
+- Bir shop yalnız kendi workspace, bağlantı, billing entitlement ve analytics verisine ulaşabilir; cross-shop erişim reddedilir.
+- Token, webhook secret, session material, provider payload ve müşteri PII'si browser'a veya loglara sızmaz.
+- Uninstall ve privacy lifecycle'ı yeni provider çağrılarını durdurur ve belgelenmiş retention/deletion politikasını uygular.
+- Minimum scope matrisi her izni görünür ürün çıktısına bağlar; gereksiz protected customer data talep edilmez.
+- Shopify-observed commerce facts, provider-reported conversion facts ve ilerideki AdsTable attribution sonucu provenance ile ayrıdır.
+- Billing entitlement server-side doğrulanır; ödeme ekranı embedded güven avantajını bozacak bağımsız yönlendirmeye zorlanmaz.
+- App Store review paketi implementation boyunca güncel tutulur ve submission öncesi ayrı insan onayı gerektirir.
+- Mevcut canonical envelope, Dataset V2 ve backend-only Formula/Funnel sınırları korunur.
+
+### Rollback ve production sınırı
+
+E10 geliştirmesi feature-gated ilerler. Shopify Partner Dashboard ayarı, production credential, scope talebi, billing aktivasyonu, migration, webhook registration ve App Store submission ayrı açık production onayı olmadan yapılmaz. Embedded yüzey kapatıldığında mevcut bağımsız AdsTable backend ve legacy rollback yolu zarar görmez.
+
+## 15. E11 — Funnel API
+
+**Durum:** `Blocked by E10 Shopify Foundation`
+
+### Planlanan işler
+
+- **E11-T1:** Versionlı `/api/funnel/data` request/response contract.
+- **E11-T2:** Shopify embedded session veya açıkça desteklenen bağımsız bearer auth; shop/workspace/user/account ownership ve query identity yasağı.
+- **E11-T3:** Date/platform/account/entity ve pagination guard'ları.
+- **E11-T4:** Paid/Organic/Blend repository query ve aggregate.
+- **E11-T5:** Formula, Compare ve Paid-only Intent backend output'u.
+- **E11-T6:** Metric support, currency, contract/engine version metadata.
+- **E11-T7:** Freshness, partial ve warnings metadata.
+- **E11-T8:** Contract, security, performance ve observability testleri.
+- **E11-T9:** V4 §2.1 hierarchy contract'ına göre branch-aware root/parent/leaf ve stable `entity_key` response'u.
 
 ### Kabul kriterleri
 
@@ -1869,7 +1910,7 @@ API version ve read feature flag; V1 endpoint'leri korunur; breaking contract ye
 
 E2, E3 ve en az bir kabul edilmiş gerçek provider V2 veri seti; contract freeze.
 
-## 15. E11 — Dashboard modularization ve Funnel UI binding
+## 16. E12 — Shopify Embedded dashboard modularization ve Funnel UI binding
 
 **Durum:** `Not started`
 
@@ -1896,17 +1937,17 @@ Framework değişimi bu planın ön koşulu değildir; önce sorumluluk sınırl
 
 ### Planlanan işler
 
-- **E11-T1:** Kritik dashboard davranışları için browser E2E baseline.
-- **E11-T2:** Minimal dashboard shell/bootstrap ayrımı.
-- **E11-T3:** Merkezi auth-aware API client ve error/timeout/abort davranışı.
-- **E11-T4:** Feature-based state ve component sınırları.
-- **E11-T5:** Funnel API→presentation adapter; business math yok.
-- **E11-T6:** `0`, `null`, unsupported, unknown, loading, empty, partial, stale ve error state'leri.
-- **E11-T7:** Standard/PMax/Klaviyo/Organic capability-aware hierarchy.
-- **E11-T8:** Compare/Intent/Export backend contract binding.
-- **E11-T9:** `legacy_dashboard|funnel_api_canary|funnel_api_enabled` flags.
-- **E11-T10:** Mock/API golden parity, responsive E2E ve canary telemetry.
-- **E11-T11:** Yeni UI business logic'inin inline `dashboard.html`a eklenmesini engelleyen architecture guard.
+- **E12-T1:** Kritik dashboard davranışları için browser E2E baseline.
+- **E12-T2:** Minimal dashboard shell/bootstrap ayrımı.
+- **E12-T3:** Merkezi auth-aware API client ve error/timeout/abort davranışı.
+- **E12-T4:** Feature-based state ve component sınırları.
+- **E12-T5:** Funnel API→presentation adapter; business math yok.
+- **E12-T6:** `0`, `null`, unsupported, unknown, loading, empty, partial, stale ve error state'leri.
+- **E12-T7:** Standard/PMax/Klaviyo/Organic capability-aware hierarchy.
+- **E12-T8:** Compare/Intent/Export backend contract binding.
+- **E12-T9:** `legacy_dashboard|funnel_api_canary|funnel_api_enabled` flags.
+- **E12-T10:** Mock/API golden parity, responsive E2E ve canary telemetry.
+- **E12-T11:** Yeni UI business logic'inin inline `dashboard.html`a eklenmesini engelleyen architecture guard.
 
 ### Kabul kriterleri
 
@@ -1938,7 +1979,7 @@ Framework değişimi bu planın ön koşulu değildir; önce sorumluluk sınırl
 
 ### Bağımlılıklar
 
-- E10.
+- E10 Shopify Embedded shell contract ve E11 Funnel API.
 - Kabul edilmiş provider parity/readiness.
 - UI E2E baseline ve feature flag altyapısı.
 
@@ -1949,18 +1990,18 @@ Framework değişimi bu planın ön koşulu değildir; önce sorumluluk sınırl
 - Canary telemetry.
 - Gerekli perceptible değişiklikler için ekran görüntüleri.
 
-## 16. E12 — Production cutover
+## 17. E13 — Production cutover
 
 **Durum:** `Not started`
 
 ### Planlanan işler
 
-- **E12-T1:** GO/NO-GO checklist ve sorumlu onayları.
-- **E12-T2:** Provider/account yüzdeli canary ramp.
-- **E12-T3:** Error, lag, partial, rejection ve parity alertleri.
-- **E12-T4:** Backup/restore ve rollback tatbikatı.
-- **E12-T5:** Support/incident runbook ve iletişim planı.
-- **E12-T6:** Full production enable ve stabilizasyon gözlemi.
+- **E13-T1:** GO/NO-GO checklist ve sorumlu onayları.
+- **E13-T2:** Provider/account yüzdeli canary ramp.
+- **E13-T3:** Error, lag, partial, rejection ve parity alertleri.
+- **E13-T4:** Backup/restore ve rollback tatbikatı.
+- **E13-T5:** Support/incident runbook ve iletişim planı.
+- **E13-T6:** Full production enable ve stabilizasyon gözlemi.
 
 ### Kabul kriterleri
 
@@ -1980,21 +2021,21 @@ UI ve API read flag'leri legacy'ye döner; provider V2 write gerekirse ayrı kap
 
 ### Bağımlılıklar
 
-E4–E11 kapsamındaki hedef provider, readiness, API ve UI kapıları.
+E4–E12 kapsamındaki hedef provider, readiness, API ve UI kapıları.
 
-## 17. E13 — Legacy retirement ve monolit kapanışı
+## 18. E14 — Legacy retirement ve monolit kapanışı
 
 **Durum:** `Not started`
 
 ### Planlanan işler
 
-- **E13-T1:** V1/snapshot consumer envanteri ve sıfırlama.
-- **E13-T2:** Read-disable/observe dönemi.
-- **E13-T3:** Legacy route/function/inline UI dead-code kaldırma.
-- **E13-T4:** `server.js`i composition root seviyesine indirme.
-- **E13-T5:** `dashboard.html`ı minimal presentation shell seviyesine indirme.
-- **E13-T6:** Dataset retention/audit ve ayrı retirement migration kararı.
-- **E13-T7:** Operasyon/runbook/documentation kapanışı.
+- **E14-T1:** V1/snapshot consumer envanteri ve sıfırlama.
+- **E14-T2:** Read-disable/observe dönemi.
+- **E14-T3:** Legacy route/function/inline UI dead-code kaldırma.
+- **E14-T4:** `server.js`i composition root seviyesine indirme.
+- **E14-T5:** `dashboard.html`ı minimal presentation shell seviyesine indirme.
+- **E14-T6:** Dataset retention/audit ve ayrı retirement migration kararı.
+- **E14-T7:** Operasyon/runbook/documentation kapanışı.
 
 ### Hedef son durum
 
@@ -2022,7 +2063,7 @@ Read-disable gözleminden önce destructive işlem yoktur. Retirement ayrı migr
 
 ### Bağımlılıklar
 
-E12 stabilizasyon süresi; V1 consumer sıfır; retention/audit ve rollback onayı.
+E13 stabilizasyon süresi; V1 consumer sıfır; retention/audit ve rollback onayı.
 
 ## 18. Ortak kalite, güvenlik ve evidence kapıları
 
@@ -2161,10 +2202,11 @@ Her kapsam/sıra/contract değişikliği şu kayıtla yapılır:
 6. E4 Meta referans vertical slice'ı dual-write/parity ile aç.
 7. E5–E8 provider'larını kontrollü ilerlet.
 8. E9 backfill/readiness'i provider bazında işlet.
-9. E10 Funnel API'yi gerçek V2 veriyle kabul et.
-10. E11 dashboard modularization ve UI canary'yi tamamla.
-11. E12 kontrollü production cutover yap.
-12. E13'te consumer sıfırlandıktan sonra legacy ve monolit kapanışını gerçekleştir.
+9. E10 Shopify Public Embedded Foundation ve review-first paketini tamamla.
+10. E11 Funnel API'yi Shopify-aware auth ve gerçek V2 veriyle kabul et.
+11. E12 embedded dashboard ve UI canary'yi tamamla.
+12. E13 kontrollü production cutover yap.
+13. E14'te consumer sıfırlandıktan sonra legacy ve monolit kapanışını gerçekleştir.
 
 ## 22. Nihai mutabakat
 
@@ -2177,7 +2219,7 @@ Bu V4 plan ile:
 - Time→FX→Dataset V2→aggregate→Formula/Compare/Intent→API→UI işlem sırası hiçbir provider için atlanamaz veya yeniden sıralanamaz.
 - Paid/Organic/Blend, aggregate-first formulas, canonical Dataset grain, deterministic Organic account mapping ve backend-only analysis boundary ortak mimari standartlardır.
 - Gate 0/E1 güvenlik ve Gate 1/E2 canlı DB kabulü provider ingest'in önündedir.
-- `server.js` ve `dashboard.html` yorgunluğu bağımsız kabul/test/rollback/bağımlılıkları olan E3, E11 ve E13 işleriyle yönetilir.
+- `server.js` ve `dashboard.html` yorgunluğu bağımsız kabul/test/rollback/bağımlılıkları olan E3, E12 ve E14 işleriyle yönetilir.
 - Big-bang rewrite yapılmaz; monolit büyütülmez ve dokunulan alan güvenli biçimde çıkarılır.
 - Her task planlanan/gerçekleşen/sapma/evidence ayrımını taşır.
 - Production cutover ve legacy retirement ölçülebilir GO kapıları olmadan yapılmaz.
@@ -2204,13 +2246,13 @@ Bu V4 plan ile:
 
 **Gerçekleşen (E1-T6D — backfill ve orphan cleanup tamamlandı):** Final kabul 7 connected, 7 encrypted, 0 auth-orphan ve 0 connected-without-encrypted-token sonucunu verdi.
 
-**Gerçekleşen (E1-T6E — plaintext nulling tamamlandı):** Global plaintext access token 0, plaintext refresh token 0 ve herhangi bir plaintext token 0 olarak kabul edildi. Encrypted envelope'lar korunmuştur. Fiziksel plaintext kolon drop işlemi E13 Legacy Retirement kapsamına taşındı.
+**Gerçekleşen (E1-T6E — plaintext nulling tamamlandı):** Global plaintext access token 0, plaintext refresh token 0 ve herhangi bir plaintext token 0 olarak kabul edildi. Encrypted envelope'lar korunmuştur. Fiziksel plaintext kolon drop işlemi E14 Legacy Retirement kapsamına taşındı.
 
-**Sapma:** İlk backfill'de iki auth-orphan bağlantı görüldü ve guarded cleanup ile kaldırıldı. Production config incident'ı Production scope'undaki `TIKTOK_SANDBOX_ACCESS_TOKEN` nedeniyle oluştu; PR #15 secret-free diagnostic yalnız variable ismini gösterdi ve variable kaldırıldı. Plaintext kolonların fiziksel drop işlemi T6'dan E13 Legacy Retirement kapsamına taşındı.
+**Sapma:** İlk backfill'de iki auth-orphan bağlantı görüldü ve guarded cleanup ile kaldırıldı. Production config incident'ı Production scope'undaki `TIKTOK_SANDBOX_ACCESS_TOKEN` nedeniyle oluştu; PR #15 secret-free diagnostic yalnız variable ismini gösterdi ve variable kaldırıldı. Plaintext kolonların fiziksel drop işlemi T6'dan E14 Legacy Retirement kapsamına taşındı.
 
 **Kabul:** Final Production kabulü 7 connected, 7 encrypted, 0 auth-orphan, 0 connected-without-encrypted-token, 0 plaintext access ve 0 plaintext refresh sonucunu verdi. Encryption enabled = `true`, legacy read enabled = `false`; site/login başarılıdır ve legacy read kapalıyken Refresh Completed sonucu alınmıştır. Ciphertext/AAD tamper reddedilir; token veya secret log ve evidence artefaktlarına girmez.
 
-**Rollback:** Güvenli olmayan query-controlled/session-bound OAuth identity yolu geri getirilemez ve active encryption key silinemez. Gerekli eski keyler rotation/rollback süresi boyunca keyring'de korunur; encrypted envelope'lar rollback amacıyla silinmez ve plaintext tokenlar geri yüklenmez. Runtime sorunu olursa yeni bağlantı/refresh kontrollü durdurulur; plaintext identity/token yoluna dönülmez. Fiziksel kolon drop E13 stabilizasyon kapısına kadar uygulanmaz.
+**Rollback:** Güvenli olmayan query-controlled/session-bound OAuth identity yolu geri getirilemez ve active encryption key silinemez. Gerekli eski keyler rotation/rollback süresi boyunca keyring'de korunur; encrypted envelope'lar rollback amacıyla silinmez ve plaintext tokenlar geri yüklenmez. Runtime sorunu olursa yeni bağlantı/refresh kontrollü durdurulur; plaintext identity/token yoluna dönülmez. Fiziksel kolon drop E14 stabilizasyon kapısına kadar uygulanmaz.
 
 **Evidence:** E1-T6B schema/RLS/grant acceptance tamamlandı. Production dry-run 9 eligible; controlled write 7 written / 2 auth-orphan failure verdi ve guarded orphan cleanup sonrasında final 7 connected / 7 encrypted / 0 auth-orphan / 0 missing encrypted kabulü alındı. Plaintext nulling sonrasında global plaintext access ve refresh sayıları 0 oldu. Production encryption `true`, legacy read `false` durumunda encrypted-only Refresh Completed sonucu alındı. PR #15 secret-free diagnostic production config incident'ında yalnız unsafe variable ismini raporladı. E1-T7 dedicated `test:security` komutu ve secretsiz CI kapısı security ve full regression paketlerini başarıyla çalıştırır.
 

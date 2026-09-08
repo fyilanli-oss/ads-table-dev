@@ -1,0 +1,9 @@
+"use strict";
+const fs=require("node:fs"),path=require("node:path"),test=require("node:test"),assert=require("node:assert/strict");
+const root=path.join(__dirname,"..");
+const plan=fs.readFileSync(path.join(root,"codex-input","AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md"),"utf8"),decision=fs.readFileSync(path.join(root,"docs","SHOPIFY_PUBLIC_EMBEDDED_APP_DECISION.md"),"utf8");
+test("Shopify GO is inserted before the blocked Funnel API",()=>{assert.ok(plan.indexOf("## 14. E10 — Shopify Public Embedded App Foundation")<plan.indexOf("## 15. E11 — Funnel API"));assert.match(plan,/E11 — Funnel API[\s\S]*Blocked by E10 Shopify Foundation/)});
+test("Shopify foundation freezes all ten review-first workstreams",()=>{for(let task=1;task<=10;task++)assert.match(plan,new RegExp(`E10-T${task}`));assert.match(plan,/E10-T9 — App Store review-first workstream/);assert.match(plan,/Review hazırlığını sona bırakma/)});
+test("Shopify decision preserves backend boundaries and separates commerce provenance",()=>{assert.match(decision,/backend\/canonical analytics omurgasını koruyarak/);assert.match(decision,/Shopify-observed order\/revenue.*provider-reported conversion aynı fact değildir/);assert.match(decision,/Browser.*identity authoritative değildir/)});
+test("Shopify plan requires official verification and separate production approval",()=>{assert.match(decision,/güncel resmi Shopify dokümantasyonundan/);assert.match(decision,/doğrulanmayan bir internet bilgisi teknik sözleşme kabul edilmez/);assert.match(decision,/ayrı açık production onayı/)});
+test("downstream epics are consistently shifted",()=>{assert.match(plan,/## 16\. E12 — Shopify Embedded dashboard modularization/);assert.match(plan,/## 17\. E13 — Production cutover/);assert.match(plan,/## 18\. E14 — Legacy retirement/);assert.doesNotMatch(plan,/## 14\. E11|## 15\. E12|## 16\. E13/)});

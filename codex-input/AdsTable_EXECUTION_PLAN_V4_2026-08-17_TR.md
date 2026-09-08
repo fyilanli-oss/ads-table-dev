@@ -1783,12 +1783,12 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 
 ## 13. E9 — Backfill ve data readiness
 
-**Durum:** `In progress — E9-T1 Done; E9-T2 next`
+**Durum:** `In progress — E9-T1/T2 Done; E9-T3 next`
 
 ### Planlanan işler
 
 - **E9-T1 — Done:** İlk hazırlama yesterday/finalized ardından today/provisional; Meta, Google, TikTok, Klaviyo; aktif ownership bulunan seçili hesaplardan provider başına en fazla 3; parked provider dışarıda; eski tarihçe otomatik değil; 14. günde günlük birikim devam eder.
-- **E9-T2:** Gün/platform/account bazında resumable cursor ve checkpoint.
+- **E9-T2 — Done:** User/platform/account/business-date/date-key unique checkpoint; opaque cursor; terminal replay engeli; service-role-only persistence.
 - **E9-T3:** Rate-limit/quota budget ve adaptive retry.
 - **E9-T4:** Canonical upsert ile idempotent batch.
 - **E9-T5:** Completeness, duplicate, metric support, timezone, FX, freshness ölçümü.
@@ -1798,6 +1798,8 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 ### E9-T1 karar kanıtı
 
 `src/backfill/onboarding-scope.js`, `tests/e9-t1-onboarding-scope.test.js` ve `docs/E9_T1_ONBOARDING_BACKFILL_SCOPE.md`. Bu görev production backfill çalıştırmaz.
+
+**E9-T2 kanıtı:** `src/backfill/checkpoint.js`, `supabase/migrations/20260908074500_create_backfill_checkpoints.sql`, `tests/e9-t2-checkpoint.test.js`, `docs/E9_T2_RESUMABLE_CHECKPOINT.md`. Production migration/backfill çalıştırılmadı.
 
 ### Kabul kriterleri
 

@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T1/T2/T3/T4 Done; E10-T5 next`
+**Durum:** `In progress — E10-T1/T2/T3/T4 Done; E10-T5-A Done, T5-B next`
 
 ### Ürün ve mimari kararı
 
@@ -1901,6 +1901,54 @@ Verified session→active tenant→injectable exchange→encrypted store zinciri
 Verified-event allowlist, uninstall/access-loss token revocation sırası, compliance subject scope, replay claim ve redacted evidence `src/shopify/privacy-lifecycle.js` içinde executable hale getirildi. Negatif/replay/order testleri `tests/e10-t4-privacy-lifecycle.test.js`, retention/deletion ve production sınırları `docs/E10_T4_TOKEN_PRIVACY_LIFECYCLE.md` içindedir.
 
 **Durum:** E10-T4 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T5 minimum scope ve commerce contract'tır. Gerçek webhook, token/data deletion, migration, Partner Dashboard veya production işlemi çalıştırılmadı.
+
+### E10-T5-A ürün/UI karar freeze'i — Shopify-native Funnel ve metrik sözlüğü
+
+**Amaç:** E10-T5 minimum scope matrisi çıkarılmadan önce Funnel bilgi mimarisi, Shopify embedded görünüm sınırı, filtre/tarih/compare davranışı, metrik adları ve commerce provenance kararlarını kalıcı olarak dondurmak.
+
+#### Shopify-native embedded kabulü
+
+- AdsTable, Shopify Admin'i yalnız görsel olarak taklit eden bağımsız bir web sayfası veya iframe hissi veren ikinci bir tasarım sistemi kullanmaz. Embedded shell ve navigation App Bridge'e; genel UI kontrolleri implementation anında güncel ve resmi Shopify UI component sistemine bağlanır.
+- Button, button group/tabs, popover, modal/sheet, date picker, select/choice list, checkbox, applied-filter chip, banner, toast, loading/empty/error state, pagination, tooltip, typography, spacing, color, focus ve accessibility davranışı için özel AdsTable component karşılığı üretilmez. Resmi componentin iç DOM/CSS selector'ına bağımlılık veya onu özel CSS ile taklit etmek acceptance failure'dır.
+- AdsTable'a özgü alan yalnız business information architecture ve veri görselleştirmesidir: Funnel stage'leri, provider hierarchy drill-down, metrik hücreleri, compare delta, metric-support/data-freshness ve capability-aware table body. Bu alan da resmi Shopify design token, responsive ve accessibility sınırlarına uyar.
+- Mevcut Funnel HTML production component kaynağı değil, interaction/data-flow referansıdır. Statik Shopify shell'i, özel toolbar/dropdown/filter modal/toggle ve global theme CSS'i taşınmaz; davranış güncel resmi componentlerle yeniden kurulur.
+- Merchant uygulamayı Shopify'dan kopuk bir site gibi algılıyorsa, duplicate global navigation görüyorsa veya desktop sayfa mobil iframe'e sıkışıyorsa embedded UX kabulü FAIL olur. App Bridge/UI component deprecation ve sürüm geçişleri kontrollü dependency upgrade + visual regression + embedded smoke ile yönetilir.
+
+#### Toolbar, tarih ve comparison
+
+- Toolbar sırası `Time Range → Comparison → Filters`; yardımcı eylemler `Export → Data freshness/auto refresh → Data Sources → Funnel/Table` olur. Responsive kırılımda aynı resmi componentler ikinci satır/sheet düzenine geçebilir.
+- `Summary` varsayılan hızlı yönetici modudur ve `Today`, `Yesterday`, `Last 7 Days`, `This Month` kolonlarını gösterir. `Custom Range` seçildiğinde kolonlar `Current period`, `Comparison period`, `Change` olur; dört summary kolonu ile iki dönemli compare aynı tabloda üst üste bindirilmez.
+- İlk compare allowlist'i `No comparison`, `Previous period`, `Previous year`, `Previous year (match day of week)`, `Custom` olur. `Targets`, ayrı hedef/bütçe modeli olmadan ilk dilime alınmaz.
+- Compare/normalization/zero-denominator sonucu backend'de hesaplanır. Previous=0 iken yüzde uydurulmaz; `not comparable/new` semantiği taşınır. Unsupported veya unknown metrik `0` değil `null`/görsel `—` olur. Shop timezone ve server contract authority'dir; browser timezone authority değildir.
+
+#### Filters
+
+- Shopify Analytics'in `Visualization`, `Annotations`, `Cumulative` veya `Human or bot session` filtreleri kopyalanmaz. Filtre taxonomy'si AdsTable'a; button, popover/sheet, choice/search, selected chip, apply/clear ve mobil davranış resmi Shopify componentlerine aittir.
+- İlk UI filter allowlist'i `Platform`, `Connected account`, `Campaign/Flow`, provider-capability-aware group (`Ad Set`, `Ad Group`, `Asset Group`) ve leaf (`Ad`, `Campaign Message`, `Flow Message`) olur. `Data availability` daha sonraki kontrollü genişlemedir.
+- `Paid`, `Organic`, `Paid + Organic`, `Traffic Type` ve UTM-derived Organic frontend filter/segment değildir. GA4/Organic ingestion parked kalır; eksik veya güvenilmez UTM'den Organic üretilmez. Provider'a atfedilemeyen Shopify commerce `Unattributed` olur, otomatik `Organic` olmaz. Backend canonical `traffic_type` yalnız internal provenance/capability amacıyla kalabilir.
+- Filtre parent/child seçimi yalnız API'nin gerçek entity identity'leriyle yapılır; görünen addan identity türetilmez. Aktif seçimler removable chip ve açık seçim sayısıyla sunulur; authorization filtreden türetilmez.
+
+#### Funnel/Table akışı ve hierarchy
+
+- `Funnel` ve `Table`, aynı backend query/compare sonucunun iki resmi-component renderer'ıdır; frontend ayrı aggregation/formula/hierarchy üretmez. Switch sırasında time range, comparison, currency, filters ve data-source state korunur.
+- Funnel görünümünde dikey stage sırası `Traffic/Acquisition → Cart → Checkout → Purchase/Revenue`; ilk kolon metrik + expandable hierarchy, sağ kolonlar Summary dönemleri veya Custom current/comparison/change olur.
+- Table görünümünde ilk sticky kolon provider hierarchy; sağa doğru metric kolonlarıdır. Desktop geniş tablo, mobilde sticky identity + kontrollü yatay metric scroll/column selection kullanır.
+- Gerçek provider hierarchy korunur: Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad`; Google PMax `Campaign → Asset Group`; TikTok `Campaign → Ad Group → Ad`; Klaviyo `Campaign → Campaign Message` ve sibling `Flow → Flow Message`; Organic parked/platform-only. Eksik `Ad Group`, `Ad` veya parent uydurulmaz.
+
+#### Metrik sözlüğü ve provenance
+
+- AdsTable ürün sözlüğü: `Sales = satış değeri`, `Spend = reklam harcaması`, **`Revenue = Sales - Spend`**. Mevcut Formula Engine'deki aynı aritmetiği taşıyan teknik `profit` alanı UI/API contract geçişinde `Revenue` olarak adlandırılır; aynı değer hem Revenue hem Profit olarak iki kez sunulmaz.
+- Gerçek `Profit`, COGS, refund, shipping, transaction/payment fee ve diğer maliyet sözleşmeleri tamamlanmadan gösterilmez. `Margin` ilk dilimde kaldırılır; ileride hangi numerator/cost setini kullandığı isimli/versionlı contract olmadan açılmaz.
+- İlk Funnel metric ailesi: `Impression`, `Click`, `Spend`, `CTR`, `CPC`, `Add to Cart`, `Add to Cart Value`, `Checkout`, `Checkout Value`, `Abandoned`, `Abandoned Value`, `Purchase`, `Sales`, `Revenue`, `ROAS`, `CPS`. Her metric support durumu korunur; missing/unsupported/unknown sıfıra çevrilmez.
+- `Shopify-observed commerce`, `provider-reported attribution`, `AdsTable-calculated` ve `Unattributed` ayrı provenance aileleridir. Shopify Sales/refund ile provider conversion value sessizce toplanmaz veya birbirinin yerine geçirilmez. Frontend provenance birleştirme kararı vermez.
+
+#### E10-T5 alt paketleri ve durum
+
+- **E10-T5-A — Done:** Bu Shopify-native UI, Funnel/Table, filter, time/compare, hierarchy, Paid/Organic, metrik adı ve provenance ürün freeze'i.
+- **E10-T5-B — Next:** Her görünür Funnel çıktısı için `UI output → Shopify resource/field → minimum scope → PII class → retention/deletion → provenance` matrisi; doğrulanmamış scope eklenmez.
+- **E10-T5-C:** Commerce provenance ve `Sales/Spend/Revenue` API/canonical presentation boundary'sini executable contract ile korur; mevcut Formula Engine migration/compatibility kararı explicit olur.
+
+**Durum:** E10-T5-A `Done`; parent E10-T5 ve E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T5-B minimum Shopify scope matrisidir. Bu freeze UI implementasyonu, Shopify scope talebi, production credential, Partner Dashboard değişikliği veya production işlemi değildir.
 
 ## 15. E11 — Funnel API
 

@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T1/T2 Done; E10-T3 next`
+**Durum:** `In progress — E10-T1/T2 Done; E10-T3-A Done, T3-B next`
 
 ### Ürün ve mimari kararı
 
@@ -1883,6 +1883,12 @@ Resmi gereksinim matrisi, fail-closed implementation hükümleri ve yeniden doğ
 One-shop/one-workspace başlangıç modeli, immutable shop kimliği, verified domain değişimi, reinstall generation, uniqueness ve browser claim rejection sözleşmeleri `src/shopify/tenant-model.js` içinde executable hale getirildi. Model kararı `docs/E10_T2_SHOP_WORKSPACE_TENANT_MODEL.md`, regresyon kanıtı `tests/e10-t2-shop-workspace-tenant.test.js` içindedir.
 
 **Durum:** E10-T2 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T3 install ve embedded authentication hazırlığıdır. Migration, Shopify/Partner Dashboard, credential, scope, billing, webhook, provider veya production işlemi yapılmadı.
+
+### E10-T3-A karar kanıtı — embedded auth güvenlik çekirdeği
+
+Install callback HMAC, shop-bound tek kullanımlık state, session token HS256/audience/time/destination/issuer doğrulaması ve active server-side tenant resolution `src/shopify/embedded-auth.js` içinde executable hale getirildi. `tests/e10-t3a-embedded-auth.test.js` tamper, replay, expiry, audience ve reauthorization negatif kapılarını doğrular; karar sınırı `docs/E10_T3A_EMBEDDED_AUTH_CONTRACT.md` içindedir.
+
+**Durum:** E10-T3-A `Done`; parent E10-T3 `In progress`. Sıradaki uygulanabilir repository işi E10-T3-B token exchange/persistence ve HTTP registration hazırlığıdır. Gerçek Shopify API/CLI sürümü ilgili resmi kaynaklardan tekrar doğrulanmadan bağlanmaz; production credential, Partner Dashboard, migration, scope, billing, webhook veya Shopify isteği çalıştırılmadı.
 
 ## 15. E11 — Funnel API
 

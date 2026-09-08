@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T1/T2/T3/T4 Done; E10-T5-A/T5-B Done, T5-C next`
+**Durum:** `In progress — E10-T1/T2/T3/T4/T5 Done; E10-T6 next`
 
 ### Ürün ve mimari kararı
 
@@ -1849,7 +1849,7 @@ AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shop
 - **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
 - **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Done — Token, uninstall ve privacy lifecycle:** Shopify token'larını encrypted store sınırına bağla; browser/log erişimini yasakla; doğrulanmış uninstall, shop erişim kaybı ve privacy/compliance olaylarında erişimi fail-closed durdur ve retention/deletion kararlarını executable contract ile kanıtla.
-- **E10-T5 — Minimum scope ve commerce contract:** Mockup/Funnel ekranlarının gerçek veri gereksinimlerinden minimum scope matrisi çıkar. İlk dilimde mümkün olduğunca PII alma; Shopify-observed order, refund, Sales, currency ve timezone facts ile provider-reported attribution'ı ayrı provenance altında tut; Revenue'yu yalnız `Sales - Spend` olarak hesapla.
+- **E10-T5 — Done — Minimum scope ve commerce contract:** Mockup/Funnel ekranlarının gerçek veri gereksinimlerinden minimum scope matrisi çıkar. İlk dilimde mümkün olduğunca PII alma; Shopify-observed order, refund, Sales, currency ve timezone facts ile provider-reported attribution'ı ayrı provenance altında tut; Revenue'yu yalnız `Sales - Spend` olarak hesapla.
 - **E10-T6 — Webhook ve initial sync:** İmza doğrulama, replay/idempotency, sıra dışı/gecikmiş event, checkpoint, retry ve initial sync sınırlarını kur. Webhook provider payload'u canonical doğrulama sınırını atlayarak Dataset V2'ye yazamaz.
 - **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
 - **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
@@ -1946,7 +1946,7 @@ Verified-event allowlist, uninstall/access-loss token revocation sırası, compl
 
 - **E10-T5-A — Done:** Bu Shopify-native UI, Funnel/Table, filter, time/compare, hierarchy, Paid/Organic, metrik adı ve provenance ürün freeze'i.
 - **E10-T5-B — Done:** Her görünür Funnel çıktısı için `UI output → Shopify resource/field → minimum scope → PII class → retention/deletion → provenance` matrisi; doğrulanmamış scope eklenmez.
-- **E10-T5-C — Next:** Commerce provenance ve `Sales/Spend/Revenue` API/canonical presentation boundary'sini executable contract ile korur; mevcut Formula Engine migration/compatibility kararı explicit olur.
+- **E10-T5-C — Done:** Commerce provenance ve `Sales/Spend/Revenue` API/canonical presentation boundary'sini executable contract ile korur; mevcut Formula Engine migration/compatibility kararı explicit olur.
 
 **Durum:** E10-T5-A `Done`; parent E10-T5 ve E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T5-B minimum Shopify scope matrisidir. Bu freeze UI implementasyonu, Shopify scope talebi, production credential, Partner Dashboard değişikliği veya production işlemi değildir.
 
@@ -1955,6 +1955,12 @@ Verified-event allowlist, uninstall/access-loss token revocation sırası, compl
 İlk dilim yalnız Shop currency/timezone ile Order tabanlı Purchase/Sales/Refund aggregate çıktısını hedefler; tek aday scope `read_orders`dır. Customer PII, `read_all_orders`, customer/product/customer-event/pixel scope'ları ve doğrulanmamış Add to Cart/Checkout kaynakları dışarıdadır. Exact alan/scope/protected-data uygunluğu production öncesi resmi API sürümünde tekrar doğrulanır. Executable matris `contracts/shopify/e10-t5b-minimum-scope.json`, karar açıklaması `docs/E10_T5B_MINIMUM_SHOPIFY_SCOPE_MATRIX.md`, guard `tests/e10-t5b-minimum-scope-matrix.test.js` içindedir.
 
 **Durum:** E10-T5-B `Done`; parent E10-T5 ve E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T5-C commerce provenance/presentation contract'tır. Bu paket Shopify scope talebi veya production query değildir; credential, Partner Dashboard, migration veya production işlemi yapılmadı.
+
+### E10-T5-C karar kanıtı — commerce provenance/presentation
+
+Shopify-observed commerce, provider-reported attribution ve AdsTable-calculated Revenue ayrımı `src/shopify/commerce-presentation.js` ile executable hale getirildi; `tests/e10-t5c-commerce-presentation.test.js` source separation, `Sales - Spend`, null/support, Profit/Margin ve Organic frontend yasağını korur. Karar `docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` içindedir.
+
+**Durum:** E10-T5-C ve parent E10-T5 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T6 webhook ve initial sync'tir. Bu paket canonical migration, production query veya Shopify işlemi yapmadı.
 
 ## 15. E11 — Funnel API
 

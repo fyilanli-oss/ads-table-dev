@@ -4059,12 +4059,12 @@ function togglePJ(groupName){
     return data&&(data.state==="CONNECTED"||data.connected===true||data.status==="connected");
   }
 
-  function render(service,connected){
+  function render(service,connected,parked=false){
     const button=document.getElementById(service.buttonId);
     if(!button)return;
-    button.disabled=false;
-    button.dataset.state=connected?"connected":"not_connected";
-    button.textContent=connected?"Disconnect":"Connect";
+    button.disabled=parked;
+    button.dataset.state=parked?"parked":connected?"connected":"not_connected";
+    button.textContent=parked?"Parked":connected?"Disconnect":"Connect";
   }
 
   async function load(service){
@@ -4073,7 +4073,7 @@ function togglePJ(groupName){
     try{
       const response=await fetch(service.statusUrl,{headers:await authHeaders()});
       const data=await response.json().catch(function(){return {}});
-      render(service,response.ok&&isConnected(data));
+      render(service,response.ok&&isConnected(data),response.ok&&data?.parked===true);
     }catch(error){
       render(service,false);
     }

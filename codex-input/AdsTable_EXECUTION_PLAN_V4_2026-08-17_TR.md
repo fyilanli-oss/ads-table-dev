@@ -1920,6 +1920,41 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T9 — App Store review-first workstream:** Listing, minimum-scope gerekçesi, test store, reviewer erişimi ve talimatları, privacy/support/data-deletion yüzeyleri, install-to-value videosu ve provider bağlı değilken incelenebilir demo/empty-state paketini geliştirmeyle paralel yürüt. Review hazırlığını sona bırakma.
 - **E10-T10 — Acceptance package:** Install/reinstall/uninstall, session/IDOR, webhook HMAC/replay, token redaction, scope, billing, CSP, mobile embedded UX ve review checklist için otomatik test ve redacted evidence paketi üret.
 
+### Shopify ile ilk temas kapısı — ilk kazma zamanı ve E10-T6 sırası
+
+**“Shopify ile ilk temas” tanımı:** Partner Dashboard'da app oluşturma/bağlama veya ayar değiştirme; Development Store'a install; App URL, embedded ayarı, redirect URI, scope ya da webhook kaydı; Shopify credential/token üretimi veya Development Store'a gerçek API query çalıştırılmasıdır. Yalnız resmi doküman/schema incelemek ve repository contract/test hazırlamak gerçek Shopify teması sayılmaz.
+
+**Kesin karar:** Shopify'daki ilk gerçek işlem **E10-T6-B — Development App Bootstrap** paketinde yapılır. Bu paket E10-T5-C `Done` ve E10-T6-A `PASS` olmadan başlayamaz; başlaması ayrıca açık development-environment insan onayı gerektirir. Production onayı yerine geçmez.
+
+#### E10-T6-A — Official capability ve development-readiness — Shopify teması yok
+
+- Başlangıç koşulu: E10-T5-C output/display matrisi kullanıcı tarafından Execution Plan içinde okunmuş, açıkça onaylanmış, `Done` yapılmış ve merge edilmiş olmalıdır.
+- Güncel Admin API/App Bridge/UI component sürümü; embedded dış navigasyon; ShopifyQL attribution dimension/metric; gerekli minimum scope/protected-data; callback URL; CSP/frame; install/session; webhook gerekliliği ve Development Store kabul adımları resmi kaynaklarla doğrulanır.
+- Çıktı yalnız redacted readiness matrisi ve `PASS/BLOCKED` evidence'tır. Partner Dashboard, store, credential, scope, redirect, webhook veya API query değişikliği yapılmaz.
+
+#### E10-T6-B — Development App Bootstrap — Shopify'da ilk kazma
+
+- Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
+- İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
+- İlk kabul yalnız install callback, session token ve `shop → workspace` binding smoke sonucudur. Production store/credential, billing activation, App Store submission ve production veri işlemi kesinlikle yapılmaz.
+
+#### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
+
+- Shopify-native `Data Sources / Platforms` ekranından Connect başlatma; `surface=shopify_embedded` transaction; resmi App Bridge top-level provider consent; callback sonrası canonical embedded app dönüşü; account selection/status smoke edilir.
+- T6-B install/session kabulü olmadan başlamaz. Provider production yetkisi veya gerçek production ingest yapmaz.
+
+#### E10-T6-D — Shopify attribution feasibility smoke — T6-C kabulünden sonra
+
+- Development Store'da yalnız T5-B'nin iki metriği için platform attribution dimension, Purchase Count, Sales Value, tarih, currency ve `read_reports`/exact scope uygunluğu read-only ve PII'siz doğrulanır.
+- Sonuç desteklenmiyorsa Order/Customer ingestion'a veya yeni scope'a otomatik geçilmez; `BLOCKED` evidence üretilir ve iş kararı istenir.
+
+#### E10-T6-E — Webhook/initial sync kararı — yalnız kanıtlanmış ihtiyaçtan sonra
+
+- Webhook veya initial sync, T5-C çıktısı ve T6-D feasibility sonucu gerçekten gerektiriyorsa ayrıca planlanır. T5-B overlap diagnostic'i tek başına order webhook, commerce storage veya Dataset V2 yazımını meşrulaştırmaz.
+- Development dışı her scope, credential, webhook, billing ve production aktivasyonu ayrı açık production onayı gerektirir.
+
+**Sıra özeti:** `E10-T5-C ürün onayı+merge → E10-T6-A offline readiness PASS → insan development onayı → E10-T6-B ilk Shopify teması → E10-T6-C embedded OAuth smoke → E10-T6-D attribution feasibility → gerekirse E10-T6-E`. Bu sırayı atlayan uygulama veya production işlemi acceptance failure'dır.
+
 ### Kabul kriterleri
 
 - Shopify tarafından doğrulanmamış shop/user/workspace kimliği hiçbir backend yetkisi vermez.

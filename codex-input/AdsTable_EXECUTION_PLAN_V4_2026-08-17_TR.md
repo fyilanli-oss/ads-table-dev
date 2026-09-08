@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T1/T2 Done; E10-T3-A Done, T3-B next`
+**Durum:** `In progress — E10-T1/T2/T3 Done; E10-T4 next`
 
 ### Ürün ve mimari kararı
 
@@ -1847,7 +1847,7 @@ AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shop
 
 - **E10-T1 — Done — Official requirements freeze:** Güncel resmi Shopify dokümantasyonundan Public App dağıtımı, embedded auth/token exchange, App Bridge, billing, privacy/protected-data ve App Store review gereksinimlerini linkli decision log ile dondur; doğrulanmamış varsayımı implementation contract yapma.
 - **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
-- **E10-T3 — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
+- **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Token, uninstall ve privacy lifecycle:** Shopify token'larını mevcut encrypted vault ilkelerine bağla; browser/log erişimini yasakla; uninstall, shop erişim kaybı ve zorunlu privacy/compliance webhook'larında erişimi fail-closed durdur ve retention/deletion kararlarını kanıtla.
 - **E10-T5 — Minimum scope ve commerce contract:** Mockup/Funnel ekranlarının gerçek veri gereksinimlerinden minimum scope matrisi çıkar. İlk dilimde mümkün olduğunca PII alma; Shopify-observed order, refund, revenue, currency ve timezone facts ile provider-reported attribution'ı ayrı provenance altında tut.
 - **E10-T6 — Webhook ve initial sync:** İmza doğrulama, replay/idempotency, sıra dışı/gecikmiş event, checkpoint, retry ve initial sync sınırlarını kur. Webhook provider payload'u canonical doğrulama sınırını atlayarak Dataset V2'ye yazamaz.
@@ -1889,6 +1889,12 @@ One-shop/one-workspace başlangıç modeli, immutable shop kimliği, verified do
 Install callback HMAC, shop-bound tek kullanımlık state, session token HS256/audience/time/destination/issuer doğrulaması ve active server-side tenant resolution `src/shopify/embedded-auth.js` içinde executable hale getirildi. `tests/e10-t3a-embedded-auth.test.js` tamper, replay, expiry, audience ve reauthorization negatif kapılarını doğrular; karar sınırı `docs/E10_T3A_EMBEDDED_AUTH_CONTRACT.md` içindedir.
 
 **Durum:** E10-T3-A `Done`; parent E10-T3 `In progress`. Sıradaki uygulanabilir repository işi E10-T3-B token exchange/persistence ve HTTP registration hazırlığıdır. Gerçek Shopify API/CLI sürümü ilgili resmi kaynaklardan tekrar doğrulanmadan bağlanmaz; production credential, Partner Dashboard, migration, scope, billing, webhook veya Shopify isteği çalıştırılmadı.
+
+### E10-T3-B karar kanıtı — token exchange/persistence ve HTTP registration
+
+Verified session→active tenant→injectable exchange→encrypted store zinciri `src/shopify/token-exchange.js`, ince callback/session registrar'ı `src/routes/shopify-auth-routes.js` içinde tamamlandı. Strict/redacted contract ve header-only session sınırı `tests/e10-t3b-token-exchange-routes.test.js`; operasyon sınırı `docs/E10_T3B_TOKEN_EXCHANGE_ROUTES.md` ile korunur.
+
+**Durum:** E10-T3-B ve parent E10-T3 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T4 token, uninstall ve privacy lifecycle'dır. Gerçek endpoint/credential, production adapter/store, migration, Partner Dashboard, scope, billing, webhook veya Shopify isteği çalıştırılmadı.
 
 ## 15. E11 — Funnel API
 

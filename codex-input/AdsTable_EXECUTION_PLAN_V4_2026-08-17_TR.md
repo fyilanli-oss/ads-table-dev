@@ -1843,6 +1843,53 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shopify Public Embedded App yönüne ilerler. Shopify kurulum, doğrulanmış shop identity, embedded dağıtım ve Shopify-origin merchant için mümkünse billing kanalıdır; AdsTable provider adapter'ları, Dataset V2, Formula Engine ve Funnel API business logic'in sahibidir. İlk sürümde bir Shopify shop bir AdsTable workspace'e bağlanır; multi-store/agency üst katmanı ertelenir. Shopify'dan alınacak ilk veri yalnız overlap incelemesi için platform bazlı Purchase Count ve Sales Value'dur; provider-reported conversion ile aynı fact olarak birleştirilmez. Shopify'a sunulacak AdsTable çıktıları ayrı ürün kararında belirlenecek, intake bu kararı peşinen yönlendirmeyecektir. AdsTable ürün sözlüğünde Revenue kaynak fact değil `Sales - Spend` sonucudur.
 
+### Shopify Embedded Uygulama Anayasası — authoritative ve zorunlu okuma
+
+Bu dokuz madde E10, E11 ve E12 için ürün anayasasıdır. Alt task, teknik doküman, mockup veya kod bu maddelerle çatışırsa ilerleme durur; Execution Plan ve gerekli iş kararı düzeltilmeden implementation yapılmaz.
+
+#### 1. Ürün amacı ve sınırı
+
+AdsTable, Shopify Admin içinde doğal çalışan bir embedded analytics uygulamasıdır; Shopify Admin'in kopyası veya bağımsız AdsTable sitesinin iframe'e yerleştirilmiş hali değildir. Shopify dağıtım ve merchant bağlamını; AdsTable provider verisi, hierarchy, formül, compare ve Funnel business logic'ini sağlar.
+
+#### 2. Authority, güvenlik ve production sınırı
+
+Shop, workspace, user ve entitlement authority server-side doğrulanır; browser claim'i yetki üretmez. Token/secret/PII browser veya loga çıkmaz. Partner Dashboard, credential, scope, billing, migration, webhook registration, App Store submission ve production veri işlemleri ayrı açık insan onayı gerektirir.
+
+#### 3. Shopify Embedded Uygulama Görsel Yaklaşımı
+
+- Resmi Shopify embedded shell ve App Bridge **zorunludur**.
+- Genel UI kontrollerinde güncel resmi Shopify UI componentleri **zorunludur**.
+- Özel AdsTable CSS component framework ve Shopify Admin'i taklit eden statik shell **yasaktır**.
+- AdsTable özel visualization yalnız Funnel/Table data presentation alanında kullanılabilir ve Shopify design token, responsive ve accessibility sınırlarına uyar.
+- Duplicate global navigation, desktop sayfanın mobil iframe'e sıkışması veya yabancı-site/iframe hissi **acceptance failure**dır.
+
+#### 4. Üst menü, tarih ve comparison
+
+Toolbar sırası `Time Range → Comparison → Filters`; yardımcı eylemler `Export → Data freshness/auto refresh → Data Sources → Funnel/Table`dır. Summary ve Custom Range aynı anda üst üste bindirilmez. Compare ve zero-denominator sonucu backend'de hesaplanır; unsupported/unknown hiçbir zaman sahte `0` olmaz.
+
+#### 5. Filters
+
+Shopify Analytics'e ait ilgisiz filtreler kopyalanmaz. AdsTable filtre taxonomy'si Platform, Connected Account ve gerçek provider hierarchy kimliklerinden oluşur; kontrol davranışı resmi Shopify componentleriyle kurulur. Paid/Organic/Blend veya UTM-derived Organic frontend filtresi açılmaz.
+
+#### 6. Funnel/Table veri akışı ve switch
+
+Funnel ve Table aynı backend query/compare sonucunun iki presentation renderer'ıdır. Switch sırasında tarih, comparison, currency, filter ve data-source state korunur. Frontend aggregation, formula veya sahte hierarchy üretmez. Funnel aşağı doğru stage, sağa doğru dönem/compare; Table aşağı doğru gerçek entity hierarchy, sağa doğru metric akışı kullanır.
+
+#### 7. Provider hierarchy
+
+Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad`; Google PMax `Campaign → Asset Group`; TikTok `Campaign → Ad Group → Ad`; Klaviyo Campaign ve Flow sibling root'lar altında kendi Message leaf'lerini kullanır. Provider'da olmayan parent/leaf seviyesi uydurulmaz ve aynı fact farklı seviyelerde double-count edilmez.
+
+#### 8. Metrik sözlüğü ve provenance
+
+`Sales = satış değeri`, `Spend = reklam harcaması`, `Revenue = Sales - Spend`dır. Gerçek cost contract olmadan Profit/Margin gösterilmez. Shopify-reported attribution, provider-reported attribution, AdsTable-calculated ve Unattributed birbirine karıştırılmaz; eksik/unsupported/unknown `null/—` kalır.
+
+#### 9. E10-T5 İçin Revize Edilmiş Ürün Sözleşmesi
+
+- **E10-T5-A — Shopify Kuralları — `Done`:** Bu anayasanın UI, embedded davranış, hierarchy, metrik ve provenance kurallarıdır.
+- **E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek? — `Done`:** Yalnız `platform`, `platform_purchase_count` ve `platform_sales_value`; yalnız Shopify-native Attribution comparison / overlap diagnostic alanında ve provider verisinden ayrı provenance ile gösterilir. Total commerce, Refund, PII, Funnel totalı, Revenue etkisi veya otomatik deduction yoktur.
+- **E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek? — `Product decision required`:** Output/display matrisi kullanıcıyla okunup açıkça onaylanmadan tamamlanmış sayılamaz.
+- **Mutlak sıra kapısı:** Kullanıcı bu dokuz maddeyi ve hazırlanacak T5-C output/display matrisini Execution Plan içinde okuyup açıkça onaylamadan E10-T6–T10, E11 veya E12 için yeni paket, branch, kod ya da PR açılamaz.
+
 ### Planlanan işler
 
 - **E10-T1 — Done — Official requirements freeze:** Güncel resmi Shopify dokümantasyonundan Public App dağıtımı, embedded auth/token exchange, App Bridge, billing, privacy/protected-data ve App Store review gereksinimlerini linkli decision log ile dondur; doğrulanmamış varsayımı implementation contract yapma.
@@ -1906,7 +1953,7 @@ Verified-event allowlist, uninstall/access-loss token revocation sırası, compl
 
 **Amaç:** E10-T5 minimum scope matrisi çıkarılmadan önce Funnel bilgi mimarisi, Shopify embedded görünüm sınırı, filtre/tarih/compare davranışı, metrik adları ve commerce provenance kararlarını kalıcı olarak dondurmak.
 
-#### 9. E10-T5 için revize edilmiş ürün sözleşmesi — A/B/C tek okuma noktası
+#### E10-T5 A/B/C ayrıntılı karar kaydı
 
 Bu bölüm E10-T5'in authoritative ürün özetidir. Aşağıdaki kararlar başka bir belge veya alt başlıktan tahmin edilmez:
 

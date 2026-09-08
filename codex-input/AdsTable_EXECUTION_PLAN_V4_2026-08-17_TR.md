@@ -1841,7 +1841,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ### Ürün ve mimari kararı
 
-AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shopify Public Embedded App yönüne ilerler. Shopify kurulum, doğrulanmış shop identity, embedded dağıtım ve Shopify-origin merchant için mümkünse billing kanalıdır; AdsTable provider adapter'ları, Dataset V2, Formula Engine ve Funnel API business logic'in sahibidir. İlk sürümde bir Shopify shop bir AdsTable workspace'e bağlanır; multi-store/agency üst katmanı ertelenir. Shopify-observed order/revenue ile provider-reported conversion aynı fact olarak birleştirilmez.
+AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shopify Public Embedded App yönüne ilerler. Shopify kurulum, doğrulanmış shop identity, embedded dağıtım ve Shopify-origin merchant için mümkünse billing kanalıdır; AdsTable provider adapter'ları, Dataset V2, Formula Engine ve Funnel API business logic'in sahibidir. İlk sürümde bir Shopify shop bir AdsTable workspace'e bağlanır; multi-store/agency üst katmanı ertelenir. Shopify-observed order/Sales ile provider-reported conversion aynı fact olarak birleştirilmez; AdsTable ürün sözlüğünde Revenue kaynak fact değil `Sales - Spend` sonucudur.
 
 ### Planlanan işler
 
@@ -1849,7 +1849,7 @@ AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shop
 - **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
 - **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Done — Token, uninstall ve privacy lifecycle:** Shopify token'larını encrypted store sınırına bağla; browser/log erişimini yasakla; doğrulanmış uninstall, shop erişim kaybı ve privacy/compliance olaylarında erişimi fail-closed durdur ve retention/deletion kararlarını executable contract ile kanıtla.
-- **E10-T5 — Minimum scope ve commerce contract:** Mockup/Funnel ekranlarının gerçek veri gereksinimlerinden minimum scope matrisi çıkar. İlk dilimde mümkün olduğunca PII alma; Shopify-observed order, refund, revenue, currency ve timezone facts ile provider-reported attribution'ı ayrı provenance altında tut.
+- **E10-T5 — Minimum scope ve commerce contract:** Mockup/Funnel ekranlarının gerçek veri gereksinimlerinden minimum scope matrisi çıkar. İlk dilimde mümkün olduğunca PII alma; Shopify-observed order, refund, Sales, currency ve timezone facts ile provider-reported attribution'ı ayrı provenance altında tut; Revenue'yu yalnız `Sales - Spend` olarak hesapla.
 - **E10-T6 — Webhook ve initial sync:** İmza doğrulama, replay/idempotency, sıra dışı/gecikmiş event, checkpoint, retry ve initial sync sınırlarını kur. Webhook provider payload'u canonical doğrulama sınırını atlayarak Dataset V2'ye yazamaz.
 - **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
 - **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
@@ -1863,7 +1863,7 @@ AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shop
 - Token, webhook secret, session material, provider payload ve müşteri PII'si browser'a veya loglara sızmaz.
 - Uninstall ve privacy lifecycle'ı yeni provider çağrılarını durdurur ve belgelenmiş retention/deletion politikasını uygular.
 - Minimum scope matrisi her izni görünür ürün çıktısına bağlar; gereksiz protected customer data talep edilmez.
-- Shopify-observed commerce facts, provider-reported conversion facts ve ilerideki AdsTable attribution sonucu provenance ile ayrıdır.
+- Shopify-observed commerce/Sales facts, provider-reported conversion facts, AdsTable-calculated Revenue ve ilerideki AdsTable attribution sonucu provenance ile ayrıdır.
 - Billing entitlement server-side doğrulanır; ödeme ekranı embedded güven avantajını bozacak bağımsız yönlendirmeye zorlanmaz.
 - App Store review paketi implementation boyunca güncel tutulur ve submission öncesi ayrı insan onayı gerektirir.
 - Mevcut canonical envelope, Dataset V2 ve backend-only Formula/Funnel sınırları korunur.
@@ -1959,8 +1959,8 @@ Verified-event allowlist, uninstall/access-loss token revocation sırası, compl
 - **E11-T1:** Versionlı `/api/funnel/data` request/response contract.
 - **E11-T2:** Shopify embedded session veya açıkça desteklenen bağımsız bearer auth; shop/workspace/user/account ownership ve query identity yasağı.
 - **E11-T3:** Date/platform/account/entity ve pagination guard'ları.
-- **E11-T4:** Paid/Organic/Blend repository query ve aggregate.
-- **E11-T5:** Formula, Compare ve Paid-only Intent backend output'u.
+- **E11-T4:** Aktif provider attribution + Shopify-observed/Unattributed commerce repository query ve aggregate; parked GA4 Organic capability backend'de korunur fakat Shopify Funnel response'unda Paid/Organic/Blend segmenti açılmaz.
+- **E11-T5:** Formula, Compare ve provider-attribution Intent backend output'u; UI'ya Paid etiketi veya Organic çıkarımı taşınmaz.
 - **E11-T6:** Metric support, currency, contract/engine version metadata.
 - **E11-T7:** Freshness, partial ve warnings metadata.
 - **E11-T8:** Contract, security, performance ve observability testleri.
@@ -1969,6 +1969,7 @@ Verified-event allowlist, uninstall/access-loss token revocation sırası, compl
 ### Kabul kriterleri
 
 - UI business math yapmadan response ile render edebilir.
+- Shopify Funnel API `Paid`, `Organic` veya `Blend` UI segmenti üretmez; atfedilemeyen commerce `Unattributed` kalır.
 - Cross-user/account sorgu reddedilir.
 - Unsupported/unknown hiçbir noktada gerçek `0`a dönüşmez.
 - Previous denominator `0` için delta `null` olur.
@@ -2021,7 +2022,7 @@ Framework değişimi bu planın ön koşulu değildir; önce sorumluluk sınırl
 - **E12-T4:** Feature-based state ve component sınırları.
 - **E12-T5:** Funnel API→presentation adapter; business math yok.
 - **E12-T6:** `0`, `null`, unsupported, unknown, loading, empty, partial, stale ve error state'leri.
-- **E12-T7:** Standard/PMax/Klaviyo/Organic capability-aware hierarchy.
+- **E12-T7:** Standard/PMax/Klaviyo ve diğer aktif provider capability-aware hierarchy; parked Organic frontend hierarchy/filter olarak render edilmez.
 - **E12-T8:** Compare/Intent/Export backend contract binding.
 - **E12-T9:** `legacy_dashboard|funnel_api_canary|funnel_api_enabled` flags.
 - **E12-T10:** Mock/API golden parity, responsive E2E ve canary telemetry.

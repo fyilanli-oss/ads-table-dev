@@ -1783,17 +1783,21 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 
 ## 13. E9 — Backfill ve data readiness
 
-**Durum:** `Not started`
+**Durum:** `In progress — E9-T1 Done; E9-T2 next`
 
 ### Planlanan işler
 
-- **E9-T1:** Ürün onaylı tarih aralığı ve provider/account kapsamı.
+- **E9-T1 — Done:** İlk hazırlama yesterday/finalized ardından today/provisional; Meta, Google, TikTok, Klaviyo; aktif ownership bulunan seçili hesaplardan provider başına en fazla 3; parked provider dışarıda; eski tarihçe otomatik değil; 14. günde günlük birikim devam eder.
 - **E9-T2:** Gün/platform/account bazında resumable cursor ve checkpoint.
 - **E9-T3:** Rate-limit/quota budget ve adaptive retry.
 - **E9-T4:** Canonical upsert ile idempotent batch.
 - **E9-T5:** Completeness, duplicate, metric support, timezone, FX, freshness ölçümü.
 - **E9-T6:** Provider bazlı parity/readiness dashboard'u.
 - **E9-T7:** Pause/resume/cancel ve runbook.
+
+### E9-T1 karar kanıtı
+
+`src/backfill/onboarding-scope.js`, `tests/e9-t1-onboarding-scope.test.js` ve `docs/E9_T1_ONBOARDING_BACKFILL_SCOPE.md`. Bu görev production backfill çalıştırmaz.
 
 ### Kabul kriterleri
 

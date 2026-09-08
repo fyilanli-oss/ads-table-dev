@@ -1,14 +1,17 @@
 {
   "contract_version": "e10-t5b-v2",
   "purpose": "attribution_overlap_input_only",
+  "candidate_shopify_surface": "Admin GraphQL shopifyqlQuery over ShopifyQL sales schema",
+  "candidate_scope": "read_reports",
+  "candidate_only_not_requested": true,
   "first_slice_scopes": [],
   "scope_decision": "deferred_until_shopify_output_contract_and_official_api_revalidation",
   "forbidden_first_slice_scopes": ["read_all_orders", "read_customers", "write_customers", "read_products", "write_products", "read_customer_events", "write_pixels"],
   "pii_policy": "no_customer_pii",
   "dimensions": ["platform"],
   "outputs": [
-    {"output":"platform_purchase_count","resource":null,"fields":[],"scope":null,"scope_status":"unresolved_no_scope_request","pii":"none","retention":"not_decided","deletion":"shop_redact","provenance":"shopify_reported_attribution"},
-    {"output":"platform_sales_value","resource":null,"fields":[],"scope":null,"scope_status":"unresolved_no_scope_request","pii":"none","retention":"not_decided","deletion":"shop_redact","provenance":"shopify_reported_attribution"}
+    {"output":"platform_purchase_count","meaning":"Shopify-attributed purchase count for one platform and selected period; never store total purchase","resource":null,"fields":[],"candidate_shopify_mapping":"ShopifyQL sales schema platform/channel breakdown plus order/purchase aggregate; exact names unresolved","scope":null,"scope_status":"unresolved_no_scope_request","pii":"none","retention":"not_decided","deletion":"shop_redact","provenance":"shopify_reported_attribution"},
+    {"output":"platform_sales_value","meaning":"Shopify-attributed sales value for one platform and selected period; never store total sales","resource":null,"fields":[],"candidate_shopify_mapping":"ShopifyQL sales schema platform/channel breakdown plus total_sales; exact dimension compatibility unresolved","scope":null,"scope_status":"unresolved_no_scope_request","pii":"none","retention":"not_decided","deletion":"shop_redact","provenance":"shopify_reported_attribution"}
   ],
   "excluded_outputs": [
     {"output":"total_purchase_count","reason":"not_required_for_overlap","ui_semantics":"out_of_scope"},

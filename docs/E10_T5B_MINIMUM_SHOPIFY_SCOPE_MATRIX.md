@@ -12,6 +12,18 @@ Bu kontrat Shopify'a gösterilecek AdsTable çıktılarından bağımsız biçim
 
 Shopify'ın bu iki aggregate değeri desteklenen ve PII'siz bir API yüzeyinden verememesi halinde kapsam order/customer ham verisine doğru sessizce genişletilmez. Ürün kararı yeniden açılır; kullanıcı onayı olmadan alternatif attribution türetme yöntemi kurulmaz.
 
+## Bu isimler ne demek ve Shopify'daki karşılıkları ne?
+
+`platform`, `platform_purchase_count` ve `platform_sales_value` Shopify API'den kopyalanmış field adları değildir. Bunlar AdsTable'ın aşağıdaki üç anlamı sabitleyen normalize contract adlarıdır:
+
+| AdsTable adı | Kesin iş anlamı | Shopify aday karşılığı |
+|---|---|---|
+| `platform` | Shopify'ın seçili dönem satışını ilişkilendirdiği reklam/marketing platformu | ShopifyQL `sales` raporunda attribution/channel kırılımı; exact dimension adı doğrulanacak |
+| `platform_purchase_count` | Shopify'ın o platforma atfettiği satın alma adedi; Total Purchase değil | Admin GraphQL `shopifyqlQuery` içinde platform/channel kırılımlı order/purchase aggregate; exact metric adı doğrulanacak |
+| `platform_sales_value` | Shopify'ın o platforma atfettiği satış değeri; Total Sales değil | ShopifyQL `sales` schema'sında platform/channel kırılımlı `total_sales`; dimension ile kullanılabilirliği doğrulanacak |
+
+Güncel resmi Shopify örnekleri aggregate rapor sorgularını Admin GraphQL `shopifyqlQuery` yüzeyine ve `read_reports` scope'una bağlamaktadır. Bunlar **aday Shopify erişim yüzeyi ve scope'udur**; exact platform dimension ve purchase metric doğrulanmadığı için production scope talebi veya tamamlanmış mapping değildir. Doğrulama başarısız olursa isim benzerliğinden field uydurulmaz ve ham Order/Customer verisine geri dönülmez.
+
 ## Kesin intake matrisi
 
 | Boyut / değer | Amaç | Provenance | İlk dilim durumu |

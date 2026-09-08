@@ -1906,6 +1906,32 @@ Verified-event allowlist, uninstall/access-loss token revocation sırası, compl
 
 **Amaç:** E10-T5 minimum scope matrisi çıkarılmadan önce Funnel bilgi mimarisi, Shopify embedded görünüm sınırı, filtre/tarih/compare davranışı, metrik adları ve commerce provenance kararlarını kalıcı olarak dondurmak.
 
+#### 9. E10-T5 için revize edilmiş ürün sözleşmesi — tek okuma noktası
+
+Bu bölüm E10-T5'in authoritative ürün özetidir. Aşağıdaki kararlar başka bir belge veya alt başlıktan tahmin edilmez:
+
+**UI kararı**
+
+- Resmi Shopify embedded shell: **Zorunlu**.
+- Resmi App Bridge: **Zorunlu**.
+- Resmi Shopify UI componentleri: Genel UI kontrollerinde **zorunlu**.
+- Özel AdsTable CSS component framework: **Yasak**.
+- AdsTable özel visualization: Yalnız Funnel/Table data presentation alanında **izinli**.
+- Shopify Admin'i taklit eden statik shell: **Yasak**.
+- Iframe/yabancı-site hissi: **Acceptance failure**.
+
+**Shopify'dan alınacak veri kararı**
+
+| AdsTable contract adı | İnsan dilindeki anlamı | Shopify'daki karşılığı / doğrulama durumu |
+|---|---|---|
+| `platform` | Shopify'ın satışı ilişkilendirdiği reklam/marketing platformu; örneğin Meta veya Google. Serbest UTM tahmini ya da AdsTable'ın provider verisinden üretilmez. | Aday yüzey ShopifyQL `sales` raporundaki attribution/channel kırılımıdır. Exact dimension adı güncel schema ile doğrulanmadan kontrat değildir. |
+| `platform_purchase_count` | Seçili tarih aralığında Shopify'ın ilgili platforma atfettiği satın alma adedi. Mağaza Total Purchase değildir. | Aday yüzey `shopifyqlQuery` içindeki platform/channel kırılımlı order/purchase aggregate metriğidir. Exact metric adı güncel schema ile doğrulanmadan kontrat değildir. |
+| `platform_sales_value` | Seçili tarih aralığında Shopify'ın ilgili platforma atfettiği satış değeri. Mağaza Total Sales değildir. | Aday yüzey ShopifyQL `sales` schema'sındaki platform/channel kırılımlı `total_sales` metriğidir; exact attribution dimension birlikteliği gerçek schema ile doğrulanmalıdır. |
+
+Bu üç contract adı **AdsTable'ın iç normalize isimleridir; Shopify API field adı değildir**. Güncel resmi Shopify örnekleri aggregate rapor erişimini Admin GraphQL `shopifyqlQuery` ve `read_reports` scope'u üzerinden göstermektedir; bu yalnız doğrulanacak aday erişim yüzeyidir, scope talebi değildir. Üçünün birlikte ve PII'siz alınabildiği doğrulanamazsa Order/Customer verisine geçilmez ve sahte mapping yapılmaz.
+
+Amaç yalnız Shopify-reported platform attribution ile provider-reported Purchase/Sales arasındaki muhtemel overlap'i sonraki backend kararında incelemektir. Bu intake mağaza totalı üretmez, Revenue hesaplamaz, kullanıcıya gösterilecek AdsTable çıktısını belirlemez ve Dataset V2'ye yazılmaz.
+
 #### Shopify-native embedded kabulü
 
 - AdsTable, Shopify Admin'i yalnız görsel olarak taklit eden bağımsız bir web sayfası veya iframe hissi veren ikinci bir tasarım sistemi kullanmaz. Embedded shell ve navigation App Bridge'e; genel UI kontrolleri implementation anında güncel ve resmi Shopify UI component sistemine bağlanır.

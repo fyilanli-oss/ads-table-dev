@@ -1783,14 +1783,14 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 
 ## 13. E9 — Backfill ve data readiness
 
-**Durum:** `In progress — E9-T1/T2/T3 Done; E9-T4 next`
+**Durum:** `In progress — E9-T1/T2/T3/T4 Done; E9-T5 next`
 
 ### Planlanan işler
 
 - **E9-T1 — Done:** İlk hazırlama yesterday/finalized ardından today/provisional; Meta, Google, TikTok, Klaviyo; aktif ownership bulunan seçili hesaplardan provider başına en fazla 3; parked provider dışarıda; eski tarihçe otomatik değil; 14. günde günlük birikim devam eder.
 - **E9-T2 — Done:** User/platform/account/business-date/date-key unique checkpoint; opaque cursor; terminal replay engeli; service-role-only persistence.
 - **E9-T3 — Done:** Atomic expiring worker lease; provider-isolated single-flight budgets; Retry-After + bounded backoff; three-attempt ceiling; parked providers excluded.
-- **E9-T4:** Canonical upsert ile idempotent batch.
+- **E9-T4 — Done:** Checkpoint kapsam doğrulaması, batch içi duplicate engeli ve mevcut canonical conflict anahtarıyla idempotent upsert.
 - **E9-T5:** Completeness, duplicate, metric support, timezone, FX, freshness ölçümü.
 - **E9-T6:** Provider bazlı parity/readiness dashboard'u.
 - **E9-T7:** Pause/resume/cancel ve runbook.
@@ -1802,6 +1802,8 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 **E9-T2 kanıtı:** `src/backfill/checkpoint.js`, `supabase/migrations/20260908074500_create_backfill_checkpoints.sql`, `tests/e9-t2-checkpoint.test.js`, `docs/E9_T2_RESUMABLE_CHECKPOINT.md`. Production migration/backfill çalıştırılmadı.
 
 **E9-T3 kanıtı:** `src/backfill/retry-policy.js`, `supabase/migrations/20260908080000_add_backfill_checkpoint_leases.sql`, `tests/e9-t3-lease-retry.test.js`, `docs/E9_T3_LEASE_QUOTA_RETRY.md`. Production migration/provider call/backfill çalıştırılmadı.
+
+**E9-T4 kanıtı:** `src/backfill/idempotent-batch.js`, `tests/e9-t4-idempotent-batch.test.js`, `docs/E9_T4_IDEMPOTENT_CANONICAL_BATCH.md`. Production migration/provider call/backfill çalıştırılmadı.
 
 ### Kabul kriterleri
 

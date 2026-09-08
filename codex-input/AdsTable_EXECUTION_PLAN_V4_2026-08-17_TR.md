@@ -1783,7 +1783,7 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 
 ## 13. E9 — Backfill ve data readiness
 
-**Durum:** `In progress — E9-T1/T2/T3/T4/T5/T6 Done; E9-T7 next`
+**Durum:** `Implementation complete — E9-T1/T2/T3/T4/T5/T6/T7 Done; production activation requires separate approval`
 
 ### Planlanan işler
 
@@ -1793,7 +1793,7 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 - **E9-T4 — Done:** Checkpoint kapsam doğrulaması, batch içi duplicate engeli ve mevcut canonical conflict anahtarıyla idempotent upsert.
 - **E9-T5 — Done:** Fail-closed completeness, duplicate, metric support, timezone, FX ve freshness ölçümü.
 - **E9-T6 — Done:** Provider bazlı, hesap kimliklerini ve metrik değerlerini taşımayan parity/readiness sunum modeli.
-- **E9-T7:** Pause/resume/cancel ve runbook.
+- **E9-T7 — Done:** Service-role-only pause/resume/cancel kontrolü, claim kapısı ve production runbook.
 
 ### E9-T1 karar kanıtı
 
@@ -1808,6 +1808,8 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 **E9-T5 kanıtı:** `src/backfill/data-readiness.js`, `tests/e9-t5-data-readiness.test.js`, `docs/E9_T5_DATA_READINESS_MEASUREMENT.md`. Production sorgusu/provider call/backfill çalıştırılmadı.
 
 **E9-T6 kanıtı:** `src/backfill/readiness-dashboard.js`, `tests/e9-t6-provider-dashboard.test.js`, `docs/E9_T6_PROVIDER_READINESS_DASHBOARD.md`. Public UI/production sorgusu/provider call/backfill çalıştırılmadı.
+
+**E9-T7 kanıtı:** `src/backfill/control-policy.js`, `supabase/migrations/20260908090000_add_backfill_checkpoint_controls.sql`, `tests/e9-t7-controls-runbook.test.js`, `docs/E9_T7_BACKFILL_CONTROL_RUNBOOK.md`. Production migration/backfill çalıştırılmadı.
 
 ### Kabul kriterleri
 

@@ -1783,7 +1783,7 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 
 ## 13. E9 — Backfill ve data readiness
 
-**Durum:** `In progress — E9-T1/T2/T3/T4/T5 Done; E9-T6 next`
+**Durum:** `In progress — E9-T1/T2/T3/T4/T5/T6 Done; E9-T7 next`
 
 ### Planlanan işler
 
@@ -1792,7 +1792,7 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 - **E9-T3 — Done:** Atomic expiring worker lease; provider-isolated single-flight budgets; Retry-After + bounded backoff; three-attempt ceiling; parked providers excluded.
 - **E9-T4 — Done:** Checkpoint kapsam doğrulaması, batch içi duplicate engeli ve mevcut canonical conflict anahtarıyla idempotent upsert.
 - **E9-T5 — Done:** Fail-closed completeness, duplicate, metric support, timezone, FX ve freshness ölçümü.
-- **E9-T6:** Provider bazlı parity/readiness dashboard'u.
+- **E9-T6 — Done:** Provider bazlı, hesap kimliklerini ve metrik değerlerini taşımayan parity/readiness sunum modeli.
 - **E9-T7:** Pause/resume/cancel ve runbook.
 
 ### E9-T1 karar kanıtı
@@ -1806,6 +1806,8 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 **E9-T4 kanıtı:** `src/backfill/idempotent-batch.js`, `tests/e9-t4-idempotent-batch.test.js`, `docs/E9_T4_IDEMPOTENT_CANONICAL_BATCH.md`. Production migration/provider call/backfill çalıştırılmadı.
 
 **E9-T5 kanıtı:** `src/backfill/data-readiness.js`, `tests/e9-t5-data-readiness.test.js`, `docs/E9_T5_DATA_READINESS_MEASUREMENT.md`. Production sorgusu/provider call/backfill çalıştırılmadı.
+
+**E9-T6 kanıtı:** `src/backfill/readiness-dashboard.js`, `tests/e9-t6-provider-dashboard.test.js`, `docs/E9_T6_PROVIDER_READINESS_DASHBOARD.md`. Public UI/production sorgusu/provider call/backfill çalıştırılmadı.
 
 ### Kabul kriterleri
 

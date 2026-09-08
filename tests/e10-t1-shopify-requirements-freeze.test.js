@@ -38,7 +38,7 @@ test("the freeze keeps identity, secrets, scope and provenance fail closed", () 
   assert.match(freeze, /doğrulanmamış shop, user veya workspace kimliği backend yetkisi üretmez/);
   assert.match(freeze, /Access token, webhook secret, session material.*browser response'una.*log'a yazılmaz/);
   assert.match(freeze, /"İleride gerekebilir" gerekçe değildir/);
-  assert.match(freeze, /Shopify-observed order\/refund\/revenue.*provider-reported conversion.*ayrı provenance/);
+  assert.match(freeze, /Shopify-reported platform attribution.*provider-reported conversion.*ayrı provenance/);
 });
 
 test("unknown implementation details remain explicit revalidation gates", () => {

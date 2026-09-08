@@ -5,7 +5,7 @@
 ## Dondurulan başlangıç sınırları
 
 - İlk sürümde bir Shopify shop bir AdsTable workspace'e bağlanır; agency/multi-store daha sonra eklenir.
-- Shopify-observed order/revenue ile Meta/Google/TikTok/Klaviyo provider-reported conversion aynı fact değildir ve ayrı provenance taşır.
+- Shopify-reported platform Purchase Count/Sales Value ile Meta/Google/TikTok/Klaviyo provider-reported conversion aynı fact değildir ve ayrı provenance taşır; Shopify total commerce verisi ilk intake'e alınmaz.
 - Minimum scope ve mümkün olduğunca PII'siz ilk dilim hedeflenir.
 - Browser tarafından taşınan shop/user/workspace identity authoritative değildir.
 - Shopify-origin kullanıcı için embedded Shopify billing öncelikli değerlendirilir; bağımsız kanal ayrı capability'dir.

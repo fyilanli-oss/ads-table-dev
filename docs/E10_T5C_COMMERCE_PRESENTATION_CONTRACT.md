@@ -1,7 +1,9 @@
-# E10-T5-C — Commerce provenance ve presentation contract
+# E10-T5-C/D — Commerce presentation varsayımının geri alınması
 
-Shopify-observed Purchase/Sales/Refund, provider-reported attribution ve AdsTable-calculated sonuçlar ayrı nesnelerde ve açık provenance ile sunulur; Shopify Sales ile provider Sales toplanmaz veya birbirinin yerine geçirilmez.
+Önceki E10-T5-C kontratının Shopify Total Purchase/Sales/Refund verisini Funnel commerce kaynağı kabul etmesi ürün yönünü aştığı için geri alınmıştır. Shopify'dan alınacak veriler, şimdilik yalnız attribution overlap incelemesi için platform bazlı Purchase Count ve Sales Value'dur.
 
-Toplam Revenue `Shopify-observed Sales - provider-reported aggregate Spend`; entity Revenue `provider-reported Sales - provider-reported Spend` olur. Eski teknik `profit` aynı değerin ikinci UI adı değildir; ilk dilimde `profit=null` ve `margin=null` kalır. Unsupported/unknown değerler `null` kalır ve derived Revenue'yu bloke eder. Organic frontend segmenti üretilmez.
+Bu iki değer `shopify_reported_attribution` provenance'ında kalır. Provider-reported Purchase/Sales ile birleştirilmez, Shopify mağaza toplamı olarak gösterilmez ve Revenue üretmekte kullanılmaz. `Revenue = Sales - Spend` AdsTable ürün sözlüğü korunur; fakat hangi Sales'in Shopify embedded çıktısına verileceği, “Shopify'a ne vereceğiz?” ürün kontratında ayrıca kararlaştırılmadan bu intake tarafından belirlenmez.
 
-Bu API presentation contract'ı mevcut canonical storage veya Formula Engine alanını migrate etmez ve production işlemi yapmaz.
+Bu düzeltmeyle eski `commerce-presentation.js` kaldırılmış ve yerine yalnız üç alanı (`platform`, `platform_purchase_count`, `platform_sales_value`) kabul eden fail-closed `attribution-overlap-intake.js` konmuştur. Total, refund, currency, timezone veya başka alan eklenirse kontrat reddeder.
+
+Bu repository kontratı API erişilebilirliği, scope, storage, sync, UI veya production işlemi iddia etmez.

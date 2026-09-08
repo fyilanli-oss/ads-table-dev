@@ -1,35 +1,58 @@
-# E10-T5-B — Minimum Shopify scope matrisi
+# E10-T5-B/D — Shopify attribution overlap intake contract
 
-## İlk dilim kararı
+## Düzeltilmiş ürün kararı
 
-İlk commerce dilimi yalnız shop currency/timezone ile son erişilebilir order penceresinden Purchase, Sales ve Refund aggregate'larını hedefler. Tek aday scope `read_orders`dır. Customer adı, e-posta, telefon, adres, note, line-item customer içeriği ve serbest metin seçilmez veya persist edilmez.
+Shopify'dan alınacak ilk veri seti bir commerce totalı veya Funnel veri kaynağı değildir. Tek amaç, Shopify'ın platform bazında raporladığı attribution ile reklam provider'larının kendi raporlarını daha sonra karşılaştırıp olası çakışmayı (overlap) inceleyebilmektir.
 
-Shop metadata alanlarının ek scope gerektirmediği varsayılmaz: `scope_status=verify_no_additional_scope` kapısı gerçek API sürümüyle doğrulanmadan production query kurulamaz. `read_orders` ve seçilen money/refund alanları da Partner Dashboard talebinden önce güncel resmi Admin GraphQL schema, protected-data sınıflandırması ve review gereksinimiyle tekrar doğrulanır.
+İzin verilen tek boyut `platform`; izin verilen tek iki değer `platform_purchase_count` ve `platform_sales_value`dır. Total Purchase, Total Sales, Refund, currency, timezone, order/customer kaydı, Add to Cart ve Checkout bu intake'in parçası değildir. Müşteri PII'si alınmaz.
 
-## Ekran → veri → scope
+## Scope neden henüz seçilmedi?
 
-| Funnel çıktısı | Shopify kaynağı | İlk karar | PII | Saklama | Provenance |
-|---|---|---|---|---|---|
-| Currency | Shop currencyCode | Ek scope durumu doğrulama kapısında | Yok | Current metadata | Shopify-observed |
-| Timezone | Shop ianaTimezone | Ek scope durumu doğrulama kapısında | Yok | Current metadata | Shopify-observed |
-| Purchase | Order id/time/cancel state aggregate | `read_orders` adayı | Alan seçimi PII içermez | Günlük aggregate | Shopify-observed |
-| Sales | Order current total shop money aggregate | `read_orders` adayı | Alan seçimi PII içermez | Günlük aggregate | Shopify-observed |
-| Refund | Order refund time/value/currency aggregate | `read_orders` adayı | Alan seçimi PII içermez | Günlük aggregate | Shopify-observed |
-| Revenue | Shopify resource değildir | `Sales - Spend` backend hesabı | Yok | Türetilmiş, persist edilmez | AdsTable-calculated |
+Bu kontrat Shopify'a gösterilecek AdsTable çıktılarından bağımsız biçimde yeni bir order ingestion tasarlamaz. İstenen iki platform-attribution değerinin güncel resmi Shopify API'de hangi resource/field ile bulunabildiği ve hangi scope/review koşulunu gerektirdiği doğrulanmadan `read_orders` dahil hiçbir scope aday olarak dondurulmaz. Bu nedenle executable contract'ta `first_slice_scopes=[]`, resource/field değerleri boş ve scope durumu `unresolved_no_scope_request`tır.
 
-## Bilinçli exclusions
+Shopify'ın bu iki aggregate değeri desteklenen ve PII'siz bir API yüzeyinden verememesi halinde kapsam order/customer ham verisine doğru sessizce genişletilmez. Ürün kararı yeniden açılır; kullanıcı onayı olmadan alternatif attribution türetme yöntemi kurulmaz.
 
-- Add to Cart ve Checkout için doğrulanmış minimum Admin API sözleşmesi yoktur; ilk Shopify-observed dilimde `unsupported`, asla sahte `0` olur.
-- 60 günden eski order geçmişi için `read_all_orders` talep edilmez; ayrı ürün gereksinimi, Shopify review ve insan scope onayı olmadan açılamaz.
-- `read_customers`, customer write scope'ları, product write/read, customer-events ve pixel write scope'ları ilk dilimde yasaktır.
-- Provider'a eşleşmeyen commerce `Unattributed`dır; Organic değildir.
+## Bu isimler ne demek ve Shopify'daki karşılıkları ne?
 
-## Resmi yeniden doğrulama kaynakları
+`platform`, `platform_purchase_count` ve `platform_sales_value` Shopify API'den kopyalanmış field adları değildir. Bunlar AdsTable'ın aşağıdaki üç anlamı sabitleyen normalize contract adlarıdır:
 
-- https://shopify.dev/docs/api/usage/access-scopes
-- https://shopify.dev/docs/apps/launch/protected-customer-data
-- https://shopify.dev/docs/api/admin-graphql/latest/objects/Shop
-- https://shopify.dev/docs/api/admin-graphql/latest/objects/Order
-- https://shopify.dev/docs/api/admin-graphql/latest/objects/Refund
+| AdsTable adı | Kesin iş anlamı | Shopify aday karşılığı |
+|---|---|---|
+| `platform` | Shopify'ın seçili dönem satışını ilişkilendirdiği reklam/marketing platformu | ShopifyQL `sales` raporunda attribution/channel kırılımı; exact dimension adı doğrulanacak |
+| `platform_purchase_count` | Shopify'ın o platforma atfettiği satın alma adedi; Total Purchase değil | Admin GraphQL `shopifyqlQuery` içinde platform/channel kırılımlı order/purchase aggregate; exact metric adı doğrulanacak |
+| `platform_sales_value` | Shopify'ın o platforma atfettiği satış değeri; Total Sales değil | ShopifyQL `sales` schema'sında platform/channel kırılımlı `total_sales`; dimension ile kullanılabilirliği doğrulanacak |
 
-Bu belge veya JSON contract scope talebi değildir. Exact API version, field availability, order erişim penceresi ve protected-data sonucu production/Partner Dashboard adımından önce yeniden doğrulanır.
+Güncel resmi Shopify örnekleri aggregate rapor sorgularını Admin GraphQL `shopifyqlQuery` yüzeyine ve `read_reports` scope'una bağlamaktadır. Bunlar **aday Shopify erişim yüzeyi ve scope'udur**; exact platform dimension ve purchase metric doğrulanmadığı için production scope talebi veya tamamlanmış mapping değildir. Doğrulama başarısız olursa isim benzerliğinden field uydurulmaz ve ham Order/Customer verisine geri dönülmez.
+
+## Kesin intake matrisi
+
+| Boyut / değer | Amaç | Provenance | İlk dilim durumu |
+|---|---|---|---|
+| Platform | Shopify raporu ile provider satırını aynı kanalda karşılaştırmak | Shopify-reported attribution | İzinli tek boyut |
+| Platform Purchase Count | Olası attribution overlap analiz girdisi | Shopify-reported attribution | İzinli |
+| Platform Sales Value | Olası attribution overlap analiz girdisi | Shopify-reported attribution | İzinli |
+
+Bu değerler Shopify-observed toplam mağaza satış gerçeği olarak adlandırılmaz. Provider-reported attribution ile toplanmaz, birbirinden çıkarılmaz, kazanan kaynak seçilmez ve frontend'de uzlaştırılmış gerçek gibi gösterilmez. Eşleştirme ve overlap hesabı, ileride ayrıca onaylanacak backend sözleşmesidir.
+
+## Nasıl gösterilecek?
+
+Bu iki Shopify metriği ana Funnel toplamına veya provider hierarchy satırlarına eklenmez. Yalnız Shopify-native bir **Attribution comparison / overlap diagnostic** alanında, seçili tarih aralığı için platform satırlarında gösterilir:
+
+`Platform | Provider Purchase | Shopify-attributed Purchase | Purchase Difference | Provider Sales | Shopify-attributed Sales | Sales Difference | Data status`
+
+Difference değerlerini backend hesaplar. Bir fark veya iki tarafta aynı anda değer bulunması kesin duplicate kanıtı değildir; UI bunu “potential overlap signal” olarak açıklar ve otomatik olarak hiçbir provider değerini düşmez. Sales karşılaştırması aynı raporlama para birimi doğrulanamıyorsa `unavailable` olur; currency bu intake'e sessizce üçüncü metrik olarak eklenmez.
+
+## Açıkça kapsam dışı
+
+- Total Purchase ve Total Sales
+- Refund ve refund toplamları
+- Shop currency ve timezone intake çıktıları
+- Order/customer satırları ve her türlü müşteri PII'si
+- Add to Cart, Checkout ve Organic çıkarımı
+- `read_orders`, `read_all_orders` veya başka bir production scope talebi
+- Dataset V2 veya yeni commerce tablosuna yazma
+- Webhook, initial sync, migration ve production query
+
+## Yeniden doğrulama kapısı
+
+Shopify'a verilecek AdsTable ürün çıktıları netleştirildikten sonra yalnız bu iki platform-attribution değerinin resmi API erişilebilirliği, exact resource/field, para birimi semantiği, tarih aralığı, scope ve protected-data sınıfı güncel Shopify sürümünde doğrulanır. Sonuç bu kontratla uyumsuzsa otomatik kapsam genişletilmez; iş kararı istenir.

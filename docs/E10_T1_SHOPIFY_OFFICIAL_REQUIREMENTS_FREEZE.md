@@ -29,7 +29,7 @@ Resmi belgede açıkça doğrulanmayan bir davranış güvenlik ya da ürün sö
 1. **Authority:** Shopify tarafından doğrulanmamış shop, user veya workspace kimliği backend yetkisi üretmez. Session token doğrulaması tenant eşlemesinin yerine geçmez; ikisi de server-side zincirde kanıtlanır.
 2. **Secrets:** Access token, webhook secret, session material ve müşteri verisi browser response'una, URL'ye, analytics event'e veya log'a yazılmaz. Token mevcut encrypted vault ilkelerine bağlanır.
 3. **Scope:** Scope matrisi ürün çıktısı → gerekli resource/field → retention → deletion gerekçesi taşımadan scope eklenmez. "İleride gerekebilir" gerekçe değildir.
-4. **Commerce provenance:** Shopify-observed order/refund/revenue, provider-reported conversion ve gelecekteki AdsTable attribution ayrı provenance ile saklanır; tek fact gibi birleştirilmez.
+4. **Commerce provenance:** Shopify-reported platform attribution, provider-reported conversion ve gelecekteki AdsTable overlap/attribution sonucu ayrı provenance ile saklanır; tek fact gibi birleştirilmez. İlk intake yalnız platform Purchase Count ve Sales Value ile sınırlıdır.
 5. **Lifecycle:** Uninstall, erişim kaybı, reauthorization ve compliance lifecycle yeni provider/Shopify çağrılarını fail-closed durdurur. Retention/deletion politikası E10-T4'te dondurulmadan destructive işlem yazılmaz.
 6. **Billing:** Client bildirimi entitlement değildir. Active/frozen/cancelled/trial gibi durumlar E10-T7'de seçilen resmi billing modeline göre backend tarafından doğrulanır.
 7. **Review:** Review readiness E10-T9 boyunca yaşayan bir artefakttır; uygulamanın sonunda geriye dönük hazırlanmaz.

@@ -1,19 +1,35 @@
 {
-  "contract_version": "e10-t5b-v1",
-  "first_slice_scopes": ["read_orders"],
+  "contract_version": "e10-t5b-v2",
+  "purpose": "attribution_overlap_input_only",
+  "candidate_shopify_surface": "Admin GraphQL shopifyqlQuery over ShopifyQL sales schema",
+  "candidate_scope": "read_reports",
+  "candidate_only_not_requested": true,
+  "first_slice_scopes": [],
+  "scope_decision": "deferred_until_shopify_output_contract_and_official_api_revalidation",
   "forbidden_first_slice_scopes": ["read_all_orders", "read_customers", "write_customers", "read_products", "write_products", "read_customer_events", "write_pixels"],
   "pii_policy": "no_customer_pii",
+  "dimensions": ["platform"],
+  "presentation": {
+    "surface": "shopify_native_attribution_comparison_overlap_diagnostic",
+    "grain": "selected_period_platform",
+    "columns": ["platform", "provider_purchase", "shopify_attributed_purchase", "purchase_difference", "provider_sales", "shopify_attributed_sales", "sales_difference", "data_status"],
+    "backend_computed": ["purchase_difference", "sales_difference"],
+    "overlap_semantics": "potential_signal_not_duplicate_proof_no_automatic_deduction",
+    "funnel_total_included": false,
+    "revenue_input": false
+  },
   "outputs": [
-    {"output":"shop_currency","resource":"Shop","fields":["currencyCode"],"scope":null,"scope_status":"verify_no_additional_scope","pii":"none","retention":"current_metadata","deletion":"shop_redact","provenance":"shopify_observed"},
-    {"output":"shop_timezone","resource":"Shop","fields":["ianaTimezone"],"scope":null,"scope_status":"verify_no_additional_scope","pii":"none","retention":"current_metadata","deletion":"shop_redact","provenance":"shopify_observed"},
-    {"output":"purchase_count","resource":"Order","fields":["id","createdAt","cancelledAt"],"scope":"read_orders","scope_status":"candidate_official_revalidation_required","pii":"none_selected","retention":"daily_aggregate_only","deletion":"shop_redact","provenance":"shopify_observed"},
-    {"output":"sales","resource":"Order","fields":["currentTotalPriceSet.shopMoney.amount","currentTotalPriceSet.shopMoney.currencyCode"],"scope":"read_orders","scope_status":"candidate_official_revalidation_required","pii":"none_selected","retention":"daily_aggregate_only","deletion":"shop_redact","provenance":"shopify_observed"},
-    {"output":"refund_value","resource":"Order.refunds","fields":["createdAt","totalRefundedSet.shopMoney.amount","totalRefundedSet.shopMoney.currencyCode"],"scope":"read_orders","scope_status":"candidate_official_revalidation_required","pii":"none_selected","retention":"daily_aggregate_only","deletion":"shop_redact","provenance":"shopify_observed"}
+    {"output":"platform_purchase_count","meaning":"Shopify-attributed purchase count for one platform and selected period; never store total purchase","resource":null,"fields":[],"candidate_shopify_mapping":"ShopifyQL sales schema platform/channel breakdown plus order/purchase aggregate; exact names unresolved","scope":null,"scope_status":"unresolved_no_scope_request","pii":"none","retention":"not_decided","deletion":"shop_redact","provenance":"shopify_reported_attribution"},
+    {"output":"platform_sales_value","meaning":"Shopify-attributed sales value for one platform and selected period; never store total sales","resource":null,"fields":[],"candidate_shopify_mapping":"ShopifyQL sales schema platform/channel breakdown plus total_sales; exact dimension compatibility unresolved","scope":null,"scope_status":"unresolved_no_scope_request","pii":"none","retention":"not_decided","deletion":"shop_redact","provenance":"shopify_reported_attribution"}
   ],
   "excluded_outputs": [
-    {"output":"add_to_cart","reason":"no_verified_minimum_admin_api_contract","ui_semantics":"unsupported_not_zero"},
-    {"output":"checkout","reason":"no_verified_minimum_admin_api_contract","ui_semantics":"unsupported_not_zero"},
-    {"output":"historical_orders_over_60_days","reason":"read_all_orders_requires_separate_review","ui_semantics":"out_of_scope"},
+    {"output":"total_purchase_count","reason":"not_required_for_overlap","ui_semantics":"out_of_scope"},
+    {"output":"total_sales","reason":"not_required_for_overlap","ui_semantics":"out_of_scope"},
+    {"output":"refund_value","reason":"not_required_for_overlap","ui_semantics":"out_of_scope"},
+    {"output":"shop_currency","reason":"not_approved_as_intake_output","ui_semantics":"out_of_scope"},
+    {"output":"shop_timezone","reason":"not_approved_as_intake_output","ui_semantics":"out_of_scope"},
+    {"output":"add_to_cart","reason":"not_required_for_overlap","ui_semantics":"out_of_scope"},
+    {"output":"checkout","reason":"not_required_for_overlap","ui_semantics":"out_of_scope"},
     {"output":"customer_identity","reason":"funnel_does_not_require_pii","ui_semantics":"forbidden"},
     {"output":"organic_attribution","reason":"ga4_utm_ingestion_parked","ui_semantics":"unattributed_not_organic"}
   ]

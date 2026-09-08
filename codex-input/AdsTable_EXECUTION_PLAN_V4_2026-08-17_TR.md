@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T1 Done; E10-T2 next`
+**Durum:** `In progress — E10-T1/T2 Done; E10-T3 next`
 
 ### Ürün ve mimari kararı
 
@@ -1846,7 +1846,7 @@ AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shop
 ### Planlanan işler
 
 - **E10-T1 — Done — Official requirements freeze:** Güncel resmi Shopify dokümantasyonundan Public App dağıtımı, embedded auth/token exchange, App Bridge, billing, privacy/protected-data ve App Store review gereksinimlerini linkli decision log ile dondur; doğrulanmamış varsayımı implementation contract yapma.
-- **E10-T2 — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını dondur. Browser query/body içindeki shop, user veya workspace kimliğini authoritative kabul etme.
+- **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
 - **E10-T3 — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Token, uninstall ve privacy lifecycle:** Shopify token'larını mevcut encrypted vault ilkelerine bağla; browser/log erişimini yasakla; uninstall, shop erişim kaybı ve zorunlu privacy/compliance webhook'larında erişimi fail-closed durdur ve retention/deletion kararlarını kanıtla.
 - **E10-T5 — Minimum scope ve commerce contract:** Mockup/Funnel ekranlarının gerçek veri gereksinimlerinden minimum scope matrisi çıkar. İlk dilimde mümkün olduğunca PII alma; Shopify-observed order, refund, revenue, currency ve timezone facts ile provider-reported attribution'ı ayrı provenance altında tut.
@@ -1877,6 +1877,12 @@ E10 geliştirmesi feature-gated ilerler. Shopify Partner Dashboard ayarı, produ
 Resmi gereksinim matrisi, fail-closed implementation hükümleri ve yeniden doğrulama tetikleyicileri `docs/E10_T1_SHOPIFY_OFFICIAL_REQUIREMENTS_FREEZE.md` içinde donduruldu; executable sözleşme `tests/e10-t1-shopify-requirements-freeze.test.js` ile korunur. Exact API/App Bridge sürümü, token modeli, commerce scope'ları, protected-data erişimi, billing modeli ve submission checklist'i ilgili uygulama taskı öncesinde güncel resmi belge ve uygulamaya özgü Partner Dashboard sonucu üzerinden yeniden doğrulanacaktır.
 
 **Durum:** E10-T1 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T2 shop/workspace tenant modelidir. Bu taskta Partner Dashboard, credential, scope, billing, migration, webhook, provider, production veya App Store submission işlemi yapılmadı.
+
+### E10-T2 karar kanıtı
+
+One-shop/one-workspace başlangıç modeli, immutable shop kimliği, verified domain değişimi, reinstall generation, uniqueness ve browser claim rejection sözleşmeleri `src/shopify/tenant-model.js` içinde executable hale getirildi. Model kararı `docs/E10_T2_SHOP_WORKSPACE_TENANT_MODEL.md`, regresyon kanıtı `tests/e10-t2-shop-workspace-tenant.test.js` içindedir.
+
+**Durum:** E10-T2 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T3 install ve embedded authentication hazırlığıdır. Migration, Shopify/Partner Dashboard, credential, scope, billing, webhook, provider veya production işlemi yapılmadı.
 
 ## 15. E11 — Funnel API
 

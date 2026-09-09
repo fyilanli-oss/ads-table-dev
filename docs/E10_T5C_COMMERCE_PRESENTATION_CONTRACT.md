@@ -1,6 +1,6 @@
 # E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek?
 
-**Durum:** `In progress — E10-T5-C1 Funnel Done; C2–C7 ürün kararı bekliyor; implementation yasak`
+**Durum:** `In progress — C1 Funnel ve C2-A Ad Analysis UI Done; C2-B Creative capability sıradaki iş; implementation yasak`
 
 E10-T5-C'nin amacı AdsTable'ın Shopify merchant'a hangi çıktıları vereceğini ve bunların Shopify-native Funnel/Table yüzeyinde nasıl gösterileceğini ürün seviyesinde dondurmaktır. Önceki Shopify Total Purchase/Sales/Refund presentation varsayımı geçersizdir; Shopify'dan alınacak iki overlap metriği bu kararı belirlemez.
 
@@ -17,14 +17,16 @@ T5-C tamamlanmadan aşağıdaki konular tek bir okunabilir output/display matris
 ## Modül sırası
 
 1. **E10-T5-C1 Funnel — `Done`:** Funnel/Table davranışı, Shopify component eşlemesi ve üç iş kararı `docs/E10_T5C1_FUNNEL_SHOPIFY_COMPONENT_FREEZE.md` ile donduruldu.
-2. **E10-T5-C2 Ad Analysis — `Product decision required`**
-3. **E10-T5-C3 Dashboard — `Product decision required`**
+2. **E10-T5-C2 Ad Analysis — `In progress`:** C2-A UI/ranking/Creative sınırı `Done`; C2-B Creative provider capability ve data model matrisi `Ready`.
+3. **E10-T5-C3 Dashboard — `Blocked by C2-B`**
 4. **E10-T5-C4 Platforms — `Blocked by C1–C3`:** Provider OAuth yüzeyi.
 5. **E10-T5-C5 Attribution — `Blocked by C1–C4`:** Overlap diagnostic yüzeyi.
 6. **E10-T5-C6 Settings — `Blocked by C1–C5`:** OAuth ve diğer ayarlar.
 7. **E10-T5-C7 Integrated navigation/acceptance — `Blocked by C1–C6`**
 
 Bu sıra parent T5-C'yi tamamlamaz. Funnel kararı diğer modüllere sessizce genellenmez; her modül kendi okunabilir freeze ve onayını alır.
+
+Ad Analysis C2-A kararı `docs/E10_T5C2A_AD_ANALYSIS_SHOPIFY_COMPONENT_FREEZE.md` ve `contracts/shopify/e10-t5c2a-ad-analysis-ui.json` içindedir. Creative ilk dilimde metadata/preview'dır; Dataset V2 fact'i veya Funnel leaf'i değildir. C2-B capability sonucu görülmeden bu sınır genişletilemez.
 
 ## Provider OAuth montajı — dondurulmuş karar
 

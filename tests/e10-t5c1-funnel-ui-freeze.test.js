@@ -44,8 +44,8 @@ test("view switching retains query and disclosure state", () => {
 
 test("Execution Plan records C1 as done without prematurely completing T5-C", () => {
   assert.match(plan, /E10-T5-C1 — `Done` — Funnel/);
-  assert.match(plan, /E10-T5-C2 — `Product decision required` — Ad Analysis/);
-  assert.match(plan, /E10-T5-C parent.*`In progress`/);
+  assert.match(plan, /E10-T5-C2 — `In progress` — Ad Analysis/);
+  assert.match(plan, /parent T5-C `In progress`/);
   assert.match(plan, /varsayılan görünüm \*\*Funnel\*\*/);
   assert.match(plan, /yalnız seçili focus metric/);
   assert.match(plan, /aynı anda yalnız bir popover/);

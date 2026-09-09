@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B Ready ve açık development onayına bağlı; every live Shopify contact gated`
+**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B development onayı alındı fakat bootstrap environment/CLI eksikliğiyle BLOCKED; Shopify teması yapılmadı`
 
 ### Ürün ve mimari kararı
 
@@ -1936,7 +1936,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-B — Development App Bootstrap — Shopify'da ilk kazma
 
-**Durum:** `Ready / explicit development approval required`.
+**Durum:** `Blocked / BLOCKED_BOOTSTRAP_ENV` — development onayı 2026-09-09'da alındı; yeni ortamda gerekli Shopify bootstrap değişkenleri ve Shopify CLI bulunmadığından Shopify teması yapılmadı. Redacted evidence `docs/E10_T6B_DEVELOPMENT_APP_BOOTSTRAP.md` ve `contracts/shopify/e10-t6b-development-bootstrap.json` içindedir.
 
 - Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
 - İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
@@ -2174,7 +2174,7 @@ Karar belgesi `docs/E10_T5C5A_ATTRIBUTION_DIFFERENCES_FREEZE.md`, executable con
 - **OAuth dönüşü:** Callback canonical Platforms route'una, server-bound allowlisted return target ile döner; standalone login/dashboard ve caller URL yasaktır.
 - **Acceptance:** Shopify responsive navigation; keyboard/focus/back/deep-link; 320px overflow, duplicate shell, stale/multiple account ve open-redirect negatif kapıları zorunludur.
 
-E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A — `Done / PASS`**; sıradaki iş **E10-T6-B — `Ready / explicit development approval required`**dır. T6-B onayı Shopify Development App/Store teması içindir ve production onayı değildir.
+E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A — `Done / PASS`**; E10-T6-B development onayı alınmış fakat yeni ortam bootstrap değişkenleri ve Shopify CLI eksikliği nedeniyle **`Blocked / BLOCKED_BOOTSTRAP_ENV`** durumundadır. Shopify teması yapılmamıştır; production onayı verilmemiştir.
 
 
 ### E10-T5-B karar kanıtı — Shopify attribution intake ve gösterim
@@ -2185,7 +2185,7 @@ E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7
 
 `docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` tamamlanan C1–C7 ilk dilim freeze'lerini izler. C5-B verified reconciliation ertelenmiştir. E10-T6-A offline readiness PASS olmuştur; açık development onayı olmadan E10-T6-B ve onu izleyen Shopify temaslı işler, ayrıca gerekli plan kapıları olmadan E10-T7–T10, E11 veya E12 implementation'ı açılamaz.
 
-**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; E10-T6-A `Done / PASS`; sıradaki iş **E10-T6-B Development App Bootstrap — Ready / explicit development approval required**; parent E10 `In progress`. T6-A scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
+**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; E10-T6-A `Done / PASS`; **E10-T6-B Development App Bootstrap — Blocked / BLOCKED_BOOTSTRAP_ENV**; parent E10 `In progress`. Development onayı alınmış, fakat bootstrap environment/CLI eksikliği nedeniyle Shopify teması yapılmamıştır. T6-A production query yapmadı.
 
 ### E10-T6-A1/A2 official-source readiness evidence
 
@@ -2197,7 +2197,7 @@ ShopifyQL `sales` schema için `referring_platform`, `orders__last_click` ve `to
 
 **Evidence:** `contracts/shopify/e10-t6a-official-readiness.json`, `docs/E10_T6A_OFFICIAL_CAPABILITY_READINESS.md`, `tests/e10-t6a-official-readiness.test.js`.
 
-**Durum:** E10-T6-A — `Done / PASS`; E10-T6-B — `Ready / explicit development approval required`. T6-A Shopify/Development Store/production teması, app/credential/scope oluşturma, API query, migration, deployment veya Shopify CLI kurulumu yapmadı.
+**Durum:** E10-T6-A — `Done / PASS`; E10-T6-B — `Blocked / BLOCKED_BOOTSTRAP_ENV`. Development onayı alınmıştır; environment/CLI preflight engeli nedeniyle Shopify/Development Store/production teması, app/credential/scope oluşturma, API query, migration veya deployment yapılmamıştır.
 
 ## 15. E11 — Funnel API
 

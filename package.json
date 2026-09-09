@@ -1,6 +1,7 @@
 {
   "scripts": {
     "start": "node server.js",
+    "e10:t6b:preflight": "node scripts/e10-t6b-preflight.js",
     "tokens:backfill:dry-run": "node scripts/provider-token-backfill-dry-run.js",
     "tokens:backfill:write": "node scripts/provider-token-backfill-write.js",
     "e2:t5:preflight": "node scripts/e2-t5-operator.js preflight",

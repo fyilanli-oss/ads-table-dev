@@ -50,5 +50,5 @@ test("the freeze remains intact after Attribution advances to integrated accepta
   assert.match(plan, /E10-T5-C5-A — `Done` — Attribution Differences/);
   assert.match(plan, /E10-T5-C7 — `Done` — Integrated navigation\/acceptance/);
   assert.match(plan, /E10-T5-C6 — `Done` — Settings/);
-  assert.match(plan, /sıradaki iş \*\*E10-T6-B Development App Bootstrap — Ready \/ explicit development approval required\*\*/);
+  assert.match(plan, /E10-T6-B Development App Bootstrap — Blocked \/ BLOCKED_BOOTSTRAP_ENV/);
 });

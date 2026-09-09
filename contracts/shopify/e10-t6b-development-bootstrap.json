@@ -1,0 +1,19 @@
+{
+  "contract": "e10-t6b-development-bootstrap",
+  "checked_at": "2026-09-09",
+  "outcome": "BLOCKED",
+  "safe_code": "BLOCKED_BOOTSTRAP_ENV",
+  "development_approval_received": true,
+  "shopify_contact": false,
+  "development_store_contact": false,
+  "production_contact": false,
+  "preflight": {
+    "required_environment_names": ["SHOPIFY_API_KEY", "SHOPIFY_API_SECRET", "SHOPIFY_APP_URL", "SHOPIFY_DEV_STORE"],
+    "missing_environment_names": ["SHOPIFY_API_KEY", "SHOPIFY_API_SECRET", "SHOPIFY_APP_URL", "SHOPIFY_DEV_STORE"],
+    "shopify_cli_available": false,
+    "approved_development_scopes": ["read_reports"],
+    "callback_path": "/auth/shopify/callback"
+  },
+  "acceptance_pending": ["development app linked", "released development configuration", "Development Store install callback", "ID token validation", "token exchange", "shop to workspace binding"],
+  "forbidden": ["invent_credentials", "log_credentials", "contact_production_store", "activate_billing", "submit_to_app_store", "run_shopifyql_smoke_before_e10_t6d"]
+}

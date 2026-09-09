@@ -59,6 +59,6 @@ test("development and production gates remain human-controlled", () => {
 
 test("Execution Plan advances only to the development approval boundary", () => {
   assert.match(plan, /E10-T6-A — `Done \/ PASS`/);
-  assert.match(plan, /E10-T6-B — `Ready \/ explicit development approval required`/);
+  assert.match(plan, /E10-T6-B — `Blocked \/ BLOCKED_BOOTSTRAP_ENV`/);
   assert.match(plan, /read_reports.*Level 2 protected customer data/s);
 });

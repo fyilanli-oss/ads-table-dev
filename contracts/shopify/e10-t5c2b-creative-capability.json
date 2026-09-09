@@ -1,0 +1,55 @@
+{
+  "contract": "e10-t5c2b-creative-capability",
+  "status": "frozen",
+  "decision": "provider_specific_metadata_sidecar_no_dataset_v2_change",
+  "first_slice": {
+    "creative_metadata_enabled": true,
+    "creative_performance_enabled": false,
+    "dataset_v2_schema_change": false,
+    "funnel_hierarchy_change": false,
+    "on_demand_preview": true
+  },
+  "sidecar_grain": ["workspace_id", "platform", "platform_account_id", "analytical_entity_key", "provider_creative_or_asset_id", "association_effective_at"],
+  "sidecar_allowlist": ["creative_type", "display_label", "preview_reference", "status", "association_effective_at", "observed_at", "capability_status"],
+  "sidecar_forbidden": ["purchase", "sales", "spend", "revenue", "customer_pii", "provider_token", "permanent_third_party_media_url"],
+  "providers": {
+    "meta": {
+      "association_model": "ad_to_adcreative_or_asset_spec",
+      "metadata_preview": "candidate_requires_official_revalidation",
+      "performance_grain": "not_approved",
+      "first_slice": "metadata_only"
+    },
+    "google_standard": {
+      "association_model": "ad_group_ad_to_assets",
+      "metadata_preview": "documented_candidate",
+      "performance_grain": "documented_candidate_not_approved",
+      "first_slice": "metadata_only"
+    },
+    "google_performance_max": {
+      "association_model": "asset_group_to_assets",
+      "metadata_preview": "documented_candidate",
+      "performance_grain": "documented_candidate_not_approved",
+      "first_slice": "metadata_only"
+    },
+    "tiktok": {
+      "association_model": "ad_to_video_image_or_identity_assets",
+      "metadata_preview": "candidate_requires_official_revalidation",
+      "performance_grain": "not_approved",
+      "first_slice": "metadata_only"
+    },
+    "pinterest": {
+      "association_model": "ad_to_pin_creative",
+      "metadata_preview": "candidate_requires_official_revalidation",
+      "performance_grain": "not_approved",
+      "first_slice": "metadata_only"
+    },
+    "klaviyo": {
+      "association_model": "campaign_or_flow_message_to_template_content",
+      "metadata_preview": "candidate_requires_official_revalidation",
+      "performance_grain": "message_leaf_only",
+      "first_slice": "metadata_only"
+    }
+  },
+  "runtime_gate": "E10-T6_or_provider_specific_approved_smoke",
+  "scope_gate": "no_new_scope_without_visible_output_and_human_approval"
+}

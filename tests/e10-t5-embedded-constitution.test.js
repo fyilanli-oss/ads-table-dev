@@ -40,7 +40,8 @@ test("visual constitution is Shopify-native and rejects iframe imitation", () =>
 test("T5 A B C and the absolute sequencing gate are explicit", () => {
   assert.match(constitution, /E10-T5-A — Shopify Kuralları — `Done`/);
   assert.match(constitution, /E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek\? — `Done`/);
-  assert.match(constitution, /E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek\? — `Product decision required`/);
+  assert.match(constitution, /E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek\? — `In progress`/);
+  assert.match(constitution, /C1 Funnel kararları onaylandı; C2–C7/);
   assert.match(constitution, /Mutlak sıra kapısı:[\s\S]*E10-T6–T10, E11 veya E12[\s\S]*branch, kod ya da PR açılamaz/);
 });
 

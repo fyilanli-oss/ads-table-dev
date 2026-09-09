@@ -39,9 +39,10 @@ test("chart and KPI semantics preserve backend math and metric direction", () =>
   assert.match(doc, /CPC\/CPS düşüşü olumlu olabilir/);
 });
 
-test("Execution Plan closes Dashboard and advances only to Platforms", () => {
+test("Execution Plan preserves Dashboard after Platforms is approved", () => {
   assert.match(plan, /E10-T5-C3 — `Done` — Dashboard/);
-  assert.match(plan, /E10-T5-C4 — `Product decision required` — Platforms/);
+  assert.match(plan, /E10-T5-C4 — `Done` — Platforms/);
+  assert.match(plan, /E10-T5-C5 — `Product decision required` — Attribution/);
   assert.match(plan, /\*\*Compare:\*\* Yalnız On\/Off/);
   assert.match(plan, /Funnel\/Table switch kaldırılır/);
   assert.match(plan, /Add to Cart Value.*Checkout Value.*Abandoned Value.*Sales/);

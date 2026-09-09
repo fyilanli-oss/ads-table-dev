@@ -35,10 +35,11 @@ test("official references and revalidation limits are explicit", () => {
   assert.equal(contract.scope_gate, "no_new_scope_without_visible_output_and_human_approval");
 });
 
-test("Execution Plan closes C2 and advances only to Dashboard product freeze", () => {
+test("Execution Plan preserves C2 while the product sequence advances", () => {
   assert.match(plan, /E10-T5-C2-B — `Done` — Creative provider capability ve data model/);
   assert.match(plan, /E10-T5-C2 — `Done` — Ad Analysis/);
   assert.match(plan, /E10-T5-C3 — `Done` — Dashboard/);
-  assert.match(plan, /E10-T5-C4 — `Product decision required` — Platforms/);
+  assert.match(plan, /E10-T5-C4 — `Done` — Platforms/);
+  assert.match(plan, /E10-T5-C5 — `Product decision required` — Attribution/);
   assert.match(plan, /Dataset V2 ve Funnel hierarchy değişmez/);
 });

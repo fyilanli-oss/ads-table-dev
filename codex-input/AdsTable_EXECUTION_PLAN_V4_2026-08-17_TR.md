@@ -1928,11 +1928,15 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-A — Official capability ve development-readiness — Shopify teması yok
 
+**Durum:** `Verification / BLOCKED_OFFICIAL_DOCS_ACCESS` — resmi package/repository envanteri PASS; kritik `shopify.dev` docs/validation satırları erişim kapısında blokeli, overall PASS değildir.
+
 - Başlangıç koşulu: E10-T5-C output/display matrisi kullanıcı tarafından Execution Plan içinde okunmuş, açıkça onaylanmış, `Done` yapılmış ve merge edilmiş olmalıdır.
 - Güncel Admin API/App Bridge/UI component sürümü; embedded dış navigasyon; ShopifyQL attribution dimension/metric; gerekli minimum scope/protected-data; callback URL; CSP/frame; install/session; webhook gerekliliği ve Development Store kabul adımları resmi kaynaklarla doğrulanır.
 - Çıktı yalnız redacted readiness matrisi ve `PASS/BLOCKED` evidence'tır. Partner Dashboard, store, credential, scope, redirect, webhook veya API query değişikliği yapılmaz.
 
 #### E10-T6-B — Development App Bootstrap — Shopify'da ilk kazma
+
+**Durum:** `Blocked by T6-A PASS + explicit development approval`.
 
 - Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
 - İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
@@ -2182,6 +2186,16 @@ E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7
 `docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` tamamlanan C1–C7 ilk dilim freeze'lerini izler. C5-B verified reconciliation ertelenmiştir. E10-T6-A offline readiness açılmıştır; T6-A PASS ve gerekli ayrı onaylar olmadan E10-T6-B, E10-T7, E10-T8, E10-T9, E10-T10, E11 veya E12 implementation'ı açılamaz.
 
 **Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; sıradaki repository işi **E10-T6-A official capability/development-readiness**; parent E10 `In progress`. Bu paket scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
+
+### E10-T6-A1 official-source readiness evidence
+
+**Gerçekleşen (2026-09-09):** Resmi `@shopify/dev-mcp` 1.15.0 paketi, aktif Shopify App Bridge/app-js/CLI repository'leri, resmi app template adayları ve App Home bundled instruction offline incelendi. App Home'un unversioned `s-*` global web component ve App Bridge API yönü doğrulandı; deprecated Polaris React yaklaşımı reddedildi. Ortam proxy'si `shopify.dev` için `403 CONNECT tunnel failed`, web docs search ise `401 Unauthorized` verdi.
+
+**Fail-closed bulgu:** Official Dev MCP kendi ShopifyQL talimatında schema/metric/dimension adlarının docs search ile doğrulanmasını ve asla tahmin edilmemesini zorunlu tutar. Bundled Admin GraphQL schema `shopifyqlQuery` wrapper'ını gösterebilse de platform attribution dimension, Purchase metric veya Sales+dimension uyumluluğunu kanıtlamaz. Bu nedenle exact UI property/validation, App Bridge navigation/OAuth exit, ShopifyQL alanları, minimum scope/protected-data, API version ve development checklist PASS değildir; `first_slice_scopes=[]` korunur.
+
+**Evidence:** `contracts/shopify/e10-t6a-official-readiness.json`, `docs/E10_T6A_OFFICIAL_CAPABILITY_READINESS.md`, `tests/e10-t6a-official-readiness.test.js`.
+
+**Durum:** E10-T6-A — `Verification / BLOCKED_OFFICIAL_DOCS_ACCESS`; T6-B — `Blocked by T6-A PASS + explicit development approval`. Bu kayıt Shopify/Development Store/production teması, scope talebi, API query, credential, migration veya deployment yapmadı. Erişim geri geldiğinde yalnız blokeli official-doc/validation satırları yeniden değerlendirilir; overall PASS olmadan sıra ilerlemez.
 
 ## 15. E11 — Funnel API
 

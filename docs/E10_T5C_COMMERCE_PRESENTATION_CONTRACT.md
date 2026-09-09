@@ -1,6 +1,6 @@
 # E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek?
 
-**Durum:** `In progress — C1/C2/C3/C4/C6 Done; C5 Attribution sıradaki ürün kararı; implementation yasak`
+**Durum:** `In progress — C1–C6 product freeze Done (C5-A Done, C5-B Deferred); C7 sıradaki ürün kararı; implementation yasak`
 
 E10-T5-C'nin amacı AdsTable'ın Shopify merchant'a hangi çıktıları vereceğini ve bunların Shopify-native Funnel/Table yüzeyinde nasıl gösterileceğini ürün seviyesinde dondurmaktır. Önceki Shopify Total Purchase/Sales/Refund presentation varsayımı geçersizdir; Shopify'dan alınacak iki overlap metriği bu kararı belirlemez.
 
@@ -20,9 +20,9 @@ T5-C tamamlanmadan aşağıdaki konular tek bir okunabilir output/display matris
 2. **E10-T5-C2 Ad Analysis — `Done`:** C2-A UI/ranking ve C2-B Creative capability/data model kararları tamamlandı.
 3. **E10-T5-C3 Dashboard — `Done`:** Completed-day compare ve count+value Funnel Overview freeze edildi.
 4. **E10-T5-C4 Platforms — `Done`:** Currency-first onboarding; Meta/Google/TikTok/Klaviyo Connect, account selection ve Disconnect yüzeyi.
-5. **E10-T5-C5 Attribution — `Product decision required`:** Overlap diagnostic yüzeyi.
+5. **E10-T5-C5 Attribution — `Done for first slice`:** C5-A Attribution Differences `Done`; C5-B verified leaf reconciliation `Deferred`.
 6. **E10-T5-C6 Settings — `Done`:** Currency, Klaviyo Email Monthly Plan Cost ve tek aktif Ad Account seçimi C4 ile birlikte onaylandı.
-7. **E10-T5-C7 Integrated navigation/acceptance — `Blocked by C5`**
+7. **E10-T5-C7 Integrated navigation/acceptance — `Product decision required`**
 
 Bu sıra parent T5-C'yi tamamlamaz. Funnel kararı diğer modüllere sessizce genellenmez; her modül kendi okunabilir freeze ve onayını alır.
 
@@ -40,6 +40,8 @@ Ad Analysis C2-A kararı `docs/E10_T5C2A_AD_ANALYSIS_SHOPIFY_COMPONENT_FREEZE.md
 Mevcut provider OAuth çekirdeği korunur, fakat mevcut `/dashboard?...` callback dönüşleri embedded akışta doğrudan kullanılamaz. Runtime adaptasyonu T5-C output/display onayı sonrasında ayrı contract ile yapılır; bu karar production OAuth ayarı değildir.
 
 Platforms ve Settings kararı `docs/E10_T5C4_PLATFORMS_SETTINGS_SHOPIFY_FREEZE.md` ve `contracts/shopify/e10-t5c4-platforms-settings-ui.json` ile donduruldu. Kullanıcının iki modülü birlikte tanımlayan açık iş kararı nedeniyle C6, C4 ile birlikte kapatıldı; bu sıra değişikliği C5 Attribution'ı atlamaz. Sıradaki ürün kararı C5'tir, ardından C7 bütünleşik kabul gelir.
+
+Attribution ilk dilimi `docs/E10_T5C5A_ATTRIBUTION_DIFFERENCES_FREEZE.md` ve `contracts/shopify/e10-t5c5a-attribution-differences-ui.json` ile donduruldu. Kullanıcıya görünen ürün `Attribution Differences`dır; aggregate fark duplicate/Ad-level overlap iddiası veya düzeltme yetkisi vermez. Review read-only'dir. Event-level order/click identity → leaf Ad kanıtı gerektiren C5-B ayrı capability olarak `Deferred`dır. Sıradaki ürün kararı C7 integrated navigation/acceptance'tır.
 
 UI, resmi Shopify embedded shell, App Bridge ve genel Shopify UI componentleriyle kurulacaktır. AdsTable'a özel görselleştirme yalnız Funnel/Table data presentation alanında kullanılabilir; özel CSS component framework, statik Shopify shell taklidi ve iframe/yabancı-site hissi kabul edilmez.
 

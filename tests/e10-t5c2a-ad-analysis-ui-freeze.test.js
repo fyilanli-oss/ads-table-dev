@@ -52,5 +52,5 @@ test("Execution Plan records C2-A and the completed Creative capability gate", (
   assert.match(plan, /E10-T5-C2-B — `Done` — Creative provider capability ve data model/);
   assert.match(plan, /Varsayılan ranking `Sales` ve yüksekten düşüğe/);
   assert.match(plan, /Creative.*Dataset V2'ye yazılmaz/);
-  assert.match(plan, /sıradaki ürün paketi E10-T5-C3 Dashboard/);
+  assert.match(plan, /E10-T5-C3 — `Done` — Dashboard/);
 });

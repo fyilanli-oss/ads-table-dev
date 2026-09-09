@@ -1,57 +1,89 @@
 # E10-T6-A — Official capability ve development-readiness
 
-**Durum:** `Verification — BLOCKED_OFFICIAL_DOCS_ACCESS`  
-**Kontrol tarihi:** 2026-09-09  
+**Durum:** `PASS — READY_FOR_EXPLICIT_DEVELOPMENT_APPROVAL`
+**Kontrol tarihi:** 2026-09-09
 **Shopify/Development Store/production teması:** Yok
 
 ## İş çıktısı
 
-Güncel resmi Shopify package/repository kaynaklarından doğrulanabilen foundation bileşenleri PASS; yalnız `shopify.dev` doküman aramasıyla doğrulanabilen kritik UI, navigation ve ShopifyQL attribution ayrıntıları blokelidir. Sonuç **BLOCKED**dır; E10-T6-B açılamaz.
+Önceki `BLOCKED_OFFICIAL_DOCS_ACCESS` ağ engeli kaldırıldı. `shopify.dev` resmi Markdown/reference sayfaları ve resmi `@shopify/dev-mcp` 1.15.0 docs/validation servisleri proxy üzerinden erişilebilir oldu. Daha önce blokeli bırakılan UI, navigation, ShopifyQL, scope, protected-data, API version ve development checklist satırları fail-closed yeniden doğrulandı. E10-T6-A sonucu **PASS**tır.
 
-## Resmi kaynak envanteri
+Bu PASS Shopify'da app oluşturmaz, scope istemez, Development Store'a bağlanmaz ve canlı sorgu çalıştırmaz. Yalnız **E10-T6-B için insan development onayı isteme kapısını** açar.
 
-| Alan | Resmi kaynak | Sonuç |
+## Dondurulan resmi baseline
+
+| Alan | Resmi kaynak | Karar |
 |---|---|---|
-| Shopify Dev MCP | [`@shopify/dev-mcp`](https://www.npmjs.com/package/@shopify/dev-mcp) 1.15.0 | PASS; Shopify'ın local, auth gerektirmeyen docs/schema doğrulama aracıdır. |
-| App Bridge | [`Shopify/shopify-app-bridge`](https://github.com/Shopify/shopify-app-bridge) | PASS; aktif resmi repository, embedded Admin/Mobile/POS SDK yönünü doğrular. |
-| JS API ve app tools | [`Shopify/shopify-app-js`](https://github.com/Shopify/shopify-app-js) | PASS; Admin API client, Shopify API, Express ve session-storage resmi paket ailelerini doğrular. |
-| CLI | [`Shopify/cli`](https://github.com/Shopify/cli) ve `@shopify/cli` 4.8.0 | PASS yalnız mevcut resmi araç ailesi için; proje template/API sürümü seçimi değildir. |
-| Resmi app templates | [`node`](https://github.com/Shopify/shopify-app-template-node), [`react-router`](https://github.com/Shopify/shopify-app-template-react-router), [`remix`](https://github.com/Shopify/shopify-app-template-remix) | PASS yalnız aday envanteri; AdsTable framework kararı henüz verilmedi. |
-| Eski Polaris React | [`Shopify/polaris-react-archive`](https://github.com/Shopify/polaris-react-archive) | REJECTED; resmi repository deprecated/archive yönündedir. |
+| Shopify Dev MCP | [`@shopify/dev-mcp` 1.15.0](https://www.npmjs.com/package/@shopify/dev-mcp) | Docs search ve component validator erişimi PASS. |
+| Admin GraphQL API | [`2026-07`](https://shopify.dev/docs/api/admin-graphql/2026-07) | T6-B/T6-D geliştirme baseline'ı; live smoke öncesi drift yeniden kontrol edilir. |
+| App Home / Polaris | [App Home v1.0](https://shopify.dev/docs/api/app-home/v1.0) | Stable Polaris 1 channel, global `s-*` web components; eski Polaris React kullanılmaz. |
+| App Bridge | [App Bridge web components](https://shopify.dev/docs/api/app-home/v1.0/app-bridge-web-components) | Polaris'ten ayrı ve unversioned; latest CDN/runtime contract'ı kullanılır. |
+| Başlangıç template'i | [`shopify-app-template-react-router`](https://github.com/Shopify/shopify-app-template-react-router) | Public/embedded, feature-rich uygulama için T6-B adayı seçildi; T6-A CLI kurmadı. |
+| Eski Polaris React | [`polaris-react-archive`](https://github.com/Shopify/polaris-react-archive) | REJECTED; dependency veya yeni UI temeli olamaz. |
 
-Official Dev MCP 1.15.0'ın bundled App Home talimatı Polaris App Home'u `unversioned`, App Bridge API + `s-` prefix'li global web components olarak tanımlar; `@shopify/polaris`/`@shopify/polaris-react` importunu yasaklar ve generated component code için resmi validation tool'unu zorunlu tutar. Bu, C1–C7'nin genel `s-*` yönünü destekler; exact property veya implementation PASS'i değildir.
+## Shopify-native component doğrulaması
 
-## Kritik blokaj
+T5-C1–C7'de dondurulan component yönünü temsil eden tek App Home artifact'i resmi Dev MCP `validate_component_codeblocks` aracıyla doğrulandı.
 
-Ortamın HTTPS proxy'si hem `shopify.dev` root hem doküman URL'lerinde origin'e ulaşmadan `403 CONNECT tunnel failed` üretir. Web search aracı ayrı olarak `401 Unauthorized` verir. DNS ve GitHub erişimi çalışır; dolayısıyla bu Shopify servis kesintisi kanıtı değildir.
+- Artifact: `e10-t6a-component-matrix`, revision `2`.
+- API: `polaris-app-home` (version parametresi verilmez; App Home validator bunu versioned API olarak kabul etmez).
+- Sonuç: **VALID / PASS**.
+- Doğrulanan temel aile: page/banner/section/layout, search/date/choice/checkbox, chip/button/menu/popover/modal/tooltip, badge/spinner ve table header/body/row/cell.
+- Validator düzeltmesi: `s-checkbox` label property kullanır; `s-tooltip` bir `content` property alan wrapper değildir, `interestFor` ile hedeflenen sibling elementtir.
 
-Official Dev MCP'nin ShopifyQL talimatı schema/grammar'ın bundled instruction içinde olmadığını; metric, dimension ve schema adlarının developer documentation'da aranmasını ve asla tahmin edilmemesini açıkça şart koşar. Bundled Admin GraphQL introspection `shopifyqlQuery` wrapper'ını doğrulayabilir, fakat ShopifyQL içindeki platform attribution dimension veya Purchase/Sales field uyumluluğunu kanıtlamaz.
+Bu kanıt component isim/property baseline'ını doğrular. Gerçek E12 ekranları üretildiğinde her yeni Shopify component kodu ayrıca aynı resmi validator'dan geçer.
 
-Bu nedenle aşağıdakiler UNVERIFIED/BLOCKED kalır:
+## Embedded navigation, callback ve güvenlik
 
-- exact ShopifyQL platform attribution dimension;
-- exact Purchase metric;
-- Sales metric + platform dimension birlikteliği ve currency semantiği;
-- minimum scope ve protected-data sonucu;
-- exact App Home component property'leri ve code validation;
-- exact App Bridge navigation/top-level OAuth exit;
-- seçilecek Admin API sürümü ve development-store kabul adımları.
+- [Navigation API](https://shopify.dev/docs/api/app-home/v1.0/apis/user-interface-and-interactions/navigation-api) dış URL'ye mevcut top-level context'te çıkış için `open(url, '_top')` / `target="_top"` contract'ını doğrular. Provider consent için `_blank`, nested iframe ve browser-authoritative dönüş URL'si kullanılmaz.
+- App config'in `auth.redirect_urls` alanında en az bir geçerli callback URL gerekir. AdsTable exact callback'i server-side sabit allowlist'ten üretir; request query/body callback authority olamaz.
+- Embedded response CSP `frame-ancestors https://{shop}.myshopify.com https://admin.shopify.com` taşır. `{shop}` yalnız doğrulanmış server-side shop identity'den çözülür; embedded olmayan yüzey framing'i reddeder.
+- Browser App Bridge'in kısa ömürlü **ID token**'ını taşır. Backend claim'leri doğrular ve Shopify access token'ını server-side token exchange ile alır; ID/access token browser URL'sine veya loga yazılmaz.
 
-## Fail-closed karar
+## ShopifyQL attribution feasibility contract'ı
 
-- `first_slice_scopes=[]` korunur; `read_reports`, `read_orders` veya başka scope talep edilmez.
-- Field, component, API veya scope isim benzerliğinden uydurulmaz.
-- Unofficial mirror, blog, search cache veya eski Polaris React contract kaynağı olmaz.
-- E10-T6-A PASS değildir; E10-T6-B development bootstrap, Partner Dashboard, store install veya API query çalıştırılamaz.
-- Erişim düzeldiğinde yalnız blocked satırlar güncel resmi docs + Dev MCP validation ile yeniden değerlendirilir; PASS satırları da sürüm drift'i için kontrol edilir.
+Resmi ShopifyQL `2026-07` sales schema ve syntax aşağıdaki exact adayları doğrular:
 
-## Acceptance için kalanlar
+| AdsTable alanı | ShopifyQL contract'ı |
+|---|---|
+| Platform | `referring_platform` |
+| Platform-attributed Purchase Count | `orders__last_click` |
+| Platform-attributed Sales Value | `total_sales__last_click` |
+| Attribution modeli | `WITH LAST_CLICK_ATTRIBUTION` |
+| Para birimi | Varsayılan shop currency; yalnız açık `WITH CURRENCY '<ISO>'` ile dönüşüm |
+| GraphQL wrapper | Admin API `shopifyqlQuery` |
 
-1. `shopify.dev` official docs search erişimi;
-2. App Home/navigation/modal component örneklerinin Dev MCP validator PASS'i;
-3. ShopifyQL schema docs'tan exact attribution dimension + metric kanıtı veya açık `UNAVAILABLE` kararı;
-4. minimum scope/protected-data matrisi;
-5. seçilen template/API version ve callback/CSP/development checklist;
-6. bütün satırlar PASS/NOT_REQUIRED olmadan overall PASS verilmemesi.
+Read-only aday query:
 
-Bu repository paketi readiness gözlemini kaydeder; ağ politikasını değiştirmez, Shopify'a bağlanmaz ve kullanıcıdan teknik işlem istemez.
+```text
+FROM sales
+  SHOW orders, total_sales
+  GROUP BY referring_platform WITH LAST_CLICK_ATTRIBUTION
+  SINCE <completed_start> UNTIL <completed_end>
+  ORDER BY total_sales__last_click DESC
+```
+
+Önemli sınırlar:
+
+1. Bu query **resmi schema/syntax capability kanıtıdır**, canlı mağaza sonucu değildir. Exact store availability, parse sonucu, platform value taxonomy, null/unattributed satırı ve toplamlar yalnız açık development onayından sonra E10-T6-D read-only smoke ile kanıtlanır.
+2. `shopifyqlQuery`, resmi Admin GraphQL referansında `read_reports` scope'una ek olarak ad, adres, telefon ve e-posta dahil **Level 2 protected customer data access** şartı bildirir. Query PII kolonu seçmese bile bu platform gereksinimi yok sayılamaz.
+3. İlk slice hiçbir Order/Customer satırı veya doğrudan tanımlayıcı ingest etmez. Protected-data başvurusu ve `read_reports` talebi T6-A'da yapılmadı; T6-B development onayı içinde görünür ve minimum olarak değerlendirilir.
+4. Requirement ürün değerine göre ağır bulunursa otomatik `read_orders` fallback'i, Order ingestion veya provider fact overwrite yapılmaz; T6-D `BLOCKED` olur ve iş kararı istenir.
+
+## Webhook ve Development Store checklist'i
+
+- Public App Store dağıtımı için `customers/data_request`, `customers/redact` ve `shop/redact` mandatory compliance webhook'ları gerekir. AdsTable access-revocation contract'ı ayrıca `app/uninstalled` lifecycle'ını korur.
+- İlk sync/order webhook'u T6-A gereksinimi değildir; T6-E'ye kadar açılmaz.
+- Resmi bootstrap sırası: public app için resmi CLI/template → development config/App URL/callback/scope → released app configuration version → Development Store install → install callback → ID token doğrulama/token exchange → `shop → workspace` binding smoke.
+- T6-A Shopify CLI kurmadı ve bu adımların hiçbirini çalıştırmadı.
+
+## PASS ve kalan insan kapısı
+
+- E10-T6-A: **PASS / Done**.
+- E10-T6-B: **Ready — explicit development approval required**.
+- Development onayı scope veya production onayı değildir. T6-B yalnız development app/store install ve install/session binding smoke kapsamındadır.
+- Billing activation, App Store submission, production credential/store/data, migration ve deployment ayrıca açık production onayı olmadan yasaktır.
+
+## Evidence sınırı
+
+Repository evidence'ı secret, shop adı, token, credential veya müşteri verisi içermez. Resmi docs search/component validation geçici tooling ile çalıştırıldı; application dependency'si veya Shopify CLI kurulumu repository'ye eklenmedi.

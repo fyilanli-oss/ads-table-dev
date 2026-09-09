@@ -1,8 +1,64 @@
 "use strict";
-const fs=require("node:fs"),path=require("node:path"),test=require("node:test"),assert=require("node:assert/strict");
-const root=path.join(__dirname,".."),matrix=JSON.parse(fs.readFileSync(path.join(root,"contracts/shopify/e10-t6a-official-readiness.json"),"utf8")),doc=fs.readFileSync(path.join(root,"docs/E10_T6A_OFFICIAL_CAPABILITY_READINESS.md"),"utf8"),plan=fs.readFileSync(path.join(root,"codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md"),"utf8");
-test("readiness is blocked without claiming Shopify contact",()=>{assert.equal(matrix.outcome,"BLOCKED");assert.equal(matrix.safe_code,"BLOCKED_OFFICIAL_DOCS_ACCESS");assert.equal(matrix.shopify_contact,false);assert.equal(matrix.development_store_contact,false);assert.equal(matrix.production_contact,false)});
-test("official accessible sources are explicit and old Polaris is rejected",()=>{assert.equal(matrix.verified.official_dev_mcp.package,"@shopify/dev-mcp");assert.equal(matrix.verified.official_dev_mcp.version,"1.15.0");assert.equal(matrix.verified.app_bridge_repository.repository,"Shopify/shopify-app-bridge");assert.equal(matrix.verified.javascript_api_repository.repository,"Shopify/shopify-app-js");assert.equal(matrix.verified.polaris_app_home_model.web_component_prefix,"s-");assert.equal(matrix.verified.deprecated_ui_dependency.must_not_select,true)});
-test("ShopifyQL fields scopes and API version remain fail-closed",()=>{for(const key of["shopifyql_platform_attribution_dimension","shopifyql_purchase_metric","shopifyql_sales_metric_dimension_compatibility","minimum_scope","protected_data_classification","api_version_selection"])assert.notEqual(matrix.blocked[key].status,"PASS");for(const rule of["guess_field","guess_scope","use_unofficial_mirror","treat_package_schema_as_shopifyql_schema"])assert.ok(matrix.forbidden.includes(rule))});
-test("T6-B and implementation remain closed",()=>{assert.equal(matrix.gates.t6a_pass,false);assert.equal(matrix.gates.t6b_allowed,false);assert.equal(matrix.gates.scope_request_allowed,false);assert.equal(matrix.gates.implementation_allowed,false);assert.match(doc,/E10-T6-B açılamaz/)});
-test("Execution Plan records the blocked evidence without advancing",()=>{assert.match(plan,/E10-T6-A — `Verification \/ BLOCKED_OFFICIAL_DOCS_ACCESS`/);assert.match(plan,/E10-T6-B[\s\S]*`Blocked by T6-A PASS/);assert.match(plan,/first_slice_scopes=\[\].*korunur/)});
+
+const fs = require("node:fs");
+const path = require("node:path");
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const root = path.join(__dirname, "..");
+const matrix = JSON.parse(fs.readFileSync(path.join(root, "contracts/shopify/e10-t6a-official-readiness.json"), "utf8"));
+const doc = fs.readFileSync(path.join(root, "docs/E10_T6A_OFFICIAL_CAPABILITY_READINESS.md"), "utf8");
+const plan = fs.readFileSync(path.join(root, "codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md"), "utf8");
+
+test("official readiness passes without claiming Shopify contact", () => {
+  assert.equal(matrix.outcome, "PASS");
+  assert.equal(matrix.safe_code, "OFFICIAL_READINESS_PASS");
+  assert.equal(matrix.shopify_contact, false);
+  assert.equal(matrix.development_store_contact, false);
+  assert.equal(matrix.production_contact, false);
+});
+
+test("current official API, App Home and template baselines are explicit", () => {
+  assert.equal(matrix.official_baseline.dev_mcp.package, "@shopify/dev-mcp");
+  assert.equal(matrix.official_baseline.dev_mcp.version, "1.15.0");
+  assert.equal(matrix.official_baseline.admin_api_version.version, "2026-07");
+  assert.equal(matrix.official_baseline.app_home.reference, "v1.0");
+  assert.equal(matrix.official_baseline.template.repository, "Shopify/shopify-app-template-react-router");
+  assert.equal(matrix.official_baseline.deprecated_ui_dependency.must_not_select, true);
+});
+
+test("T5 component direction has official validator evidence", () => {
+  assert.equal(matrix.ui_validation.tool, "validate_component_codeblocks");
+  assert.equal(matrix.ui_validation.api, "polaris-app-home");
+  assert.equal(matrix.ui_validation.revision, 2);
+  assert.equal(matrix.ui_validation.status, "PASS");
+  for (const component of ["s-page", "s-table", "s-modal", "s-tooltip", "s-checkbox"])
+    assert.ok(matrix.ui_validation.validated_components.includes(component));
+});
+
+test("ShopifyQL attribution candidate is exact and remains gated by live smoke", () => {
+  const candidate = matrix.attribution_candidate;
+  assert.equal(candidate.api_version, "2026-07");
+  assert.equal(candidate.metrics.platform_purchase_count, "orders__last_click");
+  assert.equal(candidate.metrics.platform_sales_value, "total_sales__last_click");
+  assert.equal(candidate.dimension, "referring_platform");
+  assert.equal(candidate.modifier, "LAST_CLICK_ATTRIBUTION");
+  assert.equal(candidate.scope, "read_reports");
+  assert.match(candidate.protected_customer_data, /^level_2/);
+  assert.equal(candidate.status, "PASS_OFFICIAL_CONTRACT_REQUIRES_T6D_LIVE_SMOKE");
+});
+
+test("development and production gates remain human-controlled", () => {
+  assert.equal(matrix.gates.t6a_pass, true);
+  assert.equal(matrix.gates.t6b_allowed, false);
+  assert.equal(matrix.gates.t6b_requires_explicit_development_approval, true);
+  assert.equal(matrix.gates.scope_request_allowed, false);
+  assert.equal(matrix.gates.production_allowed, false);
+  assert.match(doc, /explicit development approval required/);
+});
+
+test("Execution Plan advances only to the development approval boundary", () => {
+  assert.match(plan, /E10-T6-A — `Done \/ PASS`/);
+  assert.match(plan, /E10-T6-B — `Ready \/ explicit development approval required`/);
+  assert.match(plan, /read_reports.*Level 2 protected customer data/s);
+});

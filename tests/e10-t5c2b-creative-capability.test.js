@@ -38,6 +38,7 @@ test("official references and revalidation limits are explicit", () => {
 test("Execution Plan closes C2 and advances only to Dashboard product freeze", () => {
   assert.match(plan, /E10-T5-C2-B — `Done` — Creative provider capability ve data model/);
   assert.match(plan, /E10-T5-C2 — `Done` — Ad Analysis/);
-  assert.match(plan, /E10-T5-C3 — `Product decision required` — Dashboard/);
+  assert.match(plan, /E10-T5-C3 — `Done` — Dashboard/);
+  assert.match(plan, /E10-T5-C4 — `Product decision required` — Platforms/);
   assert.match(plan, /Dataset V2 ve Funnel hierarchy değişmez/);
 });

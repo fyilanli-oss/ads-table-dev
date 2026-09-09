@@ -1,0 +1,38 @@
+{
+  "contract": "e10-t6a-official-readiness",
+  "checked_at": "2026-09-09",
+  "outcome": "BLOCKED",
+  "safe_code": "BLOCKED_OFFICIAL_DOCS_ACCESS",
+  "shopify_contact": false,
+  "development_store_contact": false,
+  "production_contact": false,
+  "verified": {
+    "official_dev_mcp": {"package": "@shopify/dev-mcp", "version": "1.15.0", "status": "PASS"},
+    "app_bridge_repository": {"repository": "Shopify/shopify-app-bridge", "archived": false, "status": "PASS"},
+    "javascript_api_repository": {"repository": "Shopify/shopify-app-js", "archived": false, "status": "PASS"},
+    "official_templates": ["Shopify/shopify-app-template-node", "Shopify/shopify-app-template-react-router", "Shopify/shopify-app-template-remix"],
+    "polaris_app_home_model": {"versioning": "unversioned", "web_component_prefix": "s-", "global_registration_no_import": true, "status": "PASS"},
+    "deprecated_ui_dependency": {"repository": "Shopify/polaris-react-archive", "must_not_select": true, "status": "REJECTED"}
+  },
+  "blocked": {
+    "shopify_dev_https": {"safe_reason": "environment_proxy_connect_403", "status": "BLOCKED_SOURCE_ACCESS"},
+    "documentation_search": {"safe_reason": "tool_authentication_401", "status": "BLOCKED_SOURCE_ACCESS"},
+    "exact_app_home_component_properties": {"status": "REQUIRES_OFFICIAL_DOC_SEARCH_AND_VALIDATION"},
+    "exact_app_bridge_navigation_and_oauth_exit": {"status": "REQUIRES_OFFICIAL_DOC_SEARCH_AND_VALIDATION"},
+    "shopifyql_platform_attribution_dimension": {"status": "UNVERIFIED"},
+    "shopifyql_purchase_metric": {"status": "UNVERIFIED"},
+    "shopifyql_sales_metric_dimension_compatibility": {"status": "UNVERIFIED"},
+    "minimum_scope": {"status": "UNRESOLVED_NO_SCOPE_REQUEST"},
+    "protected_data_classification": {"status": "UNRESOLVED"},
+    "api_version_selection": {"status": "UNRESOLVED"},
+    "development_store_steps": {"status": "UNVERIFIED"}
+  },
+  "gates": {
+    "t6a_pass": false,
+    "t6b_allowed": false,
+    "scope_request_allowed": false,
+    "implementation_allowed": false,
+    "retry_only_blocked_checks": true
+  },
+  "forbidden": ["guess_field", "guess_scope", "use_unofficial_mirror", "treat_package_schema_as_shopifyql_schema", "contact_shopify", "start_t6b"]
+}

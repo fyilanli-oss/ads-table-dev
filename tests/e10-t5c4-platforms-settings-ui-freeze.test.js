@@ -48,7 +48,7 @@ test("the freeze remains intact after Attribution advances to integrated accepta
   assert.equal(contract.shopify_ui.custom_control_framework, false);
   assert.match(plan, /E10-T5-C4 — `Done` — Platforms/);
   assert.match(plan, /E10-T5-C5-A — `Done` — Attribution Differences/);
-  assert.match(plan, /E10-T5-C7 — `Product decision required` — Integrated navigation\/acceptance/);
+  assert.match(plan, /E10-T5-C7 — `Done` — Integrated navigation\/acceptance/);
   assert.match(plan, /E10-T5-C6 — `Done` — Settings/);
-  assert.match(plan, /sıradaki ürün paketi \*\*E10-T5-C7 Integrated navigation\/acceptance\*\*/);
+  assert.match(plan, /sıradaki repository işi \*\*E10-T6-A official capability\/development-readiness\*\*/);
 });

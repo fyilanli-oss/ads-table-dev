@@ -55,7 +55,7 @@ test("verified leaf reconciliation remains a separate evidence-gated capability"
 test("Execution Plan closes C5-A and advances only to C7", () => {
   assert.match(plan, /E10-T5-C5-A — `Done` — Attribution Differences/);
   assert.match(plan, /E10-T5-C5-B — `Deferred` — Verified Reconciliation/);
-  assert.match(plan, /E10-T5-C7 — `Product decision required` — Integrated navigation\/acceptance/);
-  assert.match(plan, /sıradaki ürün paketi \*\*E10-T5-C7 Integrated navigation\/acceptance\*\*/);
+  assert.match(plan, /E10-T5-C7 — `Done` — Integrated navigation\/acceptance/);
+  assert.match(plan, /sıradaki repository işi \*\*E10-T6-A official capability\/development-readiness\*\*/);
   assert.equal(contract.shopify_ui.official_components_only, true);
 });

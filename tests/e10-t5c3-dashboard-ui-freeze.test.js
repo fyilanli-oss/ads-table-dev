@@ -43,7 +43,7 @@ test("Execution Plan preserves Dashboard after Platforms is approved", () => {
   assert.match(plan, /E10-T5-C3 — `Done` — Dashboard/);
   assert.match(plan, /E10-T5-C4 — `Done` — Platforms/);
   assert.match(plan, /E10-T5-C5-A — `Done` — Attribution Differences/);
-  assert.match(plan, /E10-T5-C7 — `Product decision required` — Integrated navigation\/acceptance/);
+  assert.match(plan, /E10-T5-C7 — `Done` — Integrated navigation\/acceptance/);
   assert.match(plan, /\*\*Compare:\*\* Yalnız On\/Off/);
   assert.match(plan, /Funnel\/Table switch kaldırılır/);
   assert.match(plan, /Add to Cart Value.*Checkout Value.*Abandoned Value.*Sales/);

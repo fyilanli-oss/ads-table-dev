@@ -42,7 +42,7 @@ test("T5 A B C and the absolute sequencing gate are explicit", () => {
   assert.match(constitution, /E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek\? — `Done`/);
   assert.match(constitution, /E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek\? — `Done`/);
   assert.match(constitution, /C1 Funnel, C2 Ad Analysis, C3 Dashboard, C4 Platforms, C5-A Attribution Differences, C6 Settings ve C7 integrated acceptance onaylandı; C5-B Deferred/);
-  assert.match(constitution, /Mutlak sıra kapısı:[\s\S]*E10-T6-A offline readiness açılmıştır[\s\S]*E10-T6-B–T10, E11 veya E12 implementation branch\/PR'ı açılamaz/);
+  assert.match(constitution, /Mutlak sıra kapısı:[\s\S]*E10-T6-A offline readiness PASS olmuştur[\s\S]*açık development onayı olmadan E10-T6-B/);
 });
 
 test("provider OAuth is mounted in Shopify without framing third-party consent", () => {

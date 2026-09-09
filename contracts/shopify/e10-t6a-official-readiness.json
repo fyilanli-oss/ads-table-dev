@@ -1,38 +1,79 @@
 {
   "contract": "e10-t6a-official-readiness",
   "checked_at": "2026-09-09",
-  "outcome": "BLOCKED",
-  "safe_code": "BLOCKED_OFFICIAL_DOCS_ACCESS",
+  "outcome": "PASS",
+  "safe_code": "OFFICIAL_READINESS_PASS",
   "shopify_contact": false,
   "development_store_contact": false,
   "production_contact": false,
-  "verified": {
-    "official_dev_mcp": {"package": "@shopify/dev-mcp", "version": "1.15.0", "status": "PASS"},
-    "app_bridge_repository": {"repository": "Shopify/shopify-app-bridge", "archived": false, "status": "PASS"},
-    "javascript_api_repository": {"repository": "Shopify/shopify-app-js", "archived": false, "status": "PASS"},
-    "official_templates": ["Shopify/shopify-app-template-node", "Shopify/shopify-app-template-react-router", "Shopify/shopify-app-template-remix"],
-    "polaris_app_home_model": {"versioning": "unversioned", "web_component_prefix": "s-", "global_registration_no_import": true, "status": "PASS"},
+  "official_baseline": {
+    "dev_mcp": {"package": "@shopify/dev-mcp", "version": "1.15.0", "status": "PASS"},
+    "admin_api_version": {"version": "2026-07", "status": "PASS"},
+    "app_home": {"polaris_channel": "1", "reference": "v1.0", "status": "PASS"},
+    "app_bridge": {"versioning": "unversioned", "status": "PASS"},
+    "template": {"repository": "Shopify/shopify-app-template-react-router", "status": "SELECTED_FOR_T6B"},
     "deprecated_ui_dependency": {"repository": "Shopify/polaris-react-archive", "must_not_select": true, "status": "REJECTED"}
   },
-  "blocked": {
-    "shopify_dev_https": {"safe_reason": "environment_proxy_connect_403", "status": "BLOCKED_SOURCE_ACCESS"},
-    "documentation_search": {"safe_reason": "tool_authentication_401", "status": "BLOCKED_SOURCE_ACCESS"},
-    "exact_app_home_component_properties": {"status": "REQUIRES_OFFICIAL_DOC_SEARCH_AND_VALIDATION"},
-    "exact_app_bridge_navigation_and_oauth_exit": {"status": "REQUIRES_OFFICIAL_DOC_SEARCH_AND_VALIDATION"},
-    "shopifyql_platform_attribution_dimension": {"status": "UNVERIFIED"},
-    "shopifyql_purchase_metric": {"status": "UNVERIFIED"},
-    "shopifyql_sales_metric_dimension_compatibility": {"status": "UNVERIFIED"},
-    "minimum_scope": {"status": "UNRESOLVED_NO_SCOPE_REQUEST"},
-    "protected_data_classification": {"status": "UNRESOLVED"},
-    "api_version_selection": {"status": "UNRESOLVED"},
-    "development_store_steps": {"status": "UNVERIFIED"}
+  "ui_validation": {
+    "tool": "validate_component_codeblocks",
+    "api": "polaris-app-home",
+    "artifact_id": "e10-t6a-component-matrix",
+    "revision": 2,
+    "status": "PASS",
+    "validated_components": [
+      "s-page", "s-banner", "s-section", "s-stack", "s-grid", "s-search-field",
+      "s-date-field", "s-date-picker", "s-choice-list", "s-choice", "s-checkbox",
+      "s-clickable-chip", "s-button-group", "s-button", "s-popover", "s-menu",
+      "s-tooltip", "s-badge", "s-spinner", "s-table", "s-table-header-row",
+      "s-table-header", "s-table-body", "s-table-row", "s-table-cell", "s-modal", "s-text"
+    ],
+    "corrected_contract_notes": [
+      "s-checkbox uses its label property instead of text children",
+      "s-tooltip is a sibling target addressed with interestFor instead of a content property"
+    ]
+  },
+  "navigation_and_security": {
+    "provider_oauth_exit": {"method": "open(authorizationUrl, '_top')", "status": "PASS_OFFICIAL_CONTRACT"},
+    "external_new_context_forbidden_for_provider_consent": true,
+    "callback_urls": {"configuration_key": "auth.redirect_urls", "https_and_server_allowlist_required": true, "status": "PASS"},
+    "embedded_csp": {"frame_ancestors": ["https://{shop}.myshopify.com", "https://admin.shopify.com"], "per_shop_server_resolution": true, "status": "PASS"},
+    "identity": {"browser_token": "App Bridge ID token", "server_exchange": "token exchange", "status": "PASS"}
+  },
+  "attribution_candidate": {
+    "api": "GraphQL Admin API shopifyqlQuery",
+    "api_version": "2026-07",
+    "schema": "sales",
+    "metrics": {"platform_purchase_count": "orders__last_click", "platform_sales_value": "total_sales__last_click"},
+    "dimension": "referring_platform",
+    "modifier": "LAST_CLICK_ATTRIBUTION",
+    "currency": "store currency unless an explicit WITH CURRENCY value is used",
+    "scope": "read_reports",
+    "protected_customer_data": "level_2_including_direct_identifiers_required_by_shopifyqlQuery",
+    "status": "PASS_OFFICIAL_CONTRACT_REQUIRES_T6D_LIVE_SMOKE",
+    "query_template": "FROM sales SHOW orders, total_sales GROUP BY referring_platform WITH LAST_CLICK_ATTRIBUTION SINCE <completed_start> UNTIL <completed_end> ORDER BY total_sales__last_click DESC"
+  },
+  "webhooks": {
+    "app_store_compliance_topics": ["customers/data_request", "customers/redact", "shop/redact"],
+    "app_uninstalled": "required_by_adstable_access_revocation_contract",
+    "initial_sync": "NOT_REQUIRED_BY_T6A",
+    "status": "PASS_REQUIREMENT_IDENTIFIED"
+  },
+  "development_bootstrap": {
+    "app_requires_released_configuration_version_before_install": true,
+    "development_store_install": true,
+    "install_acceptance": ["install callback", "ID token validation", "token exchange", "shop_to_workspace_binding"],
+    "status": "READY_REQUIRES_EXPLICIT_DEVELOPMENT_APPROVAL"
   },
   "gates": {
-    "t6a_pass": false,
+    "t6a_pass": true,
     "t6b_allowed": false,
+    "t6b_requires_explicit_development_approval": true,
     "scope_request_allowed": false,
-    "implementation_allowed": false,
-    "retry_only_blocked_checks": true
+    "production_allowed": false
   },
-  "forbidden": ["guess_field", "guess_scope", "use_unofficial_mirror", "treat_package_schema_as_shopifyql_schema", "contact_shopify", "start_t6b"]
+  "forbidden": [
+    "contact_shopify_without_development_approval", "request_scope_without_development_approval",
+    "treat_official_contract_as_live_query_evidence", "ingest_order_or_customer_rows",
+    "expose_id_token_or_access_token_to_logs", "start_production_operation"
+  ]
 }

@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A official capability/readiness Ready; every live Shopify contact gated`
+**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B Ready ve açık development onayına bağlı; every live Shopify contact gated`
 
 ### Ürün ve mimari kararı
 
@@ -1905,7 +1905,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek? — `Done`:** Yalnız `platform`, `platform_purchase_count` ve `platform_sales_value`; yalnız Shopify-native Attribution comparison / overlap diagnostic alanında ve provider verisinden ayrı provenance ile gösterilir. Total commerce, Refund, PII, Funnel totalı, Revenue etkisi veya otomatik deduction yoktur.
 - **E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek? — `Done`:** C1 Funnel, C2 Ad Analysis, C3 Dashboard, C4 Platforms, C5-A Attribution Differences, C6 Settings ve C7 integrated acceptance onaylandı; C5-B Deferred.
 - **Provider OAuth montaj kararı:** Connect/account selection/reconnect/disconnect Shopify-native `Data Sources / Platforms` yüzeyindedir; üçüncü taraf consent top-level resmi App Bridge navigasyonuyla açılır ve callback canonical embedded app URL'sine döner. Ayrı AdsTable login/dashboard veya iframe içinde provider consent yoktur.
-- **Mutlak sıra kapısı:** T5-C output/display matrisi C7 ile onaylanmıştır. Yalnız Shopify'a gerçek temas kurmayan E10-T6-A offline readiness açılmıştır; T6-A PASS ve ayrı development onayı olmadan E10-T6-B–T10, E11 veya E12 implementation branch/PR'ı açılamaz.
+- **Mutlak sıra kapısı:** T5-C output/display matrisi C7 ile onaylanmış, Shopify'a gerçek temas kurmayan E10-T6-A offline readiness PASS olmuştur. Ayrı açık development onayı olmadan E10-T6-B ve sonraki Shopify temaslı işler; gerekli plan kapıları olmadan E10-T7–T10, E11 veya E12 implementation branch/PR'ı açılamaz.
 
 ### Planlanan işler
 
@@ -1913,8 +1913,8 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
 - **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Done — Token, uninstall ve privacy lifecycle:** Shopify token'larını encrypted store sınırına bağla; browser/log erişimini yasakla; doğrulanmış uninstall, shop erişim kaybı ve privacy/compliance olaylarında erişimi fail-closed durdur ve retention/deletion kararlarını executable contract ile kanıtla.
-- **E10-T5 — Done — Revize edilmiş ürün sözleşmesi:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim ürün kararları tamamlandı; C5-B verified reconciliation `Deferred`. Sıradaki repository kapısı Shopify teması olmayan E10-T6-A official capability/readiness'tir.
-- **E10-T6 — Ready for A only — Capability/readiness, development bootstrap ve gerekçeli sync:** Önce E10-T6-A resmi offline readiness; yalnız PASS ve ayrı development onayı sonrasında E10-T6-B ilk Shopify teması. Webhook/initial sync ancak C5-A ve resmi capability sonucu gerçekten gerektirirse açılır.
+- **E10-T5 — Done — Revize edilmiş ürün sözleşmesi:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim ürün kararları tamamlandı; C5-B verified reconciliation `Deferred`. E10-T6-A offline readiness PASS olmuştur; sıradaki kapı açık development onaylı E10-T6-B'dir.
+- **E10-T6 — In progress; A Done, B approval-gated — Capability/readiness, development bootstrap ve gerekçeli sync:** E10-T6-A resmi offline readiness PASS; ayrı açık development onayı sonrasında E10-T6-B ilk Shopify temasıdır. Webhook/initial sync ancak C5-A ve resmi capability sonucu gerçekten gerektirirse açılır.
 - **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
 - **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
 - **E10-T9 — App Store review-first workstream:** Listing, minimum-scope gerekçesi, test store, reviewer erişimi ve talimatları, privacy/support/data-deletion yüzeyleri, install-to-value videosu ve provider bağlı değilken incelenebilir demo/empty-state paketini geliştirmeyle paralel yürüt. Review hazırlığını sona bırakma.
@@ -1928,7 +1928,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-A — Official capability ve development-readiness — Shopify teması yok
 
-**Durum:** `Verification / BLOCKED_OFFICIAL_DOCS_ACCESS` — resmi package/repository envanteri PASS; kritik `shopify.dev` docs/validation satırları erişim kapısında blokeli, overall PASS değildir.
+**Durum:** `Done / PASS` — resmi docs, Dev MCP component validation, ShopifyQL/scope/protected-data ve development checklist satırları doğrulandı; Shopify/Development Store/production teması yapılmadı.
 
 - Başlangıç koşulu: E10-T5-C output/display matrisi kullanıcı tarafından Execution Plan içinde okunmuş, açıkça onaylanmış, `Done` yapılmış ve merge edilmiş olmalıdır.
 - Güncel Admin API/App Bridge/UI component sürümü; embedded dış navigasyon; ShopifyQL attribution dimension/metric; gerekli minimum scope/protected-data; callback URL; CSP/frame; install/session; webhook gerekliliği ve Development Store kabul adımları resmi kaynaklarla doğrulanır.
@@ -1936,7 +1936,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-B — Development App Bootstrap — Shopify'da ilk kazma
 
-**Durum:** `Blocked by T6-A PASS + explicit development approval`.
+**Durum:** `Ready / explicit development approval required`.
 
 - Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
 - İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
@@ -2096,7 +2096,7 @@ Gösterim yalnız Shopify-native bir **Attribution comparison / overlap diagnost
 #### E10-T5-C1 Funnel — onaylı output/display ve Shopify component freeze'i
 
 - **Onaylanan üç iş kararı:** Açılışta varsayılan görünüm **Funnel**'dır. Table compare bütün metrikleri çoğaltmaz; yalnız seçili focus metric `Comparison / Current / Absolute change / % change` olarak genişler. Desktop toolbar'da aynı anda yalnız bir popover açık kalır; mobilde yoğun seçim yüzeyi resmi modal/sheet davranışına geçer.
-- **Component yönü:** Sayfa/layout `s-page`, `s-section`, `s-grid`, `s-stack`; eylemler `s-button`, `s-button-group`, `s-menu`; overlay `s-popover`, `s-modal`; tarih `s-date-picker`, `s-date-field`, `s-choice-list`; filter `s-search-field`, `s-checkbox`, `s-clickable-chip`; durum `s-badge`, `s-banner`, `s-spinner`, `s-tooltip` ile kurulur. Component/property uygunluğu implementation öncesi E10-T6-A'da güncel resmi kaynakla tekrar doğrulanır.
+- **Component yönü:** Sayfa/layout `s-page`, `s-section`, `s-grid`, `s-stack`; eylemler `s-button`, `s-button-group`, `s-menu`; overlay `s-popover`, `s-modal`; tarih `s-date-picker`, `s-date-field`, `s-choice-list`; filter `s-search-field`, `s-checkbox`, `s-clickable-chip`; durum `s-badge`, `s-banner`, `s-spinner`, `s-tooltip` ile kurulur. Component/property yönü E10-T6-A Dev MCP validator revision 2'de doğrulandı; implementation artifact'leri ayrıca yeniden validate edilir.
 - **Tablo sınırı:** İlk tercih resmi `s-table`dır. Gerçek hierarchy, sticky/multi-header ve accessibility ihtiyacını karşılamazsa özel renderer yalnız Funnel/tree-table veri sunum gövdesinde kullanılabilir; Shopify token ve accessibility kabulü zorunludur. Özel shell, toolbar, popover, modal, button veya CSS component framework yasaktır.
 - **Funnel akışı:** Aşağı doğru `Traffic → Cart → Checkout → Outcome`; sağa doğru dönem/compare. Traffic `Impression, Click, Spend, CTR, CPC`; Cart `Add to Cart, Add to Cart Value`; Checkout `Checkout, Checkout Value, Abandoned, Abandoned Value`; Outcome `Purchase, Sales, Revenue, ROAS, CPS` metriklerini taşır.
 - **Table akışı:** Aşağı doğru yalnız gerçek provider hierarchy, sağa doğru metriklerdir. Desktop identity kolonu + yatay metric alanı; mobil identity + seçili metric grubu ve kontrollü drill-down kullanır.
@@ -2149,7 +2149,7 @@ Karar belgesi `docs/E10_T5C3_DASHBOARD_SHOPIFY_COMPONENT_FREEZE.md`, executable 
 - **Klaviyo farkı:** Hesap seçiminden sonra `Email Monthly Plan Cost` tutarı/para birimi kaydedilerek kurulum tamamlanır. `Estimated Monthly Spend` etiketi kullanılmaz.
 - **Disconnect/Reconnect:** Disconnect ikinci warning onayıyla provider erişimi ve refresh'i durdurur, tarihsel veriyi silmez. Reconnect aynı güvenli Connect zincirini yeniden kurar.
 - **Settings:** Currency, Klaviyo sabit aylık tutarı ve Ad Accounts bölümleri bulunur. OAuth ile doğrulanmış Meta/Google/TikTok hesapları arasından aynı anda yalnız bir aktif reklam hesabı seçilir; Funnel yalnız bu hesabı gösterir ve merchant seçimi sonradan değiştirebilir.
-- **Shopify standardı:** Genel layout, modal, button, form, single-choice ve status kontrolleri güncel resmi Shopify componentleriyle kurulur. Mevcut dashboard özel CSS/HTML'si yalnız davranış referansıdır; embedded UI olarak taşınmaz. Exact component/API uygunluğu E10-T6-A'da yeniden doğrulanır.
+- **Shopify standardı:** Genel layout, modal, button, form, single-choice ve status kontrolleri güncel resmi Shopify componentleriyle kurulur. Mevcut dashboard özel CSS/HTML'si yalnız davranış referansıdır; embedded UI olarak taşınmaz. Exact component/API yönü E10-T6-A'da doğrulandı; implementation artifact'i ayrıca yeniden validate edilir.
 - **Sıra sapması:** Kullanıcı C4 ve C6 iş akışlarını birlikte verdiği için iki ürün kararı aynı pakette kapatılmıştır. C5 atlanmaz; C7 C5 sonrasında gelir.
 
 Karar belgesi `docs/E10_T5C4_PLATFORMS_SETTINGS_SHOPIFY_FREEZE.md`, executable contract `contracts/shopify/e10-t5c4-platforms-settings-ui.json`, guard `tests/e10-t5c4-platforms-settings-ui-freeze.test.js` içindedir. Bu freeze UI/runtime implementasyonu, Shopify teması, provider çağrısı veya production işlemi değildir.
@@ -2174,7 +2174,7 @@ Karar belgesi `docs/E10_T5C5A_ATTRIBUTION_DIFFERENCES_FREEZE.md`, executable con
 - **OAuth dönüşü:** Callback canonical Platforms route'una, server-bound allowlisted return target ile döner; standalone login/dashboard ve caller URL yasaktır.
 - **Acceptance:** Shopify responsive navigation; keyboard/focus/back/deep-link; 320px overflow, duplicate shell, stale/multiple account ve open-redirect negatif kapıları zorunludur.
 
-E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A — `Ready` — Official capability ve development-readiness** sıradaki iştir. E10-T6-A Shopify'a gerçek temas kurmaz.
+E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A — `Done / PASS`**; sıradaki iş **E10-T6-B — `Ready / explicit development approval required`**dır. T6-B onayı Shopify Development App/Store teması içindir ve production onayı değildir.
 
 
 ### E10-T5-B karar kanıtı — Shopify attribution intake ve gösterim
@@ -2183,19 +2183,21 @@ E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7
 
 ### E10-T5-C sıra kapısı — Shopify'a verilecek AdsTable çıktıları
 
-`docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` tamamlanan C1–C7 ilk dilim freeze'lerini izler. C5-B verified reconciliation ertelenmiştir. E10-T6-A offline readiness açılmıştır; T6-A PASS ve gerekli ayrı onaylar olmadan E10-T6-B, E10-T7, E10-T8, E10-T9, E10-T10, E11 veya E12 implementation'ı açılamaz.
+`docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` tamamlanan C1–C7 ilk dilim freeze'lerini izler. C5-B verified reconciliation ertelenmiştir. E10-T6-A offline readiness PASS olmuştur; açık development onayı olmadan E10-T6-B ve onu izleyen Shopify temaslı işler, ayrıca gerekli plan kapıları olmadan E10-T7–T10, E11 veya E12 implementation'ı açılamaz.
 
-**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; sıradaki repository işi **E10-T6-A official capability/development-readiness**; parent E10 `In progress`. Bu paket scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
+**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; E10-T6-A `Done / PASS`; sıradaki iş **E10-T6-B Development App Bootstrap — Ready / explicit development approval required**; parent E10 `In progress`. T6-A scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
 
-### E10-T6-A1 official-source readiness evidence
+### E10-T6-A1/A2 official-source readiness evidence
 
-**Gerçekleşen (2026-09-09):** Resmi `@shopify/dev-mcp` 1.15.0 paketi, aktif Shopify App Bridge/app-js/CLI repository'leri, resmi app template adayları ve App Home bundled instruction offline incelendi. App Home'un unversioned `s-*` global web component ve App Bridge API yönü doğrulandı; deprecated Polaris React yaklaşımı reddedildi. Ortam proxy'si `shopify.dev` için `403 CONNECT tunnel failed`, web docs search ise `401 Unauthorized` verdi.
+**A1 (2026-09-09):** Resmi package/repository envanteri PASS iken `shopify.dev` proxy CONNECT erişimi blokeli olduğu için exact UI/navigation/ShopifyQL/scope satırları fail-closed bırakıldı.
 
-**Fail-closed bulgu:** Official Dev MCP kendi ShopifyQL talimatında schema/metric/dimension adlarının docs search ile doğrulanmasını ve asla tahmin edilmemesini zorunlu tutar. Bundled Admin GraphQL schema `shopifyqlQuery` wrapper'ını gösterebilse de platform attribution dimension, Purchase metric veya Sales+dimension uyumluluğunu kanıtlamaz. Bu nedenle exact UI property/validation, App Bridge navigation/OAuth exit, ShopifyQL alanları, minimum scope/protected-data, API version ve development checklist PASS değildir; `first_slice_scopes=[]` korunur.
+**A2 corrective revalidation (2026-09-09):** Ağ erişimi geri geldikten sonra yalnız blokeli satırlar güncel resmi `shopify.dev` Markdown/reference sayfaları ve `@shopify/dev-mcp` 1.15.0 ile yeniden doğrulandı. App Home `v1.0`/Polaris 1, unversioned App Bridge, Admin API `2026-07`, `_top` external navigation, callback/CSP/ID-token contract'ı ve Development Store checklist'i donduruldu. T5 component matrisi Dev MCP validator revision 2'de PASS oldu.
+
+ShopifyQL `sales` schema için `referring_platform`, `orders__last_click` ve `total_sales__last_click` exact adayları doğrulandı. Admin GraphQL `shopifyqlQuery` resmi olarak `read_reports` ve doğrudan tanımlayıcı alanlar dahil Level 2 protected customer data access gerektirir; T6-A hiçbir scope istemedi. Bu ağır platform gereksinimi T6-B development onayı içinde görünür tutulur ve exact canlı uygunluk T6-D read-only smoke'a kadar runtime kanıtı sayılmaz. Order/Customer ingest veya `read_orders` fallback açılmadı.
 
 **Evidence:** `contracts/shopify/e10-t6a-official-readiness.json`, `docs/E10_T6A_OFFICIAL_CAPABILITY_READINESS.md`, `tests/e10-t6a-official-readiness.test.js`.
 
-**Durum:** E10-T6-A — `Verification / BLOCKED_OFFICIAL_DOCS_ACCESS`; T6-B — `Blocked by T6-A PASS + explicit development approval`. Bu kayıt Shopify/Development Store/production teması, scope talebi, API query, credential, migration veya deployment yapmadı. Erişim geri geldiğinde yalnız blokeli official-doc/validation satırları yeniden değerlendirilir; overall PASS olmadan sıra ilerlemez.
+**Durum:** E10-T6-A — `Done / PASS`; E10-T6-B — `Ready / explicit development approval required`. T6-A Shopify/Development Store/production teması, app/credential/scope oluşturma, API query, migration, deployment veya Shopify CLI kurulumu yapmadı.
 
 ## 15. E11 — Funnel API
 

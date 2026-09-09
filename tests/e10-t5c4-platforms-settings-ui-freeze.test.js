@@ -42,12 +42,13 @@ test("Settings exposes one server-authorized active ad account to Funnel", () =>
   assert.match(doc, /checkbox veya multi-select değildir/);
 });
 
-test("the freeze requires Shopify components and advances to Attribution only", () => {
+test("the freeze remains intact after Attribution advances to integrated acceptance", () => {
   assert.equal(contract.shopify_ui.official_components_only, true);
   assert.equal(contract.shopify_ui.custom_admin_shell, false);
   assert.equal(contract.shopify_ui.custom_control_framework, false);
   assert.match(plan, /E10-T5-C4 — `Done` — Platforms/);
-  assert.match(plan, /E10-T5-C5 — `Product decision required` — Attribution/);
+  assert.match(plan, /E10-T5-C5-A — `Done` — Attribution Differences/);
+  assert.match(plan, /E10-T5-C7 — `Product decision required` — Integrated navigation\/acceptance/);
   assert.match(plan, /E10-T5-C6 — `Done` — Settings/);
-  assert.match(plan, /sıradaki ürün paketi \*\*E10-T5-C5 Attribution\*\*/);
+  assert.match(plan, /sıradaki ürün paketi \*\*E10-T5-C7 Integrated navigation\/acceptance\*\*/);
 });

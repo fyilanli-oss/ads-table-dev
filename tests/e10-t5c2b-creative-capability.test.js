@@ -40,6 +40,7 @@ test("Execution Plan preserves C2 while the product sequence advances", () => {
   assert.match(plan, /E10-T5-C2 — `Done` — Ad Analysis/);
   assert.match(plan, /E10-T5-C3 — `Done` — Dashboard/);
   assert.match(plan, /E10-T5-C4 — `Done` — Platforms/);
-  assert.match(plan, /E10-T5-C5 — `Product decision required` — Attribution/);
+  assert.match(plan, /E10-T5-C5-A — `Done` — Attribution Differences/);
+  assert.match(plan, /E10-T5-C7 — `Product decision required` — Integrated navigation\/acceptance/);
   assert.match(plan, /Dataset V2 ve Funnel hierarchy değişmez/);
 });

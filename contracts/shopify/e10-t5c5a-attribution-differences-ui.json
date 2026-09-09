@@ -1,0 +1,84 @@
+{
+  "contract": "e10-t5c5a-attribution-differences-ui",
+  "status": "frozen",
+  "user_facing_name": "Attribution Differences",
+  "surface": "separate_shopify_embedded_page",
+  "context": {
+    "preserved": ["completed_day_time_range", "workspace_currency", "platform", "active_ad_account"],
+    "comparison": false,
+    "provider_grain": "active_provider_account_aggregate",
+    "shopify_grain": "platform_attribution_aggregate",
+    "grain_equivalence_claimed": false
+  },
+  "table": {
+    "columns": [
+      "platform",
+      "provider_purchase",
+      "shopify_attributed_purchase",
+      "purchase_difference",
+      "provider_sales",
+      "shopify_attributed_sales",
+      "sales_difference",
+      "data_status",
+      "action"
+    ],
+    "difference_formula": "provider_minus_shopify_attributed",
+    "computed_by": "backend",
+    "percent_change": false,
+    "ranking": false,
+    "performance_color_semantics": false,
+    "action": "review"
+  },
+  "review_modal": {
+    "actions": ["close", "view_funnel_preserve_context"],
+    "disclosure": "difference_is_not_duplicate_proof_and_does_not_change_funnel_totals",
+    "mutation": false
+  },
+  "statuses": [
+    "no_numeric_difference",
+    "difference_found",
+    "partial_data",
+    "shopify_attribution_unavailable",
+    "provider_data_unavailable",
+    "currency_mismatch",
+    "unsupported",
+    "stale",
+    "reauthorization_required"
+  ],
+  "mutations": {
+    "dataset_v2": false,
+    "funnel_kpis": false,
+    "dashboard_kpis": false,
+    "provider_facts": false,
+    "manual_ad_allocation": false
+  },
+  "forbidden_user_claims_or_actions": [
+    "overlap",
+    "duplicate",
+    "fix_overlap",
+    "decrease_overlap",
+    "correct_sales",
+    "deduplicate",
+    "apply_adjustment"
+  ],
+  "c5b_verified_reconciliation": {
+    "status": "deferred",
+    "requires": [
+      "same_order_stable_evidence",
+      "provider_click_identity",
+      "server_resolved_leaf_ad",
+      "time_currency_attribution_semantics",
+      "scope_and_protected_data_approval",
+      "retention_and_deletion_contract",
+      "idempotency_and_rollback"
+    ],
+    "provider_fact_overwrite": false,
+    "future_adjustment": "separate_versioned_reversible_leaf_sidecar",
+    "forbidden_allocation": ["largest_ad", "proportional", "user_selected_ad"]
+  },
+  "shopify_ui": {
+    "official_components_only": true,
+    "custom_control_framework": false,
+    "exact_components_revalidated_in": "E10-T6-A"
+  }
+}

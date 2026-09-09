@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T5-A/B, C1/C2/C3/C4/C6 Done; C5 Attribution product decision required; every later implementation package gated`
+**Durum:** `In progress — E10-T5-A/B, C1–C6 product freeze Done (C5-A Done, C5-B Deferred); C7 product decision required; every implementation package gated`
 
 ### Ürün ve mimari kararı
 
@@ -1903,7 +1903,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 - **E10-T5-A — Shopify Kuralları — `Done`:** Bu anayasanın UI, embedded davranış, hierarchy, metrik ve provenance kurallarıdır.
 - **E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek? — `Done`:** Yalnız `platform`, `platform_purchase_count` ve `platform_sales_value`; yalnız Shopify-native Attribution comparison / overlap diagnostic alanında ve provider verisinden ayrı provenance ile gösterilir. Total commerce, Refund, PII, Funnel totalı, Revenue etkisi veya otomatik deduction yoktur.
-- **E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek? — `In progress`:** C1 Funnel, C2 Ad Analysis, C3 Dashboard, C4 Platforms ve C6 Settings kararları onaylandı; C5 ve C7 tamamlanmadan parent tamamlanmış sayılamaz.
+- **E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek? — `In progress`:** C1 Funnel, C2 Ad Analysis, C3 Dashboard, C4 Platforms, C5-A Attribution Differences ve C6 Settings onaylandı; C5-B Deferred, C7 tamamlanmadan parent tamamlanmış sayılamaz.
 - **Provider OAuth montaj kararı:** Connect/account selection/reconnect/disconnect Shopify-native `Data Sources / Platforms` yüzeyindedir; üçüncü taraf consent top-level resmi App Bridge navigasyonuyla açılır ve callback canonical embedded app URL'sine döner. Ayrı AdsTable login/dashboard veya iframe içinde provider consent yoktur.
 - **Mutlak sıra kapısı:** Kullanıcı bu dokuz maddeyi ve hazırlanacak T5-C output/display matrisini Execution Plan içinde okuyup açıkça onaylamadan E10-T6–T10, E11 veya E12 için yeni paket, branch, kod ya da PR açılamaz.
 
@@ -1913,7 +1913,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
 - **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Done — Token, uninstall ve privacy lifecycle:** Shopify token'larını encrypted store sınırına bağla; browser/log erişimini yasakla; doğrulanmış uninstall, shop erişim kaybı ve privacy/compliance olaylarında erişimi fail-closed durdur ve retention/deletion kararlarını executable contract ile kanıtla.
-- **E10-T5 — In progress — Revize edilmiş ürün sözleşmesi:** E10-T5-A/B ve E10-T5-C1/C2/C3/C4/C6 `Done`; C5 Attribution ve C7 integrated acceptance tamamlanmadan parent `Done` olamaz. E10-T6 ve diğer implementation paketleri tüm T5-C onayından önce açılamaz.
+- **E10-T5 — In progress — Revize edilmiş ürün sözleşmesi:** E10-T5-A/B ve E10-T5-C1–C6 ilk dilim ürün kararları `Done`; C5-B verified reconciliation `Deferred`. C7 integrated acceptance tamamlanmadan parent `Done` olamaz ve E10-T6+ implementation açılamaz.
 - **E10-T6 — Deferred pending Shopify output decision — Webhook ve initial sync:** İmza doğrulama, replay/idempotency, sıra dışı/gecikmiş event, checkpoint, retry ve initial sync sınırlarını kur. Webhook provider payload'u canonical doğrulama sınırını atlayarak Dataset V2'ye yazamaz.
 - **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
 - **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
@@ -2073,7 +2073,7 @@ Gösterim yalnız Shopify-native bir **Attribution comparison / overlap diagnost
 
 - **E10-T5-A — Done — Shopify kuralları:** Resmi embedded shell, App Bridge ve genel Shopify UI component zorunlulukları; özel framework/statik shell yasağı; Funnel/Table özel visualization sınırı ve iframe acceptance failure.
 - **E10-T5-B — Done — Shopify'dan ne alınacak, nasıl gösterilecek?:** Yalnız platform bazlı Purchase Count ve Sales Value alınır; yalnız attribution comparison/overlap diagnostic alanında ayrı provenance ile gösterilir. Total commerce, Refund, PII, Dataset V2, otomatik deduction ve Revenue etkisi yoktur.
-- **E10-T5-C — In progress — Shopify'a ne verilecek, nasıl gösterilecek?:** C1/C2/C3 ve kullanıcı tarafından birlikte tanımlanan C4 Platforms + C6 Settings onaylandı. C5 Attribution ve C7 integrated acceptance ayrı okunabilir kararlarla tamamlanacaktır.
+- **E10-T5-C — In progress — Shopify'a ne verilecek, nasıl gösterilecek?:** C1–C4, C5-A Attribution Differences ve C6 onaylandı; C5-B verified reconciliation `Deferred`. C7 integrated acceptance sıradaki okunabilir karardır.
 
 #### E10-T5-C modül sırası ve durumları
 
@@ -2083,9 +2083,11 @@ Gösterim yalnız Shopify-native bir **Attribution comparison / overlap diagnost
    - **E10-T5-C2-B — `Done` — Creative provider capability ve data model:** Provider-specific metadata sidecar kararı verildi; Creative performance kapalı, Dataset V2 ve Funnel hierarchy değişmez.
 3. **E10-T5-C3 — `Done` — Dashboard:** Completed-day dönemleri, proportional automatic compare, count+value Funnel Overview ve state-koruyan View Funnel kararı tamamlandı.
 4. **E10-T5-C4 — `Done` — Platforms:** Currency-first onboarding; Meta/Google/TikTok/Klaviyo açıklama modalı → OAuth → server-verified tek aktif account seçimi; warning modalı ile Disconnect.
-5. **E10-T5-C5 — `Product decision required` — Attribution:** Shopify/provider overlap diagnostic ve disclosure yüzeyi sıradaki ürün paketidir.
+5. **E10-T5-C5 — `Done for first slice` — Attribution:** C5-A `Done`; C5-B `Deferred`.
+   - **E10-T5-C5-A — `Done` — Attribution Differences:** Nötr platform aggregate fark tablosu ve read-only Review modalı; compare/renk/decrease/adjustment yoktur.
+   - **E10-T5-C5-B — `Deferred` — Verified Reconciliation:** Aynı order + click identity + server-resolved leaf Ad ve privacy/scope/idempotency kanıtı olmadan açılmaz.
 6. **E10-T5-C6 — `Done` — Settings:** Currency, Klaviyo Email Monthly Plan Cost ve OAuth ile doğrulanmış hesaplar arasından Funnel için tek aktif Ad Account seçimi C4 ile birlikte onaylandı.
-7. **E10-T5-C7 — `Blocked by C5` — Integrated navigation/acceptance:** Modüller arası App Bridge navigation, responsive ve iframe-hissi acceptance matrisi.
+7. **E10-T5-C7 — `Product decision required` — Integrated navigation/acceptance:** Modüller arası App Bridge navigation, responsive ve iframe-hissi acceptance matrisi sıradaki ürün paketidir.
 
 #### E10-T5-C1 Funnel — onaylı output/display ve Shopify component freeze'i
 
@@ -2148,15 +2150,27 @@ Karar belgesi `docs/E10_T5C3_DASHBOARD_SHOPIFY_COMPONENT_FREEZE.md`, executable 
 
 Karar belgesi `docs/E10_T5C4_PLATFORMS_SETTINGS_SHOPIFY_FREEZE.md`, executable contract `contracts/shopify/e10-t5c4-platforms-settings-ui.json`, guard `tests/e10-t5c4-platforms-settings-ui-freeze.test.js` içindedir. Bu freeze UI/runtime implementasyonu, Shopify teması, provider çağrısı veya production işlemi değildir.
 
+#### E10-T5-C5-A Attribution Differences — onaylı nötr fark ve Review freeze'i
+
+- **Adlandırma:** Kullanıcı yüzeyi `Attribution Differences`dır. Platform-level aggregate fark `overlap`, duplicate veya belirli bir Ad hatası sayılmaz.
+- **Tablo:** `Platform / Provider Purchase / Shopify-attributed Purchase / Purchase Difference / Provider Sales / Shopify-attributed Sales / Sales Difference / Data Status / Action`. Difference backend `provider - Shopify-attributed` hesabıdır.
+- **Sunum:** Compare, percent change, ranking ve yeşil/kırmızı performans semantiği yoktur. Sıfır yalnız sayısal eşitliktir; event-level eşleşme kanıtı değildir.
+- **Aksiyon:** Son kolonda yalnız `Review`; modal `Close` ve context-koruyan `View Funnel` sunar. Decrease/fix/deduplicate/apply veya kullanıcıya Ad seçtirerek dağıtım yoktur.
+- **KPI sınırı:** Dataset V2, provider fact, Funnel/Dashboard KPI ve hierarchy değişmez; Shopify/provider aggregate'leri birleştirilmez veya reconciled truth yapılmaz.
+- **C5-B:** Aynı Shopify order, provider click identity, server-resolved leaf Ad, time/currency/attribution, privacy/scope, retention/deletion, idempotency ve rollback kanıtı olmadan `Deferred` kalır. İleride doğrulansa bile provider fact overwrite edilmez; ayrı versionlı/reversible leaf adjustment sidecar gerekir.
+- **Shopify standardı:** Genel page/banner/table/badge/modal/action güncel resmi Shopify componentleri ve App Bridge ile kurulur; exact uygunluk E10-T6-A'da yeniden doğrulanır.
+
+Karar belgesi `docs/E10_T5C5A_ATTRIBUTION_DIFFERENCES_FREEZE.md`, executable contract `contracts/shopify/e10-t5c5a-attribution-differences-ui.json`, guard `tests/e10-t5c5a-attribution-differences-ui-freeze.test.js` içindedir. C5-A `Done`, C5-B `Deferred`; sıradaki ürün paketi **E10-T5-C7 Integrated navigation/acceptance**tır.
+
 ### E10-T5-B karar kanıtı — Shopify attribution intake ve gösterim
 
 İlk intake yalnız `platform` boyutunda `platform_purchase_count` ve `platform_sales_value` değerlerini overlap inceleme girdisi olarak kabul eder. Gösterim yalnız Shopify-native attribution comparison/overlap diagnostic alanındadır; Funnel totalı veya Revenue girdisi değildir. Total Purchase/Sales, Refund, currency, timezone, Order/Customer satırı ve PII alınmaz. Güncel resmi API doğrulamasına kadar `read_orders` dahil scope, resource ve field kararı ertelendi; scope listesi boştur. Executable matris `contracts/shopify/e10-t5b-minimum-scope.json`, karar ve gösterim açıklaması `docs/E10_T5B_MINIMUM_SHOPIFY_SCOPE_MATRIX.md`, guard `tests/e10-t5b-minimum-scope-matrix.test.js` içindedir.
 
 ### E10-T5-C sıra kapısı — Shopify'a verilecek AdsTable çıktıları
 
-`docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` modül sırasını ve tamamlanan C1/C2/C3/C4/C6 freeze'lerini izler. C5 Attribution ve C7 integrated acceptance kullanıcı tarafından Execution Plan içinde okunup açıkça onaylanmadan parent T5-C `Done` yapılamaz; E10-T6, E10-T7, E10-T8, E10-T9, E10-T10, E11 veya E12 için yeni implementation paketi açılamaz. Önceki Shopify Total Purchase/Sales/Refund presentation varsayımı geçersizdir ve yeniden kullanılamaz.
+`docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` modül sırasını ve tamamlanan C1–C6 ilk dilim freeze'lerini izler. C5-B verified reconciliation ertelenmiştir. C7 integrated acceptance kullanıcı tarafından Execution Plan içinde okunup açıkça onaylanmadan parent T5-C `Done` yapılamaz; E10-T6, E10-T7, E10-T8, E10-T9, E10-T10, E11 veya E12 için yeni implementation paketi açılamaz.
 
-**Durum:** E10-T5-A/B ve E10-T5-C1/C2/C3/C4/C6 `Done`; parent T5-C `In progress`; sıradaki ürün paketi **E10-T5-C5 Attribution**; parent E10-T5 ve E10 `In progress`. Bu paket scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
+**Durum:** E10-T5-A/B ve E10-T5-C1–C6 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C `In progress`; sıradaki ürün paketi **E10-T5-C7 Integrated navigation/acceptance**; parent E10-T5 ve E10 `In progress`. Bu paket scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
 
 ## 15. E11 — Funnel API
 

@@ -38,6 +38,7 @@ test("token exchange calls the canonical shop endpoint and normalizes expiration
   const result = await client.exchange({shop_domain: "store.myshopify.com", subject_token: "id-token", subject_token_type: "id-type", requested_token_type: "offline-type"});
   assert.equal(request[0], "https://store.myshopify.com/admin/oauth/access_token");
   assert.match(request[1].body, /grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Atoken-exchange/);
+  assert.match(request[1].body, /(?:^|&)expiring=1(?:&|$)/);
   assert.deepEqual(result, {access_token: "access", expires_at: 4600, refresh_token: "refresh", refresh_token_expires_at: 8200, scope: ""});
 });
 

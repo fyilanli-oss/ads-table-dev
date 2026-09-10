@@ -33,6 +33,7 @@ function createShopifyExchangeClient({clientId, clientSecret, fetchImpl = global
           subject_token,
           subject_token_type,
           requested_token_type,
+          expiring: "1",
         }).toString(),
       });
       const data = await responseJson(response, "SHOPIFY_TOKEN_EXCHANGE_FAILED");

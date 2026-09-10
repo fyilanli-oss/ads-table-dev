@@ -1936,12 +1936,13 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-B — Development App Bootstrap — Shopify'da ilk kazma
 
-**Durum:** `In progress / explicit development approval received; managed-installation code started; Development Store smoke awaiting environment visibility`.
+**Durum:** `In progress / Blocked — TOKEN_VAULT_CONFIG_ERROR; running App URL unreachable`.
 
 - Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
 - İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
 - İlk kabul yalnız Shopify-managed install sonrasında session token, token exchange ve `shop → workspace` binding smoke sonucudur. Uygulamaya ait legacy install OAuth callback'i acceptance parçası değildir. Production store/credential, billing activation, App Store submission ve production veri işlemi kesinlikle yapılmaz.
 - **Managed-installation düzeltmesi:** Güncel managed modelde uygulama install OAuth callback'i üretmez; Shopify install/scope onayını yönetir. Embedded App Home session token'ı `POST /api/shopify/bootstrap` üzerinden doğrulanır, offline token exchange ve Admin API shop identity kontrolünden sonra binding + encrypted token persistence atomic tamamlanır. Server-only Supabase schema/RPC/service ve composition-root kaydı repository'de hazırdır; açık onayla remote Supabase migration ve redacted postcheck `PASS_MIGRATION_ONLY` tamamlandı. Development Store smoke env görünürlüğünü bekliyor. Redacted contract ve kalan smoke adımları `docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md` içindedir.
+- **2026-09-10 smoke sonucu:** Dört Shopify girdisi redacted görünür ve Development Store domain'i canonical doğrulanmıştır; remote Supabase salt-okunur güvenlik/migration postcheck yeniden PASS'tir. Encryption keyring çalışan process'te bulunmadığından runtime `TOKEN_VAULT_CONFIG_ERROR` ile fail-closed olmuş, yapılandırılmış çalışan App URL'si de ağ seviyesinde ulaşılamamıştır. Gerçek session/ID token, token exchange, Admin Shop identity, binding, encrypted persistence ve reopen/reinstall çalıştırılmamıştır; Development Store veya production teması olmamıştır. E10-T6-B `In progress / Blocked`, E10-T6-C kapalıdır. Redacted evidence `artifacts/e10-shopify/e10-t6b-development-store-smoke.json` içindedir.
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 

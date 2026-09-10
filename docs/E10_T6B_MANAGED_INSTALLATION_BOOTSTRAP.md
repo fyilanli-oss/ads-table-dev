@@ -2,7 +2,7 @@
 
 ## Durum
 
-`In progress / Supabase migration PASS; Development Store environment unavailable in this process`.
+`In progress / Blocked — TOKEN_VAULT_CONFIG_ERROR; running App URL unreachable`.
 
 Kullanıcı Development App ve Development Store'u oluşturduğunu ve dört Shopify değerini Codex ortamına eklediğini onayladı. Bu çalışma sırasında değerler veya uzunlukları yazdırılmadı. Çalışan process'te `SHOPIFY` isim alanında hiçbir değişken görünmediği için credential ile Development Store smoke yapılmadı; bu sonuç değerlerin yeniden girilmesi gerektiği anlamına gelmez.
 
@@ -37,3 +37,9 @@ Credential'ların yeni process'e aktarılması doğrulandıktan sonra Developmen
 Repository'de config loader, gerçek token-exchange/Admin API adapter'ı, server-only Supabase şeması, atomic install RPC/service ve application composition-root kaydı hazırdır. Açık insan onayı sonrasında migration uzak Supabase'e tek transaction ve migration-ledger kaydıyla uygulandı. Postcheck; boş Shopify tablosu, forced RLS, sıfır browser grant, sıfır plaintext token kolonu, tek invoker-security RPC ve tek ledger kaydı için PASS verdi. Redacted kanıt `artifacts/e10-shopify/e10-t6b-migration-acceptance.json` içindedir. Development Store kanıtı tamamlanmadan E10-T6-B `Done` veya Shopify entegrasyonu tamamlandı sayılmaz.
 
 Scope genişletme, ShopifyQL attribution query, webhook, billing, production store veya production credential bu paketin parçası değildir.
+
+## 2026-09-10 Development Store smoke denemesi
+
+Dört Shopify değeri çalışan process'te redacted olarak görünür durumdadır ve Development Store girdisi canonical `*.myshopify.com` doğrulamasını geçmiştir. Remote Supabase salt-okunur postcheck; tablo, invoker RPC, migration ledger, forced RLS, sıfır browser grant ve sıfır plaintext token kolonu için yeniden PASS vermiştir.
+
+Smoke fail-closed durdurulmuştur: encryption keyring çalışan process'te bulunmadığı için runtime `TOKEN_VAULT_CONFIG_ERROR` üretmektedir; ayrıca yapılandırılmış çalışan App URL'sine yapılan kimliksiz route erişim kontrolü ağ seviyesinde ulaşılamaz durumdadır. Bu nedenle gerçek session/ID token, offline exchange, Admin Shop identity, binding, encrypted persistence ve ikinci açılış/reinstall adımları çalıştırılmamış; Shopify mağazasına temas edilmemiştir. Redacted sonuç `artifacts/e10-shopify/e10-t6b-development-store-smoke.json` içindedir. E10-T6-B `Done` değildir ve E10-T6-C kapalı kalır.

@@ -20,9 +20,15 @@ function exactExchangeResult(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("MANAGED_TOKEN_EXCHANGE_FAILED");
   const allowed = ["access_token", "expires_at", "refresh_token", "refresh_token_expires_at", "scope"];
   if (Object.keys(value).some((key) => !allowed.includes(key))) throw new Error("MANAGED_TOKEN_EXCHANGE_FAILED");
-  required(value.access_token, "access_token");
+  if (required(value.access_token, "access_token").length < 16) throw new Error("MANAGED_TOKEN_EXCHANGE_FAILED");
   if (!Number.isSafeInteger(value.expires_at) || value.expires_at <= 0) throw new Error("MANAGED_TOKEN_EXCHANGE_FAILED");
   if (typeof value.scope !== "string") throw new Error("MANAGED_TOKEN_EXCHANGE_FAILED");
+  const hasRefreshToken = value.refresh_token !== undefined;
+  const hasRefreshExpiry = value.refresh_token_expires_at !== undefined;
+  if (hasRefreshToken !== hasRefreshExpiry) throw new Error("MANAGED_TOKEN_EXCHANGE_FAILED");
+  if (hasRefreshToken && (typeof value.refresh_token !== "string" || value.refresh_token.length < 16 || !Number.isSafeInteger(value.refresh_token_expires_at) || value.refresh_token_expires_at <= value.expires_at)) {
+    throw new Error("MANAGED_TOKEN_EXCHANGE_FAILED");
+  }
   return value;
 }
 

@@ -36,6 +36,7 @@ function createShopifyExchangeClient({clientId, clientSecret, fetchImpl = global
         }).toString(),
       });
       const data = await responseJson(response, "SHOPIFY_TOKEN_EXCHANGE_FAILED");
+      const obtainedAt = Math.floor(now() / 1000);
       const expiresIn = Number(data.expires_in);
       const refreshExpiresIn = data.refresh_token_expires_in === undefined ? null : Number(data.refresh_token_expires_in);
       if (!data.access_token || !Number.isSafeInteger(expiresIn) || expiresIn <= 0 || typeof data.scope !== "string") {
@@ -43,9 +44,9 @@ function createShopifyExchangeClient({clientId, clientSecret, fetchImpl = global
       }
       return {
         access_token: data.access_token,
-        expires_at: Math.floor(now() / 1000) + expiresIn,
+        expires_at: obtainedAt + expiresIn,
         refresh_token: data.refresh_token,
-        refresh_token_expires_at: refreshExpiresIn === null ? undefined : Math.floor(now() / 1000) + refreshExpiresIn,
+        refresh_token_expires_at: refreshExpiresIn === null ? undefined : obtainedAt + refreshExpiresIn,
         scope: data.scope,
       };
     },

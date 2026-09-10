@@ -62,3 +62,9 @@ Yalnız kuruluşta hiç canonical keyring provision edilmemiş ve şifresi çöz
 ## Devam kararı
 
 Bu task'ın process ağacında key map görünmediği için aynı process içinde gerçek smoke'a devam edilemez. Karar muallakta değildir: **secret'ın scope edildiği Codex development environment içinde yeni task açılacaktır**. Yeni task için doğrudan kullanılacak talimat `codex-input/E10_T6B_DEVELOPMENT_STORE_SMOKE_HANDOFF_TR.md` dosyasındadır. Yeni task preflight `ready: true` vermeden kullanıcıdan tekrar durum yorumu istemeyecek ve Shopify'a authenticated temas kurmayacaktır; PASS sonrasında aynı PR #186 üzerinden gerçek embedded smoke'u tamamlayacaktır.
+
+## 2026-09-10 Final Development Store acceptance
+
+Yayınlanmış managed-installation yapılandırması ve Preview deployment üzerinden gerçek Shopify Admin embedded App Home kabulü tamamlandı. App Bridge ID token doğrulaması, `expiring=1` offline token exchange, Admin Shop identity doğrulaması, atomic shop/workspace binding, encrypted token persistence, aynı binding üzerinde idempotent ikinci bootstrap ve session reopen kontrolü birlikte PASS verdi. Kullanıcıya gösterilen nihai redacted sonuç `Development store connected securely.` oldu; token, secret veya shop/workspace kimliği evidence'a yazılmadı.
+
+E10-T6-B `Done / PASS`tır. Bu sonuç yalnız Development Store kapsamındadır; production store, billing, webhook, ShopifyQL attribution sorgusu, scope genişletme veya production ingest onayı değildir. Redacted kanıt `artifacts/e10-shopify/e10-t6b-development-store-smoke.json` içindedir. Sıradaki kapı E10-T6-C embedded provider OAuth smoke'tur.

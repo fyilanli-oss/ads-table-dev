@@ -1,14 +1,12 @@
 {
   "contract_version": "e10-t6b-development-store-smoke-v1",
-  "captured_at": "2026-09-10T10:25:00.000Z",
+  "captured_at": "2026-09-10T18:16:50.000Z",
   "environment": "development_only",
   "configuration": {
     "shopify_required_values": "PASS_REDACTED",
     "development_store_domain": "PASS_CANONICAL_REDACTED",
-    "external_keyring_configuration": "PREVIOUSLY_VERIFIED_BY_PRODUCTION_ACCEPTANCE",
-    "token_keyring": "NOT_VISIBLE_TO_ACTIVE_CODEX_PROCESS",
-    "token_keyring_visible_count": 1,
-    "token_keyring_required_count": 2
+    "deployment_scope": "PASS_PREVIEW_REDACTED",
+    "token_keyring": "PASS_REDACTED"
   },
   "remote_supabase": {
     "installation_table": "PASS_REDACTED",
@@ -19,17 +17,17 @@
     "plaintext_token_columns_zero": "PASS_REDACTED"
   },
   "deployment_status": "PASS_REDACTED",
-  "operator_route_probe": "BLOCKED_NETWORK_EGRESS_403",
+  "operator_route_probe": "NOT_REQUIRED_FOR_EMBEDDED_ACCEPTANCE",
   "development_store_reachability_probe": "REACHABLE_UNAUTHENTICATED_HTTP_4XX",
-  "embedded_session_and_id_token": "NOT_RUN_FAIL_CLOSED",
-  "offline_token_exchange": "NOT_RUN_FAIL_CLOSED",
-  "admin_shop_identity": "NOT_RUN_FAIL_CLOSED",
-  "shop_workspace_binding": "NOT_RUN_FAIL_CLOSED",
-  "encrypted_token_persistence": "NOT_RUN_FAIL_CLOSED",
-  "reopen_reinstall_idempotency": "NOT_RUN_FAIL_CLOSED",
-  "development_store_contact": false,
+  "embedded_session_and_id_token": "PASS_REDACTED",
+  "offline_token_exchange": "PASS_EXPIRING_REDACTED",
+  "admin_shop_identity": "PASS_REDACTED",
+  "shop_workspace_binding": "PASS_REDACTED",
+  "encrypted_token_persistence": "PASS_REDACTED",
+  "reopen_reinstall_idempotency": "PASS_REDACTED",
+  "development_store_contact": true,
   "unauthenticated_development_store_reachability_contact": true,
   "production_store_contact": false,
   "secrets_or_identifiers_recorded": false,
-  "outcome": "BLOCKED_ACTIVE_PROCESS_SECRET_VISIBILITY"
+  "outcome": "PASS_DEVELOPMENT_STORE_EMBEDDED_ACCEPTANCE"
 }

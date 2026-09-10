@@ -82,6 +82,22 @@ test("normalizes uncaught errors without leaking internal messages", async () =>
   });
 });
 
+test("uses a stable uppercase error message as a safe diagnostic code", async () => {
+  const logger = memoryLogger();
+  const app = express();
+  app.use(createRequestBoundary({ logger, createId: () => "shopify-reference" }));
+  app.get("/shopify", () => { throw new Error("SHOPIFY_TOKEN_EXCHANGE_FAILED"); });
+  installErrorBoundary(app, { logger });
+
+  const { res, body } = await request(app, "/shopify");
+  assert.equal(res.statusCode, 500);
+  assert.deepEqual(JSON.parse(body), {
+    error: "Internal server error",
+    code: "SHOPIFY_TOKEN_EXCHANGE_FAILED",
+    requestId: "shopify-reference",
+  });
+});
+
 test("fails closed for invalid middleware dependencies", () => {
   assert.throws(() => createRequestBoundary({ logger: {} }), /logger must expose/);
   assert.throws(() => createRequestBoundary({ createId: null }), /createId must be a function/);

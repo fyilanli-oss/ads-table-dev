@@ -37,7 +37,9 @@ function renderEmbeddedAppHome({clientId}) {
         });
         const body = await response.json().catch(() => ({}));
         if (!response.ok || body.status !== "active" || body.workspace_ready !== true) {
-          throw new Error("EMBEDDED_BOOTSTRAP_FAILED");
+          const error = new Error(typeof body.code === "string" ? body.code : "EMBEDDED_BOOTSTRAP_FAILED");
+          error.requestId = typeof body.requestId === "string" ? body.requestId : null;
+          throw error;
         }
         return body;
       };
@@ -54,8 +56,10 @@ function renderEmbeddedAppHome({clientId}) {
         status.textContent = "Development store connected securely.";
         document.documentElement.dataset.smoke = "pass";
       };
-      run().catch(() => {
-        status.textContent = "Connection could not be verified. Reopen the app and try again.";
+      run().catch((error) => {
+        const code = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "EMBEDDED_BOOTSTRAP_FAILED";
+        const reference = /^[A-Za-z0-9._:-]{1,128}$/.test(error.requestId || "") ? " Reference: " + error.requestId : "";
+        status.textContent = "Connection could not be verified (" + code + ")." + reference;
         document.documentElement.dataset.smoke = "fail";
       });
     })();

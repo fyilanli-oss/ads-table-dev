@@ -20,28 +20,20 @@ test("embedded App Home escapes the public client id", () => {
   assert.match(html, /&quot;&gt;&lt;script&gt;/);
 });
 
-test("App Home handler only claims Shopify embedded requests and disables caching", () => {
+test("App Home handler serves queryless Shopify launches and disables caching", () => {
   const handlers = new Map();
   registerEmbeddedAppHome({get(path, fn) { handlers.set(path, fn); }}, {clientId: "client"});
   assert.deepEqual([...handlers.keys()], ["/", "/shopify/app"]);
   const handler = handlers.get("/");
-  let nextCalled = false;
-  handler({query: {}}, {}, () => { nextCalled = true; });
-  assert.equal(nextCalled, true);
-
   const response = {
     headers: {},
     set(name, value) { this.headers[name] = value; },
     type(value) { this.contentType = value; return this; },
     send(value) { this.body = value; return this; },
   };
-  handler({query: {embedded: "1"}}, response, () => assert.fail("must not fall through"));
+  handler({query: {}}, response, () => assert.fail("must not fall through"));
   assert.equal(response.headers["Cache-Control"], "no-store");
   assert.equal(response.headers["Content-Security-Policy"], "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
   assert.equal(response.contentType, "html");
   assert.match(response.body, /Development store connected securely/);
-
-  const hostResponse = {...response, headers: {}, set: response.set, type: response.type, send: response.send};
-  handler({query: {host: "redacted-shopify-context"}}, hostResponse, () => assert.fail("host context must not fall through"));
-  assert.equal(hostResponse.headers["Cache-Control"], "no-store");
 });

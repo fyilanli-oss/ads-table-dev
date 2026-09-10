@@ -56,3 +56,7 @@ Kontrol ve düzeltme sırası:
 4. `npm run e10:t6b:smoke:preflight` yeniden çalıştırılır. Yalnız `token_keyring.valid_in_active_process: true`, `visible_count: 2`, `required_count: 2` ve genel `ready: true` görüldüğünde embedded smoke'a geçilir.
 
 Yalnız kuruluşta hiç canonical keyring provision edilmemiş ve şifresi çözülecek mevcut token olmadığı yetkili güvenlik sahibi tarafından doğrulanmışsa yeni keyring oluşturulur. Her key değeri kriptografik olarak rastgele 32 byte olup base64 kodlanır; environment değeri active key kimliğini aynı JSON anahtarında taşıyan tek satırlık bir object olmalıdır. Üretim komutu ve gerçek JSON yalnız güvenli operator terminali/secret manager içinde çalıştırılır; bu repository veya smoke çıktısı bunları üretmez ya da göstermez.
+
+## Devam kararı
+
+Bu task'ın process ağacında key map görünmediği için aynı process içinde gerçek smoke'a devam edilemez. Karar muallakta değildir: **secret'ın scope edildiği Codex development environment içinde yeni task açılacaktır**. Yeni task için doğrudan kullanılacak talimat `codex-input/E10_T6B_DEVELOPMENT_STORE_SMOKE_HANDOFF_TR.md` dosyasındadır. Yeni task preflight `ready: true` vermeden kullanıcıdan tekrar durum yorumu istemeyecek ve Shopify'a authenticated temas kurmayacaktır; PASS sonrasında aynı PR #186 üzerinden gerçek embedded smoke'u tamamlayacaktır.

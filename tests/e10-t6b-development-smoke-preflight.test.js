@@ -46,3 +46,16 @@ test("operator guidance identifies the canonical secret source without embedding
   assert.match(doc, /kriptografik olarak rastgele 32 byte olup base64 kodlanır/);
   assert.doesNotMatch(doc, /[A-Za-z0-9+/]{43}=/);
 });
+
+test("handoff makes the next-task decision and acceptance sequence unambiguous", () => {
+  const handoff = fs.readFileSync(path.join(__dirname, "../codex-input/E10_T6B_DEVELOPMENT_STORE_SMOKE_HANDOFF_TR.md"), "utf8");
+  assert.match(handoff, /PR #186/);
+  assert.match(handoff, /secret injection'lı \*\*yeni process\*\*/);
+  assert.match(handoff, /token_keyring\.valid_in_active_process: true/);
+  assert.match(handoff, /remote_database\.credentials_visible: true/);
+  for (const gate of ["session token doğrulaması", "offline token exchange", "Admin API Shop identity", "encrypted token persistence", "reopen/reinstall idempotency"]) {
+    assert.match(handoff, new RegExp(gate));
+  }
+  assert.match(handoff, /Production store\/credential/);
+  assert.doesNotMatch(handoff, /[A-Za-z0-9+/]{43}=/);
+});

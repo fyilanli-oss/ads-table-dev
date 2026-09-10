@@ -6,7 +6,7 @@ const VARIABLES = Object.freeze([
   "SHOPIFY_API_KEY",
   "SHOPIFY_API_SECRET",
   "SHOPIFY_APP_URL",
-  "SHOPIFY_DEV_STORE_DOMAIN",
+  "SHOPIFY_DEV_STORE",
 ]);
 
 class ShopifyConfigError extends Error {
@@ -39,7 +39,7 @@ function loadShopifyConfig(env = process.env) {
     clientId: value(env, "SHOPIFY_API_KEY"),
     clientSecret: value(env, "SHOPIFY_API_SECRET"),
     appUrl: appUrl.toString().replace(/\/$/, ""),
-    developmentStoreDomain: normalizeShopDomain(value(env, "SHOPIFY_DEV_STORE_DOMAIN")),
+    developmentStoreDomain: normalizeShopDomain(value(env, "SHOPIFY_DEV_STORE")),
   });
 }
 

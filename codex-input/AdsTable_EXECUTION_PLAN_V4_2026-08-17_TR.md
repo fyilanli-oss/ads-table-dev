@@ -1946,8 +1946,11 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 
-- Shopify-native `Data Sources / Platforms` ekranından Connect başlatma; `surface=shopify_embedded` transaction; resmi App Bridge top-level provider consent; callback sonrası canonical embedded app dönüşü; account selection/status smoke edilir.
-- T6-B install/session kabulü olmadan başlamaz. Provider production yetkisi veya gerçek production ingest yapmaz.
+**Durum:** `Blocked — workspace-scoped OAuth authority bridge gerekli`.
+
+- Preflight, mevcut OAuth transaction ve provider persistence sınırlarının yalnız standalone `user_id` authority'si taşıdığını; callback'lerin `/dashboard` yüzeyine döndüğünü doğruladı. Shopify `workspace_id` auth user kimliği gibi kullanılamaz ve query/body tenant authority kabul edilemez.
+- Önce doğrulanmış Shopify session → shop/workspace/user/provider/surface/return target transaction bağı, workspace-scoped encrypted connection persistence ve canonical embedded callback dönüşü uygulanıp isolation/replay testleri geçmelidir.
+- Bu repository kapısı PASS olmadan provider consent başlatılmaz. Provider veya production teması yapılmadı. Karar `docs/E10_T6C_EMBEDDED_PROVIDER_OAUTH_PREFLIGHT.md` ve `contracts/shopify/e10-t6c-provider-oauth-preflight.json` içindedir.
 
 #### E10-T6-D — Shopify attribution feasibility smoke — T6-C kabulünden sonra
 

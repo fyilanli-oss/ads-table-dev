@@ -1,6 +1,6 @@
 {
   "contract_version": "e10-t6b-development-store-smoke-v1",
-  "captured_at": "2026-09-10T09:42:15.413Z",
+  "captured_at": "2026-09-10T10:25:00.000Z",
   "environment": "development_only",
   "configuration": {
     "shopify_required_values": "PASS_REDACTED",
@@ -17,6 +17,7 @@
   },
   "deployment_status": "PASS_REDACTED",
   "operator_route_probe": "BLOCKED_NETWORK_EGRESS_403",
+  "development_store_reachability_probe": "REACHABLE_UNAUTHENTICATED_HTTP_4XX",
   "embedded_session_and_id_token": "NOT_RUN_FAIL_CLOSED",
   "offline_token_exchange": "NOT_RUN_FAIL_CLOSED",
   "admin_shop_identity": "NOT_RUN_FAIL_CLOSED",
@@ -24,6 +25,7 @@
   "encrypted_token_persistence": "NOT_RUN_FAIL_CLOSED",
   "reopen_reinstall_idempotency": "NOT_RUN_FAIL_CLOSED",
   "development_store_contact": false,
+  "unauthenticated_development_store_reachability_contact": true,
   "production_store_contact": false,
   "secrets_or_identifiers_recorded": false,
   "outcome": "BLOCKED_SECRET_NOT_INJECTED_IN_PROCESS"

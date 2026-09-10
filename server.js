@@ -23,7 +23,7 @@ const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snap
 const {googleSnapshotJobEvidence}=require("./src/jobs/google-snapshot-job-evidence");
 const {snapshotSpreadJobEvidence,recoverySnapshotSpreadJobEvidence}=require("./src/jobs/snapshot-job-evidence");const {createMetaLiveRefresh}=require("./src/providers/meta/live-refresh");const {createGoogleLiveRefresh}=require("./src/providers/google/live-refresh");const {discoverGoogleCustomers}=require("./src/providers/google/customer-discovery");
 const {createSharedClients}=require("./src/clients/shared-clients");
-const {loadRuntimeConfig}=require("./src/config/runtime-config");
+const {loadRuntimeConfig}=require("./src/config/runtime-config");const {registerShopifyRuntime}=require("./src/shopify/runtime");
 const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
 const productionConfig=runtimeConfig.production;
 const app=createApplication({publicDirectory:runtimeConfig.publicDirectory,tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled});
@@ -52,7 +52,7 @@ const TIKTOK_SANDBOX_ADVERTISER_ID=process.env.TIKTOK_SANDBOX_ADVERTISER_ID||"";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
 const providerTokenEncryptionEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_ENCRYPTION_ENABLED,false,"PROVIDER_TOKEN_ENCRYPTION_ENABLED");
 const providerTokenLegacyReadsEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_LEGACY_READ_ENABLED,true,"PROVIDER_TOKEN_LEGACY_READ_ENABLED");
-const {supabaseAdmin,oauthTransactionStore,providerTokenStore}=createSharedClients({env:process.env,providerTokenEncryptionEnabled,providerTokenLegacyReadsEnabled});
+const {supabaseAdmin,oauthTransactionStore,providerTokenStore}=createSharedClients({env:process.env,providerTokenEncryptionEnabled,providerTokenLegacyReadsEnabled});registerShopifyRuntime({app,env:process.env,supabaseAdmin});
 registerPublicRoutes({app,publicDirectory:runtimeConfig.publicDirectory,tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled,publicConfig:{supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}});
 async function getUserFromRequest(req){const a=req.headers.authorization||"";const t=a.startsWith("Bearer ")?a.slice(7):null;if(!t||!supabaseAdmin)return null;const {data,error}=await supabaseAdmin.auth.getUser(t);if(error||!data?.user?.id)return null;return data.user}
 async function expireTrialsIfNeeded(){if(!supabaseAdmin)return;const{error}=await supabaseAdmin.rpc("expire_trials");if(error)throw error}

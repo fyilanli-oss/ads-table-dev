@@ -34,6 +34,6 @@ Credential'ların yeni process'e aktarılması doğrulandıktan sonra Developmen
 - `shop → workspace` binding ve encrypted persistence;
 - aynı shop için idempotent reopen/reinstall kontrolü.
 
-Repository'de config loader, gerçek token-exchange/Admin API adapter'ı ve route contract'ı hazırdır. Kalıcı Supabase install service ile application composition-root kaydı ve Development Store kanıtı tamamlanmadan E10-T6-B `Done` veya Shopify entegrasyonu tamamlandı sayılmaz.
+Repository'de config loader, gerçek token-exchange/Admin API adapter'ı, server-only Supabase şeması, atomic install RPC/service ve application composition-root kaydı hazırdır. Migration bu pakette yalnız versioned artifact olarak eklenmiştir; açık production onayı olmadan uzak Supabase projesine uygulanmamıştır. Development Store kanıtı tamamlanmadan E10-T6-B `Done` veya Shopify entegrasyonu tamamlandı sayılmaz.
 
 Scope genişletme, ShopifyQL attribution query, webhook, billing, production store veya production credential bu paketin parçası değildir.

@@ -2,10 +2,10 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {loadShopifyConfig, shopifyConfigStatus, ShopifyConfigError} = require("../src/config/shopify-config");
+const {VARIABLES, loadShopifyConfig, shopifyConfigStatus, ShopifyConfigError} = require("../src/config/shopify-config");
 const {createShopifyExchangeClient, createShopifyAdminClient} = require("../src/shopify/admin-api-client");
 
-const env = {SHOPIFY_API_KEY: "key", SHOPIFY_API_SECRET: "secret", SHOPIFY_APP_URL: "https://dev.adstable.app", SHOPIFY_DEV_STORE_DOMAIN: "ads-table-dev.myshopify.com"};
+const env = {SHOPIFY_API_KEY: "key", SHOPIFY_API_SECRET: "secret", SHOPIFY_APP_URL: "https://dev.adstable.app", SHOPIFY_DEV_STORE: "ads-table-dev.myshopify.com"};
 
 test("Shopify config is disabled when absent and fails closed when partial", () => {
   assert.deepEqual(loadShopifyConfig({}), {enabled: false});
@@ -14,12 +14,19 @@ test("Shopify config is disabled when absent and fails closed when partial", () 
 });
 
 test("Shopify config validates all four values without exposing a redacted status secret", () => {
+  assert.deepEqual(VARIABLES, ["SHOPIFY_API_KEY", "SHOPIFY_API_SECRET", "SHOPIFY_APP_URL", "SHOPIFY_DEV_STORE"]);
   const config = loadShopifyConfig(env);
   assert.equal(config.enabled, true);
   assert.equal(config.appUrl, "https://dev.adstable.app");
   assert.equal(config.developmentStoreDomain, "ads-table-dev.myshopify.com");
   assert.deepEqual(shopifyConfigStatus(env), {configured: true, visible_count: 4, required_count: 4});
   assert.doesNotMatch(JSON.stringify(shopifyConfigStatus(env)), /key|secret|adstable/i);
+});
+
+test("Shopify config does not silently substitute the obsolete dev-store variable name", () => {
+  const obsolete = {...env, SHOPIFY_DEV_STORE_DOMAIN: env.SHOPIFY_DEV_STORE};
+  delete obsolete.SHOPIFY_DEV_STORE;
+  assert.throws(() => loadShopifyConfig(obsolete), (error) => error.code === "SHOPIFY_CONFIG_INCOMPLETE" && error.missing.includes("SHOPIFY_DEV_STORE"));
 });
 
 test("token exchange calls the canonical shop endpoint and normalizes expirations", async () => {

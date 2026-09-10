@@ -2176,7 +2176,7 @@ Karar belgesi `docs/E10_T5C5A_ATTRIBUTION_DIFFERENCES_FREEZE.md`, executable con
 - **OAuth dönüşü:** Callback canonical Platforms route'una, server-bound allowlisted return target ile döner; standalone login/dashboard ve caller URL yasaktır.
 - **Acceptance:** Shopify responsive navigation; keyboard/focus/back/deep-link; 320px overflow, duplicate shell, stale/multiple account ve open-redirect negatif kapıları zorunludur.
 
-E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A — `Done / PASS`**; sıradaki iş **E10-T6-B — `Ready / explicit development approval required`**dır. T6-B onayı Shopify Development App/Store teması içindir ve production onayı değildir.
+E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A ve E10-T6-B — `Done / PASS`**; sıradaki iş **E10-T6-C embedded provider OAuth smoke**tur. Development kabulü production onayı değildir.
 
 
 ### E10-T5-B karar kanıtı — Shopify attribution intake ve gösterim
@@ -2187,7 +2187,7 @@ E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7
 
 `docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` tamamlanan C1–C7 ilk dilim freeze'lerini izler. C5-B verified reconciliation ertelenmiştir. E10-T6-A offline readiness PASS olmuştur; açık development onayı olmadan E10-T6-B ve onu izleyen Shopify temaslı işler, ayrıca gerekli plan kapıları olmadan E10-T7–T10, E11 veya E12 implementation'ı açılamaz.
 
-**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; E10-T6-A `Done / PASS`; sıradaki iş **E10-T6-B Development App Bootstrap — Ready / explicit development approval required**; parent E10 `In progress`. T6-A scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
+**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; E10-T6-A ve E10-T6-B `Done / PASS`; sıradaki iş **E10-T6-C Embedded provider OAuth smoke**; parent E10 `In progress`. T6-A scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
 
 ### E10-T6-A1/A2 official-source readiness evidence
 

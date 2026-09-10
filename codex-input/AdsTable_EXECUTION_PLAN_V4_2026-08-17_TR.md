@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B Ready ve açık development onayına bağlı; every live Shopify contact gated`
+**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B açık development onayı alındı, managed-installation bootstrap kod düzeltmesi başladı; Development Store smoke env görünürlüğünü bekliyor; every production contact gated`
 
 ### Ürün ve mimari kararı
 
@@ -1914,7 +1914,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Done — Token, uninstall ve privacy lifecycle:** Shopify token'larını encrypted store sınırına bağla; browser/log erişimini yasakla; doğrulanmış uninstall, shop erişim kaybı ve privacy/compliance olaylarında erişimi fail-closed durdur ve retention/deletion kararlarını executable contract ile kanıtla.
 - **E10-T5 — Done — Revize edilmiş ürün sözleşmesi:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim ürün kararları tamamlandı; C5-B verified reconciliation `Deferred`. E10-T6-A offline readiness PASS olmuştur; sıradaki kapı açık development onaylı E10-T6-B'dir.
-- **E10-T6 — In progress; A Done, B approval-gated — Capability/readiness, development bootstrap ve gerekçeli sync:** E10-T6-A resmi offline readiness PASS; ayrı açık development onayı sonrasında E10-T6-B ilk Shopify temasıdır. Webhook/initial sync ancak C5-A ve resmi capability sonucu gerçekten gerektirirse açılır.
+- **E10-T6 — In progress; A Done, B in progress — Capability/readiness, development bootstrap ve gerekçeli sync:** E10-T6-A resmi offline readiness PASS; E10-T6-B için açık development onayı alındı, app/store kullanıcı tarafından oluşturuldu ve Shopify-managed installation bootstrap düzeltmesi başladı. Development Store smoke, credential'ların çalışan process'te görünmesini bekliyor. Webhook/initial sync ancak C5-A ve resmi capability sonucu gerçekten gerektirirse açılır.
 - **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
 - **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
 - **E10-T9 — App Store review-first workstream:** Listing, minimum-scope gerekçesi, test store, reviewer erişimi ve talimatları, privacy/support/data-deletion yüzeyleri, install-to-value videosu ve provider bağlı değilken incelenebilir demo/empty-state paketini geliştirmeyle paralel yürüt. Review hazırlığını sona bırakma.
@@ -1936,11 +1936,12 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-B — Development App Bootstrap — Shopify'da ilk kazma
 
-**Durum:** `Ready / explicit development approval required`.
+**Durum:** `In progress / explicit development approval received; managed-installation code started; Development Store smoke awaiting environment visibility`.
 
 - Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
 - İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
-- İlk kabul yalnız install callback, session token ve `shop → workspace` binding smoke sonucudur. Production store/credential, billing activation, App Store submission ve production veri işlemi kesinlikle yapılmaz.
+- İlk kabul yalnız Shopify-managed install sonrasında session token, token exchange ve `shop → workspace` binding smoke sonucudur. Uygulamaya ait legacy install OAuth callback'i acceptance parçası değildir. Production store/credential, billing activation, App Store submission ve production veri işlemi kesinlikle yapılmaz.
+- **Managed-installation düzeltmesi:** Güncel managed modelde uygulama install OAuth callback'i üretmez; Shopify install/scope onayını yönetir. Embedded App Home session token'ı `POST /api/shopify/bootstrap` üzerinden doğrulanır, offline token exchange ve Admin API shop identity kontrolünden sonra binding + encrypted token persistence atomic tamamlanır. Redacted contract ve kalan smoke adımları `docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md` içindedir.
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 

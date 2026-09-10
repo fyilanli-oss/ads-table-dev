@@ -2,6 +2,8 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
 const {developmentSmokePreflight} = require("../scripts/e10-t6b-development-smoke-preflight");
 
 const completeEnv = Object.freeze({
@@ -34,4 +36,13 @@ test("development smoke preflight remains fail-closed when the keyring is not vi
   const result = developmentSmokePreflight(env);
   assert.deepEqual(result.token_keyring, {configured: false, visible_count: 1, required_count: 2});
   assert.equal(result.ready, false);
+});
+
+test("operator guidance identifies the canonical secret source without embedding key material", () => {
+  const doc = fs.readFileSync(path.join(__dirname, "../docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md"), "utf8");
+  assert.match(doc, /Shopify Partner Dashboard'dan alınan bir credential değildir/);
+  assert.match(doc, /yeni ve bağımsız bir anahtar üretilmez/);
+  assert.match(doc, /Codex development environment secrets ekranında exact adla `PROVIDER_TOKEN_ENCRYPTION_KEYS`/);
+  assert.match(doc, /kriptografik olarak rastgele 32 byte olup base64 kodlanır/);
+  assert.doesNotMatch(doc, /[A-Za-z0-9+/]{43}=/);
 });

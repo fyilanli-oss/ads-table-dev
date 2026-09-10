@@ -10,19 +10,16 @@ function bearerToken(header) {
   return header.slice(7);
 }
 
-function registerShopifyAuthRoutes(app, {verify_install_callback, consume_install_state, complete_install, authenticate_embedded}) {
+function registerShopifyAuthRoutes(app, {bootstrap_managed_install, authenticate_embedded}) {
   if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
-  requireFunction(verify_install_callback, "verify_install_callback");
-  requireFunction(consume_install_state, "consume_install_state");
-  requireFunction(complete_install, "complete_install");
+  if (typeof app.post !== "function") throw new TypeError("app.post is required");
+  requireFunction(bootstrap_managed_install, "bootstrap_managed_install");
   requireFunction(authenticate_embedded, "authenticate_embedded");
 
-  app.get("/auth/shopify/callback", async (req, res, next) => {
+  app.post("/api/shopify/bootstrap", async (req, res, next) => {
     try {
-      const callback = verify_install_callback(req.query);
-      const state = await consume_install_state(callback);
-      await complete_install({callback, state});
-      res.redirect(303, "/dashboard?shopify=installed");
+      const result = await bootstrap_managed_install({session_token: bearerToken(req.get("authorization"))});
+      res.status(200).json(result);
     } catch (error) { next(error); }
   });
 

@@ -67,13 +67,16 @@ function renderEmbeddedAppHome({clientId}) {
 function registerEmbeddedAppHome(app, {clientId}) {
   if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
   const html = renderEmbeddedAppHome({clientId});
-  app.get("/shopify/app", (req, res, next) => {
+  const handler = (req, res, next) => {
     const embeddedRequest = req.query?.embedded === "1"
       || (typeof req.query?.host === "string" && req.query.host.length > 0);
     if (!embeddedRequest) return next();
     res.set("Cache-Control", "no-store");
+    res.set("Content-Security-Policy", "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
     return res.type("html").send(html);
-  });
+  };
+  app.get("/", handler);
+  app.get("/shopify/app", handler);
 }
 
 module.exports = Object.freeze({registerEmbeddedAppHome, renderEmbeddedAppHome});

@@ -2,8 +2,6 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const {renderEmbeddedAppHome, registerEmbeddedAppHome} = require("../src/shopify/embedded-app-home");
 
 test("embedded App Home obtains fresh Shopify ID tokens for bootstrap, idempotency, and session", () => {
@@ -23,8 +21,10 @@ test("embedded App Home escapes the public client id", () => {
 });
 
 test("App Home handler only claims Shopify embedded requests and disables caching", () => {
-  let handler;
-  registerEmbeddedAppHome({get(path, fn) { assert.equal(path, "/shopify/app"); handler = fn; }}, {clientId: "client"});
+  const handlers = new Map();
+  registerEmbeddedAppHome({get(path, fn) { handlers.set(path, fn); }}, {clientId: "client"});
+  assert.deepEqual([...handlers.keys()], ["/", "/shopify/app"]);
+  const handler = handlers.get("/");
   let nextCalled = false;
   handler({query: {}}, {}, () => { nextCalled = true; });
   assert.equal(nextCalled, true);
@@ -37,17 +37,11 @@ test("App Home handler only claims Shopify embedded requests and disables cachin
   };
   handler({query: {embedded: "1"}}, response, () => assert.fail("must not fall through"));
   assert.equal(response.headers["Cache-Control"], "no-store");
+  assert.equal(response.headers["Content-Security-Policy"], "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
   assert.equal(response.contentType, "html");
   assert.match(response.body, /Development store connected securely/);
 
   const hostResponse = {...response, headers: {}, set: response.set, type: response.type, send: response.send};
   handler({query: {host: "redacted-shopify-context"}}, hostResponse, () => assert.fail("host context must not fall through"));
   assert.equal(hostResponse.headers["Cache-Control"], "no-store");
-});
-
-
-test("root App URL forwards Shopify embedded loads to the server-rendered App Home", () => {
-  const landing = fs.readFileSync(path.join(__dirname, "../public/landing.html"), "utf8");
-  assert.match(landing, /URLSearchParams\(location\.search\).*embedded.*host/);
-  assert.match(landing, /location\.replace\("\/shopify\/app"\+location\.search\)/);
 });

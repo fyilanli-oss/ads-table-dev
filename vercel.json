@@ -5,7 +5,7 @@
     { "src": "server.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/", "dest": "/public/landing.html" },
+    { "src": "/", "dest": "/server.js" },
     { "src": "/login", "dest": "/public/login.html" },
     { "src": "/signup", "dest": "/public/signup.html" },
     { "src": "/dashboard", "dest": "/public/dashboard.html" },

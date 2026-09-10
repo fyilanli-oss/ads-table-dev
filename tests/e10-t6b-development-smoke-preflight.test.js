@@ -21,7 +21,7 @@ test("development smoke preflight reports readiness without exposing values or l
     contract_version: "e10-t6b-development-smoke-preflight-v1",
     ready: true,
     shopify: {configured: true, visible_count: 4, required_count: 4, contract_valid: true},
-    token_keyring: {configured: true},
+    token_keyring: {configured: true, visible_count: 2, required_count: 2},
     remote_database: {credentials_visible: true},
     values_or_lengths_exposed: false,
   });
@@ -30,7 +30,8 @@ test("development smoke preflight reports readiness without exposing values or l
 });
 
 test("development smoke preflight remains fail-closed when the keyring is not visible", () => {
-  const {PROVIDER_TOKEN_ACTIVE_KEY_ID, PROVIDER_TOKEN_ENCRYPTION_KEYS, ...env} = completeEnv;
-  assert.deepEqual(developmentSmokePreflight(env).token_keyring, {configured: false});
-  assert.equal(developmentSmokePreflight(env).ready, false);
+  const {PROVIDER_TOKEN_ENCRYPTION_KEYS, ...env} = completeEnv;
+  const result = developmentSmokePreflight(env);
+  assert.deepEqual(result.token_keyring, {configured: false, visible_count: 1, required_count: 2});
+  assert.equal(result.ready, false);
 });

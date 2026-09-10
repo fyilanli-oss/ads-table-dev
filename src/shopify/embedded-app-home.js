@@ -68,7 +68,9 @@ function registerEmbeddedAppHome(app, {clientId}) {
   if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
   const html = renderEmbeddedAppHome({clientId});
   app.get("/shopify/app", (req, res, next) => {
-    if (req.query?.embedded !== "1") return next();
+    const embeddedRequest = req.query?.embedded === "1"
+      || (typeof req.query?.host === "string" && req.query.host.length > 0);
+    if (!embeddedRequest) return next();
     res.set("Cache-Control", "no-store");
     return res.type("html").send(html);
   });

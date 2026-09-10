@@ -39,11 +39,15 @@ test("App Home handler only claims Shopify embedded requests and disables cachin
   assert.equal(response.headers["Cache-Control"], "no-store");
   assert.equal(response.contentType, "html");
   assert.match(response.body, /Development store connected securely/);
+
+  const hostResponse = {...response, headers: {}, set: response.set, type: response.type, send: response.send};
+  handler({query: {host: "redacted-shopify-context"}}, hostResponse, () => assert.fail("host context must not fall through"));
+  assert.equal(hostResponse.headers["Cache-Control"], "no-store");
 });
 
 
 test("root App URL forwards Shopify embedded loads to the server-rendered App Home", () => {
   const landing = fs.readFileSync(path.join(__dirname, "../public/landing.html"), "utf8");
-  assert.match(landing, /URLSearchParams\(location\.search\).*embedded/);
+  assert.match(landing, /URLSearchParams\(location\.search\).*embedded.*host/);
   assert.match(landing, /location\.replace\("\/shopify\/app"\+location\.search\)/);
 });

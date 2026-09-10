@@ -23,7 +23,7 @@ test("development smoke preflight reports readiness without exposing values or l
     contract_version: "e10-t6b-development-smoke-preflight-v1",
     ready: true,
     shopify: {configured: true, visible_count: 4, required_count: 4, contract_valid: true},
-    token_keyring: {configured: true, visible_count: 2, required_count: 2},
+    token_keyring: {valid_in_active_process: true, visible_count: 2, required_count: 2},
     remote_database: {credentials_visible: true},
     values_or_lengths_exposed: false,
   });
@@ -34,15 +34,15 @@ test("development smoke preflight reports readiness without exposing values or l
 test("development smoke preflight remains fail-closed when the keyring is not visible", () => {
   const {PROVIDER_TOKEN_ENCRYPTION_KEYS, ...env} = completeEnv;
   const result = developmentSmokePreflight(env);
-  assert.deepEqual(result.token_keyring, {configured: false, visible_count: 1, required_count: 2});
+  assert.deepEqual(result.token_keyring, {valid_in_active_process: false, visible_count: 1, required_count: 2});
   assert.equal(result.ready, false);
 });
 
 test("operator guidance identifies the canonical secret source without embedding key material", () => {
   const doc = fs.readFileSync(path.join(__dirname, "../docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md"), "utf8");
   assert.match(doc, /Shopify Partner Dashboard'dan alınan bir credential değildir/);
-  assert.match(doc, /yeni ve bağımsız bir anahtar üretilmez/);
-  assert.match(doc, /Codex development environment secrets ekranında exact adla `PROVIDER_TOKEN_ENCRYPTION_KEYS`/);
+  assert.match(doc, /external secret kayıtlarının bulunmadığı anlamına gelmez/);
+  assert.match(doc, /yeniden eklenmez, değiştirilmez veya rotate edilmez/);
   assert.match(doc, /kriptografik olarak rastgele 32 byte olup base64 kodlanır/);
   assert.doesNotMatch(doc, /[A-Za-z0-9+/]{43}=/);
 });

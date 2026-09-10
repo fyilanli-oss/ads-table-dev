@@ -5,7 +5,8 @@
   "configuration": {
     "shopify_required_values": "PASS_REDACTED",
     "development_store_domain": "PASS_CANONICAL_REDACTED",
-    "token_keyring": "BLOCKED_ENCRYPTION_KEYS_NOT_INJECTED_IN_PROCESS",
+    "external_keyring_configuration": "PREVIOUSLY_VERIFIED_BY_PRODUCTION_ACCEPTANCE",
+    "token_keyring": "NOT_VISIBLE_TO_ACTIVE_CODEX_PROCESS",
     "token_keyring_visible_count": 1,
     "token_keyring_required_count": 2
   },
@@ -30,5 +31,5 @@
   "unauthenticated_development_store_reachability_contact": true,
   "production_store_contact": false,
   "secrets_or_identifiers_recorded": false,
-  "outcome": "BLOCKED_ENCRYPTION_KEYS_NOT_INJECTED_IN_PROCESS"
+  "outcome": "BLOCKED_ACTIVE_PROCESS_SECRET_VISIBILITY"
 }

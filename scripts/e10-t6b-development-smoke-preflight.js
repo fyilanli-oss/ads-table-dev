@@ -26,7 +26,7 @@ function developmentSmokePreflight(env = process.env) {
     ready,
     shopify: Object.freeze({...shopify, contract_valid: shopifyContractValid}),
     token_keyring: Object.freeze({
-      configured: tokenKeyringValid,
+      valid_in_active_process: tokenKeyringValid,
       visible_count: visibleKeyringInputCount,
       required_count: keyringInputs.length,
     }),

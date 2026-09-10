@@ -2,7 +2,7 @@
 
 ## Durum
 
-`In progress / environment unavailable in this process`.
+`In progress / Supabase migration PASS; Development Store environment unavailable in this process`.
 
 Kullanıcı Development App ve Development Store'u oluşturduğunu ve dört Shopify değerini Codex ortamına eklediğini onayladı. Bu çalışma sırasında değerler veya uzunlukları yazdırılmadı. Çalışan process'te `SHOPIFY` isim alanında hiçbir değişken görünmediği için credential ile Development Store smoke yapılmadı; bu sonuç değerlerin yeniden girilmesi gerektiği anlamına gelmez.
 
@@ -34,6 +34,6 @@ Credential'ların yeni process'e aktarılması doğrulandıktan sonra Developmen
 - `shop → workspace` binding ve encrypted persistence;
 - aynı shop için idempotent reopen/reinstall kontrolü.
 
-Repository'de config loader, gerçek token-exchange/Admin API adapter'ı, server-only Supabase şeması, atomic install RPC/service ve application composition-root kaydı hazırdır. Migration bu pakette yalnız versioned artifact olarak eklenmiştir; açık production onayı olmadan uzak Supabase projesine uygulanmamıştır. Development Store kanıtı tamamlanmadan E10-T6-B `Done` veya Shopify entegrasyonu tamamlandı sayılmaz.
+Repository'de config loader, gerçek token-exchange/Admin API adapter'ı, server-only Supabase şeması, atomic install RPC/service ve application composition-root kaydı hazırdır. Açık insan onayı sonrasında migration uzak Supabase'e tek transaction ve migration-ledger kaydıyla uygulandı. Postcheck; boş Shopify tablosu, forced RLS, sıfır browser grant, sıfır plaintext token kolonu, tek invoker-security RPC ve tek ledger kaydı için PASS verdi. Redacted kanıt `artifacts/e10-shopify/e10-t6b-migration-acceptance.json` içindedir. Development Store kanıtı tamamlanmadan E10-T6-B `Done` veya Shopify entegrasyonu tamamlandı sayılmaz.
 
 Scope genişletme, ShopifyQL attribution query, webhook, billing, production store veya production credential bu paketin parçası değildir.

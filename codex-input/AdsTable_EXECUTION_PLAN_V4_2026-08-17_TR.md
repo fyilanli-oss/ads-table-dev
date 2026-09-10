@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B açık development onayı alındı, managed-installation bootstrap kod düzeltmesi başladı; Development Store smoke env görünürlüğünü bekliyor; every production contact gated`
+**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B managed-installation runtime ve remote Supabase migration PASS; Development Store smoke env görünürlüğünü bekliyor; every production contact gated`
 
 ### Ürün ve mimari kararı
 
@@ -1941,7 +1941,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
 - İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
 - İlk kabul yalnız Shopify-managed install sonrasında session token, token exchange ve `shop → workspace` binding smoke sonucudur. Uygulamaya ait legacy install OAuth callback'i acceptance parçası değildir. Production store/credential, billing activation, App Store submission ve production veri işlemi kesinlikle yapılmaz.
-- **Managed-installation düzeltmesi:** Güncel managed modelde uygulama install OAuth callback'i üretmez; Shopify install/scope onayını yönetir. Embedded App Home session token'ı `POST /api/shopify/bootstrap` üzerinden doğrulanır, offline token exchange ve Admin API shop identity kontrolünden sonra binding + encrypted token persistence atomic tamamlanır. Server-only Supabase schema/RPC/service ve composition-root kaydı repository'de hazırdır; migration uzak projeye uygulanmadı ve Development Store smoke bekliyor. Redacted contract ve kalan smoke adımları `docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md` içindedir.
+- **Managed-installation düzeltmesi:** Güncel managed modelde uygulama install OAuth callback'i üretmez; Shopify install/scope onayını yönetir. Embedded App Home session token'ı `POST /api/shopify/bootstrap` üzerinden doğrulanır, offline token exchange ve Admin API shop identity kontrolünden sonra binding + encrypted token persistence atomic tamamlanır. Server-only Supabase schema/RPC/service ve composition-root kaydı repository'de hazırdır; açık onayla remote Supabase migration ve redacted postcheck `PASS_MIGRATION_ONLY` tamamlandı. Development Store smoke env görünürlüğünü bekliyor. Redacted contract ve kalan smoke adımları `docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md` içindedir.
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 

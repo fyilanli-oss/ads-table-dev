@@ -1,0 +1,24 @@
+{
+  "contract_version": "e10-t6b-migration-acceptance-v1",
+  "captured_at": "2026-09-10T08:41:00.000Z",
+  "environment": "remote_supabase",
+  "migration_version": "20260910100000",
+  "migration_applied": true,
+  "ledger_version_count": 1,
+  "shopify_installation_row_count": 0,
+  "shopify_installation_table": {
+    "rls_enabled_and_forced": true,
+    "browser_role_grant_count": 0,
+    "service_role_grant_count": 7,
+    "plaintext_token_column_count": 0
+  },
+  "managed_install_function": {
+    "count": 1,
+    "security": "invoker"
+  },
+  "shopify_contact": false,
+  "development_store_smoke": "PENDING_ENV_VISIBILITY",
+  "production_store_contact": false,
+  "secrets_or_identifiers_recorded": false,
+  "outcome": "PASS_MIGRATION_ONLY"
+}

@@ -2,7 +2,7 @@
 
 ## Durum
 
-`In progress / Blocked — TOKEN_VAULT_CONFIG_ERROR; running App URL unreachable`.
+`In progress / Blocked — configured secret not injected into the smoke process`.
 
 Kullanıcı Development App ve Development Store'u oluşturduğunu ve dört Shopify değerini Codex ortamına eklediğini onayladı. Bu çalışma sırasında değerler veya uzunlukları yazdırılmadı. Çalışan process'te `SHOPIFY` isim alanında hiçbir değişken görünmediği için credential ile Development Store smoke yapılmadı; bu sonuç değerlerin yeniden girilmesi gerektiği anlamına gelmez.
 
@@ -42,4 +42,4 @@ Scope genişletme, ShopifyQL attribution query, webhook, billing, production sto
 
 Dört Shopify değeri çalışan process'te redacted olarak görünür durumdadır ve Development Store girdisi canonical `*.myshopify.com` doğrulamasını geçmiştir. Remote Supabase salt-okunur postcheck; tablo, invoker RPC, migration ledger, forced RLS, sıfır browser grant ve sıfır plaintext token kolonu için yeniden PASS vermiştir.
 
-Smoke fail-closed durdurulmuştur: encryption keyring çalışan process'te bulunmadığı için runtime `TOKEN_VAULT_CONFIG_ERROR` üretmektedir; ayrıca yapılandırılmış çalışan App URL'sine yapılan kimliksiz route erişim kontrolü ağ seviyesinde ulaşılamaz durumdadır. Bu nedenle gerçek session/ID token, offline exchange, Admin Shop identity, binding, encrypted persistence ve ikinci açılış/reinstall adımları çalıştırılmamış; Shopify mağazasına temas edilmemiştir. Redacted sonuç `artifacts/e10-shopify/e10-t6b-development-store-smoke.json` içindedir. E10-T6-B `Done` değildir ve E10-T6-C kapalı kalır.
+Smoke fail-closed durdurulmuştur: kullanıcı ekranı encryption keyring secret'ının Codex ortamında tanımlı olduğunu doğrulamaktadır, ancak secret çalışan smoke process'ine enjekte edilmemiştir ve runtime bu nedenle `TOKEN_VAULT_CONFIG_ERROR` üretmektedir. Vercel deployment ve CI PASS'tir; operator ortamından route probe ise ağ geçidinde `403` ile engellendiğinden önceki “App URL unreachable” ifadesi uygulama arızası olarak yorumlanmamalıdır. Bu nedenle gerçek session/ID token, offline exchange, Admin Shop identity, binding, encrypted persistence ve ikinci açılış/reinstall adımları çalıştırılmamış; Shopify mağazasına temas edilmemiştir. Redacted sonuç `artifacts/e10-shopify/e10-t6b-development-store-smoke.json` içindedir. E10-T6-B `Done` değildir ve E10-T6-C kapalı kalır.

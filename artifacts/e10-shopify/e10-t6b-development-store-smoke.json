@@ -5,7 +5,7 @@
   "configuration": {
     "shopify_required_values": "PASS_REDACTED",
     "development_store_domain": "PASS_CANONICAL_REDACTED",
-    "token_keyring": "BLOCKED_TOKEN_VAULT_CONFIG_ERROR"
+    "token_keyring": "BLOCKED_SECRET_NOT_INJECTED_IN_PROCESS"
   },
   "remote_supabase": {
     "installation_table": "PASS_REDACTED",
@@ -15,7 +15,8 @@
     "browser_grants_zero": "PASS_REDACTED",
     "plaintext_token_columns_zero": "PASS_REDACTED"
   },
-  "running_application_route": "BLOCKED_APP_URL_UNREACHABLE",
+  "deployment_status": "PASS_REDACTED",
+  "operator_route_probe": "BLOCKED_NETWORK_EGRESS_403",
   "embedded_session_and_id_token": "NOT_RUN_FAIL_CLOSED",
   "offline_token_exchange": "NOT_RUN_FAIL_CLOSED",
   "admin_shop_identity": "NOT_RUN_FAIL_CLOSED",
@@ -25,5 +26,5 @@
   "development_store_contact": false,
   "production_store_contact": false,
   "secrets_or_identifiers_recorded": false,
-  "outcome": "BLOCKED_TOKEN_VAULT_CONFIG_ERROR"
+  "outcome": "BLOCKED_SECRET_NOT_INJECTED_IN_PROCESS"
 }

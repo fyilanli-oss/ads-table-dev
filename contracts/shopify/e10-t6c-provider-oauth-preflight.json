@@ -1,7 +1,7 @@
 {
   "contract_version": "e10-t6c-provider-oauth-preflight-v1",
   "environment": "development_only",
-  "status": "IN_PROGRESS_TRANSACTION_AUTHORITY_PREPARED",
+  "status": "IN_PROGRESS_CONNECTION_BOUNDARY_PREPARED",
   "verified_prerequisite": "E10_T6B_PASS",
   "required_transaction_authority": [
     "shop_id",
@@ -29,8 +29,9 @@
   "production_contact": false,
   "provider_contact": false,
   "secrets_or_identifiers_recorded": false,
-  "next_repository_slice": "workspace_scoped_encrypted_connection_boundary",
+  "next_repository_slice": "embedded_provider_start_and_callback_adapter",
   "completed_repository_slices": [
-    "workspace_scoped_oauth_transaction_authority"
+    "workspace_scoped_oauth_transaction_authority",
+    "workspace_scoped_encrypted_connection_boundary"
   ]
 }

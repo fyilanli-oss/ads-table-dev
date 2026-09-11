@@ -20,7 +20,9 @@ alter table public.oauth_transactions
       and length(btrim(shopify_user_id)) > 0 and return_target = '/shopify/app/platforms')
   );
 
-create or replace function public.consume_oauth_transaction(
+drop function public.consume_oauth_transaction(text, text, text);
+
+create function public.consume_oauth_transaction(
   p_state_hash text, p_provider text, p_redirect_uri text
 ) returns table (
   user_id uuid, provider text, redirect_uri text, pkce_verifier text, created_at timestamptz,

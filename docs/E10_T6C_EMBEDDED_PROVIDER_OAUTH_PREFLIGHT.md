@@ -1,6 +1,6 @@
 # E10-T6-C — Embedded provider OAuth preflight
 
-**Durum:** `Blocked — repository authority bridge gerekli`
+**Durum:** `In progress — C1 transaction authority bridge hazır; C2 workspace connection boundary açık`
 
 E10-T6-B Development Store install/session kabulü PASS olduktan sonra E10-T6-C için repository sınırı incelendi. Canlı provider consent başlatılmadı. Mevcut provider OAuth başlangıcı standalone AdsTable kullanıcısını `requireConnectAccess` ile doğruluyor; OAuth transaction yalnız `user_id/provider/redirect_uri` taşıyor, provider callback'leri bağlantıyı aynı standalone `user_id` ile kaydediyor ve `/dashboard` yüzeyine dönüyor.
 
@@ -16,3 +16,10 @@ Bu nedenle mevcut `/auth/:provider` route'larını App Home'dan doğrudan açmak
 6. connect/account-selection/status için tenant-isolation ve replay testleri.
 
 Bu sınırlar tamamlanmadan provider consent, provider token exchange, production provider hesabı veya production store teması yapılmaz. Executable preflight kararı `contracts/shopify/e10-t6c-provider-oauth-preflight.json` içindedir.
+
+
+## E10-T6-C1 — Transaction authority bridge
+
+Repository hazırlığı, standalone `auth.users.id` yetkisini zayıflatmadan ikinci ve ayrık bir `shopify_embedded` transaction authority şekli ekler. Embedded transaction yalnız doğrulanmış Shopify session context'inden `shop_id`, `workspace_id` ve `shopify_user_id` alır; `user_id` yerine workspace kimliği geçirilmez. Shop/workspace çifti mevcut server-only installation kaydıyla foreign key üzerinden bağlıdır ve dönüş hedefi yalnız `/shopify/app/platforms` olabilir. Atomic consume bütün authority alanlarını taşır.
+
+Migration yalnız repository artefaktıdır; remote Supabase'e uygulanmadı. Provider consent/token exchange çalıştırılmadı. Sıradaki repository dilimi C2 workspace-scoped encrypted provider connection persistence ve callback adapter'ıdır.

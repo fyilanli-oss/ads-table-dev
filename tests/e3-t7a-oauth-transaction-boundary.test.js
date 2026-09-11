@@ -31,6 +31,35 @@ test("consumes only through the transaction store with normalized state", async 
   assert.deepEqual(calls, [{ state: "123", provider: "meta", redirectUri: "https://app/callback" }]);
 });
 
+test("creates embedded transactions only from verified Shopify session authority", async () => {
+  const calls = [];
+  const boundary = createOAuthTransactionBoundary({
+    transactionStore: {
+      cleanupExpired: async () => calls.push("cleanup"),
+      createEmbedded: async (input) => (calls.push(input), { state: "embedded-state" }),
+    },
+  });
+  const authority = {
+    authority: "shopify_verified_session",
+    shop_id: "shop-1",
+    workspace_id: "workspace-1",
+    shopify_user_id: "merchant-1",
+  };
+  assert.deepEqual(await boundary.createEmbeddedTransaction(authority, "meta", "https://app/meta/callback"), { state: "embedded-state" });
+  assert.deepEqual(calls, ["cleanup", {
+    authority,
+    provider: "meta",
+    redirectUri: "https://app/meta/callback",
+    pkceVerifier: null,
+    surface: "shopify_embedded",
+    returnTarget: "/shopify/app/platforms",
+  }]);
+  await assert.rejects(
+    () => boundary.createEmbeddedTransaction({...authority, authority: "browser_claim"}, "meta", "https://app/meta/callback"),
+    /VERIFIED_SHOPIFY_SESSION_REQUIRED/,
+  );
+});
+
 test("fails closed for create and returns null for non-consumable state", async () => {
   const boundary = createOAuthTransactionBoundary();
   await assert.rejects(() => boundary.createTransaction("user", "meta", "callback"), /not configured/);

@@ -96,6 +96,34 @@ test('Klaviyo PKCE verifier round-trips in the same transaction', async () => {
   assert.equal(consumed.pkce_verifier, 'secret-verifier');
 });
 
+test('embedded transaction stores workspace authority without an auth-user substitution', async () => {
+  const client = memoryClient();
+  const store = createOAuthTransactionStore({client});
+  const authority = {
+    authority: 'shopify_verified_session',
+    shop_id: 'shop-1', workspace_id: 'workspace-1', shopify_user_id: 'merchant-1'
+  };
+  const created = await store.createEmbedded({
+    authority, provider: 'meta', redirectUri: 'https://app/meta/callback',
+    surface: 'shopify_embedded', returnTarget: '/shopify/app/platforms'
+  });
+  const [row] = client.rows.values();
+  assert.equal(row.user_id, null);
+  assert.equal(row.shop_id, authority.shop_id);
+  assert.equal(row.workspace_id, authority.workspace_id);
+  assert.equal(row.shopify_user_id, authority.shopify_user_id);
+  assert.equal(row.surface, 'shopify_embedded');
+  assert.equal(row.return_target, '/shopify/app/platforms');
+  assert.equal(JSON.stringify(row).includes(created.state), false);
+});
+
+test('embedded transaction rejects caller-shaped authority and return targets', async () => {
+  const store = createOAuthTransactionStore({client: memoryClient()});
+  const base = {provider: 'meta', redirectUri: 'https://app/meta/callback', surface: 'shopify_embedded', returnTarget: '/shopify/app/platforms'};
+  await assert.rejects(() => store.createEmbedded({...base, authority: {authority: 'query', shop_id: 's', workspace_id: 'w', shopify_user_id: 'u'}}), /verified Shopify authority/);
+  await assert.rejects(() => store.createEmbedded({...base, returnTarget: 'https://evil.example', authority: {authority: 'shopify_verified_session', shop_id: 's', workspace_id: 'w', shopify_user_id: 'u'}}), /canonical embedded surface/);
+});
+
 test('cleanup deletes expired abandoned transactions only', async () => {
   let clock = new Date('2026-08-18T09:00:00.000Z');
   const client = memoryClient({now: () => clock});

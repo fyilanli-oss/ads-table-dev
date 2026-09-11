@@ -23,3 +23,8 @@ Bu sınırlar tamamlanmadan provider consent, provider token exchange, productio
 Repository hazırlığı, standalone `auth.users.id` yetkisini zayıflatmadan ikinci ve ayrık bir `shopify_embedded` transaction authority şekli ekler. Embedded transaction yalnız doğrulanmış Shopify session context'inden `shop_id`, `workspace_id` ve `shopify_user_id` alır; `user_id` yerine workspace kimliği geçirilmez. Shop/workspace çifti mevcut server-only installation kaydıyla foreign key üzerinden bağlıdır ve dönüş hedefi yalnız `/shopify/app/platforms` olabilir. Atomic consume bütün authority alanlarını taşır.
 
 Migration yalnız repository artefaktıdır; remote Supabase'e uygulanmadı. Provider consent/token exchange çalıştırılmadı. Sıradaki repository dilimi C2 workspace-scoped encrypted provider connection persistence ve callback adapter'ıdır.
+
+
+## E10-T6-C2A — Workspace provider connection boundary
+
+Consumed embedded transaction içindeki doğrulanmış shop/workspace/provider authority'si, standalone kullanıcı bağlantılarından ayrı server-only tabloya yazılır. Tokenlar yazılmadan önce mevcut AES-256-GCM vault ile workspace-bound AAD kullanılarak şifrelenir. İlk durum `pending_account_selection`dır; server-side doğrulanmış aktif hesap olmadan `connected` olunamaz. Migration yalnız repository hazırlığıdır ve canlıya uygulanmamıştır. Sıradaki dilim C2B embedded start/callback adapter ve isolation/replay kabulüdür.

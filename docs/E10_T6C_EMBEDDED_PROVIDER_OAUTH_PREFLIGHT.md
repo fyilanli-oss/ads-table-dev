@@ -1,6 +1,6 @@
 # E10-T6-C — Embedded provider OAuth preflight
 
-**Durum:** `In progress — C1 transaction authority bridge hazır; C2 workspace connection boundary açık`
+**Durum:** `In progress — C1/C2A development migration PASS; C2C tenant isolation sırada`
 
 E10-T6-B Development Store install/session kabulü PASS olduktan sonra E10-T6-C için repository sınırı incelendi. Canlı provider consent başlatılmadı. Mevcut provider OAuth başlangıcı standalone AdsTable kullanıcısını `requireConnectAccess` ile doğruluyor; OAuth transaction yalnız `user_id/provider/redirect_uri` taşıyor, provider callback'leri bağlantıyı aynı standalone `user_id` ile kaydediyor ve `/dashboard` yüzeyine dönüyor.
 
@@ -22,14 +22,16 @@ Bu sınırlar tamamlanmadan provider consent, provider token exchange, productio
 
 Repository hazırlığı, standalone `auth.users.id` yetkisini zayıflatmadan ikinci ve ayrık bir `shopify_embedded` transaction authority şekli ekler. Embedded transaction yalnız doğrulanmış Shopify session context'inden `shop_id`, `workspace_id` ve `shopify_user_id` alır; `user_id` yerine workspace kimliği geçirilmez. Shop/workspace çifti mevcut server-only installation kaydıyla foreign key üzerinden bağlıdır ve dönüş hedefi yalnız `/shopify/app/platforms` olabilir. Atomic consume bütün authority alanlarını taşır.
 
-Migration yalnız repository artefaktıdır; remote Supabase'e uygulanmadı. Provider consent/token exchange çalıştırılmadı. Sıradaki repository dilimi C2 workspace-scoped encrypted provider connection persistence ve callback adapter'ıdır.
+Migration onaylanan development Supabase ortamına uygulandı ve authority kolonları ile atomic consume dönüş sözleşmesi postcheck'te doğrulandı. Provider consent/token exchange çalıştırılmadı.
 
 
 ## E10-T6-C2A — Workspace provider connection boundary
 
-Consumed embedded transaction içindeki doğrulanmış shop/workspace/provider authority'si, standalone kullanıcı bağlantılarından ayrı server-only tabloya yazılır. Tokenlar yazılmadan önce mevcut AES-256-GCM vault ile workspace-bound AAD kullanılarak şifrelenir. İlk durum `pending_account_selection`dır; server-side doğrulanmış aktif hesap olmadan `connected` olunamaz. Migration yalnız repository hazırlığıdır ve canlıya uygulanmamıştır. Sıradaki dilim C2B embedded start/callback adapter ve isolation/replay kabulüdür.
+Consumed embedded transaction içindeki doğrulanmış shop/workspace/provider authority'si, standalone kullanıcı bağlantılarından ayrı server-only tabloya yazılır. Tokenlar yazılmadan önce mevcut AES-256-GCM vault ile workspace-bound AAD kullanılarak şifrelenir. İlk durum `pending_account_selection`dır; server-side doğrulanmış aktif hesap olmadan `connected` olunamaz. Development migration postcheck'i forced RLS, browser-role grant reddi, service-role erişimi ve boş başlangıç tablolarını doğruladı. Redacted sonuç `artifacts/e10-shopify/e10-t6c-development-migration-acceptance.json` içindedir.
 
 
 ## E10-T6-C2B — Embedded start/callback adapter
 
 Start yalnız doğrulanmış Shopify session context’inden embedded transaction üretir ve top-level consent navigasyonu döndürür. Callback, state’i atomik tüketip surface/provider/sabit return target doğrulamasından önce token exchange yapmaz; tokenlar workspace store’a yazılır ve sonuç yalnız canonical Platforms yüzeyine döner. Bu paket runtime route açmaz ve provider teması yapmaz.
+
+Sıradaki C2C dilimi tenant isolation/replay kabulünü ve feature-gated runtime wiring'i tamamlamalıdır. Development migration onayı provider consent, provider hesabı veya production deployment onayı olarak yorumlanmaz.

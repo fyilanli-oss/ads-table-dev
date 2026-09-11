@@ -1,0 +1,28 @@
+{
+  "contract_version": "e10-t6c-development-migration-acceptance-v1",
+  "captured_at": "2026-09-11T13:23:29.000Z",
+  "environment": "development",
+  "migrations": [
+    "20260911130000_add_embedded_oauth_authority",
+    "20260911150000_create_shopify_workspace_provider_connections"
+  ],
+  "preflight": {
+    "oauth_authority_columns_present": false,
+    "workspace_provider_connections_table_present": false
+  },
+  "postcheck": {
+    "oauth_authority_columns_present": true,
+    "consume_contract_updated": true,
+    "workspace_provider_connections_table_present": true,
+    "rls_enabled_and_forced": true,
+    "anonymous_role_denied": true,
+    "authenticated_role_denied": true,
+    "service_role_allowed": true,
+    "embedded_transaction_row_count": 0,
+    "workspace_provider_connection_row_count": 0
+  },
+  "provider_contact": false,
+  "production_contact": false,
+  "secrets_or_identifiers_recorded": false,
+  "outcome": "PASS_DEVELOPMENT_MIGRATION_ONLY"
+}

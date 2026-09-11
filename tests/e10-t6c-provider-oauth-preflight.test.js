@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const contract = require("../contracts/shopify/e10-t6c-provider-oauth-preflight.json");
 
 test("E10-T6-C advances only through the prepared repository slices", () => {
-  assert.equal(contract.status, "IN_PROGRESS_CONNECTION_BOUNDARY_PREPARED");
+  assert.equal(contract.status, "IN_PROGRESS_ADAPTER_PREPARED");
   assert.equal(contract.verified_prerequisite, "E10_T6B_PASS");
   assert.deepEqual(contract.required_transaction_authority, [
     "shop_id", "workspace_id", "shopify_user_id", "provider", "surface", "return_target",
@@ -20,6 +20,7 @@ test("E10-T6-C advances only through the prepared repository slices", () => {
   assert.deepEqual(contract.completed_repository_slices, [
     "workspace_scoped_oauth_transaction_authority",
     "workspace_scoped_encrypted_connection_boundary",
+    "embedded_provider_start_and_callback_adapter",
   ]);
-  assert.equal(contract.next_repository_slice, "embedded_provider_start_and_callback_adapter");
+  assert.equal(contract.next_repository_slice, "tenant_isolation_replay_and_runtime_wiring");
 });

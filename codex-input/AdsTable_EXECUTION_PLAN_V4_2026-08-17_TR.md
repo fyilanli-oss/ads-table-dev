@@ -1952,7 +1952,8 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - Önce doğrulanmış Shopify session → shop/workspace/user/provider/surface/return target transaction bağı, workspace-scoped encrypted connection persistence ve canonical embedded callback dönüşü uygulanıp isolation/replay testleri geçmelidir.
 - **E10-T6-C1 — Done (repository preparation):** Standalone user authority ile Shopify embedded authority ayrık CHECK contract ile modellenmiştir; embedded transaction doğrulanmış shop/workspace/Shopify user, provider, surface ve sabit return target taşır. Atomic consume ve server-only grant testlidir. Migration canlıya uygulanmadı.
 - **E10-T6-C2A — Done (repository preparation):** Consumed embedded transaction authority ile workspace-scoped, encrypted-only provider connection persistence hazırlandı; standalone bağlantı tablosuyla tenant kimliği birleştirilmedi. Migration canlıya uygulanmadı.
-- **E10-T6-C2B — Sıradaki repository işi:** Embedded provider start/callback adapter ve tenant-isolation/replay kabulü.
+- **E10-T6-C2B — Done (repository preparation):** Embedded start doğrulanmış Shopify session authority ile transaction üretir; callback state’i atomik tüketmeden provider exchange yapmaz ve yalnız canonical Platforms dönüşü üretir. Provider çağrısı yapılmadı.
+- **E10-T6-C2C — Sıradaki repository işi:** Tenant-isolation/replay genişletilmiş kabulü ve feature-gated runtime wiring.
 - Bu repository kapısı PASS olmadan provider consent başlatılmaz. Provider veya production teması yapılmadı. Karar `docs/E10_T6C_EMBEDDED_PROVIDER_OAUTH_PREFLIGHT.md` ve `contracts/shopify/e10-t6c-provider-oauth-preflight.json` içindedir.
 
 #### E10-T6-D — Shopify attribution feasibility smoke — T6-C kabulünden sonra

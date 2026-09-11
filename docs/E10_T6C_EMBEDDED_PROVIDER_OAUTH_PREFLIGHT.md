@@ -28,3 +28,8 @@ Migration yalnız repository artefaktıdır; remote Supabase'e uygulanmadı. Pro
 ## E10-T6-C2A — Workspace provider connection boundary
 
 Consumed embedded transaction içindeki doğrulanmış shop/workspace/provider authority'si, standalone kullanıcı bağlantılarından ayrı server-only tabloya yazılır. Tokenlar yazılmadan önce mevcut AES-256-GCM vault ile workspace-bound AAD kullanılarak şifrelenir. İlk durum `pending_account_selection`dır; server-side doğrulanmış aktif hesap olmadan `connected` olunamaz. Migration yalnız repository hazırlığıdır ve canlıya uygulanmamıştır. Sıradaki dilim C2B embedded start/callback adapter ve isolation/replay kabulüdür.
+
+
+## E10-T6-C2B — Embedded start/callback adapter
+
+Start yalnız doğrulanmış Shopify session context’inden embedded transaction üretir ve top-level consent navigasyonu döndürür. Callback, state’i atomik tüketip surface/provider/sabit return target doğrulamasından önce token exchange yapmaz; tokenlar workspace store’a yazılır ve sonuç yalnız canonical Platforms yüzeyine döner. Bu paket runtime route açmaz ve provider teması yapmaz.

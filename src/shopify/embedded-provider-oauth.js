@@ -7,7 +7,7 @@ function requiredFunction(value, name) {
   return value;
 }
 
-function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode, connectionStore} = {}) {
+function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode, createPkce = null, connectionStore} = {}) {
   if (typeof provider !== "string" || !provider) throw new TypeError("provider is required");
   if (typeof redirectUri !== "string" || !redirectUri) throw new TypeError("redirectUri is required");
   for (const [name, value] of Object.entries({authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode})) requiredFunction(value, name);
@@ -15,8 +15,10 @@ function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedde
 
   async function start({sessionToken}) {
     const authority = await authenticateEmbedded({session_token: sessionToken});
-    const transaction = await createEmbeddedTransaction(authority, provider, redirectUri);
-    const authorizationUrl = await buildAuthorizationUrl({state: transaction.state, redirectUri});
+    const pkce = createPkce ? createPkce() : null;
+    if (pkce && (!pkce.verifier || !pkce.challenge)) throw new Error("INVALID_PKCE_CONFIGURATION");
+    const transaction = await createEmbeddedTransaction(authority, provider, redirectUri, pkce?.verifier || null);
+    const authorizationUrl = await buildAuthorizationUrl({state: transaction.state, redirectUri, pkceChallenge: pkce?.challenge || null});
     return Object.freeze({authorization_url: authorizationUrl, navigation: "top_level"});
   }
 

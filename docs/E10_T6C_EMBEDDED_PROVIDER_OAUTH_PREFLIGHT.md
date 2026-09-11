@@ -42,4 +42,6 @@ Runtime flag'in açılması beş provider adapter'ının da eksiksiz server-side
 
 Tek composition factory, allowlist'teki beş provider için doğrulanmış Shopify session authentication, embedded transaction create/consume ve workspace connection store bağımlılıklarını ortak tutar. Provider'a özgü yalnız redirect URI, authorization URL üretimi ve code exchange stratejisidir. Eksik tek bir strateji dahi tüm embedded provider runtime'ını fail-closed durdurur; caller tenant alanları persistence authority olamaz.
 
-OAuth development smoke'undan önce iki repository paketi kalır: provider-specific authorization/token strategy wiring ve development activation preflight/evidence. Bunlar tamamlanmadan feature flag açılmaz ve gerçek provider consent başlatılmaz.
+Provider-specific authorization stratejileri canonical embedded callback URI'larını, minimum scope'ları ve server-only credential/exchange sınırını doğrular. Eksik tek credential veya exchange implementasyonu bütün embedded runtime'ı fail-closed durdurur.
+
+OAuth development smoke'undan önce bir repository paketi kalır: development activation preflight/evidence. Bu paket tamamlanmadan feature flag açılmaz ve gerçek provider consent başlatılmaz.

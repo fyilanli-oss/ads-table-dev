@@ -35,6 +35,7 @@ function createEmbeddedProviderOAuthAdapters({
       consumeTransaction,
       buildAuthorizationUrl: strategy.buildAuthorizationUrl,
       exchangeCode: strategy.exchangeCode,
+      createPkce: strategy.createPkce || null,
       connectionStore,
     });
   }

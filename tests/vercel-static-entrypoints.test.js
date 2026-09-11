@@ -18,7 +18,6 @@ test("builds public files as static artifacts independently from Express", () =>
 
 test("serves public entrypoints from static build outputs without booting Express", () => {
   const expected = new Map([
-    ["/", "/public/landing.html"],
     ["/login", "/public/login.html"],
     ["/signup", "/public/signup.html"],
     ["/dashboard", "/public/dashboard.html"],
@@ -38,13 +37,14 @@ test("serves public entrypoints from static build outputs without booting Expres
     );
   }
 
-  const serverFallbackIndex = config.routes.findIndex((route) => route.dest === "/server.js");
+  const serverFallbackIndex = config.routes.findIndex((route) => route.src === "/api/(.*)");
   for (const source of expected.keys()) {
     assert.ok(config.routes.indexOf(routeFor(source)) < serverFallbackIndex, `${source} must precede Express`);
   }
 });
 
 test("keeps API and OAuth application routes on the serverless function", () => {
+  assert.equal(routeFor("/")?.dest, "/server.js");
   assert.equal(routeFor("/api/(.*)")?.dest, "/server.js");
   assert.equal(routeFor("/auth/(.*)")?.dest, "/server.js");
   assert.equal(config.routes.at(-1).dest, "/server.js");

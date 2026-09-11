@@ -45,9 +45,9 @@ function createErrorBoundary({ logger = console } = {}) {
     const status = Number.isInteger(error?.status) && error.status >= 400 && error.status < 600
       ? error.status
       : 500;
-    const code = typeof error?.code === "string" && /^[A-Z0-9_]{1,64}$/.test(error.code)
-      ? error.code
-      : "INTERNAL_ERROR";
+    const explicitCode = typeof error?.code === "string" ? error.code : "";
+    const messageCode = typeof error?.message === "string" ? error.message : "";
+    const code = [explicitCode, messageCode].find((value) => /^[A-Z0-9_]{1,64}$/.test(value)) || "INTERNAL_ERROR";
     const exposed = status < 500 || error?.expose === true;
     const message = exposed && typeof error?.message === "string"
       ? error.message

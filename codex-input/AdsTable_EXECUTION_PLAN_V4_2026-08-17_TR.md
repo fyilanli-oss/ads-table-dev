@@ -1837,7 +1837,7 @@ Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile 
 
 ## 14. E10 — Shopify Public Embedded App Foundation
 
-**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B managed-installation runtime ve remote Supabase migration PASS; Development Store smoke env görünürlüğünü bekliyor; every production contact gated`
+**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B managed-installation runtime ve remote Supabase migration PASS; external keyring daha önce production kabulünde doğrulandı, bu Codex process'inde Shopify env 4/4 ve keyring girdileri 1/2 görünür; every production contact gated`
 
 ### Ürün ve mimari kararı
 
@@ -1913,8 +1913,8 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
 - **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
 - **E10-T4 — Done — Token, uninstall ve privacy lifecycle:** Shopify token'larını encrypted store sınırına bağla; browser/log erişimini yasakla; doğrulanmış uninstall, shop erişim kaybı ve privacy/compliance olaylarında erişimi fail-closed durdur ve retention/deletion kararlarını executable contract ile kanıtla.
-- **E10-T5 — Done — Revize edilmiş ürün sözleşmesi:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim ürün kararları tamamlandı; C5-B verified reconciliation `Deferred`. E10-T6-A offline readiness PASS olmuştur; sıradaki kapı açık development onaylı E10-T6-B'dir.
-- **E10-T6 — In progress; A Done, B in progress — Capability/readiness, development bootstrap ve gerekçeli sync:** E10-T6-A resmi offline readiness PASS; E10-T6-B için açık development onayı alındı, app/store kullanıcı tarafından oluşturuldu ve Shopify-managed installation bootstrap düzeltmesi başladı. Development Store smoke, credential'ların çalışan process'te görünmesini bekliyor. Webhook/initial sync ancak C5-A ve resmi capability sonucu gerçekten gerektirirse açılır.
+- **E10-T5 — Done — Revize edilmiş ürün sözleşmesi:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim ürün kararları tamamlandı; C5-B verified reconciliation `Deferred`. E10-T6-A offline readiness ve E10-T6-B Development Store kabulü PASS olmuştur; sıradaki kapı E10-T6-C embedded provider OAuth smoke'tur.
+- **E10-T6 — In progress; A ve B Done — Capability/readiness, development bootstrap ve gerekçeli sync:** E10-T6-A resmi offline readiness PASS; E10-T6-B gerçek Development Store embedded App Home üzerinde ID token, expiring offline token exchange, Admin Shop identity, atomic binding, encrypted persistence ve reopen/idempotency kapılarıyla PASS oldu. Production teması veya scope genişletme yapılmadı; sıradaki kapı E10-T6-C embedded provider OAuth smoke'tur.
 - **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
 - **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
 - **E10-T9 — App Store review-first workstream:** Listing, minimum-scope gerekçesi, test store, reviewer erişimi ve talimatları, privacy/support/data-deletion yüzeyleri, install-to-value videosu ve provider bağlı değilken incelenebilir demo/empty-state paketini geliştirmeyle paralel yürüt. Review hazırlığını sona bırakma.
@@ -1936,17 +1936,21 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-B — Development App Bootstrap — Shopify'da ilk kazma
 
-**Durum:** `In progress / explicit development approval received; managed-installation code started; Development Store smoke awaiting environment visibility`.
+**Durum:** `Done / PASS — gerçek Development Store embedded install/session kabulü tamamlandı`.
 
 - Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
 - İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
 - İlk kabul yalnız Shopify-managed install sonrasında session token, token exchange ve `shop → workspace` binding smoke sonucudur. Uygulamaya ait legacy install OAuth callback'i acceptance parçası değildir. Production store/credential, billing activation, App Store submission ve production veri işlemi kesinlikle yapılmaz.
-- **Managed-installation düzeltmesi:** Güncel managed modelde uygulama install OAuth callback'i üretmez; Shopify install/scope onayını yönetir. Embedded App Home session token'ı `POST /api/shopify/bootstrap` üzerinden doğrulanır, offline token exchange ve Admin API shop identity kontrolünden sonra binding + encrypted token persistence atomic tamamlanır. Server-only Supabase schema/RPC/service ve composition-root kaydı repository'de hazırdır; açık onayla remote Supabase migration ve redacted postcheck `PASS_MIGRATION_ONLY` tamamlandı. Development Store smoke env görünürlüğünü bekliyor. Redacted contract ve kalan smoke adımları `docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md` içindedir.
+- **Managed-installation düzeltmesi:** Güncel managed modelde uygulama install OAuth callback'i üretmez; Shopify install/scope onayını yönetir. Embedded App Home session token'ı `POST /api/shopify/bootstrap` üzerinden doğrulanır, offline token exchange ve Admin API shop identity kontrolünden sonra binding + encrypted token persistence atomic tamamlanır. Server-only Supabase schema/RPC/service ve composition-root kaydı repository'de hazırdır; açık onayla remote Supabase migration ve redacted postcheck `PASS_MIGRATION_ONLY` tamamlandı. Preview runtime yapılandırması ve encrypted persistence kapıları gerçek Development Store smoke içinde PASS verdi. Redacted contract ve kalan smoke adımları `docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md` içindedir.
+- **2026-09-10 final smoke sonucu:** Gerçek Shopify Admin embedded App Home kabulü tamamlandı. ID/session token doğrulaması, `expiring=1` offline token exchange, verified Admin Shop identity, atomic shop/workspace binding, encrypted token persistence ve idempotent reopen birlikte PASS verdi. Nihai redacted UI sonucu `Development store connected securely.` oldu. Secret, token veya tenant kimliği evidence’a yazılmadı; production teması ve scope genişletme yapılmadı. E10-T6-B `Done / PASS`, sıradaki kapı E10-T6-C’dir. Redacted evidence `artifacts/e10-shopify/e10-t6b-development-store-smoke.json` içindedir.
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 
-- Shopify-native `Data Sources / Platforms` ekranından Connect başlatma; `surface=shopify_embedded` transaction; resmi App Bridge top-level provider consent; callback sonrası canonical embedded app dönüşü; account selection/status smoke edilir.
-- T6-B install/session kabulü olmadan başlamaz. Provider production yetkisi veya gerçek production ingest yapmaz.
+**Durum:** `Blocked — workspace-scoped OAuth authority bridge gerekli`.
+
+- Preflight, mevcut OAuth transaction ve provider persistence sınırlarının yalnız standalone `user_id` authority'si taşıdığını; callback'lerin `/dashboard` yüzeyine döndüğünü doğruladı. Shopify `workspace_id` auth user kimliği gibi kullanılamaz ve query/body tenant authority kabul edilemez.
+- Önce doğrulanmış Shopify session → shop/workspace/user/provider/surface/return target transaction bağı, workspace-scoped encrypted connection persistence ve canonical embedded callback dönüşü uygulanıp isolation/replay testleri geçmelidir.
+- Bu repository kapısı PASS olmadan provider consent başlatılmaz. Provider veya production teması yapılmadı. Karar `docs/E10_T6C_EMBEDDED_PROVIDER_OAUTH_PREFLIGHT.md` ve `contracts/shopify/e10-t6c-provider-oauth-preflight.json` içindedir.
 
 #### E10-T6-D — Shopify attribution feasibility smoke — T6-C kabulünden sonra
 
@@ -2175,7 +2179,7 @@ Karar belgesi `docs/E10_T5C5A_ATTRIBUTION_DIFFERENCES_FREEZE.md`, executable con
 - **OAuth dönüşü:** Callback canonical Platforms route'una, server-bound allowlisted return target ile döner; standalone login/dashboard ve caller URL yasaktır.
 - **Acceptance:** Shopify responsive navigation; keyboard/focus/back/deep-link; 320px overflow, duplicate shell, stale/multiple account ve open-redirect negatif kapıları zorunludur.
 
-E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A — `Done / PASS`**; sıradaki iş **E10-T6-B — `Ready / explicit development approval required`**dır. T6-B onayı Shopify Development App/Store teması içindir ve production onayı değildir.
+E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A ve E10-T6-B — `Done / PASS`**; sıradaki iş **E10-T6-C embedded provider OAuth smoke**tur. Development kabulü production onayı değildir.
 
 
 ### E10-T5-B karar kanıtı — Shopify attribution intake ve gösterim
@@ -2186,7 +2190,7 @@ E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7
 
 `docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` tamamlanan C1–C7 ilk dilim freeze'lerini izler. C5-B verified reconciliation ertelenmiştir. E10-T6-A offline readiness PASS olmuştur; açık development onayı olmadan E10-T6-B ve onu izleyen Shopify temaslı işler, ayrıca gerekli plan kapıları olmadan E10-T7–T10, E11 veya E12 implementation'ı açılamaz.
 
-**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; E10-T6-A `Done / PASS`; sıradaki iş **E10-T6-B Development App Bootstrap — Ready / explicit development approval required**; parent E10 `In progress`. T6-A scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
+**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; E10-T6-A ve E10-T6-B `Done / PASS`; sıradaki iş **E10-T6-C Embedded provider OAuth smoke**; parent E10 `In progress`. T6-A scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
 
 ### E10-T6-A1/A2 official-source readiness evidence
 

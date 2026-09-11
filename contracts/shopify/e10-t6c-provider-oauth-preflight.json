@@ -1,7 +1,7 @@
 {
   "contract_version": "e10-t6c-provider-oauth-preflight-v1",
   "environment": "development_only",
-  "status": "IN_PROGRESS_ADAPTER_PREPARED",
+  "status": "IN_PROGRESS_RUNTIME_AND_PLATFORMS_UI",
   "verified_prerequisite": "E10_T6B_PASS",
   "required_transaction_authority": [
     "shop_id",
@@ -17,7 +17,7 @@
     "oauth_transaction_accepts_only_standalone_user_id",
     "provider_connection_persistence_accepts_only_standalone_user_id",
     "provider_callbacks_return_to_standalone_dashboard",
-    "embedded_app_home_has_no_platforms_surface"
+    "embedded_app_home_platforms_surface_pending_merge"
   ],
   "forbidden_shortcuts": [
     "treat_workspace_id_as_auth_user_id",
@@ -29,7 +29,7 @@
   "production_contact": false,
   "provider_contact": false,
   "secrets_or_identifiers_recorded": false,
-  "next_repository_slice": "tenant_isolation_replay_and_runtime_wiring",
+  "next_repository_slice": "runtime_composition_and_embedded_platforms_connect",
   "completed_repository_slices": [
     "workspace_scoped_oauth_transaction_authority",
     "workspace_scoped_encrypted_connection_boundary",

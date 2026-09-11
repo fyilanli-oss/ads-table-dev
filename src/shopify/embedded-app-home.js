@@ -68,6 +68,16 @@ function renderEmbeddedAppHome({clientId}) {
 </html>`;
 }
 
+function renderEmbeddedPlatforms({clientId, providerOAuthEnabled}) {
+  if (typeof clientId !== "string" || !clientId.trim()) throw new TypeError("clientId is required");
+  const providers = [
+    ["meta", "Meta"], ["google_ads", "Google Ads"], ["klaviyo", "Klaviyo"],
+    ["tiktok", "TikTok"], ["pinterest", "Pinterest"],
+  ];
+  const cards = providers.map(([id, label]) => `<li><span>${label}</span><button type="button" data-provider="${id}"${providerOAuthEnabled ? "" : " disabled"}>Connect</button></li>`).join("");
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="shopify-api-key" content="${escapeAttribute(clientId.trim())}"><script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script><title>Platforms — AdsTable</title><style>body{font:16px system-ui;margin:0;background:#f6f6f7;color:#202223}main{max-width:760px;margin:auto;padding:32px 20px}ul{list-style:none;padding:0;display:grid;gap:12px}li{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #ddd;border-radius:12px;padding:18px}button{background:#008060;color:#fff;border:0;border-radius:8px;padding:10px 18px;font-weight:600}button:disabled{background:#aaa}</style></head><body><main><h1>Platforms</h1><p>Connect a provider to AdsTable for this Shopify workspace.</p><p id="status" role="status" aria-live="polite"></p><ul>${cards}</ul></main><script>(()=>{"use strict";const status=document.getElementById("status");document.querySelectorAll("button[data-provider]").forEach(button=>button.addEventListener("click",async()=>{button.disabled=true;status.textContent="Opening secure connection…";try{if(!window.shopify||typeof window.shopify.idToken!=="function")throw new Error();const token=await window.shopify.idToken();const response=await fetch("/api/shopify/providers/"+encodeURIComponent(button.dataset.provider)+"/oauth/start",{method:"POST",headers:{Authorization:"Bearer "+token}});const body=await response.json().catch(()=>({}));if(!response.ok||body.navigation!=="top_level"||typeof body.authorization_url!=="string")throw new Error();window.open(body.authorization_url,"_top");}catch{status.textContent="Connection could not be started. Please try again.";button.disabled=false;}}));const params=new URLSearchParams(location.search);if(params.has("oauth_connected"))status.textContent="Provider authorized. Account selection is next.";else if(params.has("oauth_error"))status.textContent="Connection was not completed. Please try again.";})();</script></body></html>`;
+}
+
 function registerEmbeddedAppHome(app, {clientId}) {
   if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
   const html = renderEmbeddedAppHome({clientId});
@@ -80,4 +90,15 @@ function registerEmbeddedAppHome(app, {clientId}) {
   app.get("/shopify/app", handler);
 }
 
-module.exports = Object.freeze({registerEmbeddedAppHome, renderEmbeddedAppHome});
+
+function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}) {
+  if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
+  const html = renderEmbeddedPlatforms({clientId, providerOAuthEnabled});
+  app.get("/shopify/app/platforms", (_req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.set("Content-Security-Policy", "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
+    return res.type("html").send(html);
+  });
+}
+
+module.exports = Object.freeze({registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms});

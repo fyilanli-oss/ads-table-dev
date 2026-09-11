@@ -56,6 +56,6 @@ test("Execution Plan closes C5-A and advances only to C7", () => {
   assert.match(plan, /E10-T5-C5-A — `Done` — Attribution Differences/);
   assert.match(plan, /E10-T5-C5-B — `Deferred` — Verified Reconciliation/);
   assert.match(plan, /E10-T5-C7 — `Done` — Integrated navigation\/acceptance/);
-  assert.match(plan, /sıradaki iş \*\*E10-T6-B Development App Bootstrap — Ready \/ explicit development approval required\*\*/);
+  assert.match(plan, /sıradaki iş \*\*E10-T6-C embedded provider OAuth smoke\*\*/);
   assert.equal(contract.shopify_ui.official_components_only, true);
 });

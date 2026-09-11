@@ -1946,7 +1946,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 
-**Durum:** `In progress — C1/C2A development migration PASS; C2B-C2F repository hazırlığı tamamlandı; OAuth development smoke insan onayı bekliyor`.
+**Durum:** `In progress — C1/C2A development migration PASS; C2B-C2F hazırlığı tamamlandı; C2G runtime composition ve C2H embedded Platforms/Connect yüzeyi uygulanıyor; OAuth development smoke insan yürütmesini bekliyor`.
 
 - Preflight, mevcut OAuth transaction ve provider persistence sınırlarının yalnız standalone `user_id` authority'si taşıdığını; callback'lerin `/dashboard` yüzeyine döndüğünü doğruladı. Shopify `workspace_id` auth user kimliği gibi kullanılamaz ve query/body tenant authority kabul edilemez.
 - Önce doğrulanmış Shopify session → shop/workspace/user/provider/surface/return target transaction bağı, workspace-scoped encrypted connection persistence ve canonical embedded callback dönüşü uygulanıp isolation/replay testleri geçmelidir.
@@ -1957,6 +1957,9 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T6-C2D — Done (repository preparation):** Beş allowlisted provider için ortak embedded authority/transaction/store bağımlılıklarını provider-specific authorization/token stratejileriyle birleştiren fail-closed adapter composition hazır. OAuth development smoke'undan önce provider strategy wiring ve development activation preflight/evidence paketleri kalır.
 - **E10-T6-C2E — Done (repository preparation):** Provider authorization stratejileri canonical embedded callback, minimum scope ve server-only secret/exchange sınırlarıyla hazır. OAuth development smoke'undan önce yalnız development activation preflight/evidence paketi kalır.
 - **E10-T6-C2F — Done (repository preparation):** Redacted activation preflight Shopify, keyring, database ve beş provider config görünürlüğünü doğrular; feature flag'in preflight sırasında kapalı olmasını şart koşar. Repository paketi kalmadı; gerçek OAuth smoke ayrı insan onayı ve environment preflight PASS bekler.
+- **E10-T6-C2G — In progress:** Provider strategy, token exchange, embedded transaction ve workspace encrypted connection parçalarını gerçek composition root'a bağla. Feature flag kapalıyken davranışı değiştirme; açıkken eksik bağımlılıkta fail-closed dur.
+- **E10-T6-C2H — In progress:** Shopify App Home altında canonical `/shopify/app/platforms` yüzeyini ve beş provider Connect eylemini oluştur. Connect yalnız App Bridge ID token ile embedded start endpoint'ini çağırır; consent top-level açılır ve callback aynı Platforms yüzeyine döner. Kullanıcı consent eylemi otomatikleştirilmez.
+- **Düzeltme kaydı (2026-09-11):** Önceki “repository paketi kalmadı” değerlendirmesi kaynak kodla uyuşmuyordu. `server.js` adapter composition vermiyor, feature flag açıldığında runtime fail-closed başlıyor ve embedded App Home üzerinde Connect yüzeyi bulunmuyordu. OAuth smoke öncesi C2G ve C2H zorunlu repository kapıları olarak eklendi; secret'ların bir process çıktısında görünmemesi credential yokluğu kanıtı sayılmaz.
 - Bu repository kapısı PASS olmadan provider consent başlatılmaz. Provider veya production teması yapılmadı. Karar `docs/E10_T6C_EMBEDDED_PROVIDER_OAUTH_PREFLIGHT.md` ve `contracts/shopify/e10-t6c-provider-oauth-preflight.json` içindedir.
 
 #### E10-T6-D — Shopify attribution feasibility smoke — T6-C kabulünden sonra

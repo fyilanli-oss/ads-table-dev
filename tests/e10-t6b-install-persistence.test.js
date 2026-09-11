@@ -55,7 +55,7 @@ test("tenant resolver accepts only the canonical stored domain", async () => {
 test("server composition registers managed Shopify runtime dependencies", () => {
   const server = fs.readFileSync(path.join(__dirname, "../server.js"), "utf8");
   const runtime = fs.readFileSync(path.join(__dirname, "../src/shopify/runtime.js"), "utf8");
-  assert.match(server, /registerShopifyRuntime\(\{app,env:process\.env,supabaseAdmin\}\)/);
+  assert.match(server, /registerShopifyRuntime\(\{app,env:process\.env,supabaseAdmin,oauthTransactionStore\}\)/);
   assert.match(runtime, /const config = loadShopifyConfig\(env\)/);
   assert.match(runtime, /createShopifyInstallService\(\{client: supabaseAdmin, vault\}\)/);
   assert.match(runtime, /registerShopifyAuthRoutes\(app,/);

@@ -1946,14 +1946,15 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 
-**Durum:** `In progress — E10-T6-C1 transaction authority bridge repository hazırlığı tamamlandı; remote migration ve C2 workspace connection boundary açık`.
+**Durum:** `In progress — C1/C2A development migration PASS; C2B-C2D repository runtime hazırlığı tamamlandı; provider strategy wiring sırada`.
 
 - Preflight, mevcut OAuth transaction ve provider persistence sınırlarının yalnız standalone `user_id` authority'si taşıdığını; callback'lerin `/dashboard` yüzeyine döndüğünü doğruladı. Shopify `workspace_id` auth user kimliği gibi kullanılamaz ve query/body tenant authority kabul edilemez.
 - Önce doğrulanmış Shopify session → shop/workspace/user/provider/surface/return target transaction bağı, workspace-scoped encrypted connection persistence ve canonical embedded callback dönüşü uygulanıp isolation/replay testleri geçmelidir.
-- **E10-T6-C1 — Done (repository preparation):** Standalone user authority ile Shopify embedded authority ayrık CHECK contract ile modellenmiştir; embedded transaction doğrulanmış shop/workspace/Shopify user, provider, surface ve sabit return target taşır. Atomic consume ve server-only grant testlidir. Migration canlıya uygulanmadı.
-- **E10-T6-C2A — Done (repository preparation):** Consumed embedded transaction authority ile workspace-scoped, encrypted-only provider connection persistence hazırlandı; standalone bağlantı tablosuyla tenant kimliği birleştirilmedi. Migration canlıya uygulanmadı.
+- **E10-T6-C1 — Done:** Standalone user authority ile Shopify embedded authority ayrık CHECK contract ile modellenmiştir; embedded transaction doğrulanmış shop/workspace/Shopify user, provider, surface ve sabit return target taşır. Atomic consume ve server-only grant testlidir. Development migration ve redacted postcheck PASS.
+- **E10-T6-C2A — Done:** Consumed embedded transaction authority ile workspace-scoped, encrypted-only provider connection persistence hazırlandı; standalone bağlantı tablosuyla tenant kimliği birleştirilmedi. Development migration ve forced-RLS/role postcheck PASS.
 - **E10-T6-C2B — Done (repository preparation):** Embedded start doğrulanmış Shopify session authority ile transaction üretir; callback state’i atomik tüketmeden provider exchange yapmaz ve yalnız canonical Platforms dönüşü üretir. Provider çağrısı yapılmadı.
-- **E10-T6-C2C — Sıradaki repository işi:** Tenant-isolation/replay genişletilmiş kabulü ve feature-gated runtime wiring.
+- **E10-T6-C2C — Done (repository preparation):** Tenant-isolation/replay route kabulü ve default-off feature-gated runtime registration hazır.
+- **E10-T6-C2D — Done (repository preparation):** Beş allowlisted provider için ortak embedded authority/transaction/store bağımlılıklarını provider-specific authorization/token stratejileriyle birleştiren fail-closed adapter composition hazır. OAuth development smoke'undan önce provider strategy wiring ve development activation preflight/evidence paketleri kalır.
 - Bu repository kapısı PASS olmadan provider consent başlatılmaz. Provider veya production teması yapılmadı. Karar `docs/E10_T6C_EMBEDDED_PROVIDER_OAUTH_PREFLIGHT.md` ve `contracts/shopify/e10-t6c-provider-oauth-preflight.json` içindedir.
 
 #### E10-T6-D — Shopify attribution feasibility smoke — T6-C kabulünden sonra

@@ -1,6 +1,6 @@
 # E10-T6-C — Embedded provider OAuth preflight
 
-**Durum:** `In progress — C1/C2A development migration PASS; C2C runtime gate hazır`
+**Durum:** `In progress — C1/C2A development migration PASS; C2C/C2D runtime composition hazır`
 
 E10-T6-B Development Store install/session kabulü PASS olduktan sonra E10-T6-C için repository sınırı incelendi. Canlı provider consent başlatılmadı. Mevcut provider OAuth başlangıcı standalone AdsTable kullanıcısını `requireConnectAccess` ile doğruluyor; OAuth transaction yalnız `user_id/provider/redirect_uri` taşıyor, provider callback'leri bağlantıyı aynı standalone `user_id` ile kaydediyor ve `/dashboard` yüzeyine dönüyor.
 
@@ -37,3 +37,9 @@ Start yalnız doğrulanmış Shopify session context’inden embedded transactio
 C2C, embedded provider route'larını varsayılan olarak kapalı ve katı boolean feature flag arkasında tanımlar. Start authority yalnız Authorization bearer Shopify session üzerinden taşınır; callback yalnız state/code alanlarını adapter'a geçirir ve başarı veya hata halinde canonical Platforms yüzeyinden çıkamaz. Bilinmeyen provider'lar reddedilir; eksik/replayed state adapter'ın atomic consume sınırında fail-closed kalır.
 
 Runtime flag'in açılması beş provider adapter'ının da eksiksiz server-side composition ile verilmesini gerektirir; kısmi wiring uygulamayı başlangıçta durdurur. Development migration onayı bu flag'i açma, provider consent, provider hesabı veya production deployment onayı olarak yorumlanmaz.
+
+## E10-T6-C2D — Provider adapter composition
+
+Tek composition factory, allowlist'teki beş provider için doğrulanmış Shopify session authentication, embedded transaction create/consume ve workspace connection store bağımlılıklarını ortak tutar. Provider'a özgü yalnız redirect URI, authorization URL üretimi ve code exchange stratejisidir. Eksik tek bir strateji dahi tüm embedded provider runtime'ını fail-closed durdurur; caller tenant alanları persistence authority olamaz.
+
+OAuth development smoke'undan önce iki repository paketi kalır: provider-specific authorization/token strategy wiring ve development activation preflight/evidence. Bunlar tamamlanmadan feature flag açılmaz ve gerçek provider consent başlatılmaz.

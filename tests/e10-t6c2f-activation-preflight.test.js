@@ -1,0 +1,7 @@
+"use strict";
+const test=require("node:test");const assert=require("node:assert/strict");
+const {activationPreflight}=require("../scripts/e10-t6c-activation-preflight");
+const {SPECS}=require("../src/shopify/embedded-provider-strategies");
+function complete(){const env={SHOPIFY_API_KEY:"k",SHOPIFY_API_SECRET:"s",SHOPIFY_APP_URL:"https://dev.example",SHOPIFY_DEV_STORE:"store.myshopify.com",PROVIDER_TOKEN_ACTIVE_KEY_ID:"v1",PROVIDER_TOKEN_ENCRYPTION_KEYS:JSON.stringify({v1:Buffer.alloc(32,1).toString("base64")}),SUPABASE_URL:"https://project.supabase.co",SUPABASE_SERVICE_ROLE_KEY:"secret",SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED:"false"};for(const spec of Object.values(SPECS)){env[spec.client]="client";env[spec.secret]="secret"}return env}
+test("complete development configuration is ready while the feature remains off",()=>{const result=activationPreflight(complete());assert.equal(result.ready,true);assert.equal(result.feature_flag_safely_disabled,true);assert.equal(Object.values(result.providers).every(x=>x.configured),true)});
+test("missing credentials and premature activation fail closed without values",()=>{const env=complete();delete env.META_APP_SECRET;env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED="true";const result=activationPreflight(env);assert.equal(result.ready,false);assert.equal(result.providers.meta.visible_input_count,1);assert.equal(result.feature_flag_safely_disabled,false);assert.doesNotMatch(JSON.stringify(result),/project\.supabase\.co|store\.myshopify\.com|service_role/i)});

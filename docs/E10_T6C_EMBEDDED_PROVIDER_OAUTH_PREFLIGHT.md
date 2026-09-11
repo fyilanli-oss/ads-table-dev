@@ -44,4 +44,6 @@ Tek composition factory, allowlist'teki beş provider için doğrulanmış Shopi
 
 Provider-specific authorization stratejileri canonical embedded callback URI'larını, minimum scope'ları ve server-only credential/exchange sınırını doğrular. Eksik tek credential veya exchange implementasyonu bütün embedded runtime'ı fail-closed durdurur.
 
-OAuth development smoke'undan önce bir repository paketi kalır: development activation preflight/evidence. Bu paket tamamlanmadan feature flag açılmaz ve gerçek provider consent başlatılmaz.
+Development activation preflight yalnız yapılandırma görünürlüğü ve contract geçerliliği hakkında redacted boolean/count evidence üretir; secret değeri veya uzunluğu göstermez. Hazırlık sırasında feature flag'in kapalı olmasını zorunlu tutar.
+
+Repository paketleri tamamlandı. OAuth development smoke'una **0 paket** kaldı; gerçek provider consent başlatmak için preflight PASS ve ayrı insan onayı gerekir.

@@ -1946,7 +1946,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 
-**Durum:** `In progress — C1/C2A development migration PASS; C2B-C2E repository runtime hazırlığı tamamlandı; development activation preflight sırada`.
+**Durum:** `In progress — C1/C2A development migration PASS; C2B-C2F repository hazırlığı tamamlandı; OAuth development smoke insan onayı bekliyor`.
 
 - Preflight, mevcut OAuth transaction ve provider persistence sınırlarının yalnız standalone `user_id` authority'si taşıdığını; callback'lerin `/dashboard` yüzeyine döndüğünü doğruladı. Shopify `workspace_id` auth user kimliği gibi kullanılamaz ve query/body tenant authority kabul edilemez.
 - Önce doğrulanmış Shopify session → shop/workspace/user/provider/surface/return target transaction bağı, workspace-scoped encrypted connection persistence ve canonical embedded callback dönüşü uygulanıp isolation/replay testleri geçmelidir.
@@ -1956,6 +1956,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 - **E10-T6-C2C — Done (repository preparation):** Tenant-isolation/replay route kabulü ve default-off feature-gated runtime registration hazır.
 - **E10-T6-C2D — Done (repository preparation):** Beş allowlisted provider için ortak embedded authority/transaction/store bağımlılıklarını provider-specific authorization/token stratejileriyle birleştiren fail-closed adapter composition hazır. OAuth development smoke'undan önce provider strategy wiring ve development activation preflight/evidence paketleri kalır.
 - **E10-T6-C2E — Done (repository preparation):** Provider authorization stratejileri canonical embedded callback, minimum scope ve server-only secret/exchange sınırlarıyla hazır. OAuth development smoke'undan önce yalnız development activation preflight/evidence paketi kalır.
+- **E10-T6-C2F — Done (repository preparation):** Redacted activation preflight Shopify, keyring, database ve beş provider config görünürlüğünü doğrular; feature flag'in preflight sırasında kapalı olmasını şart koşar. Repository paketi kalmadı; gerçek OAuth smoke ayrı insan onayı ve environment preflight PASS bekler.
 - Bu repository kapısı PASS olmadan provider consent başlatılmaz. Provider veya production teması yapılmadı. Karar `docs/E10_T6C_EMBEDDED_PROVIDER_OAUTH_PREFLIGHT.md` ve `contracts/shopify/e10-t6c-provider-oauth-preflight.json` içindedir.
 
 #### E10-T6-D — Shopify attribution feasibility smoke — T6-C kabulünden sonra

@@ -1946,7 +1946,7 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 
-**Durum:** `Verification — C1/C2A development migration PASS; C2B-C2H repository hazırlığı Done; PR #202 startup corrective PASS; OAuth development smoke insan yürütmesini, ayrı aktivasyon/production deployment onayını ve bu process'te görünür Vercel token'ını bekliyor`. Credential readiness yalnız local, redacted ve network çağrısız kontrol edilir; token yoksa production operatorü başlatılmaz.
+**Durum:** `Verification — C1/C2A development migration PASS; C2B-C2H repository hazırlığı Done; PR #202 startup corrective PASS; OAuth development smoke insan yürütmesini ve ayrı aktivasyon onayını bekliyor`.
 
 #### E10-T6-C2I — Aktivasyon geri dönüşü ve development smoke kapısı
 

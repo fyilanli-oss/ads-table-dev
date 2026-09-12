@@ -32,7 +32,7 @@ test("probe contacts only the canonical HTTPS App Home without following redirec
   await assert.rejects(() => probe({url: "https://example.com/"}), /canonical App Home root/);
 });
 
-test("canonical production App Home serves the Shopify-native release", {skip: process.env.CI !== "true"}, async () => {
+test("canonical production App Home serves the Shopify-native release", {skip: process.env.E10_LIVE_SURFACE_PROBE !== "true"}, async () => {
   const result = await probe();
   assert.equal(result.pass, true, JSON.stringify(result));
 });

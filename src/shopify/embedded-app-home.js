@@ -19,13 +19,17 @@ function renderEmbeddedAppHome({clientId}) {
   <meta name="shopify-api-key" content="${apiKey}">
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   <title>AdsTable</title>
-  <style>body{font:16px system-ui;margin:0;color:#202223}main{max-width:760px;margin:auto;padding:32px 20px}.primary-action{display:inline-block;margin-top:16px;padding:12px 18px;border-radius:8px;background:#008060;color:#fff;text-decoration:none;font-weight:650}</style>
+  <style>body{font:16px system-ui;margin:0;color:#202223}main{max-width:760px;margin:auto;padding:32px 20px}.platforms-card{margin-top:24px;padding:20px;border:1px solid #c9cccf;border-radius:12px;background:#fff}.platforms-card h2{margin:0 0 8px;font-size:20px}.platforms-card p{margin:0}.primary-action{display:inline-block;margin-top:16px;padding:12px 18px;border-radius:8px;background:#008060;color:#fff;text-decoration:none;font-weight:650}</style>
 </head>
 <body>
   <main>
     <h1>AdsTable</h1>
     <p id="status" role="status" aria-live="polite">Securing your development-store connection…</p>
-    <a id="platforms" class="primary-action" href="/shopify/app/platforms">Connect advertising platforms</a>
+    <section class="platforms-card" aria-labelledby="platforms-heading" data-release="e10-t6c2i">
+      <h2 id="platforms-heading">Advertising platforms</h2>
+      <p>Connect Meta, Google Ads, TikTok, or Klaviyo to this Shopify workspace.</p>
+      <a id="platforms" class="primary-action" href="/shopify/app/platforms">Open Platforms</a>
+    </section>
   </main>
   <script>
     (() => {

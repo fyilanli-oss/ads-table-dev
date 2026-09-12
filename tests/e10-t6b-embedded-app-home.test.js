@@ -14,6 +14,8 @@ test("embedded App Home obtains fresh Shopify ID tokens for bootstrap, idempoten
   assert.match(html, /Reference: /);
   assert.match(html, /id="platforms"[^>]+href="\/shopify\/app\/platforms"/);
   assert.doesNotMatch(html, /id="platforms"[^>]+hidden/);
+  assert.match(html, /data-release="e10-t6c2i"/);
+  assert.match(html, /Connect Meta, Google Ads, TikTok, or Klaviyo/);
   assert.doesNotMatch(html, /console\.|localStorage|sessionStorage|shop_domain|workspace_id|access_token/);
 });
 

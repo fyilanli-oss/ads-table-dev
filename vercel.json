@@ -2,10 +2,12 @@
   "version": 2,
   "builds": [
     { "src": "public/**", "use": "@vercel/static" },
-    { "src": "server.js", "use": "@vercel/node" }
+    { "src": "server.js", "use": "@vercel/node" },
+    { "src": "api/shopify-app.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/", "dest": "/server.js" },
+    { "src": "/", "dest": "/api/shopify-app.js" },
+    { "src": "/shopify/app(?:/platforms)?", "dest": "/api/shopify-app.js" },
     { "src": "/login", "dest": "/public/login.html" },
     { "src": "/signup", "dest": "/public/signup.html" },
     { "src": "/dashboard", "dest": "/public/dashboard.html" },

@@ -1,0 +1,13 @@
+{
+  "contract_version": "e10-t6c-production-activation-attempt-v1",
+  "approved": true,
+  "status": "BLOCKED_BEFORE_CONTACT",
+  "safe_code": "VERCEL_AUTH_UNAVAILABLE",
+  "vercel_contact": false,
+  "environment_read": false,
+  "feature_flag_changed": false,
+  "deployment_started": false,
+  "provider_contact": false,
+  "production_data_changed": false,
+  "values_or_lengths_exposed": false
+}

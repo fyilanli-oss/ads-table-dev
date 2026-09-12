@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {renderEmbeddedPlatforms} = require("../src/shopify/embedded-app-home");
-const {enabled} = require("../src/shopify/runtime");
+const {enabled, registerShopifyRuntime} = require("../src/shopify/runtime");
 const {createEmbeddedProviderTokenExchanges, normalize} = require("../src/shopify/embedded-provider-token-exchange");
 
 test("embedded Platforms renders all provider Connect actions against the canonical start boundary", () => {
@@ -46,4 +46,27 @@ test("provider OAuth remains off unless the explicit activation flag is true", (
   assert.equal(enabled(undefined), false);
   assert.equal(enabled(""), false);
   assert.equal(enabled("true"), true);
+});
+
+test("incomplete provider activation stays isolated without crashing Shopify App Home", () => {
+  const routes = {};
+  const app = {
+    get: (path, handler) => { routes[`GET ${path}`] = handler; },
+    post: (path, handler) => { routes[`POST ${path}`] = handler; },
+  };
+  const result = registerShopifyRuntime({
+    app,
+    env: {
+      SHOPIFY_API_KEY: "key",
+      SHOPIFY_API_SECRET: "secret",
+      SHOPIFY_APP_URL: "https://dev.adstable.app",
+      SHOPIFY_DEV_STORE: "store.myshopify.com",
+      SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED: "true",
+    },
+    supabaseAdmin: {from: () => ({})},
+  });
+  assert.deepEqual(result, {enabled: true, providerOAuthEnabled: false, providerOAuthRequested: true});
+  assert.equal(typeof routes["GET /"], "function");
+  assert.equal(typeof routes["GET /shopify/app/platforms"], "function");
+  assert.equal(routes["POST /api/shopify/providers/meta/oauth/start"], undefined);
 });

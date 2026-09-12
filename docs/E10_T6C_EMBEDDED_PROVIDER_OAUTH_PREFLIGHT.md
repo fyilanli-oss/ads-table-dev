@@ -1,6 +1,6 @@
 # E10-T6-C — Embedded provider OAuth preflight
 
-**Durum:** `In progress — C1/C2A development migration PASS; C2G runtime composition ve C2H embedded Platforms/Connect uygulandı; merge/development smoke bekleniyor`
+**Durum:** `In progress — C1/C2A development migration PASS; C2G/C2H PR #196 ile main'e merge edildi; aktivasyon ve insan development smoke'u bekleniyor`
 
 E10-T6-B Development Store install/session kabulü PASS olduktan sonra E10-T6-C için repository sınırı incelendi. Canlı provider consent başlatılmadı. Mevcut provider OAuth başlangıcı standalone AdsTable kullanıcısını `requireConnectAccess` ile doğruluyor; OAuth transaction yalnız `user_id/provider/redirect_uri` taşıyor, provider callback'leri bağlantıyı aynı standalone `user_id` ile kaydediyor ve `/dashboard` yüzeyine dönüyor.
 
@@ -52,4 +52,4 @@ Kaynak kod denetimi, önceki “repository paketleri tamamlandı” kaydının d
 
 C2G provider strategy, server-side token exchange, embedded transaction store ve workspace-scoped encrypted connection store'u feature-gated runtime composition içinde birleştirir. C2H `/shopify/app/platforms` üzerinde beş provider için Connect eylemi sunar. Connect, tenant alanı kabul etmeden App Bridge ID token ile canonical start endpoint'ini çağırır ve provider consent'i top-level açar. Consent düğmesine yalnız insan basar; callback canonical Platforms yüzeyine döner.
 
-Repository uygulaması tamamlandığında OAuth development smoke'u merge ve development deployment sonrasında kullanıcı tarafından Shopify Admin içinden yürütülür. Production teması veya onayı bu paket kapsamında değildir.
+Repository uygulaması PR #196 / merge `76a63ce` ile tamamlandı; merge sonrası Security Regression ve Vercel deployment PASS. OAuth development smoke'u ayrı aktivasyon onayından sonra kullanıcı tarafından Shopify Admin içinden yürütülür. Feature flag aktivasyonu, provider consent ve production işlemi bu merge sırasında yapılmadı.

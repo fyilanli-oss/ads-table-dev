@@ -1946,7 +1946,13 @@ Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad
 
 #### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
 
-**Durum:** `In progress — C1/C2A development migration PASS; C2B-C2H repository hazırlığı Done; OAuth development smoke insan yürütmesini ve ayrı aktivasyon onayını bekliyor`.
+**Durum:** `Verification — C1/C2A development migration PASS; C2B-C2H repository hazırlığı Done; PR #202 startup corrective PASS; OAuth development smoke insan yürütmesini ve ayrı aktivasyon onayını bekliyor`.
+
+#### E10-T6-C2I — Aktivasyon geri dönüşü ve development smoke kapısı
+
+PR #199 token vault yapılandırmasını tek başına embedded provider OAuth aktivasyonu için yeterli saydı. Bu davranış eksik provider credential'ları bulunan deployment'ta composition sırasında fail-closed startup hatasına yol açtığı için Shopify App Home'u da erişilemez hale getirdi. PR #202 / merge `b5b8c79` ile bu yanlış eşleme kaldırıldı: embedded provider OAuth yalnız `SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED=true` açık aktivasyon kararıyla compose edilir; token vault varlığı aktivasyon yerine geçmez. Focused regression, full suite, Security Regression ve Vercel kapıları PASS oldu. Bu corrective, Shopify-native App Home/Platforms sözleşmesini, resmi component yönünü veya canonical OAuth akışını gevşetmez.
+
+**Sıradaki uygulanabilir kapı:** Yeni repository kodu değil, açık development aktivasyon kararı sonrasında insanın Shopify Admin içinden tek kontrollü Connect smoke'u yürütmesidir. Bu onaydan önce feature flag değiştirilmez, provider consent başlatılmaz ve production işlemi yapılmaz. Smoke başarısız olursa düzeltme aynı task branch/PR üzerinde tamamlanır; başarılı kanıt olmadan E10-T6-C veya parent E10 `Done` sayılmaz.
 
 - Preflight, mevcut OAuth transaction ve provider persistence sınırlarının yalnız standalone `user_id` authority'si taşıdığını; callback'lerin `/dashboard` yüzeyine döndüğünü doğruladı. Shopify `workspace_id` auth user kimliği gibi kullanılamaz ve query/body tenant authority kabul edilemez.
 - Önce doğrulanmış Shopify session → shop/workspace/user/provider/surface/return target transaction bağı, workspace-scoped encrypted connection persistence ve canonical embedded callback dönüşü uygulanıp isolation/replay testleri geçmelidir.

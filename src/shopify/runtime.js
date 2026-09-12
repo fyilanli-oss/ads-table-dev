@@ -10,7 +10,7 @@ const {registerShopifyAuthRoutes} = require("../routes/shopify-auth-routes");
 const {registerEmbeddedAppHome} = require("./embedded-app-home");
 const {registerEmbeddedPlatforms} = require("./embedded-app-home");
 const {registerShopifyProviderOAuthRoutes} = require("../routes/shopify-provider-oauth-routes");
-const {createEmbeddedProviderStrategies} = require("./embedded-provider-strategies");
+const {createEmbeddedProviderStrategies, SPECS} = require("./embedded-provider-strategies");
 const {createEmbeddedProviderOAuthAdapters} = require("./embedded-provider-oauth-adapters");
 const {createEmbeddedProviderTokenExchanges} = require("./embedded-provider-token-exchange");
 const {createWorkspaceProviderConnectionStore} = require("./workspace-provider-connection-store");
@@ -22,6 +22,19 @@ function enabled(value) {
   throw new Error("SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED must be true or false");
 }
 
+function providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuthAdapters}) {
+  if (embeddedProviderOAuthAdapters) return true;
+  if (!oauthTransactionStore) return false;
+  try {
+    createProviderTokenVaultFromEnv(env);
+  } catch {
+    return false;
+  }
+  return Object.values(SPECS).every(({client, secret}) =>
+    typeof env[client] === "string" && Boolean(env[client].trim()) &&
+    typeof env[secret] === "string" && Boolean(env[secret].trim()));
+}
+
 function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTransactionStore, fetchImpl = fetch, embeddedProviderOAuthAdapters}) {
   const config = loadShopifyConfig(env);
   if (!config.enabled) return Object.freeze({enabled: false});
@@ -31,7 +44,8 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
   const adminClient = createShopifyAdminClient();
   const tenantResolver = createShopifyTenantResolver({client: supabaseAdmin});
   const authConfig = {client_id: config.clientId, client_secret: config.clientSecret};
-  const providerOAuthEnabled = enabled(env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED);
+  const providerOAuthRequested = enabled(env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED);
+  const providerOAuthEnabled = providerOAuthRequested && providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuthAdapters});
   registerEmbeddedAppHome(app, {clientId: config.clientId});
   registerEmbeddedPlatforms(app, {clientId: config.clientId, providerOAuthEnabled});
   registerShopifyAuthRoutes(app, {
@@ -64,7 +78,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});
   }
-  return Object.freeze({enabled: true, providerOAuthEnabled});
+  return Object.freeze({enabled: true, providerOAuthEnabled, providerOAuthRequested});
 }
 
-module.exports = Object.freeze({registerShopifyRuntime, enabled});
+module.exports = Object.freeze({registerShopifyRuntime, enabled, providerRuntimeReady});

@@ -8,17 +8,18 @@ test("embedded App Home obtains fresh Shopify ID tokens for bootstrap, idempoten
   const html = renderEmbeddedAppHome({clientId: "development-client"});
   assert.match(html, /name="shopify-api-key" content="development-client"/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/app-bridge\.js/);
-  assert.match(html, new RegExp(`data-release="${EMBEDDED_HOME_RELEASE}"`));
-  assert.match(html, new RegExp(`/shopify/app/platforms\\?release=${EMBEDDED_HOME_RELEASE}`));
-  assert.match(html, /Open Data Sources \/ Platforms/);
+  assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
+  assert.match(html, /<s-app-nav>/);
+  assert.match(html, /<s-page heading="AdsTable">/);
+  assert.match(html, /<s-section heading="Data sources">/);
+  assert.match(html, /<s-button id="platforms" variant="primary" href="\/shopify\/app\/platforms">Manage data sources<\/s-button>/);
   assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 3);
   assert.equal((html.match(/request\("\/api\/shopify\/bootstrap", "POST"/g) || []).length, 2);
   assert.match(html, /request\("\/api\/shopify\/session", "GET"/);
   assert.match(html, /Reference: /);
-  assert.match(html, /id="platforms"[^>]+href="\/shopify\/app\/platforms\?release=e10-t6c2j"/);
-  assert.doesNotMatch(html, /id="platforms"[^>]+hidden/);
-  assert.match(html, new RegExp(`AdsTable release ${EMBEDDED_HOME_RELEASE}`));
-  assert.match(html, /Connect Meta, Google Ads, TikTok, or Klaviyo/);
+  assert.doesNotMatch(html, /<style>|class="primary-action"|data-release=/);
+  assert.doesNotMatch(html, /<iframe/i);
+  assert.match(html, /Connect and manage Meta, Google Ads, TikTok, Klaviyo, and Pinterest/);
   assert.doesNotMatch(html, /console\.|localStorage|sessionStorage|shop_domain|workspace_id|access_token/);
 });
 

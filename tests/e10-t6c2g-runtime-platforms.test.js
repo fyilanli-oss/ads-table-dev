@@ -13,7 +13,12 @@ test("embedded Platforms renders all provider Connect actions against the canoni
   }
   assert.match(html, /window\.shopify\.idToken/);
   assert.match(html, /\/api\/shopify\/providers\//);
-  assert.match(html, /window\.open\(body\.authorization_url,"_top"\)/);
+  assert.match(html, /open\(body\.authorization_url, "_top"\)/);
+  assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
+  assert.match(html, /<s-app-nav>/);
+  assert.match(html, /<s-page heading="Data sources">/);
+  assert.equal((html.match(/<s-button variant="primary" data-provider=/g) || []).length, 5);
+  assert.doesNotMatch(html, /<style>|<iframe/i);
   assert.doesNotMatch(html, /workspace[_-]id|shop[_-]id|user[_-]id/i);
 });
 

@@ -2,19 +2,22 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {renderEmbeddedAppHome, registerEmbeddedAppHome} = require("../src/shopify/embedded-app-home");
+const {EMBEDDED_HOME_RELEASE, renderEmbeddedAppHome, registerEmbeddedAppHome} = require("../src/shopify/embedded-app-home");
 
 test("embedded App Home obtains fresh Shopify ID tokens for bootstrap, idempotency, and session", () => {
   const html = renderEmbeddedAppHome({clientId: "development-client"});
   assert.match(html, /name="shopify-api-key" content="development-client"/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/app-bridge\.js/);
+  assert.match(html, new RegExp(`data-release="${EMBEDDED_HOME_RELEASE}"`));
+  assert.match(html, new RegExp(`/shopify/app/platforms\\?release=${EMBEDDED_HOME_RELEASE}`));
+  assert.match(html, /Open Data Sources \/ Platforms/);
   assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 3);
   assert.equal((html.match(/request\("\/api\/shopify\/bootstrap", "POST"/g) || []).length, 2);
   assert.match(html, /request\("\/api\/shopify\/session", "GET"/);
   assert.match(html, /Reference: /);
-  assert.match(html, /id="platforms"[^>]+href="\/shopify\/app\/platforms"/);
+  assert.match(html, /id="platforms"[^>]+href="\/shopify\/app\/platforms\?release=e10-t6c2j"/);
   assert.doesNotMatch(html, /id="platforms"[^>]+hidden/);
-  assert.match(html, /data-release="e10-t6c2i"/);
+  assert.match(html, new RegExp(`AdsTable release ${EMBEDDED_HOME_RELEASE}`));
   assert.match(html, /Connect Meta, Google Ads, TikTok, or Klaviyo/);
   assert.doesNotMatch(html, /console\.|localStorage|sessionStorage|shop_domain|workspace_id|access_token/);
 });
@@ -37,7 +40,11 @@ test("App Home handler serves queryless Shopify launches and disables caching", 
     send(value) { this.body = value; return this; },
   };
   handler({query: {}}, response, () => assert.fail("must not fall through"));
-  assert.equal(response.headers["Cache-Control"], "no-store");
+  assert.equal(response.headers["Cache-Control"], "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+  assert.equal(response.headers["CDN-Cache-Control"], "no-store");
+  assert.equal(response.headers["Vercel-CDN-Cache-Control"], "no-store");
+  assert.equal(response.headers["Surrogate-Control"], "no-store");
+  assert.equal(response.headers["X-AdsTable-Release"], EMBEDDED_HOME_RELEASE);
   assert.equal(response.headers["Content-Security-Policy"], "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
   assert.equal(response.contentType, "html");
   assert.match(response.body, /Development store connected securely/);

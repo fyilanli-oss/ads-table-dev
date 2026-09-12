@@ -27,7 +27,8 @@
     "e2:t8:capture:preflight": "node --use-env-proxy scripts/e2-t8-capture-operator.js preflight",
     "e2:t8:capture:execute": "node scripts/e2-t8-capture-operator.js execute",
     "e10:t6b:smoke:preflight": "node scripts/e10-t6b-development-smoke-preflight.js",
-    "e10:t6c:activation:preflight": "node scripts/e10-t6c-activation-preflight.js"
+    "e10:t6c:activation:preflight": "node scripts/e10-t6c-activation-preflight.js",
+    "e10:production:surface:probe": "node scripts/e10-production-surface-probe.js"
   },
   "dependencies": {
     "express": "^4.18.3",

@@ -19,16 +19,19 @@ function renderEmbeddedAppHome({clientId}) {
   <meta name="shopify-api-key" content="${apiKey}">
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   <title>AdsTable</title>
+  <style>body{font:16px system-ui;margin:0;color:#202223}main{max-width:760px;margin:auto;padding:32px 20px}.primary-action{display:inline-block;margin-top:16px;padding:12px 18px;border-radius:8px;background:#008060;color:#fff;text-decoration:none;font-weight:650}.primary-action[hidden]{display:none}</style>
 </head>
 <body>
   <main>
     <h1>AdsTable</h1>
     <p id="status" role="status" aria-live="polite">Securing your development-store connection…</p>
+    <a id="platforms" class="primary-action" href="/shopify/app/platforms" hidden>Connect advertising platforms</a>
   </main>
   <script>
     (() => {
       "use strict";
       const status = document.getElementById("status");
+      const platforms = document.getElementById("platforms");
       const request = async (path, method, token) => {
         const response = await fetch(path, {
           method,
@@ -54,6 +57,7 @@ function renderEmbeddedAppHome({clientId}) {
         const sessionToken = await window.shopify.idToken();
         await request("/api/shopify/session", "GET", sessionToken);
         status.textContent = "Development store connected securely.";
+        platforms.hidden = false;
         document.documentElement.dataset.smoke = "pass";
       };
       run().catch((error) => {

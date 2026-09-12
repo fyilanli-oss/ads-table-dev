@@ -17,6 +17,7 @@ function validateSurface({status, headers, body}, expectedRelease = EXPECTED_REL
   });
   return Object.freeze({
     contract_version: "e10-production-surface-probe-v1",
+    observed_status: Number.isInteger(status) ? status : "invalid",
     expected_release: expectedRelease,
     observed_release: typeof release === "string" && /^[a-z0-9-]{1,32}$/.test(release) ? release : "missing_or_invalid",
     checks,

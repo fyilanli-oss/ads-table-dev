@@ -5,6 +5,10 @@ set -euo pipefail
   printf '%s\n' 'E10_T6C_CONFIRMATION_INVALID' >&2
   exit 2
 }
+[[ "${E10_T6C_PRODUCTION_DEPLOY_APPROVAL:-}" == "E10-T6C-APPROVE-PRODUCTION-DEPLOY" ]] || {
+  printf '%s\n' 'E10_T6C_PRODUCTION_DEPLOY_APPROVAL_REQUIRED' >&2
+  exit 2
+}
 [[ -n "${VERCEL_TOKEN:-}" ]] || {
   printf '%s\n' 'VERCEL_AUTH_UNAVAILABLE' >&2
   exit 2

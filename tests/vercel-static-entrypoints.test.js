@@ -13,6 +13,7 @@ test("builds public files as static artifacts independently from Express", () =>
   assert.deepEqual(config.builds, [
     { src: "public/**", use: "@vercel/static" },
     { src: "server.js", use: "@vercel/node" },
+    { src: "api/shopify-app.js", use: "@vercel/node" },
   ]);
 });
 
@@ -43,8 +44,9 @@ test("serves public entrypoints from static build outputs without booting Expres
   }
 });
 
-test("keeps API and OAuth application routes on the serverless function", () => {
-  assert.equal(routeFor("/")?.dest, "/server.js");
+test("isolates Shopify presentation while keeping API and OAuth routes on the application function", () => {
+  assert.equal(routeFor("/")?.dest, "/api/shopify-app.js");
+  assert.equal(routeFor("/shopify/app(?:/platforms)?")?.dest, "/api/shopify-app.js");
   assert.equal(routeFor("/api/(.*)")?.dest, "/server.js");
   assert.equal(routeFor("/auth/(.*)")?.dest, "/server.js");
   assert.equal(config.routes.at(-1).dest, "/server.js");

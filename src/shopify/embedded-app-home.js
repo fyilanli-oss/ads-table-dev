@@ -1,5 +1,7 @@
 "use strict";
 
+const EMBEDDED_HOME_RELEASE = "e10-t6c2j";
+
 function escapeAttribute(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -19,16 +21,18 @@ function renderEmbeddedAppHome({clientId}) {
   <meta name="shopify-api-key" content="${apiKey}">
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   <title>AdsTable</title>
-  <style>body{font:16px system-ui;margin:0;color:#202223}main{max-width:760px;margin:auto;padding:32px 20px}.platforms-card{margin-top:24px;padding:20px;border:1px solid #c9cccf;border-radius:12px;background:#fff}.platforms-card h2{margin:0 0 8px;font-size:20px}.platforms-card p{margin:0}.primary-action{display:inline-block;margin-top:16px;padding:12px 18px;border-radius:8px;background:#008060;color:#fff;text-decoration:none;font-weight:650}</style>
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <style>body{font:16px system-ui;margin:0;background:#f6f6f7;color:#202223}main{max-width:760px;margin:auto;padding:32px 20px}.platforms-card{margin-top:20px;padding:24px;border:1px solid #c9cccf;border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}.platforms-card h2{margin:0 0 8px;font-size:22px}.platforms-card p{margin:0}.primary-action{display:block;margin-top:18px;padding:14px 20px;border-radius:8px;background:#008060;color:#fff;text-align:center;text-decoration:none;font-size:17px;font-weight:700}.release{margin-top:12px;color:#6d7175;font-size:12px}</style>
 </head>
 <body>
   <main>
     <h1>AdsTable</h1>
     <p id="status" role="status" aria-live="polite">Securing your development-store connection…</p>
-    <section class="platforms-card" aria-labelledby="platforms-heading" data-release="e10-t6c2i">
-      <h2 id="platforms-heading">Advertising platforms</h2>
+    <section class="platforms-card" aria-labelledby="platforms-heading" data-release="${EMBEDDED_HOME_RELEASE}">
+      <h2 id="platforms-heading">Connect your advertising platforms</h2>
       <p>Connect Meta, Google Ads, TikTok, or Klaviyo to this Shopify workspace.</p>
-      <a id="platforms" class="primary-action" href="/shopify/app/platforms">Open Platforms</a>
+      <a id="platforms" class="primary-action" href="/shopify/app/platforms?release=${EMBEDDED_HOME_RELEASE}">Open Data Sources / Platforms</a>
+      <p class="release">AdsTable release ${EMBEDDED_HOME_RELEASE}</p>
     </section>
   </main>
   <script>
@@ -88,7 +92,11 @@ function registerEmbeddedAppHome(app, {clientId}) {
   if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
   const html = renderEmbeddedAppHome({clientId});
   const handler = (_req, res) => {
-    res.set("Cache-Control", "no-store");
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+    res.set("CDN-Cache-Control", "no-store");
+    res.set("Vercel-CDN-Cache-Control", "no-store");
+    res.set("Surrogate-Control", "no-store");
+    res.set("X-AdsTable-Release", EMBEDDED_HOME_RELEASE);
     res.set("Content-Security-Policy", "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
     return res.type("html").send(html);
   };
@@ -101,10 +109,14 @@ function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}
   if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
   const html = renderEmbeddedPlatforms({clientId, providerOAuthEnabled});
   app.get("/shopify/app/platforms", (_req, res) => {
-    res.set("Cache-Control", "no-store");
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+    res.set("CDN-Cache-Control", "no-store");
+    res.set("Vercel-CDN-Cache-Control", "no-store");
+    res.set("Surrogate-Control", "no-store");
+    res.set("X-AdsTable-Release", EMBEDDED_HOME_RELEASE);
     res.set("Content-Security-Policy", "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
     return res.type("html").send(html);
   });
 }
 
-module.exports = Object.freeze({registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms});
+module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms});

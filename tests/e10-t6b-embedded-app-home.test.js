@@ -12,8 +12,8 @@ test("embedded App Home obtains fresh Shopify ID tokens for bootstrap, idempoten
   assert.equal((html.match(/request\("\/api\/shopify\/bootstrap", "POST"/g) || []).length, 2);
   assert.match(html, /request\("\/api\/shopify\/session", "GET"/);
   assert.match(html, /Reference: /);
-  assert.match(html, /id="platforms"[^>]+href="\/shopify\/app\/platforms" hidden/);
-  assert.match(html, /platforms\.hidden = false/);
+  assert.match(html, /id="platforms"[^>]+href="\/shopify\/app\/platforms"/);
+  assert.doesNotMatch(html, /id="platforms"[^>]+hidden/);
   assert.doesNotMatch(html, /console\.|localStorage|sessionStorage|shop_domain|workspace_id|access_token/);
 });
 

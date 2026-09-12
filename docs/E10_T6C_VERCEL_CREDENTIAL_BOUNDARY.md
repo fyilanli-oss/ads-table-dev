@@ -11,8 +11,8 @@
 
 The existing `scripts/e10-t6c-vercel-activation.sh` is the only approved direct Vercel activation operator. It requires both explicit confirmation constants before checking Vercel authentication, pulls Production configuration into a temporary file, runs the fail-closed preflight, changes the single embedded-provider OAuth flag, and then performs the approved production deployment.
 
-A manual GitHub Actions workflow is still required to inject `${{ secrets.VERCEL_TOKEN }}` into that operator. The repository PAT available to the coordinator cannot create or update `.github/workflows/*` because it does not have GitHub's `workflow` scope. No substitute credential transport is allowed.
+The manual `.github/workflows/e10-t6c-production-activation.yml` workflow is the only GitHub Actions entry point for this operator. It has no automatic trigger, accepts only a dispatch of `main`, requires two separate exact-value confirmations without defaults, serializes activation, and attaches its job to the GitHub `Production` environment. Permissions are limited to `contents: read`; checkout credentials are not persisted. `VERCEL_TOKEN` is injected only into the final operator step and no substitute credential transport is allowed.
 
 ## Stop gate
 
-Adding the secret is readiness, not production approval. Do not dispatch activation, change `SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED`, deploy with the Vercel CLI, or start provider consent until the separate production deployment decision is explicitly approved.
+Adding the secret, preparing this workflow, opening its PR, passing CI, or merging it to `main` is readiness—not Production activation approval. After this task is complete, the user must provide a new and explicit Production dispatch approval before anyone dispatches the workflow. Until that separate decision, do not dispatch activation, change `SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED`, deploy with the Vercel CLI, or start provider consent. A merged workflow remains inert unless a human supplies both exact confirmations in a new manual dispatch.

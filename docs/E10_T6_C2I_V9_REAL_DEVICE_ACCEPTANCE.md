@@ -1,69 +1,33 @@
 # E10-T6-C2I-V9 — Real-device Shopify-native Acceptance
 
-**Durum:** `Execution approved / redacted evidence pending`  
-**Onay tarihi:** 2026-09-13  
+**Durum:** `FAIL — SHOPIFY_INSTALL_PERSISTENCE_FAILED`
 **Provider teması:** Yasak
 
-## Amaç ve mevcut sonuç
+## Düzeltme: resim zorunlu değil
 
-V9 gerçek cihaz kabulünün yürütülmesi onaylandı. Bu onay tek başına acceptance `PASS` değildir. Shopify Admin içinde çalışan uygulamadan alınmış, kimliksizleştirilmiş App Home ve Data Sources/Platforms görüntüleri henüz repository'ye teslim edilmediği için durum `AWAITING_REDACTED_REAL_DEVICE_EVIDENCE` olarak kalır.
+Bu kabul için ekran görüntüsü, PNG dönüşümü, SHA-256, metadata temizliği, JSON manifesti, validator veya GitHub yüklemesi istenmez. Önceki kanıt zinciri gereksizdi ve kaldırıldı. Görsel yalnız kullanıcı bir sorunu göstermek isterse isteğe bağlıdır.
 
-Bu paket yalnız Shopify-native render'ı gözlemler. `Connect` düğmesine basılmaz; OAuth, provider consent, callback, account discovery, token exchange, provider API isteği, deployment veya Production mutation yapılmaz.
+## Tek işlem
 
-## İnsan capture prosedürü
+1. Shopify Admin içinden AdsTable **App Home** ekranını aç.
+2. `Manage data sources` ile **Data Sources / Platforms** ekranına geç.
+3. Hiçbir provider `Connect` düğmesine basma.
+4. İki ekran da Shopify-native görünüyorsa şu tek satır yeterlidir:
 
-1. Gerçek cihazda Shopify Admin'e giriş yap ve AdsTable uygulamasını Shopify Admin içinden aç.
-2. App Home tamamen render olduktan sonra görüntüyü al. `Home`/`Data sources` app navigation'ı, Shopify-native page/section/banner/action bileşenleri ve `Manage data sources` eylemi görünmelidir.
-3. Yalnız `Manage data sources` iç navigasyonunu kullanarak Data Sources/Platforms ekranına geç. Bu eylem provider Connect değildir.
-4. Platforms ekranında provider bölümleri ve Connect eylemlerinin render olduğunu gösteren ikinci görüntüyü al. Hiçbir provider `Connect` düğmesine basma.
-5. Repository'ye eklemeden **önce** görüntülerden mağaza adı/domaini, avatar, e-posta, kişi adı, Shopify hesap/organizasyon kimliği, provider account kimliği ve browser chrome içindeki kimlik belirteçlerini kaldır.
-6. Redaction sonrasında görüntülerin UI kararını değerlendirmeye yetecek içeriği koruduğunu gözle kontrol et. Tamamen kapatılmış veya hangi yüzey olduğu anlaşılamayan görüntü kabul edilmez.
-7. Redacted dosyalar teslim edildiğinde her dosyanın SHA-256 değeri evidence manifestine yazılır ve insan incelemesiyle privacy attestation tamamlanır.
+> App Home açıldı; Data Sources / Platforms açıldı; Connect'e basmadım.
 
-Pending contract'taki listeler gözlenmiş `PASS` değerleri değildir; kabul sırasında kanıtlanması gereken gereksinimlerdir. İki görüntü yalnız PNG olarak, sırasıyla `artifacts/e10-shopify/e10-t6-c2i-v9/app-home-redacted.png` ve `artifacts/e10-shopify/e10-t6-c2i-v9/platforms-redacted.png` yollarına eklenir. Evidence JSON'u `node scripts/e10-t6-c2i-v9-evidence.js <evidence.json>` ile doğrulanır. Validator exact dosya/route sırasını, SHA-256 değerlerini, farklı görüntüleri, güvenli boyutları, PNG yapısını ve PNG text/EXIF metadata yokluğunu fail-closed doğrular. İnsan görsel/privacy attestation'ının yerini almaz.
+Bir ekran açılmadıysa resim yüklemek yerine yalnız hangi ekranın açılmadığını yazmak yeterlidir.
 
-Evidence tesliminde `contracts/shopify/e10-t6-c2i-v9-evidence.template.json` kopyalanır; template dosyasının kendisi değiştirilmez. `REVIEW_REQUIRED`, placeholder timestamp/hash ve bütün gözlemsel attestation'ların `false` başlangıç değeri bilinçlidir. Reviewer yalnız gerçekten gözlediği kapıları `true` yapar, çıktı manifestini iki redacted PNG ile aynı artifact dizinine koyar ve validator'ı çalıştırır. Template hiçbir koşulda acceptance evidence veya `PASS` sayılamaz.
+## Kabul sınırı
 
-## Görsel kabul matrisi
+13 Eylül 2026 gerçek cihaz sonucu uygulamanın Shopify Admin içinde açıldığını, ancak App Home yerine `SHOPIFY_INSTALL_PERSISTENCE_FAILED` gösterdiğini doğruladı. Referans kimliği ve ekran görüntüsü repository'ye alınmadı. V9 `PASS` değildir.
 
-### App Home
+Kök neden App Home'un her açılışta aynı install bootstrap işlemini art arda iki kez çalıştırmasıydı. Akış tek bootstrap yazımı ve ardından ayrı session doğrulaması yapacak şekilde düzeltildi. Bu sonuç OAuth, provider consent, callback, account discovery, provider API isteği veya Production mutation yetkisi vermez.
 
-- Shopify Admin içinde embedded olarak görünür.
-- Resmi App Bridge/Polaris App Home bileşenleri doğal Shopify görünümünde render olur.
-- App navigation ve `Manage data sources` eylemi görünür ve anlaşılırdır.
-- Özel Shopify Admin taklidi, özel component CSS'i veya kullanıcıya dönük teknik release işareti yoktur.
-
-### Data Sources / Platforms
-
-- Aynı Shopify embedded uygulama navigasyonu içinde görünür.
-- Provider eylemleri resmi Shopify button görünümündedir ve durum yalnız renkle anlatılmaz.
-- Nested provider iframe, açılmış modal, consent sayfası veya provider sonucu görünmez.
-- Bu aşamada yalnız render gözlemlenir; Connect davranışı V10-A ve sonrası için ayrıdır.
-
-## Resmi Shopify kaynak sınırı
-
-- App Home, uygulama yüzeyinin Shopify Admin içinde iframe olarak çalıştığını ve Polaris web components kullandığını tanımlar: <https://shopify.dev/docs/api/app-home>
-- App navigation, uygulamanın Shopify Admin navigation menüsüne link sağlaması için resmi `s-app-nav` bileşenini tanımlar: <https://shopify.dev/docs/api/app-home/latest/app-bridge-web-components/app-nav>
-- Page ve Button bileşenleri, sayfa yapısı ve kullanıcı eylemleri için resmi App Home bileşenleridir: <https://shopify.dev/docs/api/app-home/latest/web-components/structure/page> ve <https://shopify.dev/docs/api/app-home/latest/web-components/actions/button>
-
-Görüntüdeki görsel benzerlik kaynak sözleşmesinin yerini tutmaz; source/test kapıları ile insan render kanıtı birlikte geçmelidir.
-
-## PASS / FAIL kararı
-
-`PASS` yalnız aşağıdakilerin tamamında verilir:
-
-- iki zorunlu redacted görüntü teslim edilmiştir;
-- her görüntünün SHA-256 değeri manifestte kayıtlıdır;
-- bütün görsel kapılar insan tarafından doğrulanmıştır;
-- privacy attestation tamamlanmıştır;
-- Connect/provider/OAuth/API temaslarının hiçbirinin yapılmadığı doğrulanmıştır.
-
-Eksik görüntü, yetersiz redaction, eski/custom yüzey, teknik release marker, nested iframe veya yanlışlıkla Connect'e basılması `PASS` değildir. Hata türü redacted olarak kaydedilir ve V9 corrective açılır; V10 execution başlamaz.
+Shopify-native değerlendirmesinin resmi kaynakları [App Home](https://shopify.dev/docs/api/app-home), [`s-app-nav`](https://shopify.dev/docs/api/app-home/latest/app-bridge-web-components/app-nav), [Page](https://shopify.dev/docs/api/app-home/latest/web-components/structure/page) ve [Button](https://shopify.dev/docs/api/app-home/latest/web-components/actions/button) belgeleridir.
 
 ## Paket sırası
 
-- **Tamamlanan paket:** V9 execution authorization ve fail-closed capture sözleşmesi.
-- **Sıradaki paket:** V9 insan capture + redaction + iki görüntünün hash/attestation kabulü.
-- **PASS sonrası paketler:** V10-A Klaviyo Connect modalı; V10-B ayrı provider consent kararı; V10-C verified Klaviyo account selection; V10-D Email Monthly Plan Cost; V10-E Disconnect; V10-F ayrıca onaylı read-only Production API smoke.
-
-V9 `PASS` verilene kadar V10-A dahil hiçbir Provider Connect execution alt paketi başlamaz.
+- **Tamamlanan paket:** V9 gerçek cihaz koşusu; sonuç `FAIL — SHOPIFY_INSTALL_PERSISTENCE_FAILED`.
+- **Sıradaki paket:** Düzeltilmiş tek-bootstrap akışının deploy edilmesi ve App Home'un yeniden açılması.
+- **PASS sonrası paketler:** V10-A Klaviyo Connect modalı; V10-B ayrı provider consent kararı; V10-C verified account selection; V10-D Email Monthly Plan Cost; V10-E Disconnect; V10-F ayrıca onaylı read-only Production API smoke.

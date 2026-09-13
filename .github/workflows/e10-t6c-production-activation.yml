@@ -1,0 +1,50 @@
+name: E10-T6-C2I Production activation
+
+on:
+  workflow_dispatch:
+    inputs:
+      activation_confirmation:
+        description: Type E10-T6C-ACTIVATE-DEVELOPMENT-OAUTH
+        required: true
+        type: string
+      production_deploy_approval:
+        description: Type E10-T6C-APPROVE-PRODUCTION-DEPLOY
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: e10-t6c-production-activation
+  cancel-in-progress: false
+
+jobs:
+  activate-production:
+    if: github.ref == 'refs/heads/main'
+    environment: Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate explicit approvals
+        env:
+          ACTIVATION_CONFIRMATION: ${{ inputs.activation_confirmation }}
+          PRODUCTION_DEPLOY_APPROVAL: ${{ inputs.production_deploy_approval }}
+        run: |
+          test "$ACTIVATION_CONFIRMATION" = 'E10-T6C-ACTIVATE-DEVELOPMENT-OAUTH'
+          test "$PRODUCTION_DEPLOY_APPROVAL" = 'E10-T6C-APPROVE-PRODUCTION-DEPLOY'
+
+      - name: Check out the dispatched main commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Validate redacted Production readiness in the Vercel runtime
+        run: node scripts/e10-t6c-remote-preflight.js
+
+      - name: Activate Production with the approved operator
+        env:
+          E10_T6C_CONFIRMATION: ${{ inputs.activation_confirmation }}
+          E10_T6C_PRODUCTION_DEPLOY_APPROVAL: ${{ inputs.production_deploy_approval }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: bash scripts/e10-t6c-vercel-activation.sh

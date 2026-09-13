@@ -1,0 +1,33 @@
+{
+  "contract_version": "e10-t6b-development-store-smoke-v1",
+  "captured_at": "2026-09-10T18:16:50.000Z",
+  "environment": "development_only",
+  "configuration": {
+    "shopify_required_values": "PASS_REDACTED",
+    "development_store_domain": "PASS_CANONICAL_REDACTED",
+    "deployment_scope": "PASS_PREVIEW_REDACTED",
+    "token_keyring": "PASS_REDACTED"
+  },
+  "remote_supabase": {
+    "installation_table": "PASS_REDACTED",
+    "managed_install_rpc": "PASS_REDACTED",
+    "migration_ledger": "PASS_REDACTED",
+    "forced_rls": "PASS_REDACTED",
+    "browser_grants_zero": "PASS_REDACTED",
+    "plaintext_token_columns_zero": "PASS_REDACTED"
+  },
+  "deployment_status": "PASS_REDACTED",
+  "operator_route_probe": "NOT_REQUIRED_FOR_EMBEDDED_ACCEPTANCE",
+  "development_store_reachability_probe": "REACHABLE_UNAUTHENTICATED_HTTP_4XX",
+  "embedded_session_and_id_token": "PASS_REDACTED",
+  "offline_token_exchange": "PASS_EXPIRING_REDACTED",
+  "admin_shop_identity": "PASS_REDACTED",
+  "shop_workspace_binding": "PASS_REDACTED",
+  "encrypted_token_persistence": "PASS_REDACTED",
+  "reopen_reinstall_idempotency": "PASS_REDACTED",
+  "development_store_contact": true,
+  "unauthenticated_development_store_reachability_contact": true,
+  "production_store_contact": false,
+  "secrets_or_identifiers_recorded": false,
+  "outcome": "PASS_DEVELOPMENT_STORE_EMBEDDED_ACCEPTANCE"
+}

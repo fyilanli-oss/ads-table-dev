@@ -1,0 +1,35 @@
+{
+  "contract_version": "e10-t6-c2i-v9-real-device-acceptance-v2",
+  "status": "FAIL",
+  "execution_approved": true,
+  "acceptance_passed": false,
+  "acceptance_method": "human_text_attestation",
+  "observed_result": {
+    "inside_shopify_admin": true,
+    "app_home_rendered": false,
+    "failure_code": "SHOPIFY_INSTALL_PERSISTENCE_FAILED",
+    "screenshot_stored_in_repository": false
+  },
+  "required_observations": [
+    "app_home_rendered_inside_shopify_admin",
+    "data_sources_platforms_rendered_inside_shopify_admin",
+    "shopify_native_visual_language_observed",
+    "provider_connect_not_pressed",
+    "provider_oauth_or_api_contact_not_started"
+  ],
+  "accepted_reply": "App Home açıldı; Data Sources / Platforms açıldı; Connect'e basmadım.",
+  "image_upload_required": false,
+  "png_required": false,
+  "sha256_required": false,
+  "manifest_required": false,
+  "forbidden_interactions": [
+    "provider_connect_pressed",
+    "provider_consent_started",
+    "provider_api_contact",
+    "oauth_callback_exercised",
+    "production_mutation"
+  ],
+  "acceptance_rule": "PASS requires the human text attestation after observing both surfaces; an image, hash, manifest, or repository artifact is never required",
+  "next_on_pass": "E10_T6_C2I_V10A_KLAVIYO_CONNECT_MODAL",
+  "next_on_fail": "SHOPIFY_INSTALL_PERSISTENCE_CORRECTIVE"
+}

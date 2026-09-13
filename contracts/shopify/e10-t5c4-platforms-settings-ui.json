@@ -1,0 +1,62 @@
+{
+  "contract": "e10-t5c4-platforms-settings-ui",
+  "status": "frozen",
+  "modules": ["Platforms", "Settings"],
+  "onboarding": {
+    "sequence": ["currency_selection", "platforms"],
+    "currency_required_before_platforms": true,
+    "authority": "backend_workspace"
+  },
+  "providers": {
+    "active": ["meta", "google", "tiktok", "klaviyo"],
+    "parked": ["pinterest"],
+    "excluded_from_connect_surface": ["organic", "google_sheets"]
+  },
+  "connect": {
+    "sequence": ["explanation_modal", "explicit_connect", "top_level_oauth", "verified_account_selection"],
+    "connected_requires_active_account": true,
+    "account_authority": "server_verified_ownership",
+    "standalone_dashboard_return": false
+  },
+  "klaviyo": {
+    "sequence_after_account_selection": ["email_monthly_plan_cost"],
+    "cost_required_to_complete": true,
+    "label": "Email Monthly Plan Cost",
+    "forbidden_label": "Estimated Monthly Spend"
+  },
+  "disconnect": {
+    "warning_modal": true,
+    "explicit_confirmation": true,
+    "stops_provider_access_and_refresh": true,
+    "deletes_historical_analytics": false,
+    "deletion_surface": "separate_privacy_flow"
+  },
+  "states": [
+    "not_connected",
+    "connecting",
+    "account_selection_required",
+    "connected",
+    "reauthorization_required",
+    "temporarily_unavailable",
+    "parked"
+  ],
+  "settings": {
+    "sections": ["currency", "klaviyo_email_monthly_plan_cost", "ad_accounts"],
+    "ad_accounts": {
+      "providers": ["meta", "google", "tiktok"],
+      "selection": "single",
+      "maximum_active_accounts": 1,
+      "funnel_scope": "active_account_only",
+      "switch_preserves_connection_token_and_history": true,
+      "save_revalidates_server_ownership": true
+    }
+  },
+  "shopify_ui": {
+    "official_components_only": true,
+    "custom_admin_shell": false,
+    "custom_control_framework": false,
+    "single_choice_for_ad_accounts": true,
+    "exact_components_revalidated_in": "E10-T6-A"
+  },
+  "forbidden_output": ["provider_token", "oauth_code", "raw_provider_error", "raw_html", "browser_authoritative_account"]
+}

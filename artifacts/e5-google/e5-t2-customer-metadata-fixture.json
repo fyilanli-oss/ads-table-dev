@@ -1,0 +1,22 @@
+{
+  "fixture_version": "e5-t2-google-customer-metadata-v1",
+  "synthetic": true,
+  "requested_customer_id": "1234567890",
+  "observed_at": "2026-08-31T02:30:00.000Z",
+  "response": {
+    "results": [
+      {
+        "customer": {
+          "id": "1234567890",
+          "currencyCode": "USD",
+          "timeZone": "America/Los_Angeles"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "source_currency": "USD",
+    "source_timezone": "America/Los_Angeles",
+    "business_date": "2026-08-30"
+  }
+}

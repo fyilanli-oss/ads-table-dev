@@ -1,0 +1,54 @@
+{
+  "contract": "e10-t5c2a-ad-analysis-ui",
+  "status": "frozen",
+  "module": "Ad Analysis",
+  "analytical_leaf": {
+    "standard": "ad",
+    "google_performance_max": "asset_group"
+  },
+  "ranking": {
+    "metric_allowlist": ["purchase", "sales", "revenue"],
+    "default_metric": "sales",
+    "normal_default_direction": "descending",
+    "normal_toggle_directions": ["descending", "ascending"],
+    "compare_default_key": "selected_metric_percent_change",
+    "compare_default_direction": "descending",
+    "compare_toggle_directions": ["descending", "ascending"],
+    "zero_denominator_bucket": "new_or_not_comparable",
+    "unsupported_bucket": "last",
+    "total_row_ranked": false,
+    "computed_by": "backend"
+  },
+  "main_columns": ["platform", "analytical_leaf_name", "creative", "purchase", "sales", "spend", "revenue", "intent", "performance"],
+  "removed_columns": ["margin"],
+  "detail_surfaces": {
+    "intent": "single_modal",
+    "performance": "single_modal",
+    "simultaneous_modals": false
+  },
+  "creative_first_slice": {
+    "mode": "metadata_and_preview_only",
+    "stored_in_dataset_v2": false,
+    "included_in_funnel_hierarchy": false,
+    "inherits_ad_metrics": false,
+    "allocates_ad_metrics": false,
+    "requires_capability_package": "E10-T5-C2-B"
+  },
+  "shopify_component_map": {
+    "page": ["s-page", "s-section", "s-grid", "s-stack"],
+    "ranking_switch": ["s-button-group"],
+    "table_first_choice": ["s-table"],
+    "details": ["s-button", "s-modal"],
+    "status": ["s-badge", "s-banner", "s-spinner", "s-tooltip"]
+  },
+  "forbidden": [
+    "creative_as_universal_canonical_leaf",
+    "copy_or_allocate_ad_metrics_to_creative",
+    "creative_rows_in_funnel",
+    "frontend_sort_math",
+    "fake_infinite_percent_change",
+    "margin_without_cost_contract",
+    "simultaneously_open_analysis_modals",
+    "shopify_admin_shell_replica"
+  ]
+}

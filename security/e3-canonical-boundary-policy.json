@@ -1,0 +1,15 @@
+{
+  "version": "e3-t10-v1",
+  "runtime_roots": ["funnel-core", "src"],
+  "dataset_table": "performance_dataset_rows_v2",
+  "dataset_table_allowlist": ["funnel-core/supabase-dataset-repository.js"],
+  "canonical_upsert_allowlist": [
+    "funnel-core/canonical-write-boundary.js",
+    "funnel-core/dataset-repository.js",
+    "funnel-core/supabase-dataset-repository.js"
+  ],
+  "business_math_files": [
+    "funnel-core/formula-engine.js",
+    "funnel-core/funnel-query-service.js"
+  ]
+}

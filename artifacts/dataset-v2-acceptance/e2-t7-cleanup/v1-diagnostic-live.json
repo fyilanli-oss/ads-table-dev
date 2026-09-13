@@ -1,0 +1,16 @@
+{
+  "operation": "e2_t7_final_diagnostic_v1",
+  "status": "DIAGNOSED",
+  "checkCount": 19,
+  "failedCodes": [
+    "DATASET_V2_BASELINE",
+    "DATASET_V1_BASELINE",
+    "SNAPSHOT_BASELINE",
+    "CONNECTED_CONNECTIONS",
+    "ENCRYPTED_TOKEN_ROWS"
+  ],
+  "requests": 1,
+  "retries": 0,
+  "productionCountsExposed": false,
+  "productionIdentitiesExposed": false
+}

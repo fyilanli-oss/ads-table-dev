@@ -1,0 +1,11 @@
+{
+  "operation": "e2_t7_no_change_v2",
+  "status": "APPROVAL_READY",
+  "baseline": "19/19 PASS",
+  "baselineCount": 5,
+  "baselineRequests": 1,
+  "finalRequests": 0,
+  "retries": 0,
+  "productionCountsExposed": false,
+  "productionIdentitiesExposed": false
+}

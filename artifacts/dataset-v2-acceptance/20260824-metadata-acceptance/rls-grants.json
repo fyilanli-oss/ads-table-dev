@@ -1,0 +1,65 @@
+{
+  "evidence_version": "e2-dataset-v2-metadata-v1",
+  "overall_result": "PASS",
+  "policies": [
+    {
+      "command": "SELECT",
+      "name": "performance_dataset_rows_v2_select_own",
+      "normalization_version": "dataset-v2-policy-norm-v1",
+      "permissive": "PERMISSIVE",
+      "result": "PASS",
+      "roles": [
+        "authenticated"
+      ],
+      "using_fingerprint": "268f28217275eb13db8fa9e4bfd88eb5fee6533811e452b740c3fb6a55716516",
+      "with_check_fingerprint": null
+    }
+  ],
+  "privileges": {
+    "anon": {
+      "expected": [],
+      "live": [],
+      "result": "PASS"
+    },
+    "authenticated": {
+      "expected": [
+        "SELECT"
+      ],
+      "live": [
+        "SELECT"
+      ],
+      "mutation_allowed": false,
+      "result": "PASS"
+    },
+    "service_role": {
+      "expected": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ],
+      "live": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ],
+      "result": "PASS"
+    }
+  },
+  "repository_commit": "d16e87449aeb9eefdea570f5bb8eca77b67ed8ef",
+  "rls": {
+    "expected_enabled": true,
+    "expected_forced": false,
+    "live_enabled": true,
+    "live_forced": false,
+    "result": "PASS"
+  },
+  "table": "public.performance_dataset_rows_v2"
+}

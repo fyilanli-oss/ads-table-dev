@@ -1,0 +1,47 @@
+# E2-T6 Dataset V2 RLS Acceptance
+
+## Status and boundary
+
+**E2-T6: `Verification`.** This is a repository-preparation package only. No live SQL, Supabase query, fixture write, RLS matrix, postcheck, Management API operation, deployment, or data/schema/policy/grant/ledger/environment change was performed. Static tests are not live PostgreSQL acceptance. E2-T1–T5 are `Done`; E2-T7 is out of scope and `Not started`.
+
+## Immutable review inputs
+
+The fail-closed operator binds preparation to approved main/base SHA `5a9a450a3615a9edeb8101164fc91abe074708be` and checksums its executable runtime, SQL, converter, fixture contract, and matrix before both phases.
+
+- `supabase/migrations/20260816101220_create_performance_dataset_rows_v2.sql`: SHA-256 `27cd4bf405b12a7e6928e5c9742f709440da987738fb181bf6dbf5e8da8085f2`
+- `artifacts/dataset-v2-acceptance/20260824-metadata-acceptance/rls-grants.json`: SHA-256 `95de1cab3ea95595a2c9eba2e9b0c5ed3bc0a16cc498df273ec8b6d98245ab51`
+
+The migration and committed metadata establish the contract: RLS enabled and not forced; one permissive authenticated own-row SELECT policy; no anon table privilege; authenticated SELECT only with no INSERT/UPDATE/DELETE privilege; service-role backend table access. Metadata evidence confirms configuration, but never substitutes for runtime RLS acceptance.
+
+## Human-controlled operation
+
+A separate human approval and an operator-held database credential are mandatory. Missing credentials, checksum drift, a failed preflight gate, fewer than two distinct users present in both `auth.users` and `public.users`, namespace residue, or inability to preserve deterministic transaction-local role/JWT and temporary-evidence access means **STOP**. Never automatically retry.
+
+1. Run `NODE_USE_ENV_PROXY=1 npm run e2:t6:preflight`. The operator runs the full regression suite, verifies the approved Git base and artifact checksum, submits `docs/security/sql/E2_T6_RLS_PREFLIGHT.sql` once, and stores exactly five operator-local baselines in this order: Dataset V2, V1, snapshot, connected, encrypted. The capsule remains outside the repository. Actual provider counts are never shared or committed; record no identities.
+2. Review every stop gate and obtain separate human approval.
+3. Run `NODE_USE_ENV_PROXY=1 npm run e2:t6:execute -- --confirm E2-T6-V1-LIVE`. The exact confirmation is accepted only after explicit human production approval and an approval-ready capsule.
+4. The operator persists transaction intent before submitting `docs/security/sql/E2_T6_RLS_TRANSACTION.sql` once, validates its single final redacted response with `scripts/e2-t6-rls-evidence.js`, and never retries the transaction.
+5. The operator will replace exactly five `-1` placeholders in `docs/security/sql/E2_T6_RLS_POSTCHECK.sql`, in this order: Dataset V2, V1, snapshot, connected, encrypted. It submits the result once even when transaction transport/evidence fails, validates all 19 gates, and consumes the capsule. Never manually substitute or submit either payload.
+
+## Transaction safety model
+
+The auth/public identity intersection is selected once in operator/postgres context before any role switch and stored in a separate transaction-local internal `pg_temp` actor table as exactly `user_a` and `user_b`. The real identifiers are internal actor state, not evidence, and cannot leave the transaction. `service_role` reads only that temp actor store and never queries `auth.users` directly. The harness writes two `e2_t6_rls_v1` fixtures under transaction-local `service_role`, then uses `SET LOCAL ROLE` and transaction-local `set_config(..., true)` for authenticated JWT claim emulation. Every actor transition resets the previous role and both claim settings. No actor state can survive the transaction.
+
+Evidence and internal actor state exist only in separate `pg_temp` tables declared `ON COMMIT DROP`. Transaction-local grants give authenticated, anon, and service-role only the required evidence access; service-role alone receives read access to the internal actor store. All temp objects and their grants are removed by the outer rollback. Their allowlist excludes identity, JWT/claim values, production rows, credentials, URIs, and raw error text/detail/hint/context. Each denied mutation runs in its own nested exception subtransaction; only the safe SQLSTATE and classified outcome are retained. Unexpected successful mutations are rolled back inside their nested block and fail evidence. No `ON CONFLICT`, ad hoc cleanup, persistent DDL, or mutation of V1, snapshots, OAuth, token, ledger, auth, subscription, or connection state is allowed.
+
+The payload contains no `COMMIT`; its unconditional normal end is `ROLLBACK`. Residue or an interrupted/ambiguous operation is a stop condition: do not perform ad hoc cleanup and do not retry. Escalate for investigation and separately approved recovery. The postcheck must prove Dataset V2 returned to its baseline, namespace residue is zero, V1/snapshots/OAuth/token/ledger are unchanged, RLS/policy/grants remain exact, and no persistent evidence object exists.
+
+## Acceptance matrix
+
+The closed 16-case matrix covers User A and User B own/cross-user reads, anon reads, both authenticated users' INSERT/UPDATE/DELETE privilege denials, and service-role fixture inserts/reads. Cross-user SELECT is a zero-row `DENIED_BY_RLS`; anon and authenticated mutation denials are SQLSTATE-class-42 `DENIED_BY_PRIVILEGE`. Service and own reads must each produce one row. The converter rejects missing, extra, duplicate, reordered-contract, unknown-field, identity-bearing, leaking, unexpectedly allowed, residue-bearing, or parity-false evidence.
+
+This package does not execute E2-T6. Completion requires later, separately authorized live preflight, intact rollback-only transaction, postcheck, redacted evidence review, and human acceptance. E2-T6 must not be marked `Done` before that review.
+
+## E2-C1 deviation / decision (corrective preparation)
+
+- İlk repository hazırlığı, E1 kapanış anındaki 7/7 provider bağlantı/token nüfusunu sabit kabul etmişti.
+- Canlı read-only E2-T3 preflight, connection/token nüfusunun değişebildiğini kanıtladı; hardcoded kontroller bu nedenle başarısız oldu.
+- Actual production sayıları evidence'a veya repository'ye alınmadı; yalnız operator-local baseline olarak tutulmalıdır.
+- Missing encrypted ve plaintext güvenlik kontrolleri geçti; corrective sözleşme ayrıca orphan encrypted kontrolünü zorunlu kılar.
+- Güvenlik contract'ı fixed population yerine captured connected/encrypted parity ile missing/orphan/plaintext zero olarak düzeltildi.
+- Bu değişiklik production data correction değildir. Bu corrective PR kapsamında canlı transaction, INSERT veya postcheck çalıştırılmadı ve production değişmedi.

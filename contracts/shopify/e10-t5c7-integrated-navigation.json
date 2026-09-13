@@ -1,0 +1,37 @@
+{
+  "contract": "e10-t5c7-integrated-navigation",
+  "status": "frozen",
+  "first_use_sequence": ["verified_shopify_session", "currency_selection", "platform_connection_and_verified_account", "conditional_klaviyo_email_monthly_plan_cost", "funnel"],
+  "default_route": "funnel",
+  "navigation": ["funnel", "dashboard", "ad_analysis", "attribution_differences", "platforms", "settings"],
+  "navigation_authority": "official_shopify_embedded_navigation_and_app_bridge",
+  "separate_global_shell": false,
+  "separate_mobile_navigation": false,
+  "funnel_table_is_global_route": false,
+  "shared_authoritative_context": ["shop_workspace", "workspace_currency", "active_ad_account"],
+  "handoffs": {
+    "dashboard_to_funnel": ["completed_day_time_range", "comparison", "filters", "currency", "data_sources", "active_ad_account"],
+    "attribution_to_funnel": ["completed_day_time_range", "platform", "currency", "active_ad_account"],
+    "funnel_to_table": ["time_range", "comparison", "filters", "currency", "data_sources", "expanded_entities", "focus_metric"]
+  },
+  "unsupported_context": "target_last_valid_or_approved_default_with_neutral_notice_no_silent_coercion",
+  "settings_change": "invalidate_old_currency_or_account_query_context",
+  "oauth_return": {
+    "canonical_route": "platforms",
+    "server_bound_fields": ["shop", "workspace", "user", "provider", "surface", "return_target"],
+    "allowlisted_target_only": true,
+    "standalone_dashboard_or_login": false,
+    "caller_return_url": false
+  },
+  "route_states": ["loading", "empty", "partial", "stale", "reauthorization_required", "forbidden", "not_found", "error"],
+  "acceptance": {
+    "desktop_mobile_same_information_architecture": true,
+    "keyboard_and_focus": true,
+    "back_forward_and_deep_link": true,
+    "mobile_minimum_width_px": 320,
+    "global_horizontal_overflow": false,
+    "official_components_only": true,
+    "exact_shopify_revalidation": "E10-T6-A"
+  },
+  "forbidden": ["duplicate_admin_shell", "standalone_login_or_dashboard_return", "browser_bypassed_onboarding", "supported_context_loss", "silent_context_coercion", "multiple_active_accounts", "stale_account_result", "open_redirect", "custom_mobile_navigation", "custom_control_framework", "secret_pii_identity_or_raw_error_exposure"]
+}

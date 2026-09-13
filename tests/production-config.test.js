@@ -18,6 +18,12 @@ test("review and sandbox switches default to disabled",()=>{
   assert.equal(config.tiktokTestPageEnabled,false);
 });
 
+test("TikTok V2 shadow is an explicit production-safe runtime flag",()=>{
+  assert.equal(createRuntimeFlags({NODE_ENV:"production"}).tiktokV2ShadowEnabled,false);
+  assert.equal(validateProductionConfig({NODE_ENV:"production",TIKTOK_V2_SHADOW_ENABLED:"true"}).tiktokV2ShadowEnabled,true);
+  assert.throws(()=>createRuntimeFlags({TIKTOK_V2_SHADOW_ENABLED:"yes"}),error=>error instanceof ProductionConfigError&&error.variables.includes("TIKTOK_V2_SHADOW_ENABLED"));
+});
+
 test("boolean parsing is strict and production detection gives VERCEL_ENV precedence",()=>{
   for(const value of ["true","TRUE","1"])assert.equal(parseExplicitBoolean(value),true);
   for(const value of [undefined,"","false","FALSE","0"])assert.equal(parseExplicitBoolean(value),false);
@@ -27,8 +33,8 @@ test("boolean parsing is strict and production detection gives VERCEL_ENV preced
   assert.equal(isProductionRuntime({NODE_ENV:"production"}),true);
 });
 
-test("production rejects every unsafe review or sandbox setting without exposing values",()=>{
-  for(const key of ["GOOGLE_REVIEW_HARD_ROUTE_ENABLED","GOOGLE_TEST_CUSTOMER_ID","GOOGLE_TEST_LOGIN_CUSTOMER_ID","TIKTOK_REVIEW_FALLBACK_ENABLED","TIKTOK_REVIEW_ADVERTISER_ID","TIKTOK_REVIEW_ADVERTISER_NAME","TIKTOK_SANDBOX_ENABLED","TIKTOK_SANDBOX_ACCESS_TOKEN","TIKTOK_TEST_ACCESS_TOKEN","TIKTOK_FORCE_SANDBOX_REPORTS"]){
+test("production rejects unsafe Google test settings without exposing values",()=>{
+  for(const key of ["GOOGLE_REVIEW_HARD_ROUTE_ENABLED","GOOGLE_TEST_CUSTOMER_ID","GOOGLE_TEST_LOGIN_CUSTOMER_ID"]){
     const secret="do-not-print-this-value";
     assert.throws(
       ()=>validateProductionConfig({NODE_ENV:"production",[key]:key.endsWith("ENABLED")||key==="TIKTOK_FORCE_SANDBOX_REPORTS"?"true":secret}),
@@ -37,10 +43,25 @@ test("production rejects every unsafe review or sandbox setting without exposing
   }
 });
 
+test("production quarantines legacy TikTok sandbox variables without taking down sign-in",()=>{
+  const config=validateProductionConfig({VERCEL_ENV:"production",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true",TIKTOK_SANDBOX_ACCESS_TOKEN:"legacy-secret",TIKTOK_SANDBOX_ADVERTISER_ID:"legacy-advertiser",TIKTOK_TEST_ACCESS_TOKEN:"legacy-test-secret"});
+  assert.equal(config.tiktokSandboxEnabled,false);
+  assert.equal(config.tiktokForceSandboxReports,false);
+  assert.equal(config.tiktokTestPageEnabled,false);
+});
+
+test("review bridge reuses the existing sandbox advertiser and token variables",()=>{
+  const env={VERCEL_ENV:"production",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_SANDBOX_ADVERTISER_ID:"review-advertiser",TIKTOK_SANDBOX_ACCESS_TOKEN:"server-secret"};
+  assert.equal(validateProductionConfig(env).tiktokReviewFallbackEnabled,true);
+  assert.equal(validateProductionConfig({...env,TIKTOK_SANDBOX_ADVERTISER_ID:""}).tiktokReviewFallbackEnabled,false);
+  assert.equal(validateProductionConfig({...env,TIKTOK_SANDBOX_ACCESS_TOKEN:""}).tiktokReviewFallbackEnabled,false);
+  assert.equal(validateProductionConfig({...env,TIKTOK_REVIEW_FALLBACK_ENABLED:"false"}).tiktokReviewFallbackEnabled,false);
+});
+
 test("unsafe production variables are reported in deterministic order",()=>{
   assert.throws(
-    ()=>validateProductionConfig({NODE_ENV:"production",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true"}),
-    error=>error.variables.join(",")==="GOOGLE_REVIEW_HARD_ROUTE_ENABLED,TIKTOK_SANDBOX_ACCESS_TOKEN"&&!error.message.includes("secret")
+    ()=>validateProductionConfig({NODE_ENV:"production",GOOGLE_TEST_CUSTOMER_ID:"secret",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true"}),
+    error=>error.variables.join(",")==="GOOGLE_REVIEW_HARD_ROUTE_ENABLED,GOOGLE_TEST_CUSTOMER_ID"&&!error.message.includes("secret")
   );
 });
 
@@ -52,7 +73,7 @@ test("safe startup does not emit a production config diagnostic",()=>{
 
 test("unsafe startup emits one allowlisted, deterministic, secret-free JSON diagnostic and rethrows",()=>{
   const secret="super-secret-value-that-must-not-appear";
-  const env={NODE_ENV:"production",TIKTOK_SANDBOX_ACCESS_TOKEN:secret,GOOGLE_TEST_CUSTOMER_ID:secret};
+  const env={NODE_ENV:"production",GOOGLE_TEST_LOGIN_CUSTOMER_ID:secret,GOOGLE_TEST_CUSTOMER_ID:secret};
   const calls=[];
   let thrown;
   try{loadProductionConfig(env,{error:value=>calls.push(value)});}catch(error){thrown=error;}
@@ -65,7 +86,7 @@ test("unsafe startup emits one allowlisted, deterministic, secret-free JSON diag
   assert.deepEqual(diagnostic,{
     event:"PRODUCTION_CONFIG_REJECTED",
     code:"UNSAFE_PRODUCTION_CONFIG",
-    variables:["GOOGLE_TEST_CUSTOMER_ID","TIKTOK_SANDBOX_ACCESS_TOKEN"]
+    variables:["GOOGLE_TEST_CUSTOMER_ID","GOOGLE_TEST_LOGIN_CUSTOMER_ID"]
   });
   assert.strictEqual(thrown.variables.join(","),diagnostic.variables.join(","));
 });
@@ -100,20 +121,22 @@ test("logger failure cannot bypass unsafe startup fail-fast behavior",()=>{
   let thrown;
   try{
     loadProductionConfig(
-      {NODE_ENV:"production",TIKTOK_TEST_ACCESS_TOKEN:expectedSecret},
+      {NODE_ENV:"production",GOOGLE_TEST_CUSTOMER_ID:expectedSecret},
       {error:()=>{throw new Error("logger unavailable");}}
     );
   }catch(error){thrown=error;}
   assert.ok(thrown instanceof ProductionConfigError);
-  assert.deepEqual(thrown.variables,["TIKTOK_TEST_ACCESS_TOKEN"]);
+  assert.deepEqual(thrown.variables,["GOOGLE_TEST_CUSTOMER_ID"]);
 });
 
 test("non-production review modes require complete explicit configuration",()=>{
   assert.throws(()=>validateProductionConfig({NODE_ENV:"development",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true"}),/GOOGLE_TEST_CUSTOMER_ID/);
   assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",GOOGLE_REVIEW_HARD_ROUTE_ENABLED:"true",GOOGLE_TEST_CUSTOMER_ID:"111",GOOGLE_TEST_LOGIN_CUSTOMER_ID:"222"}));
-  assert.throws(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true"}),/TIKTOK_REVIEW_ADVERTISER_ID/);
-  assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_REVIEW_ADVERTISER_ID:"111"}));
+  assert.equal(validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true"}).tiktokReviewFallbackEnabled,false);
+  assert.doesNotThrow(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_REVIEW_FALLBACK_ENABLED:"true",TIKTOK_SANDBOX_ADVERTISER_ID:"111",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret"}));
   assert.throws(()=>validateProductionConfig({NODE_ENV:"development",TIKTOK_FORCE_SANDBOX_REPORTS:"true"}),/TIKTOK_SANDBOX_ENABLED/);
+  assert.throws(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true"}),/TIKTOK_SANDBOX_ACCESS_TOKEN/);
+  assert.doesNotThrow(()=>validateProductionConfig({VERCEL_ENV:"preview",TIKTOK_SANDBOX_ENABLED:"true",TIKTOK_FORCE_SANDBOX_REPORTS:"true",TIKTOK_SANDBOX_ACCESS_TOKEN:"secret",TIKTOK_SANDBOX_ADVERTISER_ID:"111"}));
 });
 
 test("the test page requires explicit non-production sandbox mode",()=>{
@@ -143,16 +166,24 @@ test("TikTok endpoints reject the sandbox token query parameter before reading a
 });
 
 async function routeStatus(env){
-  const port=32000+Math.floor(Math.random()*10000);
-  const child=spawn(process.execPath,["-e",`const app=require('./server');app.listen(${port},()=>console.log('READY'))`],{
+  const child=spawn(process.execPath,["-e",`const app=require('./server');const server=app.listen(0,'127.0.0.1',()=>console.log('READY '+server.address().port))`],{
     cwd:root,env:{...process.env,VERCEL:"1",...env},stdio:["ignore","pipe","pipe"]
   });
   let stderr="";
+  let stdout="";
   child.stderr.on("data",chunk=>{stderr+=chunk});
+  let port;
   try{
     await new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>reject(new Error(`server timeout: ${stderr}`)),5000);
-      child.stdout.on("data",chunk=>{if(chunk.toString().includes("READY")){clearTimeout(timer);resolve();}});
+      // The legacy monolith imports all provider SDKs before it can emit READY.
+      // Keep this characterization tolerant of cold/contended CI startup while
+      // retaining a bounded fail-closed timeout.
+      const timer=setTimeout(()=>reject(new Error(`server timeout: ${stderr}`)),20000);
+      child.stdout.on("data",chunk=>{
+        stdout+=chunk;
+        const match=stdout.match(/READY (\d+)/);
+        if(match){port=Number(match[1]);clearTimeout(timer);resolve();}
+      });
       child.once("exit",code=>{clearTimeout(timer);reject(new Error(`server exited ${code}: ${stderr}`));});
     });
     const route=(await fetch(`http://127.0.0.1:${port}/tiktok-test`)).status;

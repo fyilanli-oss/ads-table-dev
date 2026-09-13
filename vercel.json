@@ -1,4 +1,30 @@
 {
+  "version": 2,
+  "builds": [
+    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "server.js", "use": "@vercel/node" },
+    { "src": "api/shopify-app.js", "use": "@vercel/node" },
+    { "src": "api/e10-activation-preflight.js", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/", "dest": "/api/shopify-app.js" },
+    { "src": "/shopify/app(?:/platforms)?", "dest": "/api/shopify-app.js" },
+    { "src": "/api/e10/activation-preflight", "dest": "/api/e10-activation-preflight.js" },
+    { "src": "/login", "dest": "/public/login.html" },
+    { "src": "/signup", "dest": "/public/signup.html" },
+    { "src": "/dashboard", "dest": "/public/dashboard.html" },
+    { "src": "/dashboard-demo", "dest": "/public/dashboard-demo.html" },
+    { "src": "/demo", "dest": "/public/dashboard-demo.html" },
+    { "src": "/privacy", "dest": "/public/privacy.html" },
+    { "src": "/terms", "dest": "/public/terms.html" },
+    { "src": "/data-deletion", "dest": "/public/data-deletion.html" },
+    { "src": "/auth/tiktok/(.*\\.txt)", "dest": "/public/auth/tiktok/$1" },
+    { "src": "/(.*\\.txt)", "dest": "/public/$1" },
+    { "src": "/(.*\\.html)", "dest": "/public/$1" },
+    { "src": "/api/(.*)", "dest": "/server.js" },
+    { "src": "/auth/(.*)", "dest": "/server.js" },
+    { "src": "/(.*)", "dest": "/server.js" }
+  ],
   "crons": [
     {
       "path": "/api/cron/auto-refresh",

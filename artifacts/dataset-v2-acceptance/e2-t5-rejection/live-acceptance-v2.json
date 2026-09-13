@@ -1,0 +1,22 @@
+{
+  "evidence_version": "e2-t5-rejection-v2-live-acceptance",
+  "operation": "e2_t5_rejection_v2",
+  "approved_main_sha": "135c9e880dd6db22059175977a3c2850ebe079fa",
+  "accepted_at_utc": "2026-08-27T09:05:00Z",
+  "preflight": "18/18 PASS",
+  "expected_case_count": 35,
+  "evaluated_case_count": 35,
+  "passed_case_count": 35,
+  "failed_case_count": 0,
+  "unexpected_accept_count": 0,
+  "residue_count": 0,
+  "transaction_requests": 1,
+  "transaction_retries": 0,
+  "postcheck": "15/15 PASS",
+  "postcheck_requests": 1,
+  "postcheck_retries": 0,
+  "state": "CONSUMED",
+  "production_no_change": true,
+  "contains_production_counts": false,
+  "contains_identity_or_row_data": false
+}

@@ -1,0 +1,18 @@
+[
+  {"case_code":"USER_A_READ_OWN","actor":"user_a","operation":"SELECT","target":"own","expected_outcome":"ALLOWED","expected_row_count":1,"expected_sqlstate_class":null,"evidence_mode":"ROW_COUNT"},
+  {"case_code":"USER_A_READ_USER_B","actor":"user_a","operation":"SELECT","target":"user_b","expected_outcome":"DENIED_BY_RLS","expected_row_count":0,"expected_sqlstate_class":null,"evidence_mode":"ROW_COUNT"},
+  {"case_code":"USER_B_READ_OWN","actor":"user_b","operation":"SELECT","target":"own","expected_outcome":"ALLOWED","expected_row_count":1,"expected_sqlstate_class":null,"evidence_mode":"ROW_COUNT"},
+  {"case_code":"USER_B_READ_USER_A","actor":"user_b","operation":"SELECT","target":"user_a","expected_outcome":"DENIED_BY_RLS","expected_row_count":0,"expected_sqlstate_class":null,"evidence_mode":"ROW_COUNT"},
+  {"case_code":"ANON_READ_USER_A","actor":"anon","operation":"SELECT","target":"user_a","expected_outcome":"DENIED_BY_PRIVILEGE","expected_row_count":0,"expected_sqlstate_class":"42","evidence_mode":"SAFE_SQLSTATE"},
+  {"case_code":"ANON_READ_USER_B","actor":"anon","operation":"SELECT","target":"user_b","expected_outcome":"DENIED_BY_PRIVILEGE","expected_row_count":0,"expected_sqlstate_class":"42","evidence_mode":"SAFE_SQLSTATE"},
+  {"case_code":"USER_A_INSERT","actor":"user_a","operation":"INSERT","target":"own","expected_outcome":"DENIED_BY_PRIVILEGE","expected_row_count":0,"expected_sqlstate_class":"42","evidence_mode":"SAFE_SQLSTATE"},
+  {"case_code":"USER_A_UPDATE_OWN","actor":"user_a","operation":"UPDATE","target":"own","expected_outcome":"DENIED_BY_PRIVILEGE","expected_row_count":0,"expected_sqlstate_class":"42","evidence_mode":"SAFE_SQLSTATE"},
+  {"case_code":"USER_A_DELETE_OWN","actor":"user_a","operation":"DELETE","target":"own","expected_outcome":"DENIED_BY_PRIVILEGE","expected_row_count":0,"expected_sqlstate_class":"42","evidence_mode":"SAFE_SQLSTATE"},
+  {"case_code":"USER_B_INSERT","actor":"user_b","operation":"INSERT","target":"own","expected_outcome":"DENIED_BY_PRIVILEGE","expected_row_count":0,"expected_sqlstate_class":"42","evidence_mode":"SAFE_SQLSTATE"},
+  {"case_code":"USER_B_UPDATE_OWN","actor":"user_b","operation":"UPDATE","target":"own","expected_outcome":"DENIED_BY_PRIVILEGE","expected_row_count":0,"expected_sqlstate_class":"42","evidence_mode":"SAFE_SQLSTATE"},
+  {"case_code":"USER_B_DELETE_OWN","actor":"user_b","operation":"DELETE","target":"own","expected_outcome":"DENIED_BY_PRIVILEGE","expected_row_count":0,"expected_sqlstate_class":"42","evidence_mode":"SAFE_SQLSTATE"},
+  {"case_code":"SERVICE_ROLE_INSERT_A","actor":"service_role","operation":"INSERT","target":"user_a","expected_outcome":"ALLOWED","expected_row_count":1,"expected_sqlstate_class":null,"evidence_mode":"ROW_COUNT"},
+  {"case_code":"SERVICE_ROLE_INSERT_B","actor":"service_role","operation":"INSERT","target":"user_b","expected_outcome":"ALLOWED","expected_row_count":1,"expected_sqlstate_class":null,"evidence_mode":"ROW_COUNT"},
+  {"case_code":"SERVICE_ROLE_READ_A","actor":"service_role","operation":"SELECT","target":"user_a","expected_outcome":"ALLOWED","expected_row_count":1,"expected_sqlstate_class":null,"evidence_mode":"ROW_COUNT"},
+  {"case_code":"SERVICE_ROLE_READ_B","actor":"service_role","operation":"SELECT","target":"user_b","expected_outcome":"ALLOWED","expected_row_count":1,"expected_sqlstate_class":null,"evidence_mode":"ROW_COUNT"}
+]

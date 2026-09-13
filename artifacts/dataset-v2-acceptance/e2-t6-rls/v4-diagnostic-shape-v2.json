@@ -1,0 +1,15 @@
+{
+  "operation": "e2_t6_rls_v4",
+  "status": "DIAGNOSTIC_COMPLETE",
+  "checkedGates": 18,
+  "currentPostcheckPass": false,
+  "failedGateCodes": [],
+  "missingGateCodes": ["DATASET_V2_BASELINE"],
+  "duplicateGateCodes": [],
+  "malformedGateCodes": [],
+  "unknownGatePresent": false,
+  "productionCountsExposed": false,
+  "productionIdentitiesExposed": false,
+  "requests": 1,
+  "retries": 0
+}

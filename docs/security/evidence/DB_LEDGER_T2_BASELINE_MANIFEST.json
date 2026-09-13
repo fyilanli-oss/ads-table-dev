@@ -1,0 +1,200 @@
+{
+  "manifest_version": "db-ledger-t2-baseline-v1",
+  "application_schema_baseline_version": "production-public-2026-08-24-v1",
+  "baseline_repository_commit": "b945a15348f690d89ff85c6b5aff40eac303769c",
+  "generated_at": "2026-08-24T00:00:00Z",
+  "normalization_version": "db-ledger-norm-v1",
+  "scope": {
+    "included": "application-owned public schema metadata and ledger evidence",
+    "auth_managed_schema_included": false,
+    "row_data_included": false,
+    "secrets_or_pii_included": false,
+    "data_export_is_schema_restore": false,
+    "fresh_project_restore_verified": false
+  },
+  "historical_ledger": [
+    {
+      "version": "20260616093145",
+      "name": "snapshot_version_unique_key",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260616103033",
+      "name": "snapshot_period_scope_columns",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260616115604",
+      "name": "snapshot_archive_retention_fields",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260617082433",
+      "name": "time_engine_snapshot_fields_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260618062937",
+      "name": "fx_constitution_snapshot_fields_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260619032341",
+      "name": "disconnect_lifecycle_fields_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260619094150",
+      "name": "db_spread_schema_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260625101919",
+      "name": "performance_dataset_rows_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260704080849",
+      "name": "create_fx_rates_daily_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260707221703",
+      "name": "adstable_production_safety_locks",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260708073908",
+      "name": "remove_jas_legacy_tables",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260709090852",
+      "name": "enable_rls_on_core_operational_tables",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260709111844",
+      "name": "add_time_engine_columns_to_performance_dataset_rows",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260709113042",
+      "name": "add_platform_business_at_to_performance_dataset_rows",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260709113124",
+      "name": "add_platform_business_at_to_dashboard_snapshots",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260709113235",
+      "name": "remove_split_business_time_columns_from_dataset",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260709123056",
+      "name": "add_fx_rate_date_to_snapshots_and_dataset",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260709130358",
+      "name": "enforce_platform_account_limit_guard",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260709135749",
+      "name": "performance_dataset_kpi_normalization_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260710122725",
+      "name": "organic_platform_skeleton_guard_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260710165903",
+      "name": "allow_platform_level_performance_dataset_rows_v1",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260722144205",
+      "name": "fix_new_user_currency_selection_required",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814111834",
+      "name": "temporary_refresh_loadtest_table",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814111854",
+      "name": "temporary_refresh_loadtest_pgnet",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814112414",
+      "name": "temporary_refresh_loadtest_cleanup",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814113035",
+      "name": "temporary_refresh_loadtest_realistic_schema",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814113454",
+      "name": "temporary_refresh_loadtest_samples",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814113752",
+      "name": "temporary_refresh_loadtest_cleanup",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814123958",
+      "name": "temporary_stress250_20000_users_schema",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814124339",
+      "name": "temporary_stress250_truncate_before_distributed_run",
+      "historical_sql_available": false
+    },
+    {
+      "version": "20260814124800",
+      "name": "temporary_stress250_cleanup",
+      "historical_sql_available": false
+    }
+  ],
+  "accepted_normalized_checksums": {
+    "oauth_consume_function": "21ddf7f83cbdaeab420877381a768952605a2373516163029170a8dbb45b4e56",
+    "oauth_cleanup_function": "789f7053c8461cc09f0e760cb7bbcc1e639eb202df36f9751c460a485da37ac9",
+    "oauth_state_hash_contract": "f296a578da8f48a0087e56b40b215fc2d778e934e16ab5a6517de530bcdf6a02",
+    "oauth_provider_contract": "c458bbe36802f1a3f8eb5624a47f2ea89675de9a05d8eb645ed727247d05edd7",
+    "oauth_ttl_contract": "e9f3214bbf625c5e05e2837dc17201e4016520b9b0d18af53eefaf4b32a3e364",
+    "token_access_envelope_contract": "70e9e634688afe4eaeab1737e25a55ff8f911783616495b6887bef34d0485d7b",
+    "token_refresh_envelope_contract": "3ee72ae856fa94a6d4ec319339a8d6e64f0487cbb2b7b7573325b2eb5d550050",
+    "token_service_role_privileges": "a927657e842b6e745ef5e5123e4a8e8d6c2a7e4580a245c18ae07c8f53c1f038"
+  },
+  "public_schema_inventory": {
+    "tables": 17,
+    "views": 0,
+    "materialized_views": 0,
+    "functions": 5,
+    "triggers": 1,
+    "policies": 21,
+    "constraints": 64,
+    "indexes": 72,
+    "columns": 283,
+    "full_normalized_catalog_checksum_capture": "required_at_controlled_preflight_before_reconciliation"
+  },
+  "repository_migration_checksums": {
+    "20260818090000": "728f62d4af52eccd0fee195b0a3dedf68889e52b7434f2676bfb90a5b65ef00b",
+    "20260818120000": "afada06dec7b95aca69e3d01dc432554c2599dcc1b357dbb300b3695ae8cb156",
+    "20260819120000": "7cd9c0dcf6b4ec8ece5c12656b974a9c02587158771404ba6e7e3735e9ca9c76",
+    "20260824120000": "f73116b653c0ce77f5751e74c36ece39ac4e94aa5f745b5f80772cb6d34de32e"
+  }
+}

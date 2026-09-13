@@ -1,0 +1,21 @@
+{
+  "evidence_version": "e2-t6-recovery-v2",
+  "operation": "e2_t6_rls_v2",
+  "terminal_code": "TRANSACTION_AND_POSTCHECK_FAILED",
+  "capsule_state": "CONSUMED",
+  "transaction_requests": 1,
+  "transaction_retries": 0,
+  "postcheck_requests": 1,
+  "postcheck_retries": 0,
+  "recovery_kind": "distinct_read_only_no_change",
+  "recovery_requests": 1,
+  "recovery_retries": 0,
+  "recovery_gates": "19/19 PASS",
+  "e2_t6_v2_residue_zero": true,
+  "total_e2_residue_zero": true,
+  "persistent_evidence_objects_zero": true,
+  "protected_baselines_unchanged": true,
+  "live_acceptance_claimed": false,
+  "contains_production_counts": false,
+  "contains_identity_or_row_data": false
+}

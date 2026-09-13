@@ -1,0 +1,12 @@
+{
+  "operation": "e2_t6_rls_v4",
+  "status": "FAIL_CLOSED",
+  "safeCode": "POSTCHECK_FAILED",
+  "transactionRequests": 1,
+  "transactionRetries": 0,
+  "postcheckRequests": 1,
+  "postcheckRetries": 0,
+  "capsuleState": "CONSUMED",
+  "productionCountsExposed": false,
+  "productionIdentitiesExposed": false
+}

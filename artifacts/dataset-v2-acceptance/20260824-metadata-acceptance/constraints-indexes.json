@@ -1,0 +1,368 @@
+{
+  "constraints": [
+    {
+      "columns": [
+        "campaign_type"
+      ],
+      "fingerprint": "30de0edec3168635f47a6de56c298598946b442536df35947c5af613fd84ced1",
+      "name": "performance_dataset_rows_v2_campaign_type_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "channel"
+      ],
+      "fingerprint": "31d54e3cd21851fabad47da10c1cf8de8556bebb1e1fdd6b248b95ec398894da",
+      "name": "performance_dataset_rows_v2_channel_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "entity_type"
+      ],
+      "fingerprint": "eea4f53480401824bc951333f3bef7673198fa203cc4efaa1d5600c70d9d999f",
+      "name": "performance_dataset_rows_v2_entity_type_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "fx_rate"
+      ],
+      "fingerprint": "9062fa9c63c92a09dada9a4ebe80c3d63cbff82143f80c091f3b6e407e9ef194",
+      "name": "performance_dataset_rows_v2_fx_rate_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "traffic_type",
+        "campaign_type",
+        "root_entity_type",
+        "parent_entity_type",
+        "parent_entity_id",
+        "parent_entity_name",
+        "entity_type",
+        "platform"
+      ],
+      "fingerprint": "d7c1eccdff2f09a4cca1968e2fb374e0679e8f45f7a528dfa4837cd0fbb19889",
+      "name": "performance_dataset_rows_v2_hierarchy_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "metric_support"
+      ],
+      "fingerprint": "b9372365396d3d18a130f886b89e1269aaf59248c63142b78ab5e34a589383e6",
+      "name": "performance_dataset_rows_v2_metric_support_keys_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "metric_support"
+      ],
+      "fingerprint": "270e3d19781422d5b91beff740e1ba2bdeb90d66ceeea326806c85e0cb1a636b",
+      "name": "performance_dataset_rows_v2_metric_support_object_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "metric_support",
+        "impressions",
+        "ad_clicks",
+        "sessions",
+        "spend",
+        "add_to_cart",
+        "add_to_cart_value",
+        "checkout",
+        "checkout_value",
+        "purchase",
+        "purchase_value"
+      ],
+      "fingerprint": "d629a18f25528094480f55d8b7c684fa53237d180263e9fda7e664d02fef1e8c",
+      "name": "performance_dataset_rows_v2_metric_value_support_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "parent_entity_type"
+      ],
+      "fingerprint": "470b6b0d94af9a2c9ba621e8bc63d1f7a82a5f2e75450ff4016c8b1f617b4cf0",
+      "name": "performance_dataset_rows_v2_parent_type_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "fingerprint": "4dc891945e16ea7d6f277a8b51132b1f8a751408a8e57d36fe86cfa59f8640f4",
+      "name": "performance_dataset_rows_v2_pkey",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "primary_key",
+      "validated": true
+    },
+    {
+      "columns": [
+        "platform"
+      ],
+      "fingerprint": "b09478128859d3c097756be2f862877900321c9a3a57a72807bbe1a23251a0b9",
+      "name": "performance_dataset_rows_v2_platform_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "raw"
+      ],
+      "fingerprint": "70da9deaeee70bf29a7fe1541d4533cf0edfad51921aba64e970c3a5c83ee271",
+      "name": "performance_dataset_rows_v2_raw_object_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "root_entity_type"
+      ],
+      "fingerprint": "a292bb00cd7d06bd335f5d052724bd268525ab8ed433c5295577fd84228d858f",
+      "name": "performance_dataset_rows_v2_root_type_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "source_confidence"
+      ],
+      "fingerprint": "84d8980eeb265ac83c0b999e5e08858d592c2c468a4d8cf3c3d87a8b7e73793e",
+      "name": "performance_dataset_rows_v2_source_confidence_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "source_currency"
+      ],
+      "fingerprint": "50a4c6f853b33a94f7fe560318ebdab0f46fe940bbb5cf3a1b9731ffbbe23b2c",
+      "name": "performance_dataset_rows_v2_source_currency_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "traffic_type",
+        "source_system",
+        "channel",
+        "ga4_property_id",
+        "platform"
+      ],
+      "fingerprint": "6499dedd2cfb6cc59c6c4c317e07fe6f88508d84516a07d1f1a638a4d6fe2e7d",
+      "name": "performance_dataset_rows_v2_source_semantics_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "source_system"
+      ],
+      "fingerprint": "9d38e1c72a2fb639fc139ee1116e6ed7484ad6d40ed6aacac09eb65e703734f5",
+      "name": "performance_dataset_rows_v2_source_system_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "synthetic"
+      ],
+      "fingerprint": "69cde8e18da153ef636b40f047add08b63562027c74d2d54003ab5b65917236b",
+      "name": "performance_dataset_rows_v2_synthetic_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "target_currency"
+      ],
+      "fingerprint": "a0e528e4cb5d53b9e466a995a124cec7e098bee1b065972f3fe8547bb9d485e1",
+      "name": "performance_dataset_rows_v2_target_currency_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "traffic_type"
+      ],
+      "fingerprint": "b303792a60245923941826194de9015c4ae6a46be2f217aca876001c82adf63a",
+      "name": "performance_dataset_rows_v2_traffic_type_chk",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": null,
+      "type": "check",
+      "validated": true
+    },
+    {
+      "columns": [
+        "user_id"
+      ],
+      "fingerprint": "f07d5c640cd7e7e67a7a88cedcd320b8fcdfbcd5f38a07bf6c67b78bfa6d6295",
+      "name": "performance_dataset_rows_v2_user_id_fkey",
+      "normalization_version": "dataset-v2-constraint-norm-v1",
+      "result": "PASS",
+      "target_relation": "public.users",
+      "type": "foreign_key",
+      "validated": true
+    }
+  ],
+  "evidence_version": "e2-dataset-v2-metadata-v1",
+  "expected_constraint_counts": {
+    "check": 19,
+    "foreign_key": 1,
+    "primary_key": 1
+  },
+  "expected_physical_index_count": 5,
+  "extra_objects": [],
+  "indexes": [
+    {
+      "columns": [
+        "user_id",
+        "platform",
+        "platform_account_id",
+        "traffic_type",
+        "business_date"
+      ],
+      "name": "performance_dataset_rows_v2_account_scope_date_idx",
+      "primary": false,
+      "ready": true,
+      "result": "PASS",
+      "unique": false,
+      "valid": true
+    },
+    {
+      "columns": [
+        "user_id",
+        "platform",
+        "platform_account_id",
+        "business_date",
+        "traffic_type",
+        "entity_key"
+      ],
+      "name": "performance_dataset_rows_v2_canonical_uidx",
+      "primary": false,
+      "ready": true,
+      "result": "PASS",
+      "unique": true,
+      "valid": true
+    },
+    {
+      "columns": [
+        "user_id",
+        "platform",
+        "platform_account_id",
+        "entity_key",
+        "business_date"
+      ],
+      "name": "performance_dataset_rows_v2_entity_history_idx",
+      "primary": false,
+      "ready": true,
+      "result": "PASS",
+      "unique": false,
+      "valid": true
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "name": "performance_dataset_rows_v2_pkey",
+      "primary": true,
+      "ready": true,
+      "result": "PASS",
+      "unique": true,
+      "valid": true
+    },
+    {
+      "columns": [
+        "user_id",
+        "business_date"
+      ],
+      "name": "performance_dataset_rows_v2_user_date_idx",
+      "primary": false,
+      "ready": true,
+      "result": "PASS",
+      "unique": false,
+      "valid": true
+    }
+  ],
+  "invalid_or_not_ready_index_count": 0,
+  "live_constraint_counts": {
+    "check": 19,
+    "foreign_key": 1,
+    "primary_key": 1
+  },
+  "live_physical_index_count": 5,
+  "missing_objects": [],
+  "overall_result": "PASS",
+  "repository_commit": "d16e87449aeb9eefdea570f5bb8eca77b67ed8ef",
+  "table": "public.performance_dataset_rows_v2",
+  "unvalidated_constraint_count": 0
+}

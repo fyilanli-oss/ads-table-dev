@@ -1,0 +1,54 @@
+{
+  "contract": "e10-t5c1-funnel-ui",
+  "status": "frozen",
+  "module": "Funnel",
+  "default_view": "funnel",
+  "views": {
+    "funnel": {
+      "flow": "stages_down_periods_right",
+      "stages": [
+        { "id": "traffic", "metrics": ["impression", "click", "spend", "ctr", "cpc"] },
+        { "id": "cart", "metrics": ["add_to_cart", "add_to_cart_value"] },
+        { "id": "checkout", "metrics": ["checkout", "checkout_value", "abandoned", "abandoned_value"] },
+        { "id": "outcome", "metrics": ["purchase", "sales", "revenue", "roas", "cps"] }
+      ],
+      "compare_columns": ["current", "comparison", "change"]
+    },
+    "table": {
+      "flow": "hierarchy_down_metrics_right",
+      "compare_mode": "single_focus_metric",
+      "focus_metric_columns": ["comparison", "current", "absolute_change", "percent_change"],
+      "other_metric_columns": ["current"]
+    }
+  },
+  "shared_state_on_switch": ["time_range", "comparison", "filters", "currency", "data_sources", "expanded_entities", "compare_focus_metric"],
+  "toolbar": {
+    "order": ["time_range", "comparison", "filters"],
+    "only_one_popover_open": true,
+    "mobile_overlay": "modal_or_sheet"
+  },
+  "shopify_component_map": {
+    "page": ["s-page", "s-section"],
+    "layout": ["s-grid", "s-stack"],
+    "actions": ["s-button", "s-button-group", "s-menu"],
+    "overlays": ["s-popover", "s-modal"],
+    "date": ["s-date-picker", "s-date-field", "s-choice-list"],
+    "filters": ["s-search-field", "s-checkbox", "s-clickable-chip"],
+    "status": ["s-badge", "s-banner", "s-spinner", "s-tooltip"],
+    "table_first_choice": ["s-table"]
+  },
+  "custom_visualization_boundary": {
+    "allowed": "funnel_and_hierarchical_table_data_presentation_only",
+    "condition": "official_s_table_capability_and_accessibility_revalidated_first",
+    "must_use_shopify_tokens": true,
+    "custom_global_shell_or_component_framework": false
+  },
+  "forbidden": [
+    "simultaneously_open_toolbar_popovers",
+    "frontend_aggregation_or_formula",
+    "invented_provider_hierarchy",
+    "fake_zero_for_missing_or_unsupported",
+    "paid_organic_blend_frontend_filter",
+    "shopify_admin_shell_replica"
+  ]
+}

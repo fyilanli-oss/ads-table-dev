@@ -1,20 +1,33 @@
-
-const express=require("express");
 const path=require("path");
 const crypto=require("crypto");
 const {google}=require("googleapis");
-const {createClient}=require("@supabase/supabase-js");
 const {createRequireConnectAccessForOAuth}=require("./security/oauth-access");
-const {createOAuthTransactionStore}=require("./security/oauth-transaction-store");
-const {loadProductionConfig,parseExplicitBoolean}=require("./security/production-config");
-const {createProviderTokenVaultFromEnv}=require("./security/provider-token-vault");
-const {createProviderTokenStore}=require("./security/provider-token-store");
-const productionConfig=loadProductionConfig();
-const app=express(); const PORT=process.env.PORT||3000;
-app.set("trust proxy",1); app.use(express.json());
-app.use((req,res,next)=>req.path==="/tiktok-test.html"&&!productionConfig.tiktokTestPageEnabled?res.sendStatus(404):next());
-app.use(express.static(path.join(__dirname,"public")));
-const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";
+const {parseExplicitBoolean}=require("./security/production-config");
+const {createApplication,startApplication}=require("./src/app");
+const {installErrorBoundary}=require("./src/middleware/http-boundary");
+const {createAccessBoundary}=require("./src/middleware/access-boundary");
+const {registerPublicRoutes}=require("./src/routes/public-routes");
+const {registerAccountStatusRoutes}=require("./src/routes/account-status-routes");
+const {createOAuthTransactionBoundary}=require("./src/oauth/transaction-boundary");
+const {registerOAuthProviderRoutes}=require("./src/oauth/provider-routes");
+const {createMetaOAuthHandlers}=require("./src/oauth/meta-handlers");
+const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
+const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
+const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");const {ORGANIC_GA4_INGEST_ENABLED,ORGANIC_GA4_PARK_REASON,requireOrganicGa4Ingest}=require("./src/providers/organic/ingest-policy");
+const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
+const {createPinterestOAuthHandlers}=require("./src/oauth/pinterest-handlers");const {pinterestAdAccountIds,discoverPinterestAdAccounts}=require("./src/providers/pinterest/account-discovery");const {createPinterestClient}=require("./src/providers/pinterest/client");
+const {createTikTokOAuthHandlers}=require("./src/oauth/tiktok-handlers");const {sandboxAdvertiser}=require("./src/providers/tiktok/sandbox-account-source");const {createTikTokLiveShadow}=require("./src/providers/tiktok/live-shadow");
+const {createRefreshJobBoundary}=require("./src/jobs/refresh-job-boundary");
+const {createManualSnapshotOrchestrator}=require("./src/jobs/manual-snapshot-orchestrator");
+const {createAutomationSnapshotOrchestrator}=require("./src/jobs/automation-snapshot-orchestrator");
+const {googleSnapshotJobEvidence}=require("./src/jobs/google-snapshot-job-evidence");
+const {snapshotSpreadJobEvidence,recoverySnapshotSpreadJobEvidence}=require("./src/jobs/snapshot-job-evidence");const {createMetaLiveRefresh}=require("./src/providers/meta/live-refresh");const {createGoogleLiveRefresh}=require("./src/providers/google/live-refresh");const {discoverGoogleCustomers}=require("./src/providers/google/customer-discovery");
+const {createSharedClients}=require("./src/clients/shared-clients");
+const {loadRuntimeConfig}=require("./src/config/runtime-config");const {registerShopifyRuntime}=require("./src/shopify/runtime");
+const runtimeConfig=loadRuntimeConfig({rootDirectory:__dirname});
+const productionConfig=runtimeConfig.production;
+const app=createApplication({publicDirectory:runtimeConfig.publicDirectory,tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled});
+const META_GRAPH_VERSION=process.env.META_GRAPH_VERSION||"v20.0";const META_V2_PRIMARY_REFRESH_ENABLED=parseExplicitBoolean(process.env.META_V2_PRIMARY_REFRESH_ENABLED,true,"META_V2_PRIMARY_REFRESH_ENABLED");const GOOGLE_V2_PRIMARY_REFRESH_ENABLED=parseExplicitBoolean(process.env.GOOGLE_V2_PRIMARY_REFRESH_ENABLED,true,"GOOGLE_V2_PRIMARY_REFRESH_ENABLED");
 const PINTEREST_API_BASE="https://api.pinterest.com/v5";
 const KLAVIYO_API_BASE="https://a.klaviyo.com";
 const KLAVIYO_WWW_BASE="https://www.klaviyo.com";
@@ -34,35 +47,20 @@ function googleReviewAccountPair(){
 const TIKTOK_AUTH_BASE="https://business-api.tiktok.com/portal/auth";
 const TIKTOK_API_BASE="https://business-api.tiktok.com/open_api";
 const TIKTOK_SANDBOX_API_BASE="https://sandbox-ads.tiktok.com/open_api";
-const TIKTOK_REVIEW_ADVERTISER_ID=process.env.TIKTOK_REVIEW_ADVERTISER_ID||"";
-const TIKTOK_REVIEW_ADVERTISER_NAME=process.env.TIKTOK_REVIEW_ADVERTISER_NAME||"";
+// Production review reuses the existing server-only sandbox credential names; no duplicate secret namespace.
+const TIKTOK_SANDBOX_ADVERTISER_ID=process.env.TIKTOK_SANDBOX_ADVERTISER_ID||"";const TIKTOK_SANDBOX_ADVERTISER_NAME=process.env.TIKTOK_SANDBOX_ADVERTISER_NAME||"";const TIKTOK_SANDBOX_ACCESS_TOKEN=process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||"";
 const TIKTOK_REVOKE_ENDPOINT=process.env.TIKTOK_REVOKE_ENDPOINT||`${TIKTOK_API_BASE}/v1.3/oauth2/revoke/`;
-const supabaseAdmin=(process.env.SUPABASE_URL&&process.env.SUPABASE_SERVICE_ROLE_KEY)?createClient(process.env.SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false}}):null;
-const oauthTransactionStore=supabaseAdmin?createOAuthTransactionStore({client:supabaseAdmin}):null;
 const providerTokenEncryptionEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_ENCRYPTION_ENABLED,false,"PROVIDER_TOKEN_ENCRYPTION_ENABLED");
 const providerTokenLegacyReadsEnabled=parseExplicitBoolean(process.env.PROVIDER_TOKEN_LEGACY_READ_ENABLED,true,"PROVIDER_TOKEN_LEGACY_READ_ENABLED");
-const providerTokenVault=providerTokenEncryptionEnabled?createProviderTokenVaultFromEnv():null;
-const providerTokenStore=providerTokenEncryptionEnabled&&supabaseAdmin?createProviderTokenStore({client:supabaseAdmin,vault:providerTokenVault,legacyReadsEnabled:providerTokenLegacyReadsEnabled}):null;
-function sendFile(res,file){res.sendFile(path.join(__dirname,"public",file))}
-app.get("/",(_,res)=>sendFile(res,"landing.html")); app.get("/dashboard-demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/login",(_,res)=>sendFile(res,"login.html")); app.get("/signup",(_,res)=>sendFile(res,"signup.html")); app.get("/dashboard",(_,res)=>sendFile(res,"dashboard.html")); app.get("/demo",(_,res)=>sendFile(res,"dashboard-demo.html")); app.get("/privacy",(_,res)=>sendFile(res,"privacy.html")); app.get("/terms",(_,res)=>sendFile(res,"terms.html")); app.get("/data-deletion",(_,res)=>sendFile(res,"data-deletion.html")); app.get("/tiktok-test",(_,res)=>productionConfig.tiktokTestPageEnabled?sendFile(res,"tiktok-test.html"):res.sendStatus(404));
-app.get("/api/public-config",(_,res)=>res.json({supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}));
+const {supabaseAdmin,oauthTransactionStore,providerTokenStore}=createSharedClients({env:process.env,providerTokenEncryptionEnabled,providerTokenLegacyReadsEnabled});registerShopifyRuntime({app,env:process.env,supabaseAdmin,oauthTransactionStore});
+registerPublicRoutes({app,publicDirectory:runtimeConfig.publicDirectory,tiktokTestPageEnabled:productionConfig.tiktokTestPageEnabled,publicConfig:{supabaseUrl:process.env.SUPABASE_URL||"",supabaseAnonKey:process.env.SUPABASE_ANON_KEY||process.env.SUPABASE_PUBLISHABLE_KEY||""}});
 async function getUserFromRequest(req){const a=req.headers.authorization||"";const t=a.startsWith("Bearer ")?a.slice(7):null;if(!t||!supabaseAdmin)return null;const {data,error}=await supabaseAdmin.auth.getUser(t);if(error||!data?.user?.id)return null;return data.user}
-async function requireUser(req,res){const u=await getUserFromRequest(req);if(!u){res.status(401).json({error:"Not authenticated"});return null}return u}
 async function expireTrialsIfNeeded(){if(!supabaseAdmin)return;const{error}=await supabaseAdmin.rpc("expire_trials");if(error)throw error}
 async function getUserSubscription(userId){await expireTrialsIfNeeded();const{data,error}=await supabaseAdmin.from("subscriptions").select("status,trial_end_date").eq("user_id",userId).maybeSingle();if(error)throw error;return data}
 function getAccessByStatus(status){const full=["trial","active"].includes(status);const readonly=status==="expired";const blocked=["suspended","deleted"].includes(status);return{dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
-async function requireAccess(req,res,userId,capability){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);if(access.blocked||!access[capability]){res.status(403).json({error:"Subscription inactive",status:sub?.status||null});return null}return{sub,access}}
+const {requireUser,requireAccess,requireLifecycleAccess,requireConnection,requireRefreshConnection,requireActiveOwnership}=createAccessBoundary({getUserFromRequest,getUserSubscription,getSubscriptionForLifecycle,getAccessByStatus,getLifecycleAccess,getConnection,getOwnership,activeOwnershipStatuses});
 const requireConnectAccessForOAuth=createRequireConnectAccessForOAuth({requireUser,getUserSubscription,getAccessByStatus});
-async function createOAuthTransaction(userId,provider,redirectUri,pkceVerifier=null){
-  if(!oauthTransactionStore)throw new Error("OAuth transaction store is not configured");
-  await oauthTransactionStore.cleanupExpired();
-  return oauthTransactionStore.create({userId,provider,redirectUri,pkceVerifier});
-}
-async function consumeOAuthTransaction(state,provider,redirectUri){
-  if(!oauthTransactionStore||!state)return null;
-  return oauthTransactionStore.consume({state:String(state),provider,redirectUri});
-}
-function sendOAuthAuthorizationResponse(req,res,authorizationUrl){if(req.query.response_mode==="json")return res.json({authorization_url:authorizationUrl});return res.redirect(authorizationUrl)}
+const {createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse}=createOAuthTransactionBoundary({transactionStore:oauthTransactionStore});
 function parseExpiry(s){return s?new Date(Date.now()+Number(s)*1000).toISOString():null}
 async function saveConnection(userId,platform,payload){
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
@@ -99,16 +97,15 @@ async function saveConnection(userId,platform,payload){
   if(error)throw new Error(error.message)
 }
 async function getConnection(userId,platform){if(!supabaseAdmin||!userId)return null;const {data,error}=await supabaseAdmin.from("platform_connections").select("*").eq("user_id",userId).eq("platform",platform).eq("connected",true).maybeSingle();if(error)throw new Error(error.message);if(!data||!providerTokenStore)return data;const tokens=await providerTokenStore.resolve({userId,platform,legacyAccessToken:data.access_token,legacyRefreshToken:data.refresh_token});return{...data,access_token:tokens.accessToken,refresh_token:tokens.refreshToken,token_storage_source:tokens.source,token_rotation_required:tokens.needsRotation}}
-async function connectionStatus(userId,platform){const r=await getConnection(userId,platform).catch(()=>null);return{connected:Boolean(r&&(r.access_token||r.refresh_token)),source:r?"database":"none",updatedAt:r?.updated_at||null}}
-async function requireConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked){res.status(403).json({error:"Account access blocked",status:access.status});return null}const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn}}
-async function requireRefreshConnection(req,res,platform){const user=await requireUser(req,res);if(!user)return null;const accessCheck=await requireAccess(req,res,user.id,"manualRefresh");if(!accessCheck)return null;const conn=await getConnection(user.id,platform);if(!conn){res.status(404).json({error:`${platform} not connected`});return null}return{user,conn,sub:accessCheck.sub,access:accessCheck.access}}
+async function connectionStatus(userId,platform){const r=await getConnection(userId,platform).catch(()=>null),selectionRequired=r?.metadata?.accountSelectionRequired===true;return{connected:Boolean(r&&(r.access_token||r.refresh_token)&&!selectionRequired),source:r?"database":"none",updatedAt:r?.updated_at||null}}
 async function canRunScheduledRefresh(userId){const sub=await getUserSubscription(userId);const access=getAccessByStatus(sub?.status);return Boolean(!access.blocked&&access.dailySync)}
 
 // ===== PHASE 1 CONSTITUTION PACK HELPERS =====
-const PHASE1_PLATFORM_LIMITS={meta:3,google:3,klaviyo:3,tiktok:3,organic:1};
+const PHASE1_PLATFORM_LIMITS={meta:3,google:3,pinterest:3,klaviyo:3,tiktok:3,organic:1};
 const PHASE1_REPORTABLE_ACCOUNT_TYPES={
   meta:"meta_ads_account",
   google:"google_ads_customer_account",
+  pinterest:"pinterest_ad_account",
   tiktok:"tiktok_advertiser_account",
   klaviyo:"klaviyo_account",
   organic:"organic_property"
@@ -117,13 +114,7 @@ function phase1ReportableAccountType(platform){return PHASE1_REPORTABLE_ACCOUNT_
 function normalizePlatformAccountId(value){return String(value||"").trim()}
 function activeOwnershipStatuses(){return ["connected","active"]}
 
-const PASSIVE_LEGACY_PLATFORMS={
-  pinterest:{
-    status:"passive_legacy",
-    label:"Pinterest",
-    message:"Pinterest is currently Passive / Legacy. New Pinterest connections are disabled; existing data remains available."
-  }
-};
+const PASSIVE_LEGACY_PLATFORMS={};
 function passiveLegacyPlatform(platform){return PASSIVE_LEGACY_PLATFORMS[String(platform||"").toLowerCase()]||null}
 function passiveLegacyPlatformStatus(platform){const cfg=passiveLegacyPlatform(platform);return cfg?{platform:String(platform||"").toLowerCase(),status:cfg.status,label:cfg.label,message:cfg.message}:null}
 function assertPlatformNotPassiveLegacy(platform){
@@ -867,7 +858,7 @@ async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccoun
     await supabaseAdmin.from("platform_ad_accounts").upsert(row,{onConflict:"user_id,platform,platform_account_id"});
     const schedule=await ensureSnapshotSchedule(userId,validation.platform,row.platform_account_id,{accountSelectionGuardVersion:"v2-explicit-selection",selectedByUserAt:now,account_type:phase1ReportableAccountType(validation.platform)});
     const backfill=await requestLifecycleBackfill({userId,platform:validation.platform,platformAccountId:row.platform_account_id,reason:"account_initial_connect"});
-    results.push({platform:validation.platform,platform_account_id:row.platform_account_id,account_name:row.account_name,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null,backfill_30d:backfill,currency:row.currency||null});
+    results.push({platform:validation.platform,platform_account_id:row.platform_account_id,account_name:row.account_name,ownership_id:ownership?.id||null,schedule_id:schedule?.id||null,backfill_30d:backfill,currency:row.currency||null,loginCustomerId:normalizeCustomerId(account.loginCustomerId||account.login_customer_id||"")||null,reportBase:account.reportBase||null,tokenSource:account.tokenSource||null,sandbox:account.sandbox===true});
   }
 
   const primary=results[0];
@@ -878,7 +869,7 @@ async function selectPlatformAccountsForLifecycle(userId,platform,selectedAccoun
       selectedPlatformAccountId:primary?.platform_account_id||null,
       lastOwnedPlatformAccountId:primary?.platform_account_id||null,
       selectedPlatformAccountIds:results.map(account=>account.platform_account_id),
-      selectedPlatformAccounts:results.map(account=>({platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null})),
+      selectedPlatformAccounts:results.map(account=>({platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null,loginCustomerId:account.loginCustomerId||null,reportBase:account.reportBase||null,tokenSource:account.tokenSource||null,sandbox:account.sandbox===true})),loginCustomerId:primary?.loginCustomerId||null,login_customer_id:primary?.loginCustomerId||null,reportBase:primary?.reportBase||null,tokenSource:primary?.tokenSource||null,sandbox:primary?.sandbox===true,
       baseCurrency:primary?.currency||null,
       accountSelectionRequired:false,
       accountSelectionGuardVersion:"v2-explicit-selection",
@@ -954,15 +945,6 @@ async function ensurePlatformOwnership(userId,platform,account){
   }
 
   return data;
-}
-async function requireActiveOwnership(userId,platform,platformAccountId){
-  const ownership=await getOwnership(platform,platformAccountId);
-  if(!ownership||ownership.owner_user_id!==userId||!activeOwnershipStatuses().includes(ownership.status)){
-    const err=new Error("Platform account ownership is not active");
-    err.status=403;
-    throw err;
-  }
-  return ownership;
 }
 async function disconnectPlatformLifecycle(userId,platform,options={}){
   const now=new Date().toISOString();
@@ -1069,122 +1051,30 @@ async function disconnectPlatformLifecycle(userId,platform,options={}){
     snapshots:"preserved"
   };
 }
-async function createRefreshJob(userId,platform,platformAccountId,metadata={}){
-  const existing=await supabaseAdmin
-    .from("snapshot_jobs")
-    .select("id,status")
-    .eq("user_id",userId)
-    .eq("platform",platform)
-    .eq("platform_account_id",platformAccountId)
-    .in("status",["queued","running"])
-    .limit(1)
-    .maybeSingle();
-  if(existing.error)throw existing.error;
-  if(existing.data){
-    const err=new Error("Refresh job already queued or running for this platform account");
-    err.status=409;
-    err.job=existing.data;
-    throw err;
-  }
-  const {data,error}=await supabaseAdmin
-    .from("snapshot_jobs")
-    .insert({
-      user_id:userId,
-      platform,
-      platform_account_id:platformAccountId,
-      status:"queued",
-      job_type:metadata.jobType||metadata.job_type||metadata.trigger||"refresh",
-      capture_reason:metadata.captureReason||metadata.capture_reason||null,
-      lifecycle_version:metadata.lifecycleVersion||metadata.lifecycle_version||DISCONNECT_LIFECYCLE_VERSION,
-      metadata,
-      created_at:new Date().toISOString(),
-      updated_at:new Date().toISOString()
-    })
-    .select("*")
-    .maybeSingle();
-  if(error)throw error;
-  return data;
-}
-async function setRefreshJobStatus(jobId,status,extra={}){
-  const now=new Date().toISOString();
-  const patch={status,updated_at:now,...extra};
-  if(status==="running")patch.started_at=now;
-  if(["completed","failed"].includes(status))patch.finished_at=now;
-  const {data,error}=await supabaseAdmin.from("snapshot_jobs").update(patch).eq("id",jobId).select("*").maybeSingle();
-  if(error)throw error;
-  return data;
-}
+const refreshJobBoundary=createRefreshJobBoundary({getClient:()=>supabaseAdmin,lifecycleVersion:DISCONNECT_LIFECYCLE_VERSION});
+const createRefreshJob=(userId,platform,platformAccountId,metadata={})=>refreshJobBoundary.create({userId,platform,platformAccountId,metadata});
+const setRefreshJobStatus=(jobId,status,extra={})=>refreshJobBoundary.transition(jobId,status,extra);
+const manualSnapshotOrchestrator=createManualSnapshotOrchestrator({jobBoundary:refreshJobBoundary});const metaV2LiveRefresh=supabaseAdmin?createMetaLiveRefresh({supabaseClient:supabaseAdmin,graphVersion:META_GRAPH_VERSION,resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate}):null;const googleV2LiveRefresh=supabaseAdmin?createGoogleLiveRefresh({supabaseClient:supabaseAdmin,search:({userId,customerId,query,loginCustomerId})=>googleAdsSearch(userId,customerId,query,loginCustomerId),resolveTargetCurrency:async userId=>await getUserAccountCurrency(userId)||DEFAULT_REPORTING_CURRENCY,resolveFxRate}):null;const tiktokV2LiveShadow=supabaseAdmin&&productionConfig.tiktokV2ShadowEnabled?createTikTokLiveShadow({supabaseClient:supabaseAdmin,resolveFxRate}):null;
+const automationSnapshotOrchestrator=createAutomationSnapshotOrchestrator({jobBoundary:refreshJobBoundary});
 // ===== END PHASE 1 CONSTITUTION PACK HELPERS =====
 function googleOAuthClient(){if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET||!process.env.GOOGLE_REDIRECT_URI)throw new Error("Missing Google OAuth env");return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,process.env.GOOGLE_REDIRECT_URI)}
 async function getFreshGoogleAccessToken(userId){const conn=await getConnection(userId,"google");if(!conn)throw new Error("Google not connected");const exp=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0;if(conn.access_token&&exp&&exp>Date.now()+120000)return conn.access_token;if(!conn.refresh_token){if(conn.access_token)return conn.access_token;throw new Error("Google refresh token missing. Please reconnect Google.")}const client=googleOAuthClient();client.setCredentials({refresh_token:conn.refresh_token});const {credentials}=await client.refreshAccessToken();const token=credentials.access_token;const expiry=credentials.expiry_date||(Date.now()+3600*1000);await saveConnection(userId,"google",{accessToken:token,refreshToken:conn.refresh_token,tokenExpiresAt:new Date(expiry).toISOString(),metadata:{...(conn.metadata||{}),refreshedAt:new Date().toISOString(),expiryDate:expiry}});return token}
-app.get("/auth/meta",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.META_APP_ID||!process.env.META_REDIRECT_URI)throw new Error("Missing Meta env");const {state}=await createOAuthTransaction(userId,"meta",process.env.META_REDIRECT_URI);const p=new URLSearchParams({client_id:process.env.META_APP_ID,redirect_uri:process.env.META_REDIRECT_URI,state,response_type:"code",scope:"ads_read"});sendOAuthAuthorizationResponse(req,res,`https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/meta/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?meta_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?meta_error=missing_code");const transaction=await consumeOAuthTransaction(state,"meta",process.env.META_REDIRECT_URI);if(!transaction)return res.redirect("/dashboard?meta_error=invalid_state");const userId=transaction.user_id;const url=new URL(`https://graph.facebook.com/${META_GRAPH_VERSION}/oauth/access_token`);url.searchParams.set("client_id",process.env.META_APP_ID);url.searchParams.set("redirect_uri",process.env.META_REDIRECT_URI);url.searchParams.set("client_secret",process.env.META_APP_SECRET);url.searchParams.set("code",code);const r=await fetch(url);const data=await r.json();if(!r.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");await saveConnection(userId,"meta",{accessToken:data.access_token,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});
-
-const metaConnAfterReconnect=await getConnection(userId,"meta");
-if(metaConnAfterReconnect){
-  try{
-    const accountsData=await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},data.access_token);
-    for(const account of accountsData.data||[])await upsertAdAccount(userId,"meta",account);
-    await saveConnection(userId,"meta",{metadata:{accountSelectionRequired:true,availableAccountCount:(accountsData.data||[]).length,accountSelectionGuardVersion:"v1"}});
-  }catch(discoveryError){
-    await saveConnection(userId,"meta",{metadata:{accountSelectionRequired:true,accountDiscoveryError:discoveryError.message,accountSelectionGuardVersion:"v1"}});
-  }
-}
-res.redirect("/dashboard?meta_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?meta_error=${encodeURIComponent(e.message)}`)}});
-app.get("/auth/google",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;const {state}=await createOAuthTransaction(userId,"google_ads",process.env.GOOGLE_REDIRECT_URI);const url=googleOAuthClient().generateAuthUrl({access_type:"offline",prompt:"consent",state,scope:["https://www.googleapis.com/auth/adwords"]});sendOAuthAuthorizationResponse(req,res,url)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/google/callback",async(req,res)=>{try{
-  const{code,state,error}=req.query;
-  if(error)return res.redirect(`/dashboard?google_error=${encodeURIComponent(error)}`);
-  if(!code)return res.redirect("/dashboard?google_error=missing_code");
-  const transaction=await consumeOAuthTransaction(state,"google_ads",process.env.GOOGLE_REDIRECT_URI);
-  if(!transaction)return res.redirect("/dashboard?google_error=invalid_state");
-  const userId=transaction.user_id;
-  const client=googleOAuthClient();
-  const{tokens}=await client.getToken(code);
-  const reviewPair=GOOGLE_REVIEW_HARD_ROUTE_ENABLED?googleReviewAccountPair():null;
-  await saveConnection(userId,"google",{
-    accessToken:tokens.access_token,
-    refreshToken:tokens.refresh_token||null,
-    tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():null,
-    accountId:reviewPair?.customerId||null,
-    accountName:reviewPair?`Google customer ${reviewPair.customerId}`:null,
-    metadata:{
-      scope:tokens.scope||null,
-      expiryDate:tokens.expiry_date||null,
-      tokenType:tokens.token_type||null,
-      selectedCustomerId:reviewPair?.customerId||null,
-      selected_customer_id:reviewPair?.customerId||null,
-      selectedPlatformAccountId:reviewPair?.customerId||null,
-      selectedPlatformAccountIds:reviewPair?[reviewPair.customerId]:[],
-      selectedPlatformAccounts:reviewPair?[{
-        platform_account_id:reviewPair.customerId,
-        customerId:reviewPair.customerId,
-        loginCustomerId:reviewPair.loginCustomerId,
-        account_name:`Google customer ${reviewPair.customerId}`
-      }]:[],
-      platform_account_id:reviewPair?.customerId||null,
-      customerId:reviewPair?.customerId||null,
-      customer_id:reviewPair?.customerId||null,
-      loginCustomerId:reviewPair?.loginCustomerId||null,
-      login_customer_id:reviewPair?.loginCustomerId||null,
-      lastOwnedPlatformAccountId:reviewPair?.customerId||null,
-      accountSelectionRequired:reviewPair?false:true,
-      reconnectSelectionRequired:reviewPair?false:true,
-      accountSelectionGuardVersion:"v2-explicit-selection",
-      accountResolutionSource:reviewPair?.source||"oauth"
-    }
-  });
-  if(reviewPair){
-    const user={id:userId};
-    await ensureGoogleSnapshotLifecycle(user,reviewPair.customerId,reviewPair.loginCustomerId,{
-      accountName:`Google customer ${reviewPair.customerId}`,
-      source:"google_oauth_review_hard_route",
-      accountResolutionSource:reviewPair.source
-    });
-  }
-  res.redirect(reviewPair?"/dashboard?google_connected=1":"/dashboard?google_connected=1&account_selection_required=1");
-}catch(e){res.redirect(`/dashboard?google_error=${encodeURIComponent(e.message)}`)}});
-
+const {start:handleMetaOAuthStart,callback:handleMetaOAuthCallback}=createMetaOAuthHandlers({
+  config:{appId:process.env.META_APP_ID,appSecret:process.env.META_APP_SECRET,redirectUri:process.env.META_REDIRECT_URI,graphVersion:META_GRAPH_VERSION},
+  requireConnectAccess:requireConnectAccessForOAuth,
+  createTransaction:createOAuthTransaction,
+  consumeTransaction:consumeOAuthTransaction,
+  sendAuthorizationResponse:sendOAuthAuthorizationResponse,
+  exchangeToken:async({code,appId,appSecret,redirectUri,graphVersion})=>{const url=new URL(`https://graph.facebook.com/${graphVersion}/oauth/access_token`);url.searchParams.set("client_id",appId);url.searchParams.set("redirect_uri",redirectUri);url.searchParams.set("client_secret",appSecret);url.searchParams.set("code",code);const response=await fetch(url);const data=await response.json();if(!response.ok||!data.access_token)throw new Error(data.error?.message||"Meta token exchange failed");return data},
+  saveConnection,
+  getConnection,
+  discoverAccounts:async token=>(await metaGraph("/me/adaccounts",{fields:"id,name,account_status,currency,timezone_name",limit:"100"},token)).data||[],
+  upsertAdAccount,
+  parseExpiry
+});
+registerOAuthProviderRoutes({app,provider:"meta",startHandler:handleMetaOAuthStart,callbackHandler:handleMetaOAuthCallback});
+const {start:handleGoogleOAuthStart,callback:handleGoogleOAuthCallback}=createGoogleAdsOAuthHandlers({redirectUri:process.env.GOOGLE_REDIRECT_URI,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,createClient:googleOAuthClient,getReviewPair:()=>GOOGLE_REVIEW_HARD_ROUTE_ENABLED?googleReviewAccountPair():null,saveConnection,ensureSnapshotLifecycle:ensureGoogleSnapshotLifecycle});
+registerOAuthProviderRoutes({app,provider:"google",startHandler:handleGoogleOAuthStart,callbackHandler:handleGoogleOAuthCallback});
 
 // ===== GOOGLE SHEETS BACKEND INTEGRATION v1 =====
 const GOOGLE_SHEETS_PLATFORM="google_sheets";
@@ -1338,55 +1228,8 @@ async function maybeAutoSyncGoogleSheets(userId){
     return {attempted:true,ok:false,spreadsheet_id:null,rows_written:0,error:e.message};
   }
 }
-app.get("/auth/google-sheets",async(req,res)=>{
-  try{
-    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
-    const {state}=await createOAuthTransaction(accessCheck.userId,"google_sheets",googleSheetsRedirectUri(req));
-    const url=googleSheetsOAuthClient(req).generateAuthUrl({access_type:"offline",prompt:"consent",include_granted_scopes:true,state,scope:GOOGLE_SHEETS_SCOPES});
-    sendOAuthAuthorizationResponse(req,res,url);
-  }catch(e){res.status(500).send(e.message)}
-});
-app.get("/auth/google-sheets/callback",async(req,res)=>{
-  try{
-    const {code,state,error,error_description}=req.query;
-    if(error)return res.redirect(`/dashboard?google_sheets_error=${encodeURIComponent(error_description||error)}`);
-    if(!code)return res.redirect("/dashboard?google_sheets_error=missing_code");
-    const transaction=await consumeOAuthTransaction(state,"google_sheets",googleSheetsRedirectUri(req));
-    if(!transaction)return res.redirect("/dashboard?google_sheets_error=invalid_state");
-    const userId=transaction.user_id;
-    const client=googleSheetsOAuthClient(req);
-    const {tokens}=await client.getToken(code);
-    if(!tokens.access_token&&!tokens.refresh_token)throw new Error("Google Sheets token exchange returned no token");
-    const existing=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
-    await saveConnection(userId,GOOGLE_SHEETS_PLATFORM,{
-      accessToken:tokens.access_token||existing?.access_token||null,
-      refreshToken:tokens.refresh_token||existing?.refresh_token||null,
-      tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:null,
-      accountName:null,
-      metadata:{
-        googleSheetsOAuthVersion:"v1",
-        scope:tokens.scope||GOOGLE_SHEETS_SCOPES.join(" "),
-        tokenType:tokens.token_type||null,
-        connectedAt:new Date().toISOString(),
-        selectedPlatformAccountId:null,
-        selectedPlatformAccountIds:[],
-        selectedPlatformAccounts:[],
-        lastOwnedPlatformAccountId:null,
-        accountSelectionRequired:true,
-        reconnectSelectionRequired:true,
-        spreadsheet_id:null,
-        spreadsheet_name:null,
-        worksheet_name:GOOGLE_SHEETS_DEFAULT_WORKSHEET,
-        auto_sync_enabled:false,
-        last_sync_at:null,
-        last_sync_status:null,
-        last_sync_error:null
-      }
-    });
-    res.redirect("/dashboard?google_sheets_connected=1&account_selection_required=1");
-  }catch(e){res.redirect(`/dashboard?google_sheets_error=${encodeURIComponent(e.message)}`)}
-});
+const {start:handleGoogleSheetsOAuthStart,callback:handleGoogleSheetsOAuthCallback}=createGoogleSheetsOAuthHandlers({scopes:GOOGLE_SHEETS_SCOPES,defaultWorksheet:GOOGLE_SHEETS_DEFAULT_WORKSHEET,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:googleSheetsRedirectUri,createClient:googleSheetsOAuthClient,getConnection,saveConnection});
+registerOAuthProviderRoutes({app,provider:"google-sheets",startHandler:handleGoogleSheetsOAuthStart,callbackHandler:handleGoogleSheetsOAuthCallback});
 app.get("/api/google-sheets/status",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
@@ -1450,71 +1293,8 @@ function organicGoogleOAuthClient(req){
   if(!process.env.GOOGLE_CLIENT_ID||!process.env.GOOGLE_CLIENT_SECRET)throw new Error("Missing Google OAuth env");
   return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID,process.env.GOOGLE_CLIENT_SECRET,organicGoogleRedirectUri(req));
 }
-app.get("/auth/organic",async(req,res)=>{
-  try{
-    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
-    const userId=accessCheck.userId;
-    const {state}=await createOAuthTransaction(userId,"ga4_organic",organicGoogleRedirectUri(req));
-    const url=organicGoogleOAuthClient(req).generateAuthUrl({
-      access_type:"offline",
-      prompt:"consent",
-      include_granted_scopes:true,
-      state,
-      scope:ORGANIC_GOOGLE_SCOPES
-    });
-    sendOAuthAuthorizationResponse(req,res,url);
-  }catch(e){res.status(500).send(e.message)}
-});
-app.get("/auth/organic/callback",async(req,res)=>{
-  const callbackAt=new Date().toISOString();
-  let transaction=null;
-  try{
-    const{code,state,error,error_description}=req.query;
-    if(error)return res.redirect(`/dashboard?organic_error=${encodeURIComponent(error_description||error)}`);
-    if(!code)return res.redirect("/dashboard?organic_error=missing_code");
-    transaction=await consumeOAuthTransaction(state,"ga4_organic",organicGoogleRedirectUri(req));
-    if(!transaction)return res.redirect("/dashboard?organic_error=invalid_state");
-    const userId=transaction.user_id;
-    const client=organicGoogleOAuthClient(req);
-    const{tokens}=await client.getToken(code);
-    if(!tokens.access_token&&!tokens.refresh_token)throw new Error("Organic token exchange returned no token");
-    const existing=await getConnection(userId,"organic").catch(()=>null);
-    await saveConnection(userId,"organic",{
-      accessToken:tokens.access_token||existing?.access_token||null,
-      refreshToken:tokens.refresh_token||existing?.refresh_token||null,
-      tokenExpiresAt:tokens.expiry_date?new Date(tokens.expiry_date).toISOString():(existing?.token_expires_at||null),
-      accountId:null,
-      accountName:null,
-      metadata:{
-        organicOAuthVersion:"v1.1-callback-fix",
-        organicOAuthConnectedAt:callbackAt,
-        organicOAuthStartedAt:transaction.created_at||null,
-        organicRedirectUri:organicGoogleRedirectUri(req),
-        scope:tokens.scope||ORGANIC_GOOGLE_SCOPES.join(" "),
-        tokenType:tokens.token_type||null,
-        expiryDate:tokens.expiry_date||null,
-        selectedPlatformAccountId:null,
-        selectedPlatformAccountIds:[],
-        selectedPlatformAccounts:[],
-        lastOwnedPlatformAccountId:null,
-        accountSelectionRequired:true,
-        reconnectSelectionRequired:true,
-        organicConfigured:false,
-        organicCallbackSaved:true
-      }
-    });
-    res.redirect("/dashboard?organic_connected=1&account_selection_required=1");
-  }catch(e){
-    try{
-      const userId=transaction?.user_id;
-      if(userId){
-        await saveConnection(userId,"organic",{metadata:{organicOAuthVersion:"v1.1-callback-fix",organicCallbackError:e.message,organicCallbackErrorAt:callbackAt}});
-      }
-    }catch{}
-    res.redirect(`/dashboard?organic_error=${encodeURIComponent(e.message)}`);
-  }
-});
-
+const {start:handleOrganicOAuthStart,callback:handleOrganicOAuthCallback}=createOrganicOAuthHandlers({scopes:ORGANIC_GOOGLE_SCOPES,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:organicGoogleRedirectUri,createClient:organicGoogleOAuthClient,getConnection,saveConnection,ingestEnabled:ORGANIC_GA4_INGEST_ENABLED});
+registerOAuthProviderRoutes({app,provider:"organic",startHandler:handleOrganicOAuthStart,callbackHandler:handleOrganicOAuthCallback});
 
 // ===== ORGANIC DISCOVERY ENDPOINTS v1 RESTORE =====
 const GA4_ADMIN_API_BASE=process.env.GA4_ADMIN_API_BASE||"https://analyticsadmin.googleapis.com/v1beta";
@@ -1567,7 +1347,7 @@ function normalizeGa4PropertySummary(accountSummary,propertySummary){
     raw:{accountSummary,propertySummary}
   };
 }
-async function listOrganicGa4Properties(userId){
+async function listOrganicGa4Properties(userId){requireOrganicGa4Ingest();
   const data=await organicGoogleFetch(userId,`${GA4_ADMIN_API_BASE}/accountSummaries?pageSize=200`);
   const accounts=Array.isArray(data.accountSummaries)?data.accountSummaries:[];
   const properties=[];
@@ -1593,7 +1373,7 @@ function pickOrganicGa4Property(input){
     raw:input
   };
 }
-async function bindOrganicGa4Property(userId,body={}){
+async function bindOrganicGa4Property(userId,body={}){requireOrganicGa4Ingest();
   const now=new Date().toISOString();
   const conn=await getConnection(userId,"organic");
   if(!conn)throw Object.assign(new Error("Organic OAuth connection is required before property binding"),{status:404});
@@ -1675,8 +1455,8 @@ async function bindOrganicGa4Property(userId,body={}){
 }
 app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
 app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
-app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"organic");const ga4=conn?.metadata?.selectedGa4Property||null;res.json({ok:true,platform:"organic",configured:Boolean(conn?.metadata?.configured&&ga4),setupStage:ga4?(conn?.metadata?.setupStage||"configured"):"property_selection_required",ga4_property:ga4,updatedAt:conn?.updated_at||null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,parked:true,setupStage:"parked",reason:ORGANIC_GA4_PARK_REASON,ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,parked:true,setupStage:"parked",reason:ORGANIC_GA4_PARK_REASON,ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
 
 
 // ===== ORGANIC SNAPSHOT v1 =====
@@ -1980,8 +1760,8 @@ function buildOrganicSnapshotPayload({snapshotDate,accountCurrency,ga4,property}
     }
   };
 }
-
 async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
+  requireOrganicGa4Ingest();
   const conn=await getConnection(user.id,"organic");
   if(!conn)throw Object.assign(new Error("Organic not connected"),{status:404});
   if(!conn.metadata?.configured)throw Object.assign(new Error("Organic GA4 property binding is required before snapshot"),{status:400});
@@ -2061,7 +1841,7 @@ async function writeOrganicSnapshotV1({user,datePreset="today",snapshotDate=null
 
 async function handleOrganicSnapshotWrite(req,res){
   let job=null,stage="connection";
-  try{
+  try{requireOrganicGa4Ingest();
     const result=await requireRefreshConnection(req,res,"organic");if(!result)return;
     const {user,conn}=result;
     if(!conn.metadata?.configured)return res.status(400).json({ok:false,error:"Organic GA4 property binding is required before refresh",stage:"settings"});
@@ -2071,15 +1851,13 @@ async function handleOrganicSnapshotWrite(req,res){
     const datePreset=String(req.body?.date_preset||req.body?.dateRange||req.query.date_preset||req.query.dateRange||"today");
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,DEFAULT_PLATFORM_TIMEZONE);
     stage="job";
-    job=await createRefreshJob(user.id,"organic",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"running");
-    stage="snapshot";
-    const writeResult=await writeOrganicSnapshotV1({user,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"organic",platformAccountId,datePreset,snapshotDate,write:jobContext=>{stage="snapshot";return writeOrganicSnapshotV1({user,datePreset,snapshotDate,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({ok:true,platform:"Organic",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
   }catch(e){
-    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    job=e.refreshJob||job;
     res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null});
   }
 }
@@ -2090,14 +1868,9 @@ app.post("/api/platform/organic/snapshot",async(req,res)=>{try{const user=await 
 
 
 function pinterestBasic(){return Buffer.from(`${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`).toString("base64")}
-app.get("/auth/pinterest",async(req,res)=>{
-  const status=passiveLegacyPlatformStatus("pinterest");
-  res.redirect(`/dashboard?pinterest_legacy=1&platform_status=${encodeURIComponent(status.status)}&message=${encodeURIComponent(status.message)}`);
-});
-app.get("/auth/pinterest/callback",async(req,res)=>{
-  const status=passiveLegacyPlatformStatus("pinterest");
-  res.redirect(`/dashboard?pinterest_legacy=1&platform_status=${encodeURIComponent(status.status)}&message=${encodeURIComponent(status.message)}`);
-});
+const {start:handlePinterestOAuthStart,callback:handlePinterestOAuthCallback,readiness:pinterestOAuthReadiness}=createPinterestOAuthHandlers({config:{enabled:false,clientId:process.env.PINTEREST_CLIENT_ID,clientSecret:process.env.PINTEREST_CLIENT_SECRET,redirectUri:process.env.PINTEREST_REDIRECT_URI,scopes:process.env.PINTEREST_SCOPES||"ads:read,user_accounts:read",authorizationBase:"https://www.pinterest.com/oauth/"},requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,exchangeToken:async({code,redirectUri})=>{const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:redirectUri});const response=await fetch(`${PINTEREST_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${pinterestBasic()}`,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},body:body.toString()}),data=await response.json().catch(()=>null);if(!response.ok||!data||typeof data!=="object")throw new Error("Pinterest token exchange failed");return data},saveConnection,parseExpiry});
+registerOAuthProviderRoutes({app,provider:"pinterest",startHandler:handlePinterestOAuthStart,callbackHandler:handlePinterestOAuthCallback});
+app.get("/api/platform/pinterest/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"pinterest"),connected=Boolean(conn&&(conn.access_token||conn.refresh_token)&&normalizePlatformAccountId(conn.account_id||conn.metadata?.selectedPlatformAccountId)&&conn.metadata?.accountSelectionRequired!==true);res.json({state:"PARKED",connected:false,parked:true,oauth:pinterestOAuthReadiness(),updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:"Pinterest status could not be loaded."})}});
 
 function base64Url(input){return Buffer.from(input).toString("base64").replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 function klaviyoBasic(){return Buffer.from(`${process.env.KLAVIYO_CLIENT_ID}:${process.env.KLAVIYO_CLIENT_SECRET}`).toString("base64")}
@@ -2192,36 +1965,33 @@ async function klaviyoFetch(conn,endpoint,options={}){
       ...options,
       headers:{Authorization:`Bearer ${activeConn.access_token}`,Accept:"application/json",Revision:process.env.KLAVIYO_REVISION||"2024-10-15","Content-Type":"application/json",...(options.headers||{})}
     });
-    const text=await response.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
-    if(response.ok)return data;
+    const text=await response.text();let data=null;try{data=text?JSON.parse(text):{}}catch{}
+    if(response.ok){if(!data||typeof data!=="object")throw Object.assign(new Error("Klaviyo returned an invalid response."),{status:502,code:"KLAVIYO_INVALID_RESPONSE"});return data;}
 
     if(attempt===0&&isKlaviyoAuthenticationError(response,data)){
       activeConn=await getFreshKlaviyoConnection(activeConn,{forceRefresh:true});
       continue;
     }
 
-    const error=Object.assign(new Error(data.errors?.[0]?.detail||data.errors?.[0]?.title||data.error_description||data.error||data.message||text||`Klaviyo API error ${response.status}`),{status:response.status});
+    const providerMessage=data?.errors?.[0]?.detail||data?.errors?.[0]?.title||data?.error_description||data?.error||data?.message,error=Object.assign(new Error(providerMessage||`Klaviyo request failed (${response.status}).`),{status:response.status});
     throw error;
   }
   throw Object.assign(new Error("Klaviyo authentication failed after token refresh"),{status:401});
 }
 
 async function resolveKlaviyoAccountIdentity(conn){
-  let raw=null;
-  try{
-    raw=await klaviyoFetch(conn,"/api/accounts/");
-  }catch(e){
-    raw={error:e.message};
-  }
+  const raw=await klaviyoFetch(conn,"/api/accounts/");
   const item=Array.isArray(raw?.data)?raw.data[0]:raw?.data;
+  if(!item||typeof item!=="object")throw Object.assign(new Error("Klaviyo did not return an accessible account."),{status:502,code:"KLAVIYO_ACCOUNT_NOT_FOUND"});
   const attr=item?.attributes||{};
   const id=String(item?.id||attr.account_id||conn?.account_id||conn?.metadata?.accountId||conn?.metadata?.account_id||"").trim();
-  const fallbackId=id||`klaviyo_${String(conn?.user_id||"account").slice(0,8)}`;
+  if(!id)throw Object.assign(new Error("Klaviyo account response did not include an account id."),{status:502,code:"KLAVIYO_ACCOUNT_ID_MISSING"});
   return {
-    platform_account_id:fallbackId,
-    account_name:attr.name||attr.company_name||conn?.account_name||`Klaviyo Account ${fallbackId}`,
-    currency:conn?.metadata?.spendCurrency||conn?.metadata?.currency||null,
-    raw_account:raw
+    platform_account_id:id,
+    account_name:attr.contact_information?.organization_name||attr.name||attr.company_name||conn?.account_name||`Klaviyo Account ${id}`,
+    currency:attr.preferred_currency||conn?.metadata?.spendCurrency||conn?.metadata?.currency||null,
+    timezone:attr.timezone||null,
+    raw_account:null
   };
 }
 
@@ -2269,9 +2039,8 @@ function klaviyoCampaignSendTime(c){return c.attributes?.send_time||c.attributes
 function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}}){
   const attr=report?.attributes||report||{};
   const stats=attr.statistics||attr.stats||attr;
-  const estimatedMonthlySpend=Number(settings.estimatedMonthlySpend||0);
-  const estimatedPeriodSpend=(estimatedMonthlySpend/30)*window.selected_day_count;
-  const spend=estimatedPeriodSpend||0;
+  // This legacy report lacks T6 sent-volume inputs; never revive calendar-day estimates here.
+  const spend=null;
   const delivered=deepFindNumber(stats,["delivered","emails_delivered","DELIVERED"])??0;
   const opens=deepFindNumber(stats,["opens","open","opened","OPENED_EMAIL"])??null;
   const clicks=deepFindNumber(stats,["clicks","click","CLICKED_EMAIL"])??0;
@@ -2295,10 +2064,10 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     emails_delivered:delivered,
     clicks,
     ctr:clickRate!==null?Number(clickRate)*100:null,
-    cpc:clicks?spend/clicks:null,
+    cpc:spend!==null&&clicks?spend/clicks:null,
     spend,
-    estimated_monthly_spend:estimatedMonthlySpend,
-    estimated_period_spend:spend,
+    estimated_monthly_spend:null,
+    estimated_period_spend:null,
     selected_day_count:window.selected_day_count,
     sales,
     revenue:sales,
@@ -2311,7 +2080,7 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     site_visit:siteVisit,
     landing_page_views:siteVisit,
     traffic_score:trafficScore,
-    real_cpc:siteVisit?spend/siteVisit:null,
+    real_cpc:spend!==null&&siteVisit?spend/siteVisit:null,
     add_to_cart:addToCart,
     checkout,
     purchase:purchaseCount,
@@ -2321,13 +2090,16 @@ function normalizeKlaviyoInsight({campaign,report,settings,window,extraEvents={}
     raw:{campaign,report,extraEvents}
   }
 }
-app.get("/auth/klaviyo",async(req,res)=>{try{const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;const userId=accessCheck.userId;if(!process.env.KLAVIYO_CLIENT_ID||!process.env.KLAVIYO_CLIENT_SECRET||!process.env.KLAVIYO_REDIRECT_URI)throw new Error("Missing Klaviyo env");const codeVerifier=base64Url(crypto.randomBytes(64));const codeChallenge=base64Url(crypto.createHash("sha256").update(codeVerifier).digest());const {state}=await createOAuthTransaction(userId,"klaviyo",process.env.KLAVIYO_REDIRECT_URI,codeVerifier);const p=new URLSearchParams({response_type:"code",client_id:process.env.KLAVIYO_CLIENT_ID,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,scope:klaviyoScopes(),state,code_challenge_method:"S256",code_challenge:codeChallenge});sendOAuthAuthorizationResponse(req,res,`${KLAVIYO_WWW_BASE}/oauth/authorize?${p}`)}catch(e){res.status(500).send(e.message)}});
-app.get("/auth/klaviyo/callback",async(req,res)=>{try{const{code,state,error,error_description}=req.query;if(error)return res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(error_description||error)}`);if(!code)return res.redirect("/dashboard?klaviyo_error=missing_code");const transaction=await consumeOAuthTransaction(state,"klaviyo",process.env.KLAVIYO_REDIRECT_URI);if(!transaction)return res.redirect("/dashboard?klaviyo_error=invalid_state");const userId=transaction.user_id;const verifier=transaction.pkce_verifier;if(!verifier)return res.redirect("/dashboard?klaviyo_error=missing_code_verifier");const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:process.env.KLAVIYO_REDIRECT_URI,code_verifier:verifier});const r=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await r.json().catch(()=>({}));if(!r.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");await saveConnection(userId,"klaviyo",{accessToken:data.access_token,refreshToken:data.refresh_token||null,tokenExpiresAt:parseExpiry(data.expires_in),accountId:null,accountName:null,metadata:{scope:data.scope||klaviyoScopes(),tokenType:data.token_type||null,expiresIn:data.expires_in||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}});const klaviyoConn=await getConnection(userId,"klaviyo");
-const klaviyoAccount=await resolveKlaviyoAccountIdentity(klaviyoConn);
-await saveConnection(userId,"klaviyo",{accountId:null,accountName:null,metadata:{selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastDiscoveredPlatformAccountId:klaviyoAccount.platform_account_id,availableAccounts:[{platform_account_id:klaviyoAccount.platform_account_id,account_name:klaviyoAccount.account_name,currency:klaviyoAccount.currency||null}],accountSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection",rawAccount:klaviyoAccount.raw_account}});
-res.redirect("/dashboard?klaviyo_connected=1&account_selection_required=1")}catch(e){res.redirect(`/dashboard?klaviyo_error=${encodeURIComponent(e.message)}`)}});
+const {start:handleKlaviyoOAuthStart,callback:handleKlaviyoOAuthCallback}=createKlaviyoOAuthHandlers({
+  config:{clientId:process.env.KLAVIYO_CLIENT_ID,clientSecret:process.env.KLAVIYO_CLIENT_SECRET,redirectUri:process.env.KLAVIYO_REDIRECT_URI,scopes:klaviyoScopes(),authorizationBase:KLAVIYO_WWW_BASE},
+  requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,
+  createPkce:()=>{const verifier=base64Url(crypto.randomBytes(64));return{verifier,challenge:base64Url(crypto.createHash("sha256").update(verifier).digest())}},
+  exchangeToken:async({code,verifier,redirectUri})=>{const body=new URLSearchParams({grant_type:"authorization_code",code,redirect_uri:redirectUri,code_verifier:verifier});const response=await fetch(`${KLAVIYO_API_BASE}/oauth/token`,{method:"POST",headers:{Authorization:`Basic ${klaviyoBasic()}`,"Content-Type":"application/x-www-form-urlencoded"},body:body.toString()});const data=await response.json().catch(()=>({}));if(!response.ok||!data.access_token)throw new Error(data.error_description||data.error||data.message||"Klaviyo token exchange failed");return data},
+  saveConnection,getConnection,resolveAccount:resolveKlaviyoAccountIdentity,parseExpiry
+});
+registerOAuthProviderRoutes({app,provider:"klaviyo",startHandler:handleKlaviyoOAuthStart,callbackHandler:handleKlaviyoOAuthCallback});
 app.get("/api/klaviyo/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");res.json({connected:Boolean(conn&&(conn.access_token||conn.refresh_token)),setupRequired:Boolean(conn?.metadata?.requiresSetup),estimatedMonthlySpend:conn?.metadata?.estimatedMonthlySpend||null,spendCurrency:conn?.metadata?.spendCurrency||null,updatedAt:conn?.updated_at||null})}catch(e){res.status(500).json({error:e.message})}});
-app.get("/api/klaviyo/accounts",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const account=await resolveKlaviyoAccountIdentity(result.conn);res.json({platform:"klaviyo",accounts:[{platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null}]})}catch(e){res.status(e.status||500).json({error:e.message})}});
+app.get("/api/klaviyo/accounts",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const account=await resolveKlaviyoAccountIdentity(result.conn);res.json({platform:"klaviyo",accounts:[{platform_account_id:account.platform_account_id,account_name:account.account_name,currency:account.currency||null,timezone:account.timezone||null}]})}catch(e){res.status(e.status||500).json({error:e.status>=500?"Klaviyo accounts could not be loaded. Please try again.":e.message})}});
 app.post("/api/klaviyo/settings",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const conn=await getConnection(user.id,"klaviyo");if(!conn)return res.status(404).json({error:"klaviyo not connected"});const estimatedMonthlySpend=Number(req.body.estimatedMonthlySpend);const spendCurrency=String(req.body.spendCurrency||"").toUpperCase();if(!estimatedMonthlySpend||estimatedMonthlySpend<=0)return res.status(400).json({error:"estimatedMonthlySpend is required"});if(!["USD","TRY","EUR"].includes(spendCurrency))return res.status(400).json({error:"spendCurrency must be USD, TRY or EUR"});const metadata={...(conn.metadata||{}),estimatedMonthlySpend,spendCurrency,requiresSetup:false,setupCompletedAt:new Date().toISOString()};const {error}=await supabaseAdmin.from("platform_connections").update({metadata,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("platform","klaviyo");if(error)throw error;res.json({ok:true,platform:"klaviyo",estimatedMonthlySpend,spendCurrency,setupRequired:false})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/klaviyo/campaigns",async(req,res)=>{try{const result=await requireConnection(req,res,"klaviyo");if(!result)return;const{conn}=result;const range=String(req.query.date_range||req.query.dateRange||"last_7d");const w=klaviyoDateWindow(range,req.query.start_date,req.query.end_date);const channel=String(req.query.channel||"email");const filter=`equals(messages.channel,\'${channel}\'),greater-or-equal(scheduled_at,${w.start}),less-or-equal(scheduled_at,${w.end})`;const data=await klaviyoFetch(conn,`/api/campaigns/?filter=${encodeURIComponent(filter)}`);res.json(data)}catch(e){res.status(500).json({error:e.message})}});
 
@@ -3106,18 +2878,14 @@ async function handleMetaSnapshotWrite(req,res){
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"meta",platformAccountId,conn,null);
     const adminTimeSync=resolveAdminTimeSync(new Date(),platformTimeZone);
     const datePreset="today";
-    const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
+    const snapshotDate=adminTimeSync.platform_business_date;
     const limit=String(req.body?.limit||req.query.limit||"100");
 
     stage="job";
-    job=await createRefreshJob(user.id,"meta",platformAccountId,{trigger:"manual",datePreset,snapshotDate,limit,captureReason:"manual_refresh",snapshotClass:"primary",...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION});
-    await setRefreshJobStatus(job.id,"running");
-
-    stage="meta_api";
-    const writeResult=await writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,sourceJobId:job.id,captureReason:"manual_refresh",platformTimeZone,adminTimeSync,snapshotClass:"primary"});
-
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"meta",platformAccountId,datePreset,snapshotDate,jobMetadata:{limit,...adminTimeSync,timeEngineVersion:TIME_ENGINE_VERSION},complete:(result,job)=>({snapshot_id:result.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:result.performance_spread_result||null,meta_v2_evidence:result.meta_v2_evidence||null}}),write:jobContext=>{stage="meta_api";return META_V2_PRIMARY_REFRESH_ENABLED?metaV2LiveRefresh.run({userId:user.id,accessToken:conn.access_token,accountId:platformAccountId,since:snapshotDate,until:snapshotDate,sourceJobId:jobContext.sourceJobId,limit:Number(limit)}):writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,datePreset,snapshotDate,limit,platformTimeZone,adminTimeSync,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
 
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({
@@ -3146,14 +2914,14 @@ async function handleMetaSnapshotWrite(req,res){
       fx_source_currency:writeResult.snapshot?.fx_source_currency||null,
       fx_target_currency:writeResult.snapshot?.fx_target_currency||null,
       fx_engine_version:writeResult.snapshot?.fx_engine_version||null,
-      row_counts:writeResult.row_counts,
+      row_counts:writeResult.row_counts,dataset_v2:writeResult.dataset_v2||null,
       performance_spread_result:writeResult.performance_spread_result||null,
       kpis:writeResult.snapshot?.kpis||{},
       purchase_journey:writeResult.snapshot?.purchase_journey||{},
       click_journey:writeResult.snapshot?.click_journey||{}
     });
   }catch(e){
-    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    job=e.refreshJob||job;
     res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null});
   }
 }
@@ -3491,7 +3259,6 @@ app.post("/api/backfill/process",async(req,res)=>{
 });
 
 async function runMetaAutoRefreshForSchedule(schedule){
-  let job=null;
   const runDate=new Date();
   const limit=String(schedule.metadata?.limit||"100");
 
@@ -3538,94 +3305,16 @@ async function runMetaAutoRefreshForSchedule(schedule){
     };
   }
 
-  job=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
-    trigger:"automation",
-    datePreset:policy.datePreset,
-    snapshotDate,
-    limit,
-    captureReason:policy.captureReason,
-    snapshotClass:policy.snapshotClass,
-    scheduleId:schedule.id,
-    platformHour:policy.hour,
-    platformBusinessHour:policy.platform_business_hour,
-    dataMaturityWindowHours:policy.data_maturity_window_hours,
-    server_time_utc:policy.server_time_utc,
-    istanbul_time:policy.istanbul_time,
-    platform_account_time:policy.platform_account_time,
-    platform_account_timezone:policy.platform_account_timezone,
-    platform_business_date:policy.platform_business_date,
-    timeEngineVersion:TIME_ENGINE_VERSION
+  const execution=await automationSnapshotOrchestrator.run({
+    userId:schedule.user_id,platform:"meta",platformAccountId,snapshotDate,scheduleId:schedule.id,policy,
+    primaryMetadata:{limit,platformHour:policy.hour,platformBusinessHour:policy.platform_business_hour,dataMaturityWindowHours:policy.data_maturity_window_hours,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,platform_account_time:policy.platform_account_time,platform_account_timezone:policy.platform_account_timezone,platform_business_date:policy.platform_business_date,timeEngineVersion:TIME_ENGINE_VERSION},
+    recoveryMetadata:{limit,timeEngineVersion:TIME_ENGINE_VERSION},
+    write:jobContext=>writeMetaSnapshotImmutable({user,conn,adAccountId:platformAccountId,limit,platformTimeZone,adminTimeSync:policy,...jobContext})
   });
 
-  await setRefreshJobStatus(job.id,"running");
-
-  try{
-    const writeResult=await writeMetaSnapshotImmutable({
-      user,
-      conn,
-      adAccountId:platformAccountId,
-      datePreset:policy.datePreset,
-      snapshotDate,
-      limit,
-      sourceJobId:job.id,
-      captureReason:policy.captureReason,
-      platformTimeZone,
-      adminTimeSync:policy,
-      snapshotClass:policy.snapshotClass
-    });
-
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"meta",platformAccountId,{
-        trigger:"automation",
-        datePreset:policy.recoveryDatePreset,
-        snapshotDate,
-        limit,
-        captureReason:policy.recoveryCaptureReason,
-        snapshotClass:policy.recoverySnapshotClass,
-        scheduleId:schedule.id,
-        pairedPrimaryJobId:job.id,
-        timeEngineVersion:TIME_ENGINE_VERSION
-      });
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeMetaSnapshotImmutable({
-          user,
-          conn,
-          adAccountId:platformAccountId,
-          datePreset:policy.recoveryDatePreset,
-          snapshotDate,
-          limit,
-          sourceJobId:recoveryJob.id,
-          captureReason:policy.recoveryCaptureReason,
-          platformTimeZone,
-          adminTimeSync:policy,
-          snapshotClass:policy.recoverySnapshotClass
-        });
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-
-    await supabaseAdmin
-      .from("snapshot_schedules")
-      .update({
-        last_run_at:new Date().toISOString(),
-        next_run_at:nextAutomationSlotUtc(),
-        updated_at:new Date().toISOString()
-      })
-      .eq("id",schedule.id);
-
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,fx_rate:writeResult.snapshot?.fx_rate??null,fx_provider:writeResult.snapshot?.fx_provider||null,fx_source_currency:writeResult.snapshot?.fx_source_currency||null,fx_target_currency:writeResult.snapshot?.fx_target_currency||null,fx_engine_version:writeResult.snapshot?.fx_engine_version||null,performance_spread_result:writeResult.performance_spread_result||null};
-  }catch(e){
-    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    throw e;
-  }
+  await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
+  const writeResult=execution.result;
+  return {ok:true,job_id:execution.job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,fx_rate:writeResult.snapshot?.fx_rate??null,fx_provider:writeResult.snapshot?.fx_provider||null,fx_source_currency:writeResult.snapshot?.fx_source_currency||null,fx_target_currency:writeResult.snapshot?.fx_target_currency||null,fx_engine_version:writeResult.snapshot?.fx_engine_version||null,performance_spread_result:writeResult.performance_spread_result||null};
 }
 
 app.get("/api/cron/auto-refresh",async(req,res)=>{
@@ -3955,7 +3644,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic"),googleSheets=await connectionStatus(user.id,"google_sheets");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:organic.connected,google_sheets:googleSheets.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:organic.source,google_sheets:googleSheets.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:googleSheets.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"skeleton",label:"Organic",message:"Organic platform skeleton is available. GA4 and Search Console OAuth will be added in the next patch."}}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic"),googleSheets=await connectionStatus(user.id,"google_sheets");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:false,google_sheets:googleSheets.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:"parked",google_sheets:googleSheets.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:googleSheets.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"parked",label:"Organic",message:"GA4 Organic ingestion is parked; Paid/Organic Blend capability remains available for a future backend source."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic","google_sheets"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -3983,7 +3672,7 @@ function normalizeMetaInsight(row,level){const a=row.actions||[],c=row.cost_per_
 app.get("/api/meta/insights",async(req,res)=>{try{const result=await requireConnection(req,res,"meta");if(!result)return;const{conn}=result;const adAccountId=req.query.adAccountId||req.query.ad_account_id;if(!adAccountId)return res.status(400).json({error:"Missing adAccountId"});const level=["campaign","adset","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const fields=["campaign_id","campaign_name","account_currency","impressions","reach","clicks","ctr","cpc","spend","actions","action_values","cost_per_action_type","conversion_rate_ranking"];if(level==="adset")fields.splice(2,0,"adset_id","adset_name");if(level==="ad")fields.splice(2,0,"adset_id","adset_name","ad_id","ad_name");const data=await metaGraph(`/${adAccountId}/insights`,{level,date_preset:req.query.date_preset||"last_7d",fields:fields.join(","),limit:req.query.limit||"100"},conn.access_token);res.json({platform:"Meta",level,date_preset:req.query.date_preset||"last_7d",rows:(data.data||[]).map(r=>normalizeMetaInsight(r,level)),paging:data.paging||null})}catch(e){res.status(500).json({error:e.message})}});
 function normalizeCustomerId(id){return String(id||"").replace(/-/g,"").trim()}
 function googleHeaders(token,loginCustomerId){const h={Authorization:`Bearer ${token}`,"developer-token":process.env.GOOGLE_DEVELOPER_TOKEN||"","Content-Type":"application/json"};if(loginCustomerId)h["login-customer-id"]=normalizeCustomerId(loginCustomerId);return h}
-async function googleAdsSearch(userId,customerId,query,loginCustomerId){const token=await getFreshGoogleAccessToken(userId);const clean=normalizeCustomerId(customerId);const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${clean}/googleAds:search`,{method:"POST",headers:googleHeaders(token,loginCustomerId),body:JSON.stringify({query})});const data=await r.json();if(!r.ok){const err=new Error(JSON.stringify(data));err.status=r.status;throw err}return data}
+async function googleAdsSearch(userId,customerId,query,loginCustomerId){const token=await getFreshGoogleAccessToken(userId);const clean=normalizeCustomerId(customerId);const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${clean}/googleAds:search`,{method:"POST",headers:googleHeaders(token,loginCustomerId),body:JSON.stringify({query})});const data=await r.json();if(!r.ok){const err=new Error("Google Ads request failed");err.status=r.status;err.code="GOOGLE_ADS_REQUEST_FAILED";throw err}return data}
 function googleDateClause(range){return range==="today"?"segments.date DURING TODAY":(range==="yesterday"||range==="day_close")?"segments.date DURING YESTERDAY":range==="last_30d"?"segments.date DURING LAST_30_DAYS":"segments.date DURING LAST_7_DAYS"}
 function googleQuery(level,range){const d=googleDateClause(range);if(level==="adgroup")return `SELECT segments.date, customer.currency_code, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group.status, metrics.impressions, metrics.clicks, metrics.ctr, metrics.average_cpc, metrics.cost_micros, metrics.conversions, metrics.all_conversions, metrics.conversions_value, metrics.conversions_from_interactions_rate FROM ad_group WHERE ${d} ORDER BY metrics.cost_micros DESC LIMIT 100`;if(level==="ad")return `SELECT segments.date, customer.currency_code, campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, metrics.impressions, metrics.clicks, metrics.ctr, metrics.average_cpc, metrics.cost_micros, metrics.conversions, metrics.all_conversions, metrics.conversions_value, metrics.conversions_from_interactions_rate FROM ad_group_ad WHERE ${d} ORDER BY metrics.cost_micros DESC LIMIT 100`;return `SELECT segments.date, customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, bidding_strategy.type, metrics.impressions, metrics.clicks, metrics.ctr, metrics.average_cpc, metrics.cost_micros, metrics.conversions, metrics.all_conversions, metrics.conversions_value, metrics.conversions_from_interactions_rate FROM campaign WHERE ${d} ORDER BY metrics.cost_micros DESC LIMIT 100`}
 function googleConversionBreakdownQuery(level,range){const d=googleDateClause(range);if(level==="adgroup")return `SELECT campaign.id, campaign.name, ad_group.id, ad_group.name, segments.conversion_action, segments.conversion_action_name, segments.conversion_action_category, metrics.conversions, metrics.conversions_value FROM ad_group WHERE ${d} AND metrics.conversions > 0 LIMIT 1000`;if(level==="ad")return `SELECT campaign.id, campaign.name, ad_group.id, ad_group.name, ad_group_ad.ad.id, segments.conversion_action, segments.conversion_action_name, segments.conversion_action_category, metrics.conversions, metrics.conversions_value FROM ad_group_ad WHERE ${d} AND metrics.conversions > 0 LIMIT 1000`;return `SELECT campaign.id, campaign.name, segments.conversion_action, segments.conversion_action_name, segments.conversion_action_category, metrics.conversions, metrics.conversions_value FROM campaign WHERE ${d} AND metrics.conversions > 0 LIMIT 1000`}
@@ -4000,7 +3689,7 @@ function microsToMoney(v){return v===null||v===undefined||v===""?null:Number(v)/
 function nested(o,p){return p.split(".").reduce((a,k)=>a&&a[k]!==undefined?a[k]:undefined,o)}
 function googleMatchConversion(actions,kind){const list=Array.isArray(actions)?actions:[];const cfg={add_to_cart:{categories:["ADD_TO_CART"],names:["add_to_cart","add to cart","cart"]},checkout:{categories:["BEGIN_CHECKOUT"],names:["begin_checkout","checkout","start_checkout","started_checkout"]},purchase:{categories:["PURCHASE"],names:["purchase","placed_order","order","sale"]}}[kind];if(!cfg)return null;let total=0,value=0,found=false;for(const a of list){const name=String(a.name||"").toLowerCase();const cat=String(a.category||"").toUpperCase();const matched=cfg.categories.includes(cat)||cfg.names.some(n=>name.includes(n));if(matched){found=true;total+=Number(a.conversions||0);value+=Number(a.conversions_value||0)}}return found?{count:total,value}:null}
 function normalizeGoogleInsight(row,level){const m=row.metrics||{},c=row.campaign||{},ag=row.adGroup||row.ad_group||{},aga=row.adGroupAd||row.ad_group_ad||{},cust=row.customer||{},seg=row.segments||{};const spend=microsToMoney(m.costMicros??m.cost_micros),cpc=microsToMoney(m.averageCpc??m.average_cpc),genericRevenue=Number(m.conversionsValue??m.conversions_value??0),genericConversions=Number(m.conversions??0),invalidClicks=Number(m.invalidClicks??m.invalid_clicks??0),clicks=Number(m.clicks||0),validClicks=Math.max(clicks-invalidClicks,0),landingPageViews=row.__landing_page_views===undefined?null:row.__landing_page_views;const actions=row.__conversion_actions||[];const atc=googleMatchConversion(actions,"add_to_cart"),chk=googleMatchConversion(actions,"checkout"),pur=googleMatchConversion(actions,"purchase");const addToCart=atc?atc.count:null,checkout=chk?chk.count:null,purchase=pur?pur.count:null,purchaseValue=pur?pur.value:genericRevenue||null;const abandoned=checkout!==null&&purchase!==null?Math.max((checkout||0)-(purchase||0),0):null;const sales=purchaseValue;const roas=spend&&spend>0&&sales!==null?sales/spend:null;const acos=sales&&sales>0&&spend!==null?(spend/sales)*100:null;return{platform:"Google",level,date:seg.date||null,campaign_id:c.id||null,campaign_name:c.name||null,campaign_status:c.status||null,channel_type:c.advertisingChannelType||c.advertising_channel_type||null,bidding_strategy_type:nested(row,"biddingStrategy.type")||nested(row,"bidding_strategy.type")||null,adgroup_id:ag.id||null,adgroup_name:ag.name||null,adgroup_status:ag.status||null,ad_id:nested(aga,"ad.id")||null,ad_name:nested(aga,"ad.name")||null,ad_status:aga.status||null,currency:cust.currencyCode||cust.currency_code||null,impressions:Number(m.impressions||0),clicks,ad_clicks:clicks,link_clicks:clicks,landing_page_views:landingPageViews,traffic_score:clicks>0&&landingPageViews!==null?(landingPageViews/clicks)*100:null,real_cpc:landingPageViews>0&&spend!==null?spend/landingPageViews:null,lpv_merge_status:row.__landing_page_view_merge_status||null,invalid_clicks:invalidClicks,valid_clicks:validClicks,ctr:m.ctr!==undefined?Number(m.ctr)*100:null,cpc,spend,conversions:genericConversions,all_conversions:Number(m.allConversions??m.all_conversions??0),add_to_cart:addToCart,checkout,purchase,purchases:purchase,abandoned,purchase_value:purchaseValue,revenue:sales,sales,conversion_rate:m.conversionsFromInteractionsRate!==undefined?Number(m.conversionsFromInteractionsRate)*100:m.conversions_from_interactions_rate!==undefined?Number(m.conversions_from_interactions_rate)*100:null,cvr:clicks&&purchase!==null?(purchase/clicks)*100:null,roas,acos,conversion_actions:actions,raw:{...row,landing_page_view_rows:row.__landing_page_view_rows||[]}}}
-app.get("/api/google/customers",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const token=await getFreshGoogleAccessToken(user.id);const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,{method:"GET",headers:googleHeaders(token)});const data=await r.json();if(!r.ok)return res.status(r.status).json({error:JSON.stringify(data),status:r.status});const customers=(data.resourceNames||[]).map(resourceName=>({resourceName,customerId:String(resourceName).replace("customers/","")}));res.json({customers})}catch(e){res.status(500).json({error:e.message})}});
+app.get("/api/google/customers",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const token=await getFreshGoogleAccessToken(user.id);const r=await fetch(`https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers:listAccessibleCustomers`,{method:"GET",headers:googleHeaders(token)});const data=await r.json();if(!r.ok)return res.status(r.status).json({error:"Google Ads customer discovery failed",status:r.status});res.json(await discoverGoogleCustomers({resourceNames:data.resourceNames||[],search:({customerId,loginCustomerId,query})=>googleAdsSearch(user.id,customerId,query,loginCustomerId)}))}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/google/insights",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const customerId=req.query.customerId||req.query.customer_id;if(!customerId)return res.status(400).json({error:"Missing customerId"});const level=["campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const loginCustomerId=req.query.loginCustomerId||req.query.login_customer_id||"";const query=googleQuery(level,dateRange);const data=await googleAdsSearch(user.id,customerId,query,loginCustomerId);let breakdownData={results:[]},breakdownError=null;try{breakdownData=await googleAdsSearch(user.id,customerId,googleConversionBreakdownQuery(level,dateRange),loginCustomerId)}catch(err){breakdownError=err.message}const performanceRows=data.results||[];let lpvData={results:[]},lpvError=null;try{lpvData=await googleAdsSearch(user.id,customerId,googleLandingPageViewQuery(level,dateRange),loginCustomerId)}catch(err){lpvError=err.message}const withConversions=mergeGoogleConversionActions(performanceRows,breakdownData.results||[],level);const mergedRows=mergeGoogleLandingPageViews(withConversions,lpvData.results||[],level);res.json({platform:"Google",level,customerId:normalizeCustomerId(customerId),loginCustomerId:loginCustomerId?normalizeCustomerId(loginCustomerId):null,date_range:dateRange,rows:mergedRows.map(r=>normalizeGoogleInsight(r,level)),rawCount:mergedRows.length,conversionBreakdownCount:breakdownData.results?breakdownData.results.length:0,conversionBreakdownError:breakdownError,landingPageViewCount:lpvData.results?lpvData.results.length:0,landingPageViewError:lpvError,fieldMask:data.fieldMask||null,conversionFieldMask:breakdownData.fieldMask||null,landingPageViewFieldMask:lpvData.fieldMask||null,requestId:data.requestId||null,nextPageToken:data.nextPageToken||null})}catch(e){res.status(e.status||500).json({error:e.message})}});
 
 // ===== GOOGLE SNAPSHOT WRITE v1 (Snapshot Layer only) =====
@@ -4402,7 +4091,6 @@ async function ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustome
 }
 
 async function runGoogleAutoRefreshForSchedule(schedule){
-  let job=null;
   const runDate=new Date();
 
   const {data:user,error:userError}=await supabaseAdmin
@@ -4459,90 +4147,17 @@ async function runGoogleAutoRefreshForSchedule(schedule){
     };
   }
 
-  job=await createRefreshJob(schedule.user_id,"google",platformAccountId,{
-    trigger:"automation",
-    dateRange:policy.datePreset,
-    datePreset:policy.datePreset,
-    snapshotDate,
-    captureReason:policy.captureReason,
-    snapshotClass:policy.snapshotClass,
-    scheduleId:schedule.id,
-    loginCustomerId,
-    platformHour:policy.hour,
-    platformBusinessHour:policy.platform_business_hour,
-    dataMaturityWindowHours:policy.data_maturity_window_hours,
-    server_time_utc:policy.server_time_utc,
-    istanbul_time:policy.istanbul_time,
-    platform_account_time:policy.platform_account_time,
-    platform_account_timezone:policy.platform_account_timezone,
-    platform_business_date:policy.platform_business_date,
-    timeEngineVersion:TIME_ENGINE_VERSION
+  const execution=await automationSnapshotOrchestrator.run({
+    userId:schedule.user_id,platform:"google",platformAccountId,snapshotDate,scheduleId:schedule.id,policy,
+    primaryMetadata:{dateRange:policy.datePreset,loginCustomerId,platformHour:policy.hour,platformBusinessHour:policy.platform_business_hour,dataMaturityWindowHours:policy.data_maturity_window_hours,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,platform_account_time:policy.platform_account_time,platform_account_timezone:policy.platform_account_timezone,platform_business_date:policy.platform_business_date,timeEngineVersion:TIME_ENGINE_VERSION},
+    recoveryMetadata:{dateRange:policy.recoveryDatePreset,loginCustomerId,timeEngineVersion:TIME_ENGINE_VERSION},
+    primaryComplete:snapshotSpreadJobEvidence,recoveryComplete:recoverySnapshotSpreadJobEvidence,
+    write:jobContext=>writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange:jobContext.datePreset,...jobContext})
   });
 
-  await setRefreshJobStatus(job.id,"running");
-
-  try{
-    const writeResult=await writeGoogleSnapshotImmutable({
-      user,
-      customerId:platformAccountId,
-      loginCustomerId,
-      dateRange:policy.datePreset,
-      snapshotDate,
-      sourceJobId:job.id,
-      captureReason:policy.captureReason,
-      snapshotClass:policy.snapshotClass
-    });
-
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null}});
-
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"google",platformAccountId,{
-        trigger:"automation",
-        dateRange:policy.recoveryDatePreset,
-        datePreset:policy.recoveryDatePreset,
-        snapshotDate,
-        captureReason:policy.recoveryCaptureReason,
-        snapshotClass:policy.recoverySnapshotClass,
-        scheduleId:schedule.id,
-        loginCustomerId,
-        pairedPrimaryJobId:job.id,
-        timeEngineVersion:TIME_ENGINE_VERSION
-      });
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeGoogleSnapshotImmutable({
-          user,
-          customerId:platformAccountId,
-          loginCustomerId,
-          dateRange:policy.recoveryDatePreset,
-          snapshotDate,
-          sourceJobId:recoveryJob.id,
-          captureReason:policy.recoveryCaptureReason,
-          snapshotClass:policy.recoverySnapshotClass
-        });
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null,metadata:{row_counts:recoveryWrite.row_counts||null,performance_spread_result:recoveryWrite.performance_spread_result||null}});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-
-    await supabaseAdmin
-      .from("snapshot_schedules")
-      .update({
-        last_run_at:new Date().toISOString(),
-        next_run_at:nextAutomationSlotUtc(),
-        updated_at:new Date().toISOString()
-      })
-      .eq("id",schedule.id);
-
-    return {ok:true,job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null};
-  }catch(e){
-    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    throw e;
-  }
+  await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
+  const writeResult=execution.result;
+  return {ok:true,job_id:execution.job.id,snapshot_id:writeResult.snapshot?.id||null,snapshot_version:writeResult.snapshot?.snapshot_version||null,snapshot_class:writeResult.snapshot?.snapshot_class||policy.snapshotClass,date_preset:policy.datePreset,capture_reason:policy.captureReason,platform_account_timezone:platformTimeZone,platform_account_time:policy.platform_account_time,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,row_counts:writeResult.row_counts||null,performance_spread_result:writeResult.performance_spread_result||null};
 }
 
 async function handleGoogleSnapshotWrite(req,res){
@@ -4565,19 +4180,17 @@ async function handleGoogleSnapshotWrite(req,res){
     stage="lifecycle";
     await ensureGoogleSnapshotLifecycle(user,platformAccountId,loginCustomerId,{accountName:`Google customer ${platformAccountId}`,source:"manual_google_refresh"});
     stage="job";
-    job=await createRefreshJob(user.id,"google",platformAccountId,{trigger:"manual",dateRange,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary",timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId});
-    await setRefreshJobStatus(job.id,"running");
-    stage="google_api";
-    const writeResult=await writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"google",platformAccountId,snapshotDate,jobMetadata:{dateRange,timeEngineVersion:TIME_ENGINE_VERSION,accountResolutionSource:resolvedGoogleAccount.source,loginCustomerId},complete:GOOGLE_V2_PRIMARY_REFRESH_ENABLED?((result,currentJob)=>({snapshot_id:null,metadata:{...(currentJob.metadata||{}),google_v2_evidence:result.google_v2_evidence}})):googleSnapshotJobEvidence,write:jobContext=>{stage="google_api";return GOOGLE_V2_PRIMARY_REFRESH_ENABLED?googleV2LiveRefresh.run({userId:user.id,customerId:platformAccountId,loginCustomerId,sourceJobId:jobContext.sourceJobId}):writeGoogleSnapshotImmutable({user,customerId:platformAccountId,loginCustomerId,dateRange,snapshotDate,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     stage="snapshot";
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result||null,google_api:{campaign:{rawCount:writeResult.google_api.campaign.rawCount,effectiveRows:writeResult.google_api.campaign.rows?.length||0,entityFallback:writeResult.google_api.campaign.entityFallback||false,entityRawCount:writeResult.google_api.campaign.entityRawCount||0,entityFallbackError:writeResult.google_api.campaign.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.campaign.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.campaign.conversionBreakdownError,landingPageViewError:writeResult.google_api.campaign.landingPageViewError},adgroup:{rawCount:writeResult.google_api.adgroup.rawCount,effectiveRows:writeResult.google_api.adgroup.rows?.length||0,entityFallback:writeResult.google_api.adgroup.entityFallback||false,entityRawCount:writeResult.google_api.adgroup.entityRawCount||0,entityFallbackError:writeResult.google_api.adgroup.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.adgroup.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.adgroup.conversionBreakdownError,landingPageViewError:writeResult.google_api.adgroup.landingPageViewError},ad:{rawCount:writeResult.google_api.ad.rawCount,effectiveRows:writeResult.google_api.ad.rows?.length||0,entityFallback:writeResult.google_api.ad.entityFallback||false,entityRawCount:writeResult.google_api.ad.entityRawCount||0,entityFallbackError:writeResult.google_api.ad.entityFallbackError||null,entityDiagnosticFallback:writeResult.google_api.ad.entityDiagnosticFallback||false,conversionBreakdownError:writeResult.google_api.ad.conversionBreakdownError,landingPageViewError:writeResult.google_api.ad.landingPageViewError}}}});
-    const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
+    const googleSheetsSync=GOOGLE_V2_PRIMARY_REFRESH_ENABLED?{attempted:false,ok:true,skipped:true,reason:"google_v2_primary_has_no_v1_sheet_source"}:(req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id));
     res.json({
       ok:true,
       platform:"Google",
       google_sheets_sync:googleSheetsSync,
       refresh_job:{id:job.id,status:"completed"},
-      mode:writeResult.mode,
+      mode:writeResult.mode,dataset_v2:writeResult.dataset_v2||null,google_v2_evidence:writeResult.google_v2_evidence||null,
       snapshot_id:writeResult.snapshot?.id||null,
       snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,
       snapshot_version:writeResult.snapshot?.snapshot_version||null,
@@ -4592,7 +4205,7 @@ async function handleGoogleSnapshotWrite(req,res){
       performance_summary_counts:writeResult.snapshot?.performance_summary?.counts||{}
     });
   }catch(e){
-    if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
+    job=e.refreshJob||job;
     res.status(e.status||500).json({ok:false,error:e.message,stage,refresh_job_id:job?.id||null});
   }
 }
@@ -4602,7 +4215,7 @@ app.get("/api/refresh/google",handleGoogleSnapshotWrite);
 app.post("/api/refresh/google",handleGoogleSnapshotWrite);
 // ===== END GOOGLE SNAPSHOT WRITE v1 =====
 
-async function pinterestFetch(conn,endpoint,options={}){const r=await fetch(`${PINTEREST_API_BASE}${endpoint}`,{...options,headers:{Authorization:`Bearer ${conn.access_token}`,"Content-Type":"application/json",...(options.headers||{})}});const text=await r.text();let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}if(!r.ok)throw new Error(data.message||text||`Pinterest API error ${r.status}`);return data}
+const pinterestClient=createPinterestClient({apiBase:PINTEREST_API_BASE,clientCredentials:pinterestBasic(),saveConnection,getConnection,parseExpiry});const pinterestFetch=(conn,endpoint,options)=>pinterestClient.request(conn,endpoint,options);
 
 function dateRangeToPinterestDates(range){
   const end=new Date();
@@ -4656,7 +4269,7 @@ function normalizePinterestRows(data,level){
 }
 app.get("/api/pinterest/insights",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{conn}=result;const adAccountId=req.query.adAccountId||req.query.ad_account_id;if(!adAccountId)return res.status(400).json({error:"Missing adAccountId"});const level=["account","campaign","adgroup","ad"].includes(String(req.query.level||"campaign"))?String(req.query.level||"campaign"):"campaign";const dateRange=String(req.query.date_range||req.query.dateRange||"last_7d");const dates=req.query.start_date&&req.query.end_date?{start_date:String(req.query.start_date),end_date:String(req.query.end_date)}:dateRangeToPinterestDates(dateRange);const defaultColumns="SPEND_IN_MICRO_DOLLAR,IMPRESSION_1,CLICKTHROUGH_1,OUTBOUND_CLICK_1,TOTAL_PAGE_VISIT,TOTAL_CLICK_ADD_TO_CART,TOTAL_VIEW_ADD_TO_CART,TOTAL_CHECKOUT,TOTAL_CHECKOUT_VALUE_IN_MICRO_DOLLAR,TOTAL_WEB_CHECKOUT,TOTAL_WEB_CHECKOUT_VALUE_IN_MICRO_DOLLAR";const params=new URLSearchParams({start_date:dates.start_date,end_date:dates.end_date,granularity:String(req.query.granularity||"DAY"),columns:String(req.query.columns||defaultColumns),click_window_days:String(req.query.click_window_days||30),engagement_window_days:String(req.query.engagement_window_days||30),view_window_days:String(req.query.view_window_days||1),conversion_report_time:String(req.query.conversion_report_time||"TIME_OF_AD_ACTION")});const campaignIds=req.query.campaign_ids||req.query.campaignIds||"";const adGroupIds=req.query.ad_group_ids||req.query.adGroupIds||"";const adIds=req.query.ad_ids||req.query.adIds||"";if(level==="campaign"&&!campaignIds)return res.status(400).json({error:"Parameter 'campaign_ids' is required."});if(level==="adgroup"&&!adGroupIds)return res.status(400).json({error:"Parameter 'ad_group_ids' is required."});if(level==="ad"&&!adIds)return res.status(400).json({error:"Parameter 'ad_ids' is required."});if(campaignIds)params.set("campaign_ids",String(campaignIds));if(adGroupIds)params.set("ad_group_ids",String(adGroupIds));if(adIds)params.set("ad_ids",String(adIds));const endpoint=`${pinterestAnalyticsEndpoint(adAccountId,level)}?${params.toString()}`;const data=await pinterestFetch(conn,endpoint);const normalizedRows=normalizePinterestRows(data,level);res.json({platform:"Pinterest",level,adAccountId,date_range:dateRange,start_date:dates.start_date,end_date:dates.end_date,campaign_ids:campaignIds||null,ad_group_ids:adGroupIds||null,ad_ids:adIds||null,rows:normalizedRows,rawCount:normalizedRows.length,raw:data})}catch(e){res.status(500).json({error:e.message})}});
 
-app.get("/api/pinterest/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const{user,conn}=result;const data=await pinterestFetch(conn,"/ad_accounts");const accounts=data.items||[];res.json(data)}catch(e){res.status(500).json({error:e.message})}});
+app.get("/api/pinterest/adaccounts",async(req,res)=>{try{const result=await requireConnection(req,res,"pinterest");if(!result)return;const list=await pinterestFetch(result.conn,"/ad_accounts?include_shared_accounts=true"),ids=pinterestAdAccountIds(list),details=[];for(const id of ids.slice(0,PHASE1_PLATFORM_LIMITS.pinterest)){const row=await pinterestFetch(result.conn,`/ad_accounts/${encodeURIComponent(id)}`).catch(()=>null);if(row)details.push(row)}const accounts=discoverPinterestAdAccounts({items:details});res.json({platform:"pinterest",accounts})}catch(e){res.status(e.status||500).json({error:e.status>=500?"Pinterest accounts could not be loaded. Please try again.":e.message,code:e.code||null})}});
 app.get("/api/accounts",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_ad_accounts").select("*").eq("user_id",user.id).order("platform",{ascending:true});if(error)throw error;res.json({accounts:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 
 app.post("/api/accounts/select",async(req,res)=>{
@@ -4666,7 +4279,11 @@ app.post("/api/accounts/select",async(req,res)=>{
     const selectedAccounts=req.body?.accounts||req.body?.selectedAccounts||[];
     const result=await selectPlatformAccountsForLifecycle(user.id,platform,selectedAccounts);
     res.json(result);
-  }catch(e){res.status(e.status||500).json({ok:false,error:e.message,code:e.code||null,limit:e.limit||null,activeCount:e.activeCount||null,selectedCount:e.selectedCount||null})}
+  }catch(e){
+    const status=e.status||500;
+    const safeError=status>=500?"Account selection could not be saved. Please try again.":e.message;
+    res.status(status).json({ok:false,error:safeError,code:e.code||null,limit:e.limit||null,activeCount:e.activeCount||null,selectedCount:e.selectedCount||null});
+  }
 });
 
 app.get("/api/accounts/selection-status",async(req,res)=>{
@@ -4719,9 +4336,9 @@ app.get("/api/platform/google/status",async(req,res)=>{
     const user=await requireUser(req,res);
     if(!user)return;
 
-    const conn=await getConnection(user.id,"google");
+    const status=await connectionStatus(user.id,"google");
     res.json({
-      state: conn ? "CONNECTED" : "NOT_CONNECTED"
+      state: status.connected ? "CONNECTED" : "NOT_CONNECTED"
     });
   }catch(e){
     res.status(500).json({error:e.message});
@@ -4824,7 +4441,9 @@ app.post("/api/platform/klaviyo/estimated-spend",async(req,res)=>{
       ...(conn.metadata||{}),
       estimated_monthly_spend:{
         amount,
-        currency
+        currency,
+        spend_kind:"allocated_email_plan",
+        allocation_method:"monthly_sent_volume_share"
       }
     };
 
@@ -4943,8 +4562,7 @@ app.post("/api/account/currency",async(req,res)=>{try{const user=await requireLi
 function normalizeAccountStatus(status){return String(status||"").toLowerCase()}
 function getLifecycleAccess(status){const s=normalizeAccountStatus(status);const full=["trial","active"].includes(s);const readonly=s==="expired";const blocked=["suspended","deleted"].includes(s);return{status:s||null,login:full||readonly,dashboard:full||readonly,snapshots:full||readonly,insightHistory:full||readonly,connect:full,manualRefresh:full,refresh:full,dailySync:full,export:full,aiInsights:full,blocked}}
 async function getSubscriptionForLifecycle(userId){await expireTrialsIfNeeded();const{data,error}=await supabaseAdmin.from("subscriptions").select("status,trial_end_date").eq("user_id",userId).maybeSingle();if(error)throw error;return data}
-async function requireLifecycleAccess(req,res,capability){const user=await requireUser(req,res);if(!user)return null;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);if(access.blocked||!access[capability]){res.status(403).json({error:"Account access blocked",status:access.status,capability});return null}return{user,sub,access}}
-app.get("/api/account/status",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const sub=await getSubscriptionForLifecycle(user.id);const access=getLifecycleAccess(sub?.status);res.json({status:access.status,access,deleted_at:null,hard_delete_at:null})}catch(e){res.status(500).json({error:e.message})}});
+registerAccountStatusRoutes({app,requireUser,getSubscription:getSubscriptionForLifecycle,getLifecycleAccess});
 app.post("/api/account/request-delete",async(req,res)=>{try{const result=await requireLifecycleAccess(req,res,"dashboard");if(!result)return;const token=crypto.randomBytes(32).toString("hex");const expiresAt=new Date(Date.now()+30*60*1000).toISOString();const{error}=await supabaseAdmin.from("subscriptions").update({deletion_token:token,deletion_token_expires_at:expiresAt,updated_at:new Date().toISOString()}).eq("user_id",result.user.id).in("status",["trial","active","expired"]);if(error)throw error;const proto=req.headers["x-forwarded-proto"]||req.protocol||"https";const host=req.headers["x-forwarded-host"]||req.headers.host;const confirmationUrl=`${proto}://${host}/api/account/confirm-delete?token=${encodeURIComponent(token)}`;res.json({message:"Delete confirmation ready",confirmationUrl,tokenExpiresAt:expiresAt})}catch(e){res.status(500).json({error:e.message})}});
 app.get("/api/account/confirm-delete",async(req,res)=>{try{const token=String(req.query.token||"");if(!token)return res.status(400).send("Missing delete token.");const{data,error}=await supabaseAdmin.from("subscriptions").select("user_id,status,deletion_token_expires_at").eq("deletion_token",token).maybeSingle();if(error)throw error;if(!data)return res.status(400).send("Invalid or expired delete token.");if(data.status==="deleted")return res.redirect("/login?account_deleted=1");const expiresAt=data.deletion_token_expires_at?new Date(data.deletion_token_expires_at).getTime():0;if(!expiresAt||expiresAt<Date.now())return res.status(400).send("Invalid or expired delete token.");const deletedAt=new Date();const hardDeleteAt=new Date(deletedAt.getTime()+90*24*60*60*1000);const{error:updateError}=await supabaseAdmin.from("subscriptions").update({status:"deleted",deleted_at:deletedAt.toISOString(),hard_delete_at:hardDeleteAt.toISOString(),deletion_token:null,deletion_token_expires_at:null,updated_at:deletedAt.toISOString()}).eq("user_id",data.user_id);if(updateError)throw updateError;res.redirect("/login?account_deleted=1")}catch(e){res.status(500).send(e.message)}});
 // ===== END PHASE C ACCOUNT LIFECYCLE + DELETE MY DATA =====
@@ -5036,11 +4654,20 @@ async function tiktokApiFetch({base=TIKTOK_API_BASE,endpoint,token,headers={},pa
     if(v===undefined||v===null||v==="")continue;
     url.searchParams.set(k,Array.isArray(v)||typeof v==="object"?JSON.stringify(v):String(v));
   }
-  const r=await fetch(url,{headers:{...headers}});
-  const text=await r.text();
-  let data;try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
-  if(!r.ok)throw new Error(data.message||data.error?.message||text||`TikTok API error ${r.status}`);
-  return data;
+  const maxAttempts=3;
+  for(let attempt=1;attempt<=maxAttempts;attempt+=1){
+    const r=await fetch(url,{headers:{...headers}});
+    const text=await r.text();
+    let data,parsed=true;try{data=text?JSON.parse(text):{}}catch{parsed=false;data={}}
+    const providerCode=Number(data?.code??0);
+    const qpsLimited=providerCode===40100||r.status===429;
+    if(r.ok&&parsed&&(data?.code===undefined||providerCode===0))return data;
+    if(qpsLimited&&attempt<maxAttempts){await new Promise(resolve=>setTimeout(resolve,1100*attempt));continue;}
+    const error=new Error(data.message||data.error?.message||(parsed?`TikTok API error ${r.status}`:'TikTok API returned malformed JSON'));
+    error.status=qpsLimited?429:(r.ok?502:r.status);
+    error.safe_stage="provider_fetch";
+    throw error;
+  }
 }
 
 async function bootstrapTikTokFromReport(userId,conn,advertiserId,context={}){
@@ -5093,54 +4720,11 @@ async function bootstrapTikTokFromReport(userId,conn,advertiserId,context={}){
 }
 
 
-app.get("/auth/tiktok",async(req,res)=>{
-  try{
-    const accessCheck=await requireConnectAccessForOAuth(req,res);if(!accessCheck)return;
-    const userId=accessCheck.userId;
-
-    // TIKTOK_AUTH_GUARD_FIX_v1
-    // If TikTok is already connected and lifecycle-bound to an account, do not restart OAuth.
-    const existingTikTokConnection=await getConnection(userId,"tiktok").catch(()=>null);
-    if(existingTikTokConnection?.access_token&&normalizePlatformAccountId(existingTikTokConnection.account_id)){
-      return res.redirect("/dashboard?tiktok_already_connected=1");
-    }
-
-    if(!tiktokClientId()||!tiktokRedirectUri())throw new Error("Missing TikTok OAuth env");
-    const {state}=await createOAuthTransaction(userId,"tiktok",tiktokRedirectUri());
-    const p=new URLSearchParams({app_id:tiktokClientId(),redirect_uri:tiktokRedirectUri(),state});
-    sendOAuthAuthorizationResponse(req,res,`${TIKTOK_AUTH_BASE}?${p}`);
-  }catch(e){res.status(500).send(e.message)}
+const {start:handleTikTokOAuthStart,callback:handleTikTokOAuthCallback}=createTikTokOAuthHandlers({
+  config:{clientId:tiktokClientId(),clientSecret:tiktokClientSecret(),redirectUri:tiktokRedirectUri(),authorizationBase:TIKTOK_AUTH_BASE},requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getConnection,normalizeAccountId:normalizePlatformAccountId,
+  exchangeToken:async({code,clientId,clientSecret})=>{const response=await fetch(`${TIKTOK_API_BASE}/v1.3/oauth2/access_token/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({app_id:clientId,secret:clientSecret,auth_code:String(code)})});const payload=await response.json().catch(()=>({}));if(!response.ok||payload.code!==0||!payload.data?.access_token)throw new Error(payload.message||payload.error?.message||"TikTok token exchange failed");return payload.data},saveConnection,parseExpiry:parseTikTokExpiry
 });
-
-app.get("/auth/tiktok/callback",async(req,res)=>{
-  try{
-    const {state,error,error_description}=req.query;
-    const authCode=req.query.auth_code||req.query.code;
-    if(error)return res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(error_description||error)}`);
-    if(!authCode)return res.redirect("/dashboard?tiktok_error=missing_code");
-    const transaction=await consumeOAuthTransaction(state,"tiktok",tiktokRedirectUri());
-    if(!transaction)return res.redirect("/dashboard?tiktok_error=invalid_state");
-    const userId=transaction.user_id;
-    if(!tiktokClientId()||!tiktokClientSecret())throw new Error("Missing TikTok token env");
-    const r=await fetch(`${TIKTOK_API_BASE}/v1.3/oauth2/access_token/`,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({app_id:tiktokClientId(),secret:tiktokClientSecret(),auth_code:String(authCode)})
-    });
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok||data.code!==0||!data.data?.access_token)throw new Error(data.message||data.error?.message||"TikTok token exchange failed");
-    await saveConnection(userId,"tiktok",{
-      accessToken:data.data.access_token,
-      refreshToken:data.data.refresh_token||null,
-      tokenExpiresAt:parseTikTokExpiry(data.data.expires_in),
-      accountId:null,
-      accountName:null,
-      metadata:{scope:data.data.scope||null,openId:data.data.open_id||null,expiresIn:data.data.expires_in||null,tokenType:data.data.token_type||null,selectedPlatformAccountId:null,selectedPlatformAccountIds:[],selectedPlatformAccounts:[],lastOwnedPlatformAccountId:null,accountSelectionRequired:true,reconnectSelectionRequired:true,accountSelectionGuardVersion:"v2-explicit-selection"}
-    });
-    res.redirect("/dashboard?tiktok_connected=1&account_selection_required=1");
-  }catch(e){res.redirect(`/dashboard?tiktok_error=${encodeURIComponent(e.message)}`)}
-});
-
+registerOAuthProviderRoutes({app,provider:"tiktok",startHandler:handleTikTokOAuthStart,callbackHandler:handleTikTokOAuthCallback});
 app.get("/api/tiktok/status",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
@@ -5165,7 +4749,7 @@ app.get("/api/tiktok/truth-contract",async(req,res)=>{
 app.get("/api/tiktok/advertisers",async(req,res)=>{
   try{
     const result=await requireConnection(req,res,"tiktok");if(!result)return;
-    const {conn}=result;
+    const {conn}=result,sandboxAccount=sandboxAdvertiser({productionConfig,advertiserId:TIKTOK_SANDBOX_ADVERTISER_ID,advertiserName:TIKTOK_SANDBOX_ADVERTISER_NAME,sandboxBase:TIKTOK_SANDBOX_API_BASE});if(sandboxAccount)return res.json({platform:"tiktok",advertisers:[sandboxAccount],advertiser_source:"non_production_sandbox",sandbox:true});
     if(!conn?.access_token)return res.status(400).json({error:"TikTok access token is required for advertiser resolution"});
     const data=await tiktokApiFetch({
       base:TIKTOK_API_BASE,
@@ -5185,13 +4769,13 @@ app.get("/api/tiktok/advertisers",async(req,res)=>{
     // OAuth account discovery can return no accessible advertisers even though
     // the approved test advertiser is queryable with the connected token.
     // Surface that advertiser in the existing account-selection flow.
-    if(!advertisers.length&&productionConfig.tiktokReviewFallbackEnabled&&TIKTOK_REVIEW_ADVERTISER_ID){
+    if(!advertisers.length&&productionConfig.tiktokReviewFallbackEnabled&&TIKTOK_SANDBOX_ADVERTISER_ID){
       advertisers.push({
-        advertiser_id:TIKTOK_REVIEW_ADVERTISER_ID,
-        advertiser_name:TIKTOK_REVIEW_ADVERTISER_NAME,
+        advertiser_id:TIKTOK_SANDBOX_ADVERTISER_ID,
+        advertiser_name:TIKTOK_SANDBOX_ADVERTISER_NAME,
         status:"active",
         currency:null,
-        review_fallback:true
+        review_fallback:true,sandbox:true,reportBase:TIKTOK_SANDBOX_API_BASE,tokenSource:"server_review_access_token"
       });
     }
 
@@ -5380,47 +4964,28 @@ function tiktokSnapshotRow(row,level,platformAccountId,synthetic=false){
 }
 
 async function fetchTikTokSnapshotRows(conn,platformAccountId,datePreset){
-  const sandboxToken=productionConfig.tiktokSandboxEnabled?(process.env.TIKTOK_SANDBOX_ACCESS_TOKEN||process.env.TIKTOK_TEST_ACCESS_TOKEN||""):"";
-  const useSandbox=Boolean(productionConfig.tiktokSandboxEnabled&&sandboxToken&&(conn?.metadata?.tokenSource==="manual_sandbox_access_token"||conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE||productionConfig.tiktokForceSandboxReports));
-  const token=useSandbox?sandboxToken:conn.access_token;
-  const base=useSandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
+  const sandboxToken=productionConfig.tiktokSandboxEnabled?TIKTOK_SANDBOX_ACCESS_TOKEN:"";
+  const useSandbox=Boolean(productionConfig.tiktokSandboxEnabled&&sandboxToken&&(conn?.metadata?.tokenSource==="manual_sandbox_access_token"||conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE||productionConfig.tiktokForceSandboxReports));const useReviewBridge=Boolean(productionConfig.tiktokReviewFallbackEnabled&&TIKTOK_SANDBOX_ACCESS_TOKEN&&conn?.metadata?.tokenSource==="server_review_access_token"&&conn?.metadata?.reportBase===TIKTOK_SANDBOX_API_BASE);
+  const token=useReviewBridge?TIKTOK_SANDBOX_ACCESS_TOKEN:(useSandbox?sandboxToken:conn.access_token);
+  const base=useReviewBridge||useSandbox?TIKTOK_SANDBOX_API_BASE:TIKTOK_API_BASE;
   const endpoint="/v1.3/report/integrated/get/";
   const headers={"Access-Token":token};
   const w=tiktokDateWindow(datePreset||"today");
   const metrics=["spend","impressions","clicks","ctr","cpc","conversion"];
   const levels=["campaign","adgroup","ad"];
-  const result={rows:[],raw:{},counts:{campaign:0,adgroup:0,ad:0},tokenSource:useSandbox?"manual_sandbox_access_token":"platform_connections.access_token",base};
+  const result={rows:[],reportEvidence:{},counts:{campaign:0,adgroup:0,ad:0},tokenSource:useReviewBridge?"server_review_access_token":(useSandbox?"manual_sandbox_access_token":"platform_connections.access_token"),base};
+  let previousRequestStartedAt=0;
   for(const level of levels){
+    const waitMs=Math.max(0,1100-(Date.now()-previousRequestStartedAt));
+    if(waitMs)await new Promise(resolve=>setTimeout(resolve,waitMs));
+    previousRequestStartedAt=Date.now();
     const levelInfo=resolveTikTokReportLevel(level);
     const data=await tiktokApiFetch({base,endpoint,headers,params:{report_type:"BASIC",data_level:levelInfo.dataLevel,advertiser_id:platformAccountId,start_date:w.start,end_date:w.end,dimensions:[levelInfo.dimension],metrics,page:1,page_size:100}});
     const normalized=normalizeTikTokRows(data,levelInfo.level);
     const rows=normalized.map(r=>tiktokSnapshotRow(r,levelInfo.level,platformAccountId,false));
-    result.raw[level]=data;
+    result.reportEvidence[level]={status:"ok",row_count:rows.length,empty:rows.length===0};
     result.counts[levelInfo.level]=rows.length;
     result.rows.push(...rows);
-  }
-  const shouldCreateFallbackRows=useSandbox||levels.some(level=>Number(result.counts[level]||0)===0);
-  if(shouldCreateFallbackRows){
-    const fallbackBase={raw:{fallback_reason:useSandbox?"sandbox_empty_report":"empty_report_level_fallback",token_source:result.tokenSource}};
-    const fallbackRows=[
-      {
-        level:"campaign",
-        row:{...fallbackBase,campaign_id:platformAccountId,name:`TikTok Campaign ${platformAccountId}`,campaign_name:`TikTok Campaign ${platformAccountId}`,campaign_status:"empty_period_fallback"}
-      },
-      {
-        level:"adgroup",
-        row:{...fallbackBase,campaign_id:platformAccountId,adgroup_id:`${platformAccountId}_adgroup_fallback`,adgroup_name:`TikTok AdGroup ${platformAccountId}`,adgroup_status:"empty_period_fallback"}
-      },
-      {
-        level:"ad",
-        row:{...fallbackBase,campaign_id:platformAccountId,adgroup_id:`${platformAccountId}_adgroup_fallback`,ad_id:`${platformAccountId}_ad_fallback`,ad_name:`TikTok Ad ${platformAccountId}`,ad_status:"empty_period_fallback"}
-      }
-    ];
-    for(const fallback of fallbackRows){
-      if(Number(result.counts[fallback.level]||0)>0)continue;
-      result.rows.push(tiktokSnapshotRow(fallback.row,fallback.level,platformAccountId,true));
-      result.counts[fallback.level]=1;
-    }
   }
   return result;
 }
@@ -5439,7 +5004,7 @@ function buildSnapshotPayloadFromPerformanceRows({platform,snapshotDate,accountC
     kpis:{spend:totals.spend,sales:totals.sales,revenue:totals.revenue,impressions:totals.impressions,clicks:totals.clicks,ctr:totals.impressions>0?totals.clicks/totals.impressions*100:null,cpc:totals.clicks>0?totals.spend/totals.clicks:null,roas:totals.spend>0?totals.revenue/totals.spend:null},
     purchase_journey:{add_to_cart:addToCart,checkout,abandoned:checkout&&purchase!==null?Math.max(checkout-purchase,0):0,purchase,purchases:purchase,purchase_value:totals.revenue},
     click_journey:{ad_clicks:totals.clicks,link_clicks:linkClicks,landing_page_views:lpv,traffic_score:linkClicks>0&&lpv>0?lpv/linkClicks*100:null,real_cpc:lpv>0?totals.spend/lpv:null},
-    performance_summary:{rows,counts,truth_contract:truthContract,source_confidence:sourceConfidence,null_policy:"Fields are present even when values are zero/null; fallback rows are explicitly marked in raw/source_confidence."}
+    performance_summary:{rows,counts,truth_contract:truthContract,source_confidence:sourceConfidence,empty_result:rows.length===0,null_policy:"A successful empty provider report remains an empty row set; measured zero is never synthesized."}
   };
 }
 
@@ -5476,7 +5041,7 @@ async function writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePre
   const platformBaseCurrency=fetched.rows.find(r=>r.currency)?.currency||conn?.metadata?.baseCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
   const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"tiktok",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:fetched.rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:fetched.counts,sourceConfidence:"snapshot_layer_tiktok_v2",truthContract:tiktokTruthContract()});
-  snapshot.performance_summary.raw_report=fetched.raw;
+  snapshot.performance_summary.report_evidence=fetched.reportEvidence;
   snapshot.performance_summary.token_source=fetched.tokenSource;
   return insertSnapshotAndSpread({user,platform:"tiktok",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
 }
@@ -5493,14 +5058,12 @@ async function handleTikTokSnapshotWrite(req,res){
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,null);
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
     stage="job";
-    job=await createRefreshJob(user.id,"tiktok",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"running");
-    stage="snapshot";
-    const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"tiktok",platformAccountId,datePreset,snapshotDate,complete:(result,currentJob)=>{const legacy=result.legacy_result||result;return{snapshot_id:legacy.snapshot?.id||null,metadata:{...(currentJob.metadata||{}),performance_spread_result:legacy.performance_spread_result||null,tiktok_shadow_evidence:result.shadow_evidence||null}}},write:async jobContext=>{stage="snapshot";if(!tiktokV2LiveShadow)return writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,...jobContext});const timezone=await getPlatformAccountTimezone(user.id,"tiktok",platformAccountId,conn,null),targetCurrency=await getUserAccountCurrency(user.id)||DEFAULT_REPORTING_CURRENCY,sourceCurrency=normalizeCurrency(conn?.metadata?.baseCurrency)||targetCurrency;return tiktokV2LiveShadow.run({request:{userId:user.id,advertiserId:platformAccountId,providerDate:snapshotDate},advertiser:{id:platformAccountId,currency:sourceCurrency,timezone},targetCurrency,sourceJobId:jobContext.sourceJobId,legacyWrite:()=>writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,...jobContext})})}});
+    job=execution.job;
+    const shadowEvidence=execution.result.shadow_evidence||null,writeResult=execution.result.legacy_result||execution.result;
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
-    res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
-  }catch(e){if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
+    res.json({ok:true,platform:"TikTok",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,tiktok_shadow:shadowEvidence,google_sheets_sync:googleSheetsSync});
+  }catch(e){job=e.refreshJob||job;res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
 }
 
 async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset="today",snapshotDate,sourceJobId=null,captureReason="manual_refresh",snapshotClass="primary"}){
@@ -5532,13 +5095,10 @@ async function writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePr
     const n=normalizeKlaviyoInsight({campaign,report,settings:conn.metadata||{},window:w});
     rows.push({platform:"Klaviyo",level:"campaign",id:String(n.campaign_id||campaign.id),id_in_platform:String(n.campaign_id||campaign.id),campaign_id:String(n.campaign_id||campaign.id),campaign_name:n.campaign_name,campaign_status:n.campaign_status,currency:n.currency||conn.metadata?.spendCurrency||null,spend:n.spend,impressions:n.impressions,reach:null,clicks:n.clicks,ctr:n.ctr,cpc:n.cpc,sales:n.sales,revenue:n.revenue,roas:n.roas,conversions:n.purchase,purchase:n.purchase,purchases:n.purchase,conversion_value:n.revenue,ad_clicks:n.opened_email||n.clicks,link_clicks:n.link_clicks,landing_page_views:n.landing_page_views||0,add_to_cart:n.add_to_cart||0,checkout:n.checkout||0,purchase_value:n.revenue,abandoned:n.abandoned,source_confidence:"klaviyo_api_or_estimated_spend",raw:n.raw});
   }
-  if(!rows.length){
-    const spend=Number(conn.metadata?.estimatedPeriodSpend||0)||0;
-    rows.push({platform:"Klaviyo",level:"campaign",id:normalized,id_in_platform:normalized,campaign_id:normalized,campaign_name:conn.account_name||`Klaviyo Account ${normalized}`,campaign_status:"empty_period_fallback",currency:conn.metadata?.spendCurrency||null,spend,impressions:0,clicks:0,ctr:null,cpc:null,sales:0,revenue:0,roas:null,conversions:0,purchase:0,purchases:0,conversion_value:0,ad_clicks:0,link_clicks:0,landing_page_views:0,add_to_cart:0,checkout:0,purchase_value:0,abandoned:0,source_confidence:"klaviyo_empty_period_fallback",raw:{fallback_reason:"no_campaign_rows_for_period"}});
-  }
   const platformBaseCurrency=rows.find(r=>r.currency)?.currency||conn.metadata?.spendCurrency||null;
   const accountCurrency=await getUserAccountCurrency(user.id)||normalizeCurrency(platformBaseCurrency)||DEFAULT_REPORTING_CURRENCY;
   const snapshot=buildSnapshotPayloadFromPerformanceRows({platform:"klaviyo",snapshotDate:effectiveSnapshotDate,accountCurrency:platformBaseCurrency||accountCurrency,rows:rows.map(r=>({...r,currency:r.currency||platformBaseCurrency||accountCurrency})),counts:{campaign:rows.length,adgroup:0,ad:0},sourceConfidence:"snapshot_layer_klaviyo_v1"});
+  snapshot.performance_summary.empty_result=rows.length===0;
   return insertSnapshotAndSpread({user,platform:"klaviyo",platformAccountId:normalized,platformBaseCurrency,snapshot,datePreset:period.datePreset,period,sourceJobId,captureReason,snapshotClass,platformTimeZone,timeSync});
 }
 
@@ -5554,14 +5114,12 @@ async function handleKlaviyoSnapshotWrite(req,res){
     const platformTimeZone=await getPlatformAccountTimezone(user.id,"klaviyo",platformAccountId,conn,null);
     const snapshotDate=e2aSnapshotDate(req.body?.snapshot_date||req.query.snapshot_date,platformTimeZone);
     stage="job";
-    job=await createRefreshJob(user.id,"klaviyo",platformAccountId,{trigger:"manual",datePreset,snapshotDate,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"running");
-    stage="snapshot";
-    const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,sourceJobId:job.id,captureReason:"manual_refresh",snapshotClass:"primary"});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null,metadata:{...(job.metadata||{}),performance_spread_result:writeResult.performance_spread_result||null}});
+    const execution=await manualSnapshotOrchestrator.run({userId:user.id,platform:"klaviyo",platformAccountId,datePreset,snapshotDate,write:jobContext=>{stage="snapshot";return writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset,snapshotDate,...jobContext})}});
+    job=execution.job;
+    const writeResult=execution.result;
     const googleSheetsSync=req._skipGoogleSheetsAutoSync?{attempted:false,ok:true,skipped:true,reason:"global_refresh_deferred"}:await maybeAutoSyncGoogleSheets(user.id);
     res.json({ok:true,platform:"Klaviyo",refresh_job:{id:job.id,status:"completed"},snapshot_id:writeResult.snapshot?.id||null,snapshot_date:writeResult.snapshot?.snapshot_date||snapshotDate,platform_account_id:platformAccountId,row_counts:writeResult.row_counts,performance_spread_result:writeResult.performance_spread_result,google_sheets_sync:googleSheetsSync});
-  }catch(e){if(job?.id)await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
+  }catch(e){job=e.refreshJob||job;res.status(e.status||500).json({ok:false,error:e.message,stage,job_id:job?.id||null})}
 }
 
 
@@ -5592,7 +5150,7 @@ async function ensureConfiguredOrganicSchedules(){
   return {ok:true,count:results.length,results};
 }
 
-async function runOrganicAutoRefreshForSchedule(schedule){
+async function runOrganicAutoRefreshForSchedule(schedule){if(!ORGANIC_GA4_INGEST_ENABLED)return {ok:true,skipped:true,platform:"organic",reason:ORGANIC_GA4_PARK_REASON,schedule_id:schedule.id};
   const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",schedule.user_id).maybeSingle();
   if(userError)throw userError;
   if(!user)throw new Error("Auto refresh user not found");
@@ -5634,152 +5192,60 @@ async function runOrganicAutoRefreshForSchedule(schedule){
   }
 
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
-  const job=await createRefreshJob(schedule.user_id,"organic",platformAccountId,{
-    trigger:"automation",
-    datePreset:policy.datePreset,
+  const execution=await automationSnapshotOrchestrator.run({
+    userId:schedule.user_id,
+    platform:"organic",
+    platformAccountId,
     snapshotDate,
-    captureReason:policy.captureReason,
-    snapshotClass:policy.snapshotClass,
     scheduleId:schedule.id,
-    platformBusinessHour:policy.platform_business_hour,
-    dataMaturityWindowHours:policy.data_maturity_window_hours,
-    server_time_utc:policy.server_time_utc,
-    istanbul_time:policy.istanbul_time,
-    platform_account_time:policy.platform_account_time,
-    platform_account_timezone:policy.platform_account_timezone,
-    platform_business_date:policy.platform_business_date,
-    timeEngineVersion:TIME_ENGINE_VERSION
+    policy,
+    primaryMetadata:{platformBusinessHour:policy.platform_business_hour,dataMaturityWindowHours:policy.data_maturity_window_hours,server_time_utc:policy.server_time_utc,istanbul_time:policy.istanbul_time,platform_account_time:policy.platform_account_time,platform_account_timezone:policy.platform_account_timezone,platform_business_date:policy.platform_business_date,timeEngineVersion:TIME_ENGINE_VERSION},
+    recoveryMetadata:{timeEngineVersion:TIME_ENGINE_VERSION},
+    write:jobContext=>writeOrganicSnapshotV1({user,...jobContext})
   });
 
-  await setRefreshJobStatus(job.id,"running");
+  await supabaseAdmin.from("snapshot_schedules").update({
+    last_run_at:new Date().toISOString(),
+    next_run_at:nextAutomationSlotUtc(),
+    updated_at:new Date().toISOString()
+  }).eq("id",schedule.id);
 
-  try{
-    const writeResult=await writeOrganicSnapshotV1({
-      user,
-      datePreset:policy.datePreset,
-      snapshotDate,
-      sourceJobId:job.id,
-      captureReason:policy.captureReason,
-      snapshotClass:policy.snapshotClass
-    });
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"organic",platformAccountId,{
-        trigger:"automation",
-        datePreset:policy.recoveryDatePreset,
-        snapshotDate,
-        captureReason:policy.recoveryCaptureReason,
-        snapshotClass:policy.recoverySnapshotClass,
-        scheduleId:schedule.id,
-        pairedPrimaryJobId:job.id,
-        timeEngineVersion:TIME_ENGINE_VERSION
-      });
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeOrganicSnapshotV1({
-          user,
-          datePreset:policy.recoveryDatePreset,
-          snapshotDate,
-          sourceJobId:recoveryJob.id,
-          captureReason:policy.recoveryCaptureReason,
-          snapshotClass:policy.recoverySnapshotClass
-        });
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-
-    await supabaseAdmin.from("snapshot_schedules").update({
-      last_run_at:new Date().toISOString(),
-      next_run_at:nextAutomationSlotUtc(),
-      updated_at:new Date().toISOString()
-    }).eq("id",schedule.id);
-
-    return {
-      ok:true,
-      platform:"organic",
-      job_id:job.id,
-      snapshot_id:writeResult.snapshot?.id||null,
-      row_counts:writeResult.row_counts,
-      performance_spread_result:writeResult.performance_spread_result||null,
-      recovery_result
-    };
-  }catch(e){
-    await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);
-    throw e;
-  }
+  return {
+    ok:true,
+    platform:"organic",
+    job_id:execution.job.id,
+    snapshot_id:execution.result.snapshot?.id||null,
+    row_counts:execution.result.row_counts,
+    performance_spread_result:execution.result.performance_spread_result||null,
+    recovery_result:execution.recoveryResult
+  };
 }
 
-async function runTikTokAutoRefreshForSchedule(schedule){
+async function runAutomationSnapshotForSchedule({schedule,platform,missingConnectionError,missingAccountError,writeSnapshot}){
   const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",schedule.user_id).maybeSingle();
   if(userError)throw userError;if(!user)throw new Error("Auto refresh user not found");
-  const conn=await getConnection(schedule.user_id,"tiktok");if(!conn)throw new Error("Auto refresh TikTok connection not found");
-  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);if(!platformAccountId)throw new Error("Auto refresh missing TikTok advertiser id");
-  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"tiktok",platformAccountId,conn,null);
-  const policy=resolveAutoRefreshPolicy({date:new Date(),platformTimeZone,platform:"tiktok"});
-  if(!policy.isAutomationHour)return {ok:true,skipped:true,platform:"tiktok",reason:"not_platform_automation_hour",schedule_id:schedule.id};
+  const conn=await getConnection(schedule.user_id,platform);if(!conn)throw new Error(missingConnectionError);
+  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);if(!platformAccountId)throw new Error(missingAccountError);
+  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,platform,platformAccountId,conn,null);
+  const policy=resolveAutoRefreshPolicy({date:new Date(),platformTimeZone,platform});
+  if(!policy.isAutomationHour)return {ok:true,skipped:true,platform,reason:"not_platform_automation_hour",schedule_id:schedule.id};
   const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
-  const job=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{trigger:"automation",datePreset:policy.datePreset,snapshotDate,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass,scheduleId:schedule.id});
-  await setRefreshJobStatus(job.id,"running");
-  try{
-    const writeResult=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"tiktok",platformAccountId,{trigger:"automation",datePreset:policy.recoveryDatePreset,snapshotDate,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass,scheduleId:schedule.id,pairedPrimaryJobId:job.id});
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeTikTokSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.recoveryDatePreset,snapshotDate,sourceJobId:recoveryJob.id,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass});
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-    await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
-    return {ok:true,platform:"tiktok",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts,recovery_result};
-  }catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
+  const execution=await automationSnapshotOrchestrator.run({userId:schedule.user_id,platform,platformAccountId,snapshotDate,scheduleId:schedule.id,policy,write:jobContext=>writeSnapshot({user,conn,platformAccountId,...jobContext})});
+  await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
+  return {ok:true,platform,job_id:execution.job.id,snapshot_id:execution.result.snapshot?.id||null,row_counts:execution.result.row_counts,recovery_result:execution.recoveryResult};
 }
 
-async function runKlaviyoAutoRefreshForSchedule(schedule){
-  const {data:user,error:userError}=await supabaseAdmin.from("users").select("*").eq("id",schedule.user_id).maybeSingle();
-  if(userError)throw userError;if(!user)throw new Error("Auto refresh user not found");
-  const conn=await getConnection(schedule.user_id,"klaviyo");if(!conn)throw new Error("Auto refresh Klaviyo connection not found");
-  const platformAccountId=normalizePlatformAccountId(schedule.platform_account_id||conn.account_id);if(!platformAccountId)throw new Error("Auto refresh missing Klaviyo account id");
-  const platformTimeZone=await getPlatformAccountTimezone(schedule.user_id,"klaviyo",platformAccountId,conn,null);
-  const policy=resolveAutoRefreshPolicy({date:new Date(),platformTimeZone,platform:"klaviyo"});
-  if(!policy.isAutomationHour)return {ok:true,skipped:true,platform:"klaviyo",reason:"not_platform_automation_hour",schedule_id:schedule.id};
-  const snapshotDate=e2aSnapshotDate(null,platformTimeZone);
-  const job=await createRefreshJob(schedule.user_id,"klaviyo",platformAccountId,{trigger:"automation",datePreset:policy.datePreset,snapshotDate,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass,scheduleId:schedule.id});
-  await setRefreshJobStatus(job.id,"running");
-  try{
-    const writeResult=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.datePreset,snapshotDate,sourceJobId:job.id,captureReason:policy.captureReason,snapshotClass:policy.snapshotClass});
-    await setRefreshJobStatus(job.id,"completed",{snapshot_id:writeResult.snapshot?.id||null});
-    let recovery_result=null;
-    if(policy.shouldRunRecoverySnapshot){
-      const recoveryJob=await createRefreshJob(schedule.user_id,"klaviyo",platformAccountId,{trigger:"automation",datePreset:policy.recoveryDatePreset,snapshotDate,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass,scheduleId:schedule.id,pairedPrimaryJobId:job.id});
-      await setRefreshJobStatus(recoveryJob.id,"running");
-      try{
-        const recoveryWrite=await writeKlaviyoSnapshotImmutable({user,conn,platformAccountId,datePreset:policy.recoveryDatePreset,snapshotDate,sourceJobId:recoveryJob.id,captureReason:policy.recoveryCaptureReason,snapshotClass:policy.recoverySnapshotClass});
-        await setRefreshJobStatus(recoveryJob.id,"completed",{snapshot_id:recoveryWrite.snapshot?.id||null});
-        recovery_result={ok:true,job_id:recoveryJob.id,snapshot_id:recoveryWrite.snapshot?.id||null};
-      }catch(recoveryError){
-        await setRefreshJobStatus(recoveryJob.id,"failed",{error_message:recoveryError.message}).catch(()=>null);
-        recovery_result={ok:false,job_id:recoveryJob.id,error:recoveryError.message};
-      }
-    }
-    await supabaseAdmin.from("snapshot_schedules").update({last_run_at:new Date().toISOString(),next_run_at:nextAutomationSlotUtc(),updated_at:new Date().toISOString()}).eq("id",schedule.id);
-    return {ok:true,platform:"klaviyo",job_id:job.id,snapshot_id:writeResult.snapshot?.id||null,row_counts:writeResult.row_counts,recovery_result};
-  }catch(e){await setRefreshJobStatus(job.id,"failed",{error_message:e.message}).catch(()=>null);throw e}
+function runTikTokAutoRefreshForSchedule(schedule){
+  return runAutomationSnapshotForSchedule({schedule,platform:"tiktok",missingConnectionError:"Auto refresh TikTok connection not found",missingAccountError:"Auto refresh missing TikTok advertiser id",writeSnapshot:writeTikTokSnapshotImmutable});
+}
+
+function runKlaviyoAutoRefreshForSchedule(schedule){
+  return runAutomationSnapshotForSchedule({schedule,platform:"klaviyo",missingConnectionError:"Auto refresh Klaviyo connection not found",missingAccountError:"Auto refresh missing Klaviyo account id",writeSnapshot:writeKlaviyoSnapshotImmutable});
 }
 
 // ===== END TIKTOK READ LAYER =====
 
-if(process.env.VERCEL!=="1") app.listen(PORT,()=>console.log(`AdsTable server running on ${PORT}`));
+installErrorBoundary(app);
+
+if(process.env.VERCEL!=="1")startApplication(app,{port:runtimeConfig.port});
 module.exports=app;

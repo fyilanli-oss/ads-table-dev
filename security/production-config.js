@@ -5,12 +5,13 @@ const PRODUCTION_CONFIG_VARIABLES=Object.freeze([
   "GOOGLE_TEST_CUSTOMER_ID",
   "GOOGLE_TEST_LOGIN_CUSTOMER_ID",
   "TIKTOK_FORCE_SANDBOX_REPORTS",
-  "TIKTOK_REVIEW_ADVERTISER_ID",
-  "TIKTOK_REVIEW_ADVERTISER_NAME",
   "TIKTOK_REVIEW_FALLBACK_ENABLED",
+  "TIKTOK_SANDBOX_ADVERTISER_ID",
+  "TIKTOK_SANDBOX_ADVERTISER_NAME",
   "TIKTOK_SANDBOX_ACCESS_TOKEN",
   "TIKTOK_SANDBOX_ENABLED",
-  "TIKTOK_TEST_ACCESS_TOKEN"
+  "TIKTOK_TEST_ACCESS_TOKEN",
+  "TIKTOK_V2_SHADOW_ENABLED"
 ]);
 const PRODUCTION_CONFIG_VARIABLE_SET=new Set(PRODUCTION_CONFIG_VARIABLES);
 
@@ -60,16 +61,21 @@ function isPresent(value){return value!==undefined&&value!==null&&String(value).
 function createRuntimeFlags(env={}){
   const production=isProductionRuntime(env);
   const googleReviewHardRouteEnabled=parseExplicitBoolean(env.GOOGLE_REVIEW_HARD_ROUTE_ENABLED,false,"GOOGLE_REVIEW_HARD_ROUTE_ENABLED");
-  const tiktokReviewFallbackEnabled=parseExplicitBoolean(env.TIKTOK_REVIEW_FALLBACK_ENABLED,false,"TIKTOK_REVIEW_FALLBACK_ENABLED");
-  const tiktokSandboxEnabled=parseExplicitBoolean(env.TIKTOK_SANDBOX_ENABLED,false,"TIKTOK_SANDBOX_ENABLED");
+  const tiktokReviewFallbackRequested=parseExplicitBoolean(env.TIKTOK_REVIEW_FALLBACK_ENABLED,false,"TIKTOK_REVIEW_FALLBACK_ENABLED");
+  const tiktokReviewConfigurationReady=isPresent(env.TIKTOK_SANDBOX_ADVERTISER_ID)&&isPresent(env.TIKTOK_SANDBOX_ACCESS_TOKEN);
+  const tiktokSandboxRequested=parseExplicitBoolean(env.TIKTOK_SANDBOX_ENABLED,false,"TIKTOK_SANDBOX_ENABLED");
   const tiktokForceSandboxReports=parseExplicitBoolean(env.TIKTOK_FORCE_SANDBOX_REPORTS,false,"TIKTOK_FORCE_SANDBOX_REPORTS");
+  const tiktokV2ShadowEnabled=parseExplicitBoolean(env.TIKTOK_V2_SHADOW_ENABLED,false,"TIKTOK_V2_SHADOW_ENABLED");
   return Object.freeze({
     production,
     googleReviewHardRouteEnabled,
-    tiktokReviewFallbackEnabled,
-    tiktokSandboxEnabled,
-    tiktokForceSandboxReports:tiktokSandboxEnabled&&tiktokForceSandboxReports,
-    tiktokTestPageEnabled:!production&&tiktokSandboxEnabled
+    tiktokReviewFallbackEnabled:tiktokReviewFallbackRequested&&tiktokReviewConfigurationReady,
+    tiktokReviewFallbackRequested,
+    tiktokReviewConfigurationReady,
+    tiktokSandboxEnabled:!production&&tiktokSandboxRequested,
+    tiktokForceSandboxReports:!production&&tiktokSandboxRequested&&tiktokForceSandboxReports,
+    tiktokV2ShadowEnabled,
+    tiktokTestPageEnabled:!production&&tiktokSandboxRequested
   });
 }
 
@@ -80,21 +86,17 @@ function validateProductionConfig(env={}){
     if(flags.googleReviewHardRouteEnabled)unsafe.push("GOOGLE_REVIEW_HARD_ROUTE_ENABLED");
     if(isPresent(env.GOOGLE_TEST_CUSTOMER_ID))unsafe.push("GOOGLE_TEST_CUSTOMER_ID");
     if(isPresent(env.GOOGLE_TEST_LOGIN_CUSTOMER_ID))unsafe.push("GOOGLE_TEST_LOGIN_CUSTOMER_ID");
-    if(flags.tiktokReviewFallbackEnabled)unsafe.push("TIKTOK_REVIEW_FALLBACK_ENABLED");
-    if(isPresent(env.TIKTOK_REVIEW_ADVERTISER_ID))unsafe.push("TIKTOK_REVIEW_ADVERTISER_ID");
-    if(isPresent(env.TIKTOK_REVIEW_ADVERTISER_NAME))unsafe.push("TIKTOK_REVIEW_ADVERTISER_NAME");
-    if(flags.tiktokSandboxEnabled)unsafe.push("TIKTOK_SANDBOX_ENABLED");
-    if(isPresent(env.TIKTOK_SANDBOX_ACCESS_TOKEN))unsafe.push("TIKTOK_SANDBOX_ACCESS_TOKEN");
-    if(isPresent(env.TIKTOK_TEST_ACCESS_TOKEN))unsafe.push("TIKTOK_TEST_ACCESS_TOKEN");
-    if(parseExplicitBoolean(env.TIKTOK_FORCE_SANDBOX_REPORTS,false,"TIKTOK_FORCE_SANDBOX_REPORTS"))unsafe.push("TIKTOK_FORCE_SANDBOX_REPORTS");
   }else{
     if(flags.googleReviewHardRouteEnabled){
       if(!isPresent(env.GOOGLE_TEST_CUSTOMER_ID))unsafe.push("GOOGLE_TEST_CUSTOMER_ID");
       if(!isPresent(env.GOOGLE_TEST_LOGIN_CUSTOMER_ID))unsafe.push("GOOGLE_TEST_LOGIN_CUSTOMER_ID");
       if(isPresent(env.GOOGLE_TEST_CUSTOMER_ID)&&String(env.GOOGLE_TEST_CUSTOMER_ID).replace(/\D/g,"")===String(env.GOOGLE_TEST_LOGIN_CUSTOMER_ID).replace(/\D/g,""))unsafe.push("GOOGLE_TEST_CUSTOMER_ID","GOOGLE_TEST_LOGIN_CUSTOMER_ID");
     }
-    if(flags.tiktokReviewFallbackEnabled&&!isPresent(env.TIKTOK_REVIEW_ADVERTISER_ID))unsafe.push("TIKTOK_REVIEW_ADVERTISER_ID");
-    if(parseExplicitBoolean(env.TIKTOK_FORCE_SANDBOX_REPORTS,false,"TIKTOK_FORCE_SANDBOX_REPORTS")&&!flags.tiktokSandboxEnabled)unsafe.push("TIKTOK_FORCE_SANDBOX_REPORTS","TIKTOK_SANDBOX_ENABLED");
+    if(parseExplicitBoolean(env.TIKTOK_FORCE_SANDBOX_REPORTS,false,"TIKTOK_FORCE_SANDBOX_REPORTS")){
+      if(!flags.tiktokSandboxEnabled)unsafe.push("TIKTOK_FORCE_SANDBOX_REPORTS","TIKTOK_SANDBOX_ENABLED");
+      if(!isPresent(env.TIKTOK_SANDBOX_ACCESS_TOKEN))unsafe.push("TIKTOK_SANDBOX_ACCESS_TOKEN");
+      if(!isPresent(env.TIKTOK_SANDBOX_ADVERTISER_ID))unsafe.push("TIKTOK_SANDBOX_ADVERTISER_ID");
+    }
   }
   const variables=[...new Set(unsafe)].sort();
   if(variables.length)throw new ProductionConfigError(`Unsafe production configuration: ${variables.join(", ")}`,variables);

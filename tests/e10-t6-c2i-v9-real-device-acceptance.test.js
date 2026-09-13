@@ -11,6 +11,7 @@ const {SURFACES, VISUAL_GATES, PRIVACY_GATES, FORBIDDEN_INTERACTIONS, inspectPng
 const root = path.join(__dirname, "..");
 const contract = JSON.parse(fs.readFileSync(path.join(root, "contracts/shopify/e10-t6-c2i-v9-real-device-acceptance.json"), "utf8"));
 const doc = fs.readFileSync(path.join(root, "docs/E10_T6_C2I_V9_REAL_DEVICE_ACCEPTANCE.md"), "utf8");
+const template = JSON.parse(fs.readFileSync(path.join(root, "contracts/shopify/e10-t6-c2i-v9-evidence.template.json"), "utf8"));
 
 test("V9 approval authorizes capture but cannot claim acceptance without evidence", () => {
   assert.equal(contract.execution_approved, true);
@@ -96,4 +97,14 @@ test("validator rejects missing attestations, interaction, hash drift, and PNG m
   assert.throws(() => validateV9Evidence({...evidence, forbidden_interactions: {...evidence.forbidden_interactions, provider_connect_pressed: true}}, {root}), /provider_connect_pressed/);
   assert.throws(() => validateV9Evidence({...evidence, captures: evidence.captures.map((capture, index) => index ? capture : {...capture, sha256: "0".repeat(64)})}, {root}), /sha256 mismatch/);
   assert.throws(() => inspectPng(png(800, 1200, true)), /forbidden metadata/);
+});
+
+test("intake template is visibly non-accepting and cannot pass the validator", () => {
+  assert.equal(template.status, "REVIEW_REQUIRED");
+  assert.equal(template.acceptance_passed, false);
+  assert.ok(Object.values(template.visual_gates).every(value => value === false));
+  assert.ok(Object.values(template.privacy_gates).every(value => value === false));
+  assert.ok(Object.values(template.forbidden_interactions).every(value => value === false));
+  assert.throws(() => validateV9Evidence(template, {root}), /cannot claim V9 acceptance/);
+  assert.match(doc, /Template hiçbir koşulda acceptance evidence veya `PASS` sayılamaz/);
 });

@@ -20,6 +20,8 @@ Bu paket yalnız Shopify-native render'ı gözlemler. `Connect` düğmesine bas�
 6. Redaction sonrasında görüntülerin UI kararını değerlendirmeye yetecek içeriği koruduğunu gözle kontrol et. Tamamen kapatılmış veya hangi yüzey olduğu anlaşılamayan görüntü kabul edilmez.
 7. Redacted dosyalar teslim edildiğinde her dosyanın SHA-256 değeri evidence manifestine yazılır ve insan incelemesiyle privacy attestation tamamlanır.
 
+Pending contract'taki listeler gözlenmiş `PASS` değerleri değildir; kabul sırasında kanıtlanması gereken gereksinimlerdir. İki görüntü yalnız PNG olarak, sırasıyla `artifacts/e10-shopify/e10-t6-c2i-v9/app-home-redacted.png` ve `artifacts/e10-shopify/e10-t6-c2i-v9/platforms-redacted.png` yollarına eklenir. Evidence JSON'u `node scripts/e10-t6-c2i-v9-evidence.js <evidence.json>` ile doğrulanır. Validator exact dosya/route sırasını, SHA-256 değerlerini, farklı görüntüleri, güvenli boyutları, PNG yapısını ve PNG text/EXIF metadata yokluğunu fail-closed doğrular. İnsan görsel/privacy attestation'ının yerini almaz.
+
 ## Görsel kabul matrisi
 
 ### App Home

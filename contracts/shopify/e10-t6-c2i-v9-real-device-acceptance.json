@@ -18,32 +18,34 @@
       "sha256": null
     }
   ],
-  "visual_gates": {
-    "inside_shopify_admin": true,
-    "official_shopify_components_rendered": true,
-    "app_navigation_visible": true,
-    "app_home_manage_data_sources_action_visible": true,
-    "platforms_provider_actions_visible": true,
-    "custom_admin_shell_absent": true,
-    "custom_component_css_absent": true,
-    "technical_release_marker_absent": true,
-    "nested_provider_iframe_absent": true
-  },
-  "privacy_gates": {
-    "shop_identity_absent": true,
-    "account_identity_absent": true,
-    "person_identity_absent": true,
-    "browser_chrome_identity_absent": true,
-    "token_code_credential_absent": true,
-    "redaction_completed_before_repository_add": true
-  },
-  "interaction_gates": {
-    "provider_connect_pressed": false,
-    "provider_consent_started": false,
-    "provider_api_contact": false,
-    "oauth_callback_exercised": false,
-    "production_mutation": false
-  },
+  "required_visual_gates": [
+    "inside_shopify_admin",
+    "official_shopify_components_rendered",
+    "app_navigation_visible",
+    "app_home_manage_data_sources_action_visible",
+    "platforms_provider_actions_visible",
+    "custom_admin_shell_absent",
+    "custom_component_css_absent",
+    "technical_release_marker_absent",
+    "nested_provider_iframe_absent"
+  ],
+  "required_privacy_gates": [
+    "shop_identity_absent",
+    "account_identity_absent",
+    "person_identity_absent",
+    "browser_chrome_identity_absent",
+    "token_code_credential_absent",
+    "redaction_completed_before_repository_add",
+    "human_privacy_attestation"
+  ],
+  "forbidden_interactions": [
+    "provider_connect_pressed",
+    "provider_consent_started",
+    "provider_api_contact",
+    "oauth_callback_exercised",
+    "production_mutation"
+  ],
+  "evidence_validator": "node scripts/e10-t6-c2i-v9-evidence.js <evidence.json>",
   "acceptance_rule": "PASS requires both redacted captures, human privacy attestation, every visual gate true, and every forbidden interaction false",
   "next_on_pass": "E10_T6_C2I_V10A_KLAVIYO_CONNECT_MODAL",
   "next_on_fail": "E10_T6_C2I_V9_CORRECTIVE"

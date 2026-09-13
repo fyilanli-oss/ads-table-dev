@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {EMBEDDED_HOME_RELEASE, renderEmbeddedAppHome, registerEmbeddedAppHome} = require("../src/shopify/embedded-app-home");
 
-test("embedded App Home bootstraps once and obtains a fresh token for session verification", () => {
+test("embedded App Home reuses an active installation and bootstraps only for reauthorization", () => {
   const html = renderEmbeddedAppHome({clientId: "development-client"});
   assert.match(html, /name="shopify-api-key" content="development-client"/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/app-bridge\.js/);
@@ -13,9 +13,10 @@ test("embedded App Home bootstraps once and obtains a fresh token for session ve
   assert.match(html, /<s-page heading="AdsTable">/);
   assert.match(html, /<s-section heading="Data sources">/);
   assert.match(html, /<s-button id="platforms" variant="primary" href="\/shopify\/app\/platforms">Manage data sources<\/s-button>/);
-  assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 2);
+  assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 3);
   assert.equal((html.match(/request\("\/api\/shopify\/bootstrap", "POST"/g) || []).length, 1);
-  assert.match(html, /request\("\/api\/shopify\/session", "GET"/);
+  assert.equal((html.match(/request\("\/api\/shopify\/session", "GET"/g) || []).length, 2);
+  assert.match(html, /error\.message !== "SHOP_REAUTHORIZATION_REQUIRED"/);
   assert.match(html, /Reference: /);
   assert.doesNotMatch(html, /<style>|class="primary-action"|data-release=/);
   assert.doesNotMatch(html, /<iframe/i);

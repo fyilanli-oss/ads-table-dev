@@ -72,10 +72,16 @@ function renderEmbeddedAppHome({clientId}) {
         if (!window.shopify || typeof window.shopify.idToken !== "function") {
           throw new Error("SHOPIFY_APP_BRIDGE_REQUIRED");
         }
-        const firstToken = await window.shopify.idToken();
-        await request("/api/shopify/bootstrap", "POST", firstToken);
-        const sessionToken = await window.shopify.idToken();
-        await request("/api/shopify/session", "GET", sessionToken);
+        try {
+          const sessionToken = await window.shopify.idToken();
+          await request("/api/shopify/session", "GET", sessionToken);
+        } catch (error) {
+          if (error.message !== "SHOP_REAUTHORIZATION_REQUIRED") throw error;
+          const bootstrapToken = await window.shopify.idToken();
+          await request("/api/shopify/bootstrap", "POST", bootstrapToken);
+          const verifiedToken = await window.shopify.idToken();
+          await request("/api/shopify/session", "GET", verifiedToken);
+        }
         status.setAttribute("heading", "Development store connected securely");
         status.setAttribute("tone", "success");
         status.textContent = "Your verified Shopify workspace is ready.";

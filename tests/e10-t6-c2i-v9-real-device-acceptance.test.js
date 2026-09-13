@@ -28,6 +28,23 @@ test("V9 approval authorizes capture but cannot claim acceptance without evidenc
   }
 });
 
+test("human handoff accepts ordinary image attachments and keeps conversion agent-owned", () => {
+  assert.deepEqual(contract.human_handoff.accepted_source_formats, ["chat_image_attachment", "png", "jpeg", "webp", "heic"]);
+  assert.equal(contract.human_handoff.user_must_prepare_png_or_hash, false);
+  assert.deepEqual(contract.human_handoff.required_user_actions, [
+    "capture_app_home",
+    "capture_data_sources_platforms_without_pressing_connect",
+    "hide_visible_shop_account_and_person_identifiers",
+    "attach_both_images_to_the_conversation",
+  ]);
+  assert.deepEqual(contract.human_handoff.repository_processing_owned_by_agent, [
+    "convert_to_png_if_needed", "remove_image_metadata", "verify_redaction", "calculate_sha256",
+    "build_evidence_manifest", "run_evidence_validator",
+  ]);
+  assert.match(doc, /PNG hazırlaman gerekmiyor/);
+  assert.match(doc, /JSON doldurman veya GitHub'a dosya yüklemen gerekmiyor/);
+});
+
 test("V9 requires Shopify-native visuals and rejects imitation surfaces", () => {
   assert.deepEqual(contract.required_visual_gates, VISUAL_GATES);
   assert.match(doc, /source\/test kapıları ile insan render kanıtı birlikte geçmelidir/);
@@ -35,7 +52,7 @@ test("V9 requires Shopify-native visuals and rejects imitation surfaces", () => 
 
 test("capture evidence is redacted before it enters the repository", () => {
   assert.deepEqual(contract.required_privacy_gates, PRIVACY_GATES);
-  assert.match(doc, /Repository'ye eklemeden \*\*önce\*\*/);
+  assert.match(doc, /repository'ye eklenmeden \*\*önce\*\*/i);
   assert.match(contract.acceptance_rule, /both redacted captures/);
   assert.match(contract.acceptance_rule, /human privacy attestation/);
 });

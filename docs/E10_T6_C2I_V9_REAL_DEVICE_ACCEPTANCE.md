@@ -4,6 +4,18 @@
 **Onay tarihi:** 2026-09-13  
 **Provider teması:** Yasak
 
+## Kullanıcı için kısa yol — PNG hazırlaman gerekmiyor
+
+Teknik PNG, SHA-256, metadata ve evidence JSON işlemleri kullanıcı sorumluluğu değildir. Telefon veya bilgisayardan aldığın ekran görüntülerini bu konuşmaya normal resim eki olarak gönderebilirsin; PNG, JPEG, WebP veya HEIC olabilir. Ben teslimden sonra görüntüleri güvenli repository PNG'lerine dönüştürür, metadata'yı kaldırır, redaction'ı kontrol eder, hash/manifest üretir ve validator'ı çalıştırırım.
+
+Senden gereken yalnız şunlardır:
+
+1. Shopify Admin içindeki **App Home** ekranının görüntüsünü al.
+2. `Manage data sources` ile **Data Sources / Platforms** ekranına geçip ikinci görüntüyü al; hiçbir `Connect` düğmesine basma.
+3. Görünen mağaza adı/domaini, avatar, e-posta, kişi veya hesap kimliğini kırp ya da kapat ve iki resmi doğrudan bu konuşmaya ekle.
+
+Görüntü formatını dönüştürmen, dosya adını değiştirmen, SHA-256 hesaplaman, JSON doldurman veya GitHub'a dosya yüklemen gerekmiyor.
+
 ## Amaç ve mevcut sonuç
 
 V9 gerçek cihaz kabulünün yürütülmesi onaylandı. Bu onay tek başına acceptance `PASS` değildir. Shopify Admin içinde çalışan uygulamadan alınmış, kimliksizleştirilmiş App Home ve Data Sources/Platforms görüntüleri henüz repository'ye teslim edilmediği için durum `AWAITING_REDACTED_REAL_DEVICE_EVIDENCE` olarak kalır.
@@ -16,11 +28,11 @@ Bu paket yalnız Shopify-native render'ı gözlemler. `Connect` düğmesine bas�
 2. App Home tamamen render olduktan sonra görüntüyü al. `Home`/`Data sources` app navigation'ı, Shopify-native page/section/banner/action bileşenleri ve `Manage data sources` eylemi görünmelidir.
 3. Yalnız `Manage data sources` iç navigasyonunu kullanarak Data Sources/Platforms ekranına geç. Bu eylem provider Connect değildir.
 4. Platforms ekranında provider bölümleri ve Connect eylemlerinin render olduğunu gösteren ikinci görüntüyü al. Hiçbir provider `Connect` düğmesine basma.
-5. Repository'ye eklemeden **önce** görüntülerden mağaza adı/domaini, avatar, e-posta, kişi adı, Shopify hesap/organizasyon kimliği, provider account kimliği ve browser chrome içindeki kimlik belirteçlerini kaldır.
+5. Görüntüyü konuşmaya eklemeden önce mağaza adı/domaini, avatar, e-posta, kişi adı, Shopify hesap/organizasyon kimliği, provider account kimliği ve browser chrome içindeki kimlik belirteçlerini mümkünse kırp veya kapat. Teslimden sonra repository'ye eklenmeden **önce** ikinci redaction kontrolü yapılır.
 6. Redaction sonrasında görüntülerin UI kararını değerlendirmeye yetecek içeriği koruduğunu gözle kontrol et. Tamamen kapatılmış veya hangi yüzey olduğu anlaşılamayan görüntü kabul edilmez.
 7. Redacted dosyalar teslim edildiğinde her dosyanın SHA-256 değeri evidence manifestine yazılır ve insan incelemesiyle privacy attestation tamamlanır.
 
-Pending contract'taki listeler gözlenmiş `PASS` değerleri değildir; kabul sırasında kanıtlanması gereken gereksinimlerdir. İki görüntü yalnız PNG olarak, sırasıyla `artifacts/e10-shopify/e10-t6-c2i-v9/app-home-redacted.png` ve `artifacts/e10-shopify/e10-t6-c2i-v9/platforms-redacted.png` yollarına eklenir. Evidence JSON'u `node scripts/e10-t6-c2i-v9-evidence.js <evidence.json>` ile doğrulanır. Validator exact dosya/route sırasını, SHA-256 değerlerini, farklı görüntüleri, güvenli boyutları, PNG yapısını ve PNG text/EXIF metadata yokluğunu fail-closed doğrular. İnsan görsel/privacy attestation'ının yerini almaz.
+Pending contract'taki listeler gözlenmiş `PASS` değerleri değildir; kabul sırasında kanıtlanması gereken gereksinimlerdir. Kullanıcının gönderdiği kaynak format ne olursa olsun repository'ye yalnız normalize edilmiş iki PNG, sırasıyla `artifacts/e10-shopify/e10-t6-c2i-v9/app-home-redacted.png` ve `artifacts/e10-shopify/e10-t6-c2i-v9/platforms-redacted.png` yollarına eklenir. Evidence JSON'u `node scripts/e10-t6-c2i-v9-evidence.js <evidence.json>` ile doğrulanır. Validator exact dosya/route sırasını, SHA-256 değerlerini, farklı görüntüleri, güvenli boyutları, PNG yapısını ve PNG text/EXIF metadata yokluğunu fail-closed doğrular. İnsan görsel/privacy attestation'ının yerini almaz.
 
 Evidence tesliminde `contracts/shopify/e10-t6-c2i-v9-evidence.template.json` kopyalanır; template dosyasının kendisi değiştirilmez. `REVIEW_REQUIRED`, placeholder timestamp/hash ve bütün gözlemsel attestation'ların `false` başlangıç değeri bilinçlidir. Reviewer yalnız gerçekten gözlediği kapıları `true` yapar, çıktı manifestini iki redacted PNG ile aynı artifact dizinine koyar ve validator'ı çalıştırır. Template hiçbir koşulda acceptance evidence veya `PASS` sayılamaz.
 

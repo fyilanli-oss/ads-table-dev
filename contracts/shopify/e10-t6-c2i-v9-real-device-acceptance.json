@@ -4,6 +4,30 @@
   "execution_approved": true,
   "acceptance_passed": false,
   "capture_authority": "human_in_authenticated_shopify_admin",
+  "human_handoff": {
+    "accepted_source_formats": [
+      "chat_image_attachment",
+      "png",
+      "jpeg",
+      "webp",
+      "heic"
+    ],
+    "required_user_actions": [
+      "capture_app_home",
+      "capture_data_sources_platforms_without_pressing_connect",
+      "hide_visible_shop_account_and_person_identifiers",
+      "attach_both_images_to_the_conversation"
+    ],
+    "repository_processing_owned_by_agent": [
+      "convert_to_png_if_needed",
+      "remove_image_metadata",
+      "verify_redaction",
+      "calculate_sha256",
+      "build_evidence_manifest",
+      "run_evidence_validator"
+    ],
+    "user_must_prepare_png_or_hash": false
+  },
   "required_captures": [
     {
       "surface": "app_home",

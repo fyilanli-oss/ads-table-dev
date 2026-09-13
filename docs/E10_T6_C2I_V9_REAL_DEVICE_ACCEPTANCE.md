@@ -22,6 +22,8 @@ Bu paket yalnız Shopify-native render'ı gözlemler. `Connect` düğmesine bas�
 
 Pending contract'taki listeler gözlenmiş `PASS` değerleri değildir; kabul sırasında kanıtlanması gereken gereksinimlerdir. İki görüntü yalnız PNG olarak, sırasıyla `artifacts/e10-shopify/e10-t6-c2i-v9/app-home-redacted.png` ve `artifacts/e10-shopify/e10-t6-c2i-v9/platforms-redacted.png` yollarına eklenir. Evidence JSON'u `node scripts/e10-t6-c2i-v9-evidence.js <evidence.json>` ile doğrulanır. Validator exact dosya/route sırasını, SHA-256 değerlerini, farklı görüntüleri, güvenli boyutları, PNG yapısını ve PNG text/EXIF metadata yokluğunu fail-closed doğrular. İnsan görsel/privacy attestation'ının yerini almaz.
 
+Evidence tesliminde `contracts/shopify/e10-t6-c2i-v9-evidence.template.json` kopyalanır; template dosyasının kendisi değiştirilmez. `REVIEW_REQUIRED`, placeholder timestamp/hash ve bütün gözlemsel attestation'ların `false` başlangıç değeri bilinçlidir. Reviewer yalnız gerçekten gözlediği kapıları `true` yapar, çıktı manifestini iki redacted PNG ile aynı artifact dizinine koyar ve validator'ı çalıştırır. Template hiçbir koşulda acceptance evidence veya `PASS` sayılamaz.
+
 ## Görsel kabul matrisi
 
 ### App Home

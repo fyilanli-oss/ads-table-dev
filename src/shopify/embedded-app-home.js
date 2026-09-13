@@ -74,8 +74,6 @@ function renderEmbeddedAppHome({clientId}) {
         }
         const firstToken = await window.shopify.idToken();
         await request("/api/shopify/bootstrap", "POST", firstToken);
-        const secondToken = await window.shopify.idToken();
-        await request("/api/shopify/bootstrap", "POST", secondToken);
         const sessionToken = await window.shopify.idToken();
         await request("/api/shopify/session", "GET", sessionToken);
         status.setAttribute("heading", "Development store connected securely");

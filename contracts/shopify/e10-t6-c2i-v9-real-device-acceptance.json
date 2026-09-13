@@ -1,67 +1,21 @@
 {
-  "contract_version": "e10-t6-c2i-v9-real-device-acceptance-v1",
-  "status": "AWAITING_REDACTED_REAL_DEVICE_EVIDENCE",
+  "contract_version": "e10-t6-c2i-v9-real-device-acceptance-v2",
+  "status": "AWAITING_HUMAN_TEXT_ATTESTATION",
   "execution_approved": true,
   "acceptance_passed": false,
-  "capture_authority": "human_in_authenticated_shopify_admin",
-  "human_handoff": {
-    "accepted_source_formats": [
-      "chat_image_attachment",
-      "png",
-      "jpeg",
-      "webp",
-      "heic"
-    ],
-    "required_user_actions": [
-      "capture_app_home",
-      "capture_data_sources_platforms_without_pressing_connect",
-      "hide_visible_shop_account_and_person_identifiers",
-      "attach_both_images_to_the_conversation"
-    ],
-    "repository_processing_owned_by_agent": [
-      "convert_to_png_if_needed",
-      "remove_image_metadata",
-      "verify_redaction",
-      "calculate_sha256",
-      "build_evidence_manifest",
-      "run_evidence_validator"
-    ],
-    "user_must_prepare_png_or_hash": false
-  },
-  "required_captures": [
-    {
-      "surface": "app_home",
-      "route": "/shopify/app",
-      "redacted_file": null,
-      "sha256": null
-    },
-    {
-      "surface": "data_sources_platforms",
-      "route": "/shopify/app/platforms",
-      "redacted_file": null,
-      "sha256": null
-    }
+  "acceptance_method": "human_text_attestation",
+  "required_observations": [
+    "app_home_rendered_inside_shopify_admin",
+    "data_sources_platforms_rendered_inside_shopify_admin",
+    "shopify_native_visual_language_observed",
+    "provider_connect_not_pressed",
+    "provider_oauth_or_api_contact_not_started"
   ],
-  "required_visual_gates": [
-    "inside_shopify_admin",
-    "official_shopify_components_rendered",
-    "app_navigation_visible",
-    "app_home_manage_data_sources_action_visible",
-    "platforms_provider_actions_visible",
-    "custom_admin_shell_absent",
-    "custom_component_css_absent",
-    "technical_release_marker_absent",
-    "nested_provider_iframe_absent"
-  ],
-  "required_privacy_gates": [
-    "shop_identity_absent",
-    "account_identity_absent",
-    "person_identity_absent",
-    "browser_chrome_identity_absent",
-    "token_code_credential_absent",
-    "redaction_completed_before_repository_add",
-    "human_privacy_attestation"
-  ],
+  "accepted_reply": "App Home açıldı; Data Sources / Platforms açıldı; Connect'e basmadım.",
+  "image_upload_required": false,
+  "png_required": false,
+  "sha256_required": false,
+  "manifest_required": false,
   "forbidden_interactions": [
     "provider_connect_pressed",
     "provider_consent_started",
@@ -69,8 +23,7 @@
     "oauth_callback_exercised",
     "production_mutation"
   ],
-  "evidence_validator": "node scripts/e10-t6-c2i-v9-evidence.js <evidence.json>",
-  "acceptance_rule": "PASS requires both redacted captures, human privacy attestation, every visual gate true, and every forbidden interaction false",
+  "acceptance_rule": "PASS requires the human text attestation after observing both surfaces; an image, hash, manifest, or repository artifact is never required",
   "next_on_pass": "E10_T6_C2I_V10A_KLAVIYO_CONNECT_MODAL",
   "next_on_fail": "E10_T6_C2I_V9_CORRECTIVE"
 }

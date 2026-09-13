@@ -1,0 +1,66 @@
+{
+  "contract_version": "e10-t6-c2i-v10-provider-connect-decision-v1",
+  "status": "DECISION_FROZEN_EXECUTION_BLOCKED",
+  "decision_date": "2026-09-13",
+  "selected_first_provider": "klaviyo",
+  "fallback_provider": "google_ads",
+  "blocking_prerequisite": "E10_T6_C2I_V9_REAL_DEVICE_SHOPIFY_NATIVE_PASS",
+  "evidence_received": false,
+  "authorization": {
+    "repository_decision_work": true,
+    "provider_consent": false,
+    "provider_api_smoke": false,
+    "production_mutation": false
+  },
+  "terminology": {
+    "klaviyo_account_label": "Klaviyo account",
+    "klaviyo_account_is_ad_account": false,
+    "cost_label": "Email Monthly Plan Cost",
+    "forbidden_cost_label": "Spend Amount"
+  },
+  "connect_sequence": [
+    "connect_trigger",
+    "explanation_modal",
+    "explicit_modal_connect",
+    "top_level_oauth",
+    "server_verified_callback",
+    "verified_klaviyo_account_selection",
+    "account_selection_close",
+    "email_monthly_plan_cost_entry",
+    "explicit_cost_save",
+    "connected"
+  ],
+  "connect_invariants": {
+    "official_shopify_components_only": true,
+    "oauth_inside_nested_iframe": false,
+    "account_selection": "single",
+    "browser_supplied_account_authority": false,
+    "oauth_alone_means_connected": false,
+    "cost_required_to_complete": true,
+    "duplicate_submit_prevented": true,
+    "raw_provider_error_exposed": false
+  },
+  "disconnect_sequence": [
+    "disconnect_trigger",
+    "warning_modal",
+    "explicit_disconnect_or_cancel",
+    "disconnect_confirmed",
+    "provider_refresh_stopped",
+    "historical_analytics_retained"
+  ],
+  "disconnect_invariants": {
+    "warning_tone": "critical",
+    "cancel_is_non_destructive": true,
+    "historical_analytics_deleted": false,
+    "privacy_deletion_implicit": false
+  },
+  "next_packages": [
+    "E10_T6_C2I_V9_REAL_DEVICE_ACCEPTANCE",
+    "E10_T6_C2I_V10A_KLAVIYO_CONNECT_MODAL",
+    "E10_T6_C2I_V10B_KLAVIYO_CONSENT_DECISION",
+    "E10_T6_C2I_V10C_KLAVIYO_ACCOUNT_SELECTION",
+    "E10_T6_C2I_V10D_KLAVIYO_MONTHLY_PLAN_COST",
+    "E10_T6_C2I_V10E_KLAVIYO_DISCONNECT",
+    "E10_T6_C2I_V10F_KLAVIYO_READ_ONLY_API_SMOKE"
+  ]
+}

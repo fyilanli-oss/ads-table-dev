@@ -20,7 +20,11 @@ async function verifyGitHubActionsOidc(token, {audience, fetchImpl = fetch, now 
   for (const [name, value] of Object.entries(expected)) if (claims[name] !== value) throw new Error(`OIDC_${name.toUpperCase()}_INVALID`);
   if (!Number.isInteger(claims.exp) || claims.exp <= seconds || !Number.isInteger(claims.iat) || claims.iat > seconds + 30) throw new Error("OIDC_TIME_INVALID");
   if (claims.nbf !== undefined && (!Number.isInteger(claims.nbf) || claims.nbf > seconds + 30)) throw new Error("OIDC_TIME_INVALID");
-  if (typeof claims.workflow_ref !== "string" || !claims.workflow_ref.endsWith("/.github/workflows/e10-t6c-production-activation.yml@refs/heads/main")) throw new Error("OIDC_WORKFLOW_INVALID");
+  const allowedWorkflows = [
+    "/.github/workflows/e10-t6c-production-activation.yml@refs/heads/main",
+    "/.github/workflows/e10-t6c-production-readiness.yml@refs/heads/main"
+  ];
+  if (typeof claims.workflow_ref !== "string" || !allowedWorkflows.some(workflow => claims.workflow_ref.endsWith(workflow))) throw new Error("OIDC_WORKFLOW_INVALID");
   if (!/^\d+$/.test(String(claims.run_id || "")) || !/^\d+$/.test(String(claims.run_attempt || ""))) throw new Error("OIDC_RUN_INVALID");
   return Object.freeze({run_id: String(claims.run_id), run_attempt: String(claims.run_attempt)});
 }

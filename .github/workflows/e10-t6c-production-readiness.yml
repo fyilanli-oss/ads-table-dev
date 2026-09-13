@@ -1,0 +1,42 @@
+name: E10-T6-C2I Production readiness refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      redeploy_confirmation:
+        description: Type E10-T6C-REDEPLOY-WITHOUT-ACTIVATION
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: e10-t6c-production-readiness
+  cancel-in-progress: false
+
+jobs:
+  refresh-and-verify:
+    if: github.ref == 'refs/heads/main'
+    environment: Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate explicit redeployment approval
+        env:
+          REDEPLOY_CONFIRMATION: ${{ inputs.redeploy_confirmation }}
+        run: test "$REDEPLOY_CONFIRMATION" = 'E10-T6C-REDEPLOY-WITHOUT-ACTIVATION'
+
+      - name: Check out the dispatched main commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+
+      - name: Redeploy Production without activation
+        env:
+          E10_T6C_REDEPLOY_CONFIRMATION: ${{ inputs.redeploy_confirmation }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: bash scripts/e10-t6c-vercel-redeploy.sh
+
+      - name: Validate redacted Production readiness
+        run: node scripts/e10-t6c-remote-preflight.js

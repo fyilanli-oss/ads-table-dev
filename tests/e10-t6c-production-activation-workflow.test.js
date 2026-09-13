@@ -15,10 +15,16 @@ test('workflow has only manual trigger and two non-defaulted approvals', () => {
 });
 
 test('execution is main-only, least privilege, serialized, and Production-gated', () => {
-  assert.match(workflow, /^permissions:\n  contents: read\n/m);
+  assert.match(workflow, /^permissions:\n  contents: read\n  id-token: write\n/m);
   assert.match(workflow, /^concurrency:\n  group: e10-t6c-production-activation\n  cancel-in-progress: false$/m);
   assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /^    environment: Production$/m);
+});
+
+test('OIDC-authenticated remote preflight runs before the token-scoped operator', () => {
+  const preflight = workflow.indexOf('node scripts/e10-t6c-remote-preflight.js');
+  const operator = workflow.indexOf('bash scripts/e10-t6c-vercel-activation.sh');
+  assert.ok(preflight > 0 && operator > preflight);
 });
 
 test('checkout is immutable and does not persist credentials', () => {

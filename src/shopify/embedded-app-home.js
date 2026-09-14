@@ -49,6 +49,12 @@ function renderEmbeddedAppHome({clientId}) {
         <s-button id="platforms" variant="primary" href="/shopify/app/platforms">Manage data sources</s-button>
       </s-stack>
     </s-section>
+    <s-section heading="Klaviyo">
+      <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
+        <s-paragraph>Connect Klaviyo to this Shopify workspace.</s-paragraph>
+        <s-button variant="primary" href="/shopify/app/platforms#klaviyo">Connect</s-button>
+      </s-stack>
+    </s-section>
   </s-page>
   <script>
     (() => {
@@ -103,7 +109,7 @@ function renderEmbeddedAppHome({clientId}) {
 
 function renderProviderSection([id, label], providerOAuthEnabled) {
   const disabled = providerOAuthEnabled ? "" : " disabled";
-  return `<s-section heading="${label}">
+  return `<s-section id="${id}" heading="${label}">
       <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
         <s-paragraph>Connect ${label} to this Shopify workspace.</s-paragraph>
         <s-button variant="primary" data-provider="${id}"${disabled}>Connect</s-button>

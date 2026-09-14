@@ -1,0 +1,17 @@
+# Deployed with Shopify CLI; this is the canonical embedded-app configuration.
+client_id = "a077a8abd25e9b9f215dbaf5c70cbcc0"
+name = "AdsTable"
+application_url = "https://dev.adstable.app/shopify/app"
+embedded = true
+
+[build]
+include_config_on_deploy = true
+automatically_update_urls_on_dev = false
+
+[access_scopes]
+scopes = ""
+
+[auth]
+redirect_urls = [
+  "https://dev.adstable.app/shopify/app"
+]

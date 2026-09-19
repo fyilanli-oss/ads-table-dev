@@ -51,6 +51,24 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
   }
 
   return Object.freeze({
+    async status(authority) {
+      const connection = await store.readKlaviyoStatus(authority);
+      if (!connection) return {status: "not_connected"};
+      if (connection.status === "connected") {
+        const cost = typeof connection.email_monthly_plan_cost === "number"
+          ? connection.email_monthly_plan_cost.toFixed(2)
+          : connection.email_monthly_plan_cost;
+        if (typeof cost !== "string" || !/^(0|[1-9]\d{0,7})\.\d{2}$/.test(cost) || !/^[A-Z]{3}$/.test(connection.account_currency || "")) {
+          return {status: "temporarily_unavailable"};
+        }
+        return {
+          status: "connected",
+          email_monthly_plan_cost: cost,
+          currency: connection.account_currency,
+        };
+      }
+      return {status: connection.status === "pending_account_selection" ? "account_selection_required" : "temporarily_unavailable"};
+    },
     async list(authority) {
       const result = await accounts(authority);
       return {

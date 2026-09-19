@@ -50,6 +50,6 @@ test("App Home handler serves queryless Shopify launches and disables caching", 
   assert.equal(response.headers["Content-Security-Policy"], "frame-ancestors https://admin.shopify.com https://*.myshopify.com");
   assert.equal(response.contentType, "html");
   assert.match(response.body, /Development store connected securely/);
-  assert.match(response.body, /<s-section heading="Klaviyo">/);
-  assert.match(response.body, /href="\/shopify\/app\/platforms#klaviyo">Connect<\/s-button>/);
+  assert.doesNotMatch(response.body, /<s-section heading="Klaviyo">/);
+  assert.doesNotMatch(response.body, /platforms#klaviyo/);
 });

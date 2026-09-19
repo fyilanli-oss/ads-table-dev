@@ -1,8 +1,20 @@
 {
   "contract_version": "e10-t6-c2i-v9-real-device-acceptance-v1",
-  "status": "AWAITING_REDACTED_REAL_DEVICE_EVIDENCE",
+  "status": "FAIL_PRODUCT_UI_CORRECTIVE_REQUIRED",
   "execution_approved": true,
   "acceptance_passed": false,
+  "observed_result": {
+    "app_home_rendered_inside_shopify_admin": true,
+    "data_sources_rendered_inside_shopify_admin": true,
+    "provider_connect_pressed_by_human": false,
+    "failure_codes": [
+      "DUPLICATE_KLAVIYO_HOME_ACTION",
+      "INCONSISTENT_KLAVIYO_CONNECTION_STATE",
+      "REPETITIVE_PROVIDER_COPY",
+      "PINTEREST_NOT_PARKED",
+      "AUTOMATIC_KLAVIYO_PROVIDER_CONTACT"
+    ]
+  },
   "capture_authority": "human_in_authenticated_shopify_admin",
   "required_captures": [
     {

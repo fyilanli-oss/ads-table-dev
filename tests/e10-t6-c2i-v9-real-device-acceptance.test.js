@@ -12,11 +12,12 @@ const root = path.join(__dirname, "..");
 const contract = JSON.parse(fs.readFileSync(path.join(root, "contracts/shopify/e10-t6-c2i-v9-real-device-acceptance.json"), "utf8"));
 const doc = fs.readFileSync(path.join(root, "docs/E10_T6_C2I_V9_REAL_DEVICE_ACCEPTANCE.md"), "utf8");
 const template = JSON.parse(fs.readFileSync(path.join(root, "contracts/shopify/e10-t6-c2i-v9-evidence.template.json"), "utf8"));
+const acceptedEvidence = JSON.parse(fs.readFileSync(path.join(root, "artifacts/e10-shopify/e10-t6-c2i-v9/evidence.json"), "utf8"));
 
-test("V9 records the observed product UI failure and cannot claim acceptance", () => {
+test("V9 preserves the observed failure and records the accepted corrective evidence", () => {
   assert.equal(contract.execution_approved, true);
-  assert.equal(contract.status, "FAIL_PRODUCT_UI_CORRECTIVE_REQUIRED");
-  assert.equal(contract.acceptance_passed, false);
+  assert.equal(contract.status, "PASS");
+  assert.equal(contract.acceptance_passed, true);
   assert.equal(contract.observed_result.app_home_rendered_inside_shopify_admin, true);
   assert.equal(contract.observed_result.data_sources_rendered_inside_shopify_admin, true);
   assert.equal(contract.observed_result.provider_connect_pressed_by_human, false);
@@ -26,10 +27,10 @@ test("V9 records the observed product UI failure and cannot claim acceptance", (
     {surface: "app_home", route: "/shopify/app"},
     {surface: "data_sources_platforms", route: "/shopify/app/platforms"},
   ]);
-  for (const capture of contract.required_captures) {
-    assert.equal(capture.redacted_file, null);
-    assert.equal(capture.sha256, null);
-  }
+  assert.deepEqual(contract.required_captures, acceptedEvidence.captures);
+  assert.equal(contract.accepted_result.evidence_manifest, "artifacts/e10-shopify/e10-t6-c2i-v9/evidence.json");
+  assert.equal(contract.accepted_result.validator_status, "PASS");
+  assert.equal(contract.accepted_result.human_interaction_attested, true);
 });
 
 test("V9 requires Shopify-native visuals and rejects imitation surfaces", () => {
@@ -49,7 +50,15 @@ test("V9 never authorizes Connect or provider contact", () => {
   assert.equal(contract.next_on_pass, "E10_T6_C2I_V10A_KLAVIYO_CONNECT_MODAL");
   assert.equal(contract.next_on_fail, "E10_T6_C2I_V9_CORRECTIVE");
   assert.match(doc, /Hiçbir provider `Connect` düğmesine basma/);
-  assert.match(doc, /V9 `PASS` verilene kadar V10-A dahil hiçbir Provider Connect execution alt paketi başlamaz/);
+  assert.match(doc, /V10-A ancak bu evidence paketinin review\/merge kapısından sonra ayrı kapsam olarak başlatılır/);
+});
+
+test("committed redacted captures and human attestation pass the V9 validator", () => {
+  const result = validateV9Evidence(acceptedEvidence, {root});
+  assert.equal(result.status, "PASS");
+  assert.equal(result.acceptance_passed, true);
+  assert.equal(result.captures.length, 2);
+  assert.notEqual(result.captures[0].sha256, result.captures[1].sha256);
 });
 
 function png(width, height, metadata = false) {

@@ -1,0 +1,47 @@
+{
+  "contract_version": "e10-t6-c2i-v9-real-device-evidence-v1",
+  "status": "PASS",
+  "acceptance_passed": true,
+  "captured_at": "2026-09-19T21:32:43Z",
+  "captures": [
+    {
+      "surface": "app_home",
+      "route": "/shopify/app",
+      "redacted_file": "artifacts/e10-shopify/e10-t6-c2i-v9/app-home-redacted.png",
+      "sha256": "90b2e1bfa27052fd5b9993832e0eb8f16e50c4e57ece9657e0eff1b3e645004c"
+    },
+    {
+      "surface": "data_sources_platforms",
+      "route": "/shopify/app/platforms",
+      "redacted_file": "artifacts/e10-shopify/e10-t6-c2i-v9/platforms-redacted.png",
+      "sha256": "16835c67bb812fc14b6efce5d6426e91cf103aa826422c1d9c87356645994d5e"
+    }
+  ],
+  "visual_gates": {
+    "inside_shopify_admin": true,
+    "official_shopify_components_rendered": true,
+    "app_navigation_visible": true,
+    "app_home_manage_data_sources_action_visible": true,
+    "platforms_provider_actions_visible": true,
+    "custom_admin_shell_absent": true,
+    "custom_component_css_absent": true,
+    "technical_release_marker_absent": true,
+    "nested_provider_iframe_absent": true
+  },
+  "privacy_gates": {
+    "shop_identity_absent": true,
+    "account_identity_absent": true,
+    "person_identity_absent": true,
+    "browser_chrome_identity_absent": true,
+    "token_code_credential_absent": true,
+    "redaction_completed_before_repository_add": true,
+    "human_privacy_attestation": true
+  },
+  "forbidden_interactions": {
+    "provider_connect_pressed": false,
+    "provider_consent_started": false,
+    "provider_api_contact": false,
+    "oauth_callback_exercised": false,
+    "production_mutation": false
+  }
+}

@@ -1,7 +1,8 @@
 # E10-T6-C2I-V9 — Real-device Shopify-native Acceptance
 
-**Durum:** `FAIL — product UI corrective required`
-**Onay tarihi:** 2026-09-13  
+**Durum:** `PASS — corrective accepted with redacted real-device evidence`
+**İlk yürütme onayı:** 2026-09-13
+**Kabul tarihi:** 2026-09-20
 **Provider teması:** Yasak
 
 ## Amaç ve mevcut sonuç
@@ -19,6 +20,19 @@ Gözlenen başarısızlıklar:
 Ham insan görüntüleri shop/provider kimliği içerdiği için repository'ye eklenmedi. Bu görüntüler `PASS` kanıtı olarak kullanılmaz; yalnız `FAIL` teşhisini oluşturdu. Corrective tamamlanmadan yeni capture/redaction işi istenmez.
 
 Bu paket yalnız Shopify-native render'ı gözlemler. `Connect` düğmesine basılmaz; OAuth, provider consent, callback, account discovery, token exchange, provider API isteği, deployment veya Production mutation yapılmaz.
+
+## Corrective acceptance sonucu — 20 Eylül 2026
+
+V9 product UI corrective Production'a yayınlandıktan sonra gerçek cihazda App Home ve Data Sources/Platforms yeniden gözlendi. İnsan yalnız `Manage data sources` iç navigasyonunu kullandığını; hiçbir provider `Connect` düğmesine basmadığını ve OAuth/izin ekranı açılmadığını açıkça doğruladı.
+
+- App Home yalnız store bağlantı durumu ve `Manage data sources` eylemini gösterdi; mükerrer Klaviyo kartı yoktu.
+- Data Sources provider açıklamalarını ayrıştırılmış biçimde gösterdi.
+- Klaviyo hesap kimliği göstermeden `Connected · 5.00 USD/month` durumunu gösterdi ve Klaviyo `Connect` eylemini gizledi.
+- Pinterest `Parked` ve pasif `Connect` eylemiyle gösterildi.
+- Görüntüler repository'ye eklenmeden önce mağaza/avatar kimliği maskelendi; ham JPG dosyaları repository'ye alınmadı.
+- İki metadata-free PNG, SHA-256 değerleri ve insan privacy/interaction attestation'ı `artifacts/e10-shopify/e10-t6-c2i-v9/evidence.json` içinde validator tarafından doğrulandı.
+
+Bu sonuç V9'u `PASS` yapar. Sıradaki uygulanabilir paket V10-A Klaviyo Connect açıklama modalıdır; V10-A bu kanıt paketinin review/merge kapısından önce başlatılmaz.
 
 ## Corrective kapsamı
 
@@ -81,8 +95,8 @@ Eksik görüntü, yetersiz redaction, eski/custom yüzey, teknik release marker,
 
 ## Paket sırası
 
-- **Tamamlanan paket:** V9 execution authorization ve fail-closed capture sözleşmesi.
-- **Sıradaki paket:** V9 insan capture + redaction + iki görüntünün hash/attestation kabulü.
-- **PASS sonrası paketler:** V10-A Klaviyo Connect modalı; V10-B ayrı provider consent kararı; V10-C verified Klaviyo account selection; V10-D Email Monthly Plan Cost; V10-E Disconnect; V10-F ayrıca onaylı read-only Production API smoke.
+- **Tamamlanan paket:** V9 execution authorization, corrective, insan capture, redaction ve hash/attestation kabulü.
+- **Sıradaki paket:** V10-A Klaviyo Connect modalı.
+- **Sonraki paketler:** V10-B ayrı provider consent kararı; V10-C verified Klaviyo account selection; V10-D Email Monthly Plan Cost; V10-E Disconnect; V10-F ayrıca onaylı read-only Production API smoke.
 
-V9 `PASS` verilene kadar V10-A dahil hiçbir Provider Connect execution alt paketi başlamaz.
+V9 `PASS` kanıtı bu paketle hazırlanmıştır. V10-A ancak bu evidence paketinin review/merge kapısından sonra ayrı kapsam olarak başlatılır.

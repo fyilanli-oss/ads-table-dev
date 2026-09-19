@@ -1,16 +1,35 @@
 # E10-T6-C2I-V9 — Real-device Shopify-native Acceptance
 
-**Durum:** `Execution approved / redacted evidence pending`  
+**Durum:** `FAIL — product UI corrective required`
 **Onay tarihi:** 2026-09-13  
 **Provider teması:** Yasak
 
 ## Amaç ve mevcut sonuç
 
-V9 gerçek cihaz kabulünün yürütülmesi onaylandı. Bu onay tek başına acceptance `PASS` değildir. Shopify Admin içinde çalışan uygulamadan alınmış, kimliksizleştirilmiş App Home ve Data Sources/Platforms görüntüleri henüz repository'ye teslim edilmediği için durum `AWAITING_REDACTED_REAL_DEVICE_EVIDENCE` olarak kalır.
+V9 gerçek cihaz kabulü 19 Eylül 2026 tarihinde insan gözlemiyle yürütüldü. App Home ve Data Sources/Platforms Shopify Admin içinde açıldı; insan hiçbir provider `Connect` düğmesine basmadı. Buna rağmen ürün yüzeyi acceptance `PASS` değildir.
+
+Gözlenen başarısızlıklar:
+
+- App Home, `Manage data sources` eylemine ek olarak ikinci ve durumdan habersiz bir Klaviyo `Connect` kartı gösterdi.
+- Data Sources kayıtlı Klaviyo bağlantısını `Connected` gösterirken App Home aynı bağlantıyı `Connect` gösterdi.
+- Provider bölümleri aynı bağlantı cümlesini tekrar etti.
+- Ürün freeze'inde `Parked` olan Pinterest aktif `Connect` eylemiyle gösterildi.
+- Data Sources ilk render'ı Klaviyo account endpoint'ini otomatik çağırdı; bu endpoint provider Account API'sine gidebildiği ve token yenileyebildiği için insan Connect'e basmasa dahi V9 provider-teması sınırı korunmadı.
+
+Ham insan görüntüleri shop/provider kimliği içerdiği için repository'ye eklenmedi. Bu görüntüler `PASS` kanıtı olarak kullanılmaz; yalnız `FAIL` teşhisini oluşturdu. Corrective tamamlanmadan yeni capture/redaction işi istenmez.
 
 Bu paket yalnız Shopify-native render'ı gözlemler. `Connect` düğmesine basılmaz; OAuth, provider consent, callback, account discovery, token exchange, provider API isteği, deployment veya Production mutation yapılmaz.
 
-## İnsan capture prosedürü
+## Corrective kapsamı
+
+1. App Home yalnız store bağlantı durumu ve Data Sources girişini gösterir; provider-specific Klaviyo kartı göstermez.
+2. Data Sources provider açıklamaları platform amacını kısa ve tekrarsız anlatır.
+3. Pinterest `Parked` gösterilir ve aktif provider OAuth boundary'si taşımaz.
+4. Normal Data Sources açılışı yalnız doğrulanmış Shopify session üzerinden yerel connection status okur; Klaviyo API'sine, token refresh'e veya account discovery'ye gitmez.
+5. Kayıtlı Klaviyo bağlantısı hesap kimliği göstermeden `Connected` ile aylık plan maliyeti/currency bilgisini gösterir ve çelişkili `Connect` eylemini gizler.
+6. Bu corrective Connect modalı, OAuth, account selection, cost mutation veya Disconnect uygulamaz; bunlar V10 kapılarında kalır.
+
+## PASS sonrası insan capture prosedürü
 
 1. Gerçek cihazda Shopify Admin'e giriş yap ve AdsTable uygulamasını Shopify Admin içinden aç.
 2. App Home tamamen render olduktan sonra görüntüyü al. `Home`/`Data sources` app navigation'ı, Shopify-native page/section/banner/action bileşenleri ve `Manage data sources` eylemi görünmelidir.

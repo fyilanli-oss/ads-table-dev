@@ -13,10 +13,14 @@ const contract = JSON.parse(fs.readFileSync(path.join(root, "contracts/shopify/e
 const doc = fs.readFileSync(path.join(root, "docs/E10_T6_C2I_V9_REAL_DEVICE_ACCEPTANCE.md"), "utf8");
 const template = JSON.parse(fs.readFileSync(path.join(root, "contracts/shopify/e10-t6-c2i-v9-evidence.template.json"), "utf8"));
 
-test("V9 approval authorizes capture but cannot claim acceptance without evidence", () => {
+test("V9 records the observed product UI failure and cannot claim acceptance", () => {
   assert.equal(contract.execution_approved, true);
-  assert.equal(contract.status, "AWAITING_REDACTED_REAL_DEVICE_EVIDENCE");
+  assert.equal(contract.status, "FAIL_PRODUCT_UI_CORRECTIVE_REQUIRED");
   assert.equal(contract.acceptance_passed, false);
+  assert.equal(contract.observed_result.app_home_rendered_inside_shopify_admin, true);
+  assert.equal(contract.observed_result.data_sources_rendered_inside_shopify_admin, true);
+  assert.equal(contract.observed_result.provider_connect_pressed_by_human, false);
+  assert.ok(contract.observed_result.failure_codes.includes("AUTOMATIC_KLAVIYO_PROVIDER_CONTACT"));
   assert.equal(contract.capture_authority, "human_in_authenticated_shopify_admin");
   assert.deepEqual(contract.required_captures.map(({surface, route}) => ({surface, route})), [
     {surface: "app_home", route: "/shopify/app"},

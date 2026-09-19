@@ -74,6 +74,18 @@ function createWorkspaceProviderConnectionStore({client, vault, now = () => new 
     };
   }
 
+  async function readKlaviyoStatus(authority) {
+    const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections")
+      .select("status,email_monthly_plan_cost,account_currency")).maybeSingle();
+    if (error) throw new Error("CONNECTION_READ_FAILED");
+    if (!data || data.status === "revoked") return null;
+    return {
+      status: data.status,
+      email_monthly_plan_cost: data.email_monthly_plan_cost,
+      account_currency: data.account_currency,
+    };
+  }
+
   async function refreshKlaviyo({authority, version, accessToken, refreshToken}) {
     const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections").update({
       access_token_envelope: vault.encrypt(accessToken, context(authority.workspace_id, "klaviyo", "access")),
@@ -93,7 +105,7 @@ function createWorkspaceProviderConnectionStore({client, vault, now = () => new 
     if (!data) throw Object.assign(new Error("CONNECTION_CHANGED"), {code: "CONNECTION_CHANGED", status: 409});
   }
 
-  return Object.freeze({writeFromOAuthTransaction, resolve, readKlaviyo, completeKlaviyo, refreshKlaviyo});
+  return Object.freeze({writeFromOAuthTransaction, resolve, readKlaviyo, readKlaviyoStatus, completeKlaviyo, refreshKlaviyo});
 }
 
 module.exports = Object.freeze({createWorkspaceProviderConnectionStore, assertEmbeddedTransaction});

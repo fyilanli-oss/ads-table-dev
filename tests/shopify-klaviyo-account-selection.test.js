@@ -19,6 +19,7 @@ function fixture() {
   const connection = {status: "pending_account_selection", accessToken: "secret-access", refreshToken: "secret-refresh", updated_at: "version-1"};
   const store = {
     readKlaviyo: async auth => { assert.deepEqual(auth, authority); return connection; },
+    readKlaviyoStatus: async auth => { assert.deepEqual(auth, authority); return connection; },
     completeKlaviyo: async input => calls.push(input),
     refreshKlaviyo: async input => {calls.push(input); Object.assign(connection, {accessToken: input.accessToken, updated_at: "version-2"});},
   };
@@ -29,6 +30,24 @@ function fixture() {
   };
   return {store, connection, calls, selection: createKlaviyoAccountSelection({store, fetchImpl})};
 }
+
+test("reads stored Klaviyo status without contacting the provider or exposing account identity", async () => {
+  let contacted = false;
+  const store = {readKlaviyoStatus: async () => ({status: "connected", email_monthly_plan_cost: "5.00", account_currency: "USD"})};
+  const selection = createKlaviyoAccountSelection({store, fetchImpl: async () => {contacted = true;}});
+  assert.deepEqual(await selection.status(authority), {status: "connected", email_monthly_plan_cost: "5.00", currency: "USD"});
+  assert.equal(contacted, false);
+});
+
+test("stored Klaviyo status fails closed when cost or currency is incomplete", async () => {
+  for (const row of [
+    {status: "connected", email_monthly_plan_cost: null, account_currency: "USD"},
+    {status: "connected", email_monthly_plan_cost: "5.00", account_currency: null},
+  ]) {
+    const selection = createKlaviyoAccountSelection({store: {readKlaviyoStatus: async () => row}, fetchImpl: async () => assert.fail("provider must not be contacted")});
+    assert.deepEqual(await selection.status(authority), {status: "temporarily_unavailable"});
+  }
+});
 
 test("lists verified accounts without disclosing encrypted or plaintext credentials", async () => {
   const {selection} = fixture();
@@ -146,7 +165,7 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect"]) elements.set(id,element());
   const requests=[];
   let finishSave;
-  const context={document:{getElementById:id=>elements.get(id),querySelector:()=>elements.get("connect"),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
+  const context={URLSearchParams,location:{search:"?oauth_connected=klaviyo&account_selection_required=1"},document:{getElementById:id=>elements.get(id),querySelector:()=>elements.get("connect"),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
     requests.push({url,options});
     if(options.method==="POST") return new Promise(resolve=>{finishSave=()=>resolve(response(200,{status:"connected",account_name:"Verified",currency:"USD",email_monthly_plan_cost:"0.00"}));});
     return response(200,{status:"pending_account_selection",accounts:[{id:"a",name:"<script>untrusted</script>",currency:"USD"}]});
@@ -165,4 +184,20 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   assert.deepEqual(JSON.parse(requests[1].options.body),{account_id:"a",email_monthly_plan_cost:"0"});
   finishSave(); await saving;
   assert.match(elements.get("klaviyo-message").textContent,/Connected: Verified/);
+});
+
+test("UI reads stored status on page load without requesting Klaviyo accounts", async () => {
+  const elements=new Map();
+  const element=()=>({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect"]) elements.set(id,element());
+  const requests=[];
+  const context={URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
+    requests.push({url,options});
+    return response(200,{status:"connected",email_monthly_plan_cost:"5.00",currency:"USD"});
+  }};
+  vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/status"]);
+  assert.equal(elements.get("klaviyo-connect").hidden,true);
+  assert.equal(elements.get("klaviyo-message").textContent,"Connected · 5.00 USD/month");
 });

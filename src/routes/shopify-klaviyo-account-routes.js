@@ -19,6 +19,7 @@ function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selecti
       return res.status(known ? error.status || 503 : 503).json({code: known ? error.code : "KLAVIYO_UNAVAILABLE"});
     }
   };
+  app.get("/api/shopify/providers/klaviyo/accounts/status", handler(authority => selection.status(authority)));
   app.get("/api/shopify/providers/klaviyo/accounts", handler(authority => selection.list(authority)));
   app.post("/api/shopify/providers/klaviyo/accounts/select", handler((authority, body) => selection.complete(authority, body)));
 }

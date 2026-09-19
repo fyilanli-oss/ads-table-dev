@@ -1,5 +1,7 @@
 "use strict";
 
+const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
+
 const EMBEDDED_HOME_RELEASE = "e10-t6c2k";
 
 function escapeAttribute(value) {
@@ -112,8 +114,20 @@ function renderProviderSection([id, label], providerOAuthEnabled) {
   return `<s-section id="${id}" heading="${label}">
       <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
         <s-paragraph>Connect ${label} to this Shopify workspace.</s-paragraph>
-        <s-button variant="primary" data-provider="${id}"${disabled}>Connect</s-button>
+        ${id === "klaviyo" ? '<div id="klaviyo-connect">' : ""}<s-button variant="primary" data-provider="${id}"${disabled}>Connect</s-button>${id === "klaviyo" ? "</div>" : ""}
       </s-stack>
+      ${id === "klaviyo" && providerOAuthEnabled ? `<s-stack id="klaviyo-accounts" gap="base">
+        <s-paragraph id="klaviyo-message" aria-live="polite">Checking Klaviyo connection…</s-paragraph>
+        <div id="klaviyo-choice-step" hidden><s-stack gap="base">
+          <s-select id="klaviyo-choice" label="Klaviyo account"></s-select>
+          <s-button id="klaviyo-choose">Select account</s-button>
+        </s-stack></div>
+        <div id="klaviyo-cost-step" hidden><s-stack gap="base">
+          <s-number-field id="klaviyo-cost" label="Email Monthly Plan Cost" min="0" max="99999999.99" step="0.01"></s-number-field>
+          <s-button id="klaviyo-save" variant="primary">Save and connect</s-button>
+        </s-stack></div>
+        <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Reload accounts</s-button></div>
+      </s-stack>` : ""}
     </s-section>`;
 }
 
@@ -167,6 +181,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled}) {
         }
       }));
       const params = new URLSearchParams(location.search);
+      (${initializeKlaviyoAccounts.toString()})();
       if (params.has("oauth_connected")) {
         status.setAttribute("heading", "Provider authorized");
         status.setAttribute("tone", "success");

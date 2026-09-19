@@ -14,6 +14,7 @@ function createEmbeddedProviderOAuthAdapters({
   consumeTransaction,
   connectionStore,
   providerStrategies,
+  resolveReturnTarget,
 } = {}) {
   requiredFunction(authenticateEmbedded, "authenticateEmbedded");
   requiredFunction(createEmbeddedTransaction, "createEmbeddedTransaction");
@@ -37,6 +38,7 @@ function createEmbeddedProviderOAuthAdapters({
       exchangeCode: strategy.exchangeCode,
       createPkce: strategy.createPkce || null,
       connectionStore,
+      resolveReturnTarget,
     });
   }
   return Object.freeze(adapters);

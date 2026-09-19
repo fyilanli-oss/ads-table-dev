@@ -17,6 +17,7 @@ function initializeKlaviyoAccounts() {
   let accounts = [];
   let selected = null;
   let busy = false;
+  let retryAction = null;
 
   async function request(path, body) {
     if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
@@ -44,9 +45,38 @@ function initializeKlaviyoAccounts() {
     if (error.message === "KLAVIYO_REAUTHORIZE") connect.hidden = false;
   }
 
-  async function load() {
+  async function loadStatus() {
     if (busy) return;
     busy = true;
+    retryAction = loadStatus;
+    retryStep.hidden = true;
+    try {
+      const result = await request("/status");
+      if (result.status === "connected") {
+        connect.hidden = true;
+        const amount = result.email_monthly_plan_cost == null ? "" : " · " + result.email_monthly_plan_cost + " " + result.currency + "/month";
+        message.textContent = "Connected" + amount;
+      } else if (result.status === "account_selection_required") {
+        connect.hidden = true;
+        message.textContent = "Account selection required";
+      } else if (result.status === "not_connected") {
+        connect.hidden = false;
+        message.textContent = "Not connected";
+      } else {
+        connect.hidden = true;
+        message.textContent = "Temporarily unavailable";
+      }
+    } catch (error) {
+      showError(error);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function loadAccounts() {
+    if (busy) return;
+    busy = true;
+    retryAction = loadAccounts;
     retryStep.hidden = true;
     choiceStep.hidden = true;
     costStep.hidden = true;
@@ -103,8 +133,10 @@ function initializeKlaviyoAccounts() {
     } catch (error) { showError(error); }
     finally { busy = false; save.disabled = false; save.loading = false; }
   });
-  retry.addEventListener("click", load);
-  load();
+  retry.addEventListener("click", () => retryAction && retryAction());
+  const params = new URLSearchParams(location.search);
+  if (params.get("oauth_connected") === "klaviyo" && params.get("account_selection_required") === "1") loadAccounts();
+  else loadStatus();
 }
 
 module.exports = {initializeKlaviyoAccounts};

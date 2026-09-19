@@ -6,18 +6,24 @@ const {renderEmbeddedPlatforms} = require("../src/shopify/embedded-app-home");
 const {enabled, registerShopifyRuntime} = require("../src/shopify/runtime");
 const {createEmbeddedProviderTokenExchanges, normalize} = require("../src/shopify/embedded-provider-token-exchange");
 
-test("embedded Platforms renders all provider Connect actions against the canonical start boundary", () => {
+test("embedded Platforms renders active provider Connect actions and keeps Pinterest parked", () => {
   const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: true});
-  for (const provider of ["meta", "google_ads", "klaviyo", "tiktok", "pinterest"]) {
+  for (const provider of ["meta", "google_ads", "klaviyo", "tiktok"]) {
     assert.match(html, new RegExp(`data-provider="${provider}"`));
   }
+  assert.doesNotMatch(html, /data-provider="pinterest"/);
+  assert.match(html, /Pinterest connection is not available in this release/);
+  assert.match(html, /<s-paragraph>Parked<\/s-paragraph>/);
+  assert.doesNotMatch(html, /Connect (?:Meta|Google Ads|Klaviyo|TikTok|Pinterest) to this Shopify workspace/);
+  assert.match(html, /fetch\("\/api\/shopify\/providers\/klaviyo\/accounts" \+ path/);
+  assert.match(html, /request\("\/status"\)/);
   assert.match(html, /window\.shopify\.idToken/);
   assert.match(html, /\/api\/shopify\/providers\//);
   assert.match(html, /open\(body\.authorization_url, "_top"\)/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
   assert.match(html, /<s-app-nav>/);
   assert.match(html, /<s-page heading="Data sources">/);
-  assert.equal((html.match(/<s-button variant="primary" data-provider=/g) || []).length, 5);
+  assert.equal((html.match(/<s-button variant="primary" data-provider=/g) || []).length, 4);
   assert.doesNotMatch(html, /<style>|<iframe/i);
   assert.doesNotMatch(html, /workspace[_-]id|shop[_-]id|user[_-]id/i);
 });
@@ -25,6 +31,8 @@ test("embedded Platforms renders all provider Connect actions against the canoni
 test("embedded Platforms keeps Connect actions disabled until runtime activation", () => {
   const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: false});
   assert.equal((html.match(/ disabled/g) || []).length, 5);
+  assert.match(html, /Connection setup unavailable/);
+  assert.doesNotMatch(html, /Checking connection status/);
 });
 
 test("provider token exchanges normalize object and nested TikTok token responses", () => {

@@ -51,12 +51,6 @@ function renderEmbeddedAppHome({clientId}) {
         <s-button id="platforms" variant="primary" href="/shopify/app/platforms">Manage data sources</s-button>
       </s-stack>
     </s-section>
-    <s-section heading="Klaviyo">
-      <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
-        <s-paragraph>Connect Klaviyo to this Shopify workspace.</s-paragraph>
-        <s-button variant="primary" href="/shopify/app/platforms#klaviyo">Connect</s-button>
-      </s-stack>
-    </s-section>
   </s-page>
   <script>
     (() => {
@@ -109,15 +103,18 @@ function renderEmbeddedAppHome({clientId}) {
 </html>`;
 }
 
-function renderProviderSection([id, label], providerOAuthEnabled) {
+function renderProviderSection({id, label, description, parked = false}, providerOAuthEnabled) {
   const disabled = providerOAuthEnabled ? "" : " disabled";
   return `<s-section id="${id}" heading="${label}">
       <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
-        <s-paragraph>Connect ${label} to this Shopify workspace.</s-paragraph>
-        ${id === "klaviyo" ? '<div id="klaviyo-connect">' : ""}<s-button variant="primary" data-provider="${id}"${disabled}>Connect</s-button>${id === "klaviyo" ? "</div>" : ""}
+        <s-stack gap="tight">
+          <s-paragraph>${description}</s-paragraph>
+          ${id === "klaviyo" ? `<s-paragraph id="klaviyo-message" aria-live="polite">${providerOAuthEnabled ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
+          ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
+        </s-stack>
+        ${parked ? '<s-button disabled>Connect</s-button>' : `${id === "klaviyo" ? '<div id="klaviyo-connect">' : ""}<s-button variant="primary" data-provider="${id}"${disabled}>Connect</s-button>${id === "klaviyo" ? "</div>" : ""}`}
       </s-stack>
       ${id === "klaviyo" && providerOAuthEnabled ? `<s-stack id="klaviyo-accounts" gap="base">
-        <s-paragraph id="klaviyo-message" aria-live="polite">Checking Klaviyo connection…</s-paragraph>
         <div id="klaviyo-choice-step" hidden><s-stack gap="base">
           <s-select id="klaviyo-choice" label="Klaviyo account"></s-select>
           <s-button id="klaviyo-choose">Select account</s-button>
@@ -126,7 +123,7 @@ function renderProviderSection([id, label], providerOAuthEnabled) {
           <s-number-field id="klaviyo-cost" label="Email Monthly Plan Cost" min="0" max="99999999.99" step="0.01"></s-number-field>
           <s-button id="klaviyo-save" variant="primary">Save and connect</s-button>
         </s-stack></div>
-        <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Reload accounts</s-button></div>
+        <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Try again</s-button></div>
       </s-stack>` : ""}
     </s-section>`;
 }
@@ -134,8 +131,11 @@ function renderProviderSection([id, label], providerOAuthEnabled) {
 function renderEmbeddedPlatforms({clientId, providerOAuthEnabled}) {
   if (typeof clientId !== "string" || !clientId.trim()) throw new TypeError("clientId is required");
   const providers = [
-    ["meta", "Meta"], ["google_ads", "Google Ads"], ["klaviyo", "Klaviyo"],
-    ["tiktok", "TikTok"], ["pinterest", "Pinterest"],
+    {id: "meta", label: "Meta", description: "Meta advertising performance and spend."},
+    {id: "google_ads", label: "Google Ads", description: "Google Ads performance and spend."},
+    {id: "klaviyo", label: "Klaviyo", description: "Email performance and monthly plan cost."},
+    {id: "tiktok", label: "TikTok", description: "TikTok advertising performance and spend."},
+    {id: "pinterest", label: "Pinterest", description: "Pinterest connection is not available in this release.", parked: true},
   ];
   const sections = providers.map((provider) => renderProviderSection(provider, providerOAuthEnabled)).join("\n    ");
   return `<!doctype html>

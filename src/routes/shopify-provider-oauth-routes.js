@@ -28,7 +28,15 @@ function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
     const adapter = PROVIDERS.includes(req.params.provider) ? adapters[req.params.provider] : null;
     if (!adapter) return res.redirect(`${RETURN_TARGET}?oauth_error=provider_not_found`);
     try {
-      await adapter.callback({state: req.query.state, code: req.query.code});
+      const result = await adapter.callback({state: req.query.state, code: req.query.code});
+      if (result?.redirect_to && result.redirect_to !== RETURN_TARGET) {
+        const target = new URL(result.redirect_to);
+        if (target.protocol !== "https:" || !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(target.hostname) ||
+          target.port || target.username || target.password || !/^\/admin\/apps\/[A-Za-z0-9_-]+$/.test(target.pathname) || target.search || target.hash) {
+          throw new Error("INVALID_EMBEDDED_RETURN_TARGET");
+        }
+        return res.redirect(target.href);
+      }
       return res.redirect(`${RETURN_TARGET}?oauth_connected=${encodeURIComponent(req.params.provider)}&account_selection_required=1`);
     } catch {
       return res.redirect(`${RETURN_TARGET}?oauth_error=connection_failed`);

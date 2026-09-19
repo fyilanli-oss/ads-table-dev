@@ -31,6 +31,8 @@ function createWorkspaceProviderConnectionStore({client, vault, now = () => new 
       shop_id: authority.shop_id,
       provider: authority.provider,
       status: "pending_account_selection",
+      active_account_id: null,
+      ...(authority.provider === "klaviyo" ? {email_monthly_plan_cost: null, account_currency: null} : {}),
       access_token_envelope: vault.encrypt(accessToken, context(authority.workspace_id, authority.provider, "access")),
       refresh_token_envelope: vault.encrypt(refreshToken, context(authority.workspace_id, authority.provider, "refresh")),
       updated_at: now().toISOString(),
@@ -55,7 +57,43 @@ function createWorkspaceProviderConnectionStore({client, vault, now = () => new 
     });
   }
 
-  return Object.freeze({writeFromOAuthTransaction, resolve});
+  function klaviyoQuery(authority, query) {
+    if (authority?.authority !== "shopify_verified_session") throw new Error("UNVERIFIED_SHOPIFY_SESSION");
+    return query.eq("workspace_id", required(authority.workspace_id, "workspace_id"))
+      .eq("shop_id", required(authority.shop_id, "shop_id")).eq("provider", "klaviyo");
+  }
+
+  async function readKlaviyo(authority) {
+    const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections")
+      .select("status,active_account_id,email_monthly_plan_cost,account_currency,updated_at,access_token_envelope,refresh_token_envelope")).maybeSingle();
+    if (error) throw new Error("CONNECTION_READ_FAILED");
+    if (!data) return null;
+    return {...data,
+      accessToken: data.status === "revoked" ? null : vault.decrypt(data.access_token_envelope, context(authority.workspace_id, "klaviyo", "access")),
+      refreshToken: data.status === "revoked" ? null : vault.decrypt(data.refresh_token_envelope, context(authority.workspace_id, "klaviyo", "refresh")),
+    };
+  }
+
+  async function refreshKlaviyo({authority, version, accessToken, refreshToken}) {
+    const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections").update({
+      access_token_envelope: vault.encrypt(accessToken, context(authority.workspace_id, "klaviyo", "access")),
+      refresh_token_envelope: vault.encrypt(refreshToken, context(authority.workspace_id, "klaviyo", "refresh")),
+      updated_at: now().toISOString(),
+    })).eq("updated_at", required(version, "connection version")).neq("status", "revoked").select("updated_at").maybeSingle();
+    if (error) throw new Error("CONNECTION_WRITE_FAILED");
+    if (!data) throw Object.assign(new Error("CONNECTION_CHANGED"), {code: "CONNECTION_CHANGED", status: 409});
+  }
+
+  async function completeKlaviyo({authority, version, account, cost}) {
+    const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections").update({
+      status: "connected", active_account_id: account.id, account_currency: account.currency,
+      email_monthly_plan_cost: cost, updated_at: now().toISOString(),
+    })).eq("updated_at", required(version, "connection version")).neq("status", "revoked").select("active_account_id").maybeSingle();
+    if (error) throw new Error("CONNECTION_WRITE_FAILED");
+    if (!data) throw Object.assign(new Error("CONNECTION_CHANGED"), {code: "CONNECTION_CHANGED", status: 409});
+  }
+
+  return Object.freeze({writeFromOAuthTransaction, resolve, readKlaviyo, completeKlaviyo, refreshKlaviyo});
 }
 
 module.exports = Object.freeze({createWorkspaceProviderConnectionStore, assertEmbeddedTransaction});

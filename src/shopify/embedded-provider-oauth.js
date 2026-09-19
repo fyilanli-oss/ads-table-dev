@@ -7,7 +7,7 @@ function requiredFunction(value, name) {
   return value;
 }
 
-function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode, createPkce = null, connectionStore} = {}) {
+function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode, createPkce = null, connectionStore, resolveReturnTarget = async () => RETURN_TARGET} = {}) {
   if (typeof provider !== "string" || !provider) throw new TypeError("provider is required");
   if (typeof redirectUri !== "string" || !redirectUri) throw new TypeError("redirectUri is required");
   for (const [name, value] of Object.entries({authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode})) requiredFunction(value, name);
@@ -28,10 +28,11 @@ function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedde
     if (!transaction || transaction.surface !== "shopify_embedded" || transaction.provider !== provider || transaction.return_target !== RETURN_TARGET) {
       throw new Error("INVALID_EMBEDDED_OAUTH_TRANSACTION");
     }
+    const returnTarget = await resolveReturnTarget(transaction);
     const tokens = await exchangeCode({code, redirectUri, pkceVerifier: transaction.pkce_verifier || null});
     if (!tokens || typeof tokens.accessToken !== "string" || !tokens.accessToken) throw new Error("INVALID_PROVIDER_TOKEN_RESPONSE");
     await connectionStore.writeFromOAuthTransaction({transaction, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken || null});
-    return Object.freeze({redirect_to: RETURN_TARGET, outcome: "account_selection_required"});
+    return Object.freeze({redirect_to: returnTarget, outcome: "account_selection_required"});
   }
 
   return Object.freeze({start, callback});

@@ -86,6 +86,20 @@ function createWorkspaceProviderConnectionStore({client, vault, now = () => new 
     };
   }
 
+  async function readKlaviyoForReset(authority) {
+    const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections")
+      .select("status,updated_at,refresh_token_envelope")).maybeSingle();
+    if (error) throw new Error("CONNECTION_READ_FAILED");
+    if (!data) return null;
+    return {
+      status: data.status,
+      updated_at: data.updated_at,
+      refreshToken: data.status === "revoked"
+        ? null
+        : vault.decrypt(data.refresh_token_envelope, context(authority.workspace_id, "klaviyo", "refresh")),
+    };
+  }
+
   async function refreshKlaviyo({authority, version, accessToken, refreshToken}) {
     const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections").update({
       access_token_envelope: vault.encrypt(accessToken, context(authority.workspace_id, "klaviyo", "access")),
@@ -105,7 +119,27 @@ function createWorkspaceProviderConnectionStore({client, vault, now = () => new 
     if (!data) throw Object.assign(new Error("CONNECTION_CHANGED"), {code: "CONNECTION_CHANGED", status: 409});
   }
 
-  return Object.freeze({writeFromOAuthTransaction, resolve, readKlaviyo, readKlaviyoStatus, completeKlaviyo, refreshKlaviyo});
+  async function markKlaviyoRevoked({authority, version}) {
+    const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections").update({
+      status: "revoked",
+      updated_at: now().toISOString(),
+    })).eq("updated_at", required(version, "connection version")).neq("status", "revoked")
+      .select("status").maybeSingle();
+    if (error) throw new Error("CONNECTION_WRITE_FAILED");
+    if (!data) throw Object.assign(new Error("CONNECTION_CHANGED"), {code: "CONNECTION_CHANGED", status: 409});
+    return Object.freeze({status: "revoked"});
+  }
+
+  return Object.freeze({
+    writeFromOAuthTransaction,
+    resolve,
+    readKlaviyo,
+    readKlaviyoStatus,
+    readKlaviyoForReset,
+    completeKlaviyo,
+    refreshKlaviyo,
+    markKlaviyoRevoked,
+  });
 }
 
 module.exports = Object.freeze({createWorkspaceProviderConnectionStore, assertEmbeddedTransaction});

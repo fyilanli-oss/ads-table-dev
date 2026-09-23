@@ -1,0 +1,57 @@
+{
+  "contract": "r5-klaviyo-consolidation",
+  "version": 2,
+  "supersedes": "contracts/r5-klaviyo-consolidation-v1.json",
+  "authority": {
+    "tenant_key": "workspace_id",
+    "canonical_connection_key": ["workspace_id", "provider"],
+    "legacy_binding_key": ["legacy_user_id", "workspace_id"],
+    "provider": "klaviyo"
+  },
+  "observed_live_outcome": {
+    "gate": "R5-B",
+    "result": "reauthorization_required",
+    "http_status": 409,
+    "provider_write_performed": false,
+    "token_refresh_performed": false,
+    "canonical_connection_created": false
+  },
+  "gates": [
+    {
+      "id": "R5-A",
+      "name": "explicit_legacy_binding",
+      "result": "passed"
+    },
+    {
+      "id": "R5-B",
+      "name": "provider_account_verification",
+      "result": "reauthorization_required",
+      "requirements": [
+        "read_only_request_is_not_retried",
+        "expired_grant_is_not_refreshed",
+        "unverified_grant_is_not_promoted_to_canonical"
+      ]
+    },
+    {
+      "id": "R5-C",
+      "name": "controlled_clean_reset",
+      "requirements": [
+        "action_time_human_confirmation",
+        "revoke_refresh_token_exactly_once",
+        "mark_embedded_connection_revoked_only_after_provider_success",
+        "preserve_encrypted_envelopes_account_cost_and_history",
+        "keep_canonical_connection_empty",
+        "do_not_start_new_oauth_in_the_reset_operation"
+      ]
+    }
+  ],
+  "forbidden": [
+    "refresh_expired_grant_to_force_migration",
+    "delete_legacy_or_embedded_history",
+    "clear_token_envelopes_during_reset",
+    "mark_local_connection_revoked_before_provider_success",
+    "start_oauth_in_the_revoke_request",
+    "enable_legacy_and_canonical_refresh_concurrently",
+    "revoke_without_action_time_confirmation"
+  ]
+}

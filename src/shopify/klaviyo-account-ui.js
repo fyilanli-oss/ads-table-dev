@@ -36,6 +36,7 @@ function initializeKlaviyoAccounts() {
     const messages = {
       SHOPIFY_SESSION_REQUIRED: "Open AdsTable from Shopify Admin to continue.",
       KLAVIYO_REAUTHORIZE: "Your Klaviyo authorization needs to be renewed. Select Connect to authorize again.",
+      KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED: "The existing Klaviyo authorization has expired. A clean connection must be prepared before reconnecting.",
       INVALID_PLAN_COST: "Enter a monthly cost of 0 or more, with up to two decimal places.",
       INVALID_ACCOUNT: "This account could not be verified. Reload the accounts and select again.",
       CONNECTION_CHANGED: "The connection changed. Reload the accounts before saving again.",
@@ -116,6 +117,7 @@ function initializeKlaviyoAccounts() {
     busy = true;
     retryAction = verifyR5ReadOnly;
     retryStep.hidden = true;
+    connect.hidden = true;
     message.textContent = "Verifying the existing Klaviyo account…";
     try {
       const result = await request("/verify");

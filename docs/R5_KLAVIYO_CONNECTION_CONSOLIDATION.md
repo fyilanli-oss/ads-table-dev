@@ -12,7 +12,7 @@ Eski satırlardan yalnız birinin Klaviyo hesap numarası embedded kayıtla eşl
 
 ## Durum
 
-`R5-A complete, human binding recorded — R5-B reauthorization required — R5-C controlled clean reset preparation`.
+`R5 complete — controlled clean reset executed and postcheck passed`.
 
 ## R5 kapıları
 
@@ -27,6 +27,8 @@ Embedded token yalnız server tarafında çözülür ve Klaviyo Account API'ye s
 ### R5-C — Koşullu kanonik taşıma veya kontrollü temiz reset
 
 R5-B doğrulaması geçseydi embedded bağlantının uyumlu şifreli token zarfları plaintext'e çevrilmeden `workspace_provider_connections` tablosuna alınacaktı. Canlı doğrulama `409` ile fail-closed durduğu için bu yol kullanılmayacaktır. Kullanıcının temiz başlangıç kararıyla R5-C v2 kontrollü reset yoluna dönmüştür: ayrı işlem-anı onayı sonrasında eski refresh token bir kez revoke edilir; yalnız provider başarısından sonra embedded satır `revoked` olur. Kanonik satır yaratılmaz; token zarfı, hesap/maliyet/currency, V1 veri ve snapshot geçmişi silinmez.
+
+Bu kontrollü reset 23 Eylül 2026 tarihinde tamamlandı. Yeni bağlantı açılmadı; R6/R7'ye kadar Connect kapalı tutulur.
 
 ## Canlı salt okunur envanter — 23 Eylül 2026
 
@@ -69,10 +71,22 @@ R5-B doğrulaması geçseydi embedded bağlantının uyumlu şifreli token zarfl
 - `contracts/r5-klaviyo-consolidation-v2.json` kontrollü temiz reset dalını tanımlar.
 - Kontrollü reset modülü Shopify session-bound POST route'una ve resmi `s-modal` onay yüzeyine bağlanmak üzere hazırlanmıştır. Modalı açmak/Cancel etkisizdir; yalnız **Remove connection** işlem-anı onayı canlı revoke ve yerel `revoked` finalizasyonunu başlatır.
 
+## R5-C canlı kapanış sonucu — 23 Eylül 2026
+
+- PR #233 merge commit `8f183720fe1e64975ce8adabbeb8318f55257259` production'da `READY` durumunda ve `dev.adstable.app` alias'ına bağlıdır.
+- Merchant Shopify modalında **Remove connection** eylemini onayladı.
+- Session-bound reset endpoint'i production logunda bir kez `200` döndü.
+- Supabase postcheck `PASS`: embedded Klaviyo `1 revoked / 0 connected`; canonical Klaviyo `0`.
+- Seçilmiş hesap, aylık maliyet, source currency ve encrypted access/refresh zarfları tarihçe olarak korundu.
+- Aktif human-attested binding `1`; Klaviyo schedule ve açık job `0`; legacy freeze trigger `6`; plaintext legacy token `0`.
+- Reset sırasında OAuth, token refresh, canonical insert, Dataset V2 yazımı veya token silme yapılmadı.
+- R5 kapanmıştır. Sonraki paket, ayrı kapsam ve onayla R6 canonical runtime'dır.
+
 ## Değişmeyen sınırlar
 
-- Provider revoke yok.
+- Yeni provider revoke yok; R5-C kapsamındaki tek kontrollü revoke tamamlandı.
 - Token silme, decrypt/re-encrypt veya plaintext log yok.
 - Eski ve kanonik refresh hattı aynı anda açılmaz.
 - İkinci belirsiz eski Klaviyo satırı otomatik bağlanmaz.
-- R6 runtime aktivasyonu ve R7 ekran akışı bu paketin dışında kalır.
+- R6 runtime aktivasyonu ve R7 ekran akışı bu paketin dışında kalır; bu kapanış onları otomatik başlatmaz.
+

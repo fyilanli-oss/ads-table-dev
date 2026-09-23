@@ -16,6 +16,19 @@
     "token_refresh_performed": false,
     "canonical_connection_created": false
   },
+  "controlled_reset_outcome": {
+    "gate": "R5-C",
+    "result": "passed",
+    "http_status": 200,
+    "action_time_human_confirmation": true,
+    "embedded_connection_status": "revoked",
+    "canonical_connection_created": false,
+    "new_oauth_started": false,
+    "token_refresh_performed": false,
+    "token_envelopes_deleted": false,
+    "historical_fields_preserved": true,
+    "database_postcheck": "PASS"
+  },
   "gates": [
     {
       "id": "R5-A",
@@ -35,6 +48,7 @@
     {
       "id": "R5-C",
       "name": "controlled_clean_reset",
+      "result": "passed",
       "requirements": [
         "action_time_human_confirmation",
         "revoke_refresh_token_exactly_once",
@@ -55,3 +69,4 @@
     "revoke_without_action_time_confirmation"
   ]
 }
+

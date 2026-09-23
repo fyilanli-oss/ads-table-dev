@@ -1,0 +1,88 @@
+{
+  "contract_version": "r3-dataset-workspace-v1",
+  "status": "R3A_R3B_COMPLETE_R3C_DEFERRED_TO_R6_GATE",
+  "depends_on": "r2-workspace-currency-v1",
+  "canonical_tenant": "workspace_id",
+  "canonical_contract_version": "v2",
+  "dataset_table": "public.performance_dataset_rows_v2",
+  "migration": "supabase/migrations/20260923083734_add_dataset_v2_workspace_tenant.sql",
+  "staged_transition": {
+    "workspace_id_initially_nullable": true,
+    "workspace_foreign_key": "public.workspaces(id)",
+    "legacy_user_id_retained_until": "R10",
+    "legacy_user_id_is_optional_in_contract_v2": true,
+    "legacy_user_id_nullable_requires_activation_migration": true,
+    "legacy_user_indexes_retained_during_r3a": true,
+    "workspace_not_null_requires_later_gate": true,
+    "workspace_runtime_cutover_package": "R6"
+  },
+  "workspace_unique_key": [
+    "workspace_id",
+    "platform",
+    "platform_account_id",
+    "business_date",
+    "traffic_type",
+    "entity_key"
+  ],
+  "authority": {
+    "browser_workspace_claim_is_authority": false,
+    "server_resolved_workspace_required": true,
+    "user_id_role": "compatibility_actor_only",
+    "email_or_provider_account_matching_forbidden": true
+  },
+  "live_preflight": {
+    "dataset_v2_rows": 0,
+    "workspace_rows": 1,
+    "workspace_settings_rows": 0,
+    "workspace_id_column_exists": false,
+    "backfill_checkpoints_exists": false,
+    "result": "PASS_LIVE_APPLY_GATE",
+    "evidence": "docs/security/evidence/R3_DATASET_WORKSPACE_PREFLIGHT_2026-09-23.json"
+  },
+  "backfill_checkpoint_disposition": {
+    "legacy_user_scoped_migration": "quarantined_not_applied",
+    "workspace_runtime_contract_prepared": true,
+    "physical_workspace_checkpoint_activation": "R8",
+    "reason": "backfill_checkpoints_does_not_exist_live"
+  },
+  "active_providers": ["meta", "google_ads", "klaviyo"],
+  "parked_providers": ["tiktok", "pinterest"],
+  "forbidden_in_this_package": [
+    "dataset_row_backfill",
+    "provider_runtime_cutover",
+    "workspace_id_not_null",
+    "drop_user_id",
+    "drop_legacy_user_indexes",
+    "oauth_or_provider_contact"
+  ],
+  "production_gate": {
+    "explicit_approval_required": true,
+    "explicit_approval_received": true,
+    "live_migration_version": "20260923083734",
+    "postcheck_result": "PASS",
+    "evidence": "docs/security/evidence/R3A_DATASET_WORKSPACE_APPLY_2026-09-23.json",
+    "preflight": "docs/security/sql/R3_DATASET_WORKSPACE_PREFLIGHT.sql",
+    "postcheck": "docs/security/sql/R3_DATASET_WORKSPACE_POSTCHECK.sql",
+    "rollback": "docs/security/sql/R3_DATASET_WORKSPACE_ROLLBACK.sql",
+    "next_gate": "R4_connection_authority_then_R5_consolidation_then_R6_runtime_activation"
+  },
+  "r3b_runtime_verification": {
+    "result": "PASS_WITH_ACTIVATION_SCHEMA_DEPENDENCY",
+    "authority_boundary": "funnel-core/workspace-dataset-runtime.js",
+    "browser_tenant_fields_rejected": true,
+    "server_resolved_workspace_required": true,
+    "cross_workspace_write_rejected": true,
+    "workspace_query_scope_enforced": true,
+    "provider_runtime_activated": false,
+    "live_dataset_rows": 0,
+    "live_workspace_id_nullable": true,
+    "live_user_id_nullable": false,
+    "live_user_id_fk_to_public_users": true,
+    "evidence": "docs/security/evidence/R3B_WORKSPACE_RUNTIME_VERIFICATION_2026-09-23.json",
+    "dependency_correction": {
+      "r4_unblocked_after": "R3-A_and_R3-B",
+      "r3c_runs_after": "R6_workspace_runtime_acceptance",
+      "reason": "R3-C NOT NULL enforcement cannot precede the R6 writer cutover it must validate"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "evidence_version": "r3b-workspace-runtime-verification-v1",
+  "captured_at_date": "2026-09-23",
+  "project_name": "adstable-dev",
+  "mode": "read_only_live_metadata_and_local_runtime_contract",
+  "result": "PASS_WITH_ACTIVATION_SCHEMA_DEPENDENCY",
+  "live_schema": {
+    "dataset_v2_rows": 0,
+    "null_workspace_rows": 0,
+    "workspace_settings_rows": 0,
+    "workspace_id_nullable": true,
+    "workspace_unique_index_exists": true,
+    "user_id_nullable": false,
+    "user_id_fk_to_public_users": true
+  },
+  "runtime_contract": {
+    "server_resolved_workspace_required": true,
+    "caller_workspace_id_rejected": true,
+    "caller_user_id_rejected": true,
+    "caller_shop_id_rejected": true,
+    "cross_workspace_write_rejected": true,
+    "cross_workspace_query_rejected": true,
+    "user_id_role": "optional_compatibility_actor_only"
+  },
+  "dependency_correction": {
+    "r4_unblocked_after": "R3-A_and_R3-B",
+    "r6_waits_for": ["R4", "R5"],
+    "r3c_waits_for": "R6_workspace_writer_acceptance"
+  },
+  "production_runtime_activated": false,
+  "database_mutation_performed": false,
+  "provider_contact_performed": false,
+  "oauth_changed": false,
+  "deployment_performed": false,
+  "contains_identifiers": false,
+  "contains_tokens": false,
+  "next_gate": "explicit_R4A_scope_and_production_approval"
+}

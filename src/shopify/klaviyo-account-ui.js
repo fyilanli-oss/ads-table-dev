@@ -111,6 +111,21 @@ function initializeKlaviyoAccounts() {
     finally { busy = false; }
   }
 
+  async function verifyR5ReadOnly() {
+    if (busy) return;
+    busy = true;
+    retryAction = verifyR5ReadOnly;
+    retryStep.hidden = true;
+    message.textContent = "Verifying the existing Klaviyo account…";
+    try {
+      const result = await request("/verify");
+      if (result.status !== "verified" || result.active_account_verified !== true) throw new Error("KLAVIYO_UNAVAILABLE");
+      connect.hidden = true;
+      message.textContent = "Connected · Klaviyo account verified · " + result.currency;
+    } catch (error) { showError(error); }
+    finally { busy = false; }
+  }
+
   choose.addEventListener("click", () => {
     selected = accounts.find(account => account.id === choices.value);
     if (!selected?.currency) return showError(new Error("INVALID_ACCOUNT"));
@@ -135,7 +150,8 @@ function initializeKlaviyoAccounts() {
   });
   retry.addEventListener("click", () => retryAction && retryAction());
   const params = new URLSearchParams(location.search);
-  if (params.get("oauth_connected") === "klaviyo" && params.get("account_selection_required") === "1") loadAccounts();
+  if (params.get("r5_read_only_verify") === "1") verifyR5ReadOnly();
+  else if (params.get("oauth_connected") === "klaviyo" && params.get("account_selection_required") === "1") loadAccounts();
   else loadStatus();
 }
 

@@ -1,0 +1,40 @@
+{
+  "evidence_version": "r2-workspace-currency-foundation-apply-v1",
+  "captured_at_date": "2026-09-20",
+  "project_name": "adstable-dev",
+  "authorization_scope": "r2_workspace_currency_foundation_migration_only",
+  "result": "PASS",
+  "live_migration_version": "20260920090105",
+  "live_migration_name": "create_workspace_currency_foundation",
+  "preflight_gate": "PASS",
+  "postcheck_gate": "PASS",
+  "counts": {
+    "workspaces": 1,
+    "workspace_settings": 0,
+    "shopify_installations": 1,
+    "embedded_provider_connections": 1,
+    "oauth_transactions": 5,
+    "dataset_v2_rows": 0
+  },
+  "security": {
+    "workspaces_rls_enabled_and_forced": true,
+    "workspace_settings_rls_enabled_and_forced": true,
+    "browser_roles_denied": true,
+    "service_role_exact_crud": true,
+    "service_role_extra_privileges": false,
+    "installation_foreign_key_validated": true,
+    "installation_orphans": false
+  },
+  "reporting_currency_inferred": false,
+  "oauth_or_provider_rows_changed": false,
+  "dataset_v2_rows_changed": false,
+  "contains_identifiers": false,
+  "contains_tokens": false,
+  "advisor_classification": {
+    "new_r2_warn_findings": 0,
+    "new_r2_performance_findings": 0,
+    "rls_enabled_no_policy_info": "expected_server_only_deny_by_default_no_browser_grants"
+  },
+  "next_package": "R3_dataset_v2_workspace_tenant_conversion",
+  "next_package_requires_separate_approval": true
+}

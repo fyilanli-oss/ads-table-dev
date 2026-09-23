@@ -1,0 +1,62 @@
+{
+  "evidence_version": "r4b-workspace-provider-connection-apply-v1",
+  "captured_at_date": "2026-09-23",
+  "project_name": "adstable-dev",
+  "project_id": "xnstrzhavqkztvmlwsrx",
+  "result": "PASS",
+  "explicit_approval_received": true,
+  "migration": {
+    "version": "20260923091731",
+    "name": "create_workspace_provider_connections",
+    "mode": "additive_empty_schema_only"
+  },
+  "preflight": {
+    "result": "PASS",
+    "canonical_table_existed": false,
+    "workspace_rows": 1,
+    "shopify_connection_rows": 1,
+    "legacy_connection_rows": 8,
+    "legacy_token_rows": 7,
+    "legacy_plaintext_token_rows": 0,
+    "shopify_duplicate_workspace_provider_groups": 0
+  },
+  "postcheck": {
+    "result": "PASS",
+    "canonical_table_exists": true,
+    "canonical_table_rows": 0,
+    "primary_key_valid": true,
+    "workspace_foreign_key_validated": true,
+    "lifecycle_index_exists": true,
+    "rls_and_force_rls_enabled": true,
+    "browser_roles_denied": true,
+    "service_role_crud_exact": true
+  },
+  "unchanged_existing_counts": {
+    "shopify_connection_rows": 1,
+    "legacy_connection_rows": 8,
+    "legacy_token_rows": 7,
+    "legacy_plaintext_token_rows": 0
+  },
+  "advisors": {
+    "new_r4_warn_findings": 0,
+    "expected_info": [
+      "workspace_provider_connections: RLS enabled with no policy because browser access is intentionally denied",
+      "workspace_provider_connections_status_updated_idx: unused because the canonical table is empty"
+    ],
+    "pre_existing_findings_unchanged_in_scope": true,
+    "security_remediation_reference": "https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy",
+    "performance_remediation_reference": "https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index"
+  },
+  "not_performed": [
+    "connection_or_token_copy",
+    "token_decrypt_or_reencrypt",
+    "oauth_route_change",
+    "runtime_cutover",
+    "provider_contact_or_revoke",
+    "legacy_write_freeze",
+    "deployment"
+  ],
+  "next_gate": "explicit_R4C_legacy_write_freeze_approval",
+  "contains_identifiers": false,
+  "contains_tokens": false
+}

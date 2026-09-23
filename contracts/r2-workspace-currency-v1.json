@@ -1,0 +1,55 @@
+{
+  "contract_version": "r2-workspace-currency-v1",
+  "status": "LIVE_APPLIED_POSTCHECK_PASS",
+  "depends_on": "r1-workspace-authority-v1",
+  "canonical_tenant": "workspace_id",
+  "schema": {
+    "workspace_table": "public.workspaces",
+    "settings_table": "public.workspace_settings",
+    "installation_adapter": "public.shopify_installations",
+    "installation_foreign_key": "shopify_installations_workspace_fk"
+  },
+  "reporting_currency": {
+    "required_before_data_sources": true,
+    "format": "^[A-Z]{3}$",
+    "source": "merchant_selected",
+    "forbidden_sources": [
+      "shopify_store_currency",
+      "shopify_presentment_currency",
+      "provider_account_currency",
+      "browser_supplied_workspace_authority"
+    ],
+    "provider_source_currency_is_separate": true,
+    "change_requires_version_increment": true,
+    "change_requires_reprocessing_decision": true
+  },
+  "access": {
+    "public_schema_rls": "enabled_and_forced",
+    "anon": "none",
+    "authenticated": "none",
+    "service_role": ["select", "insert", "update", "delete"],
+    "browser_direct_write": false,
+    "server_resolved_workspace_required": true
+  },
+  "seed": {
+    "source": "verified_shopify_installations_workspace_id",
+    "automatic_identity_matching": false,
+    "forbidden_matching_fields": ["email", "shop_domain", "shopify_user_id", "provider_account_id"],
+    "workspace_settings_seeded": false
+  },
+  "active_providers": ["meta", "google_ads", "klaviyo"],
+  "parked_providers": ["tiktok", "pinterest"],
+  "production_gate": {
+    "explicit_approval_required": true,
+    "preflight_result": "PASS",
+    "live_migration_version": "20260920090105",
+    "postcheck_result": "PASS",
+    "live_evidence": "docs/security/evidence/R2_WORKSPACE_CURRENCY_FOUNDATION_APPLY_2026-09-20.json",
+    "ledger_reconciliation": "docs/security/evidence/R2A_EMBEDDED_MIGRATION_LEDGER_RECONCILIATION_2026-09-20.json",
+    "required_before_apply": null,
+    "preflight": "docs/security/sql/R2_WORKSPACE_CURRENCY_PREFLIGHT.sql",
+    "postcheck": "docs/security/sql/R2_WORKSPACE_CURRENCY_POSTCHECK.sql",
+    "rollback": "docs/security/sql/R2_WORKSPACE_CURRENCY_ROLLBACK.sql",
+    "advisors_required": ["security", "performance"]
+  }
+}

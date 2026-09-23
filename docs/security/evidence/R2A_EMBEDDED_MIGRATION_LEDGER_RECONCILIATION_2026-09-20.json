@@ -1,0 +1,45 @@
+{
+  "evidence_version": "r2a-embedded-migration-ledger-reconciliation-v1",
+  "captured_at_date": "2026-09-20",
+  "project_name": "adstable-dev",
+  "authorization_scope": "two_verified_migration_ledger_records_only",
+  "result": "PASS",
+  "ledger_versions_added": [
+    "20260911130000",
+    "20260911150000"
+  ],
+  "ledger_names": {
+    "20260911130000": "add_embedded_oauth_authority",
+    "20260911150000": "create_shopify_workspace_provider_connections"
+  },
+  "excluded_version_recorded": {
+    "20260908074500": false
+  },
+  "post_repair_counts": {
+    "shopify_installations": 1,
+    "shopify_workspace_nulls": 0,
+    "distinct_shopify_workspaces": 1,
+    "dataset_v2_rows": 0,
+    "embedded_provider_connections": 1,
+    "embedded_klaviyo_connections": 1,
+    "legacy_klaviyo_connections": 2,
+    "oauth_transactions": 5
+  },
+  "post_repair_fingerprints": {
+    "duplicate_installation_workspaces": 0,
+    "duplicate_provider_connections": 0,
+    "provider_rls_enabled": true,
+    "provider_rls_forced": true,
+    "provider_client_grants_absent": true,
+    "oauth_consume_function_exists": true
+  },
+  "r2_preflight_gate": "PASS",
+  "workspaces_exists": false,
+  "workspace_settings_exists": false,
+  "business_rows_changed": false,
+  "schema_ddl_executed": false,
+  "foundation_migration_applied": false,
+  "contains_identifiers": false,
+  "contains_tokens": false,
+  "next_required_gate": "explicit_R2_foundation_live_apply_approval"
+}

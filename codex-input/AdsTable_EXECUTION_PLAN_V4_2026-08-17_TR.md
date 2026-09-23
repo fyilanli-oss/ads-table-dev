@@ -1,7 +1,7 @@
 # AdsTable — V4 Execution Plan
 
-**Sürüm:** V4  
-**Tarih:** 17 Ağustos 2026  
+**Sürüm:** V4.1 — Workspace-first execution amendment
+**Tarih:** 17 Ağustos 2026; son karar revizyonu 20 Eylül 2026
 **Belge türü:** Güncel uygulama, kabul ve takip planı  
 **Durum:** Mutabık kalınan execution baseline  
 
@@ -37,6 +37,7 @@ Repository ve CI yürütme günlüğü bu belgenin geçmişe dönük baseline ni
 | `Verification` | Kod tamam; kabul, test ve evidence doğrulanıyor. |
 | `Done` | Bütün kabul, test, rollback ve evidence koşulları sağlandı. |
 | `Deferred` | Açık karar ve gerekçeyle ileri tarihe taşındı. |
+| `Parked` | Mevcut artefaktlar korunur; yeni bağlantı, provider teması, runtime activation veya ürün yüzeyi ayrı açık karara kadar ilerlemez. |
 
 ## 1. Değiştirilemez execution prensipleri
 
@@ -92,6 +93,62 @@ Alanlardan biri uygulanabilir değilse silinmez; `Uygulanamaz — gerekçe` yaz�
 
 Her paket koordinasyon özetinde önce tek cümlelik **iş çıktısı** ve ölçülebilir **iş değeri** yazılır. Teknik araç, PR, hata kodu ve operasyon kapıları ana çıktı gibi sunulmaz; yalnız gerektiğinde teknik evidence olarak eklenir. İş çıktısı kullanıcı, gelir, operasyon, güvenlik veya süreklilik açısından anlamlı değilse paket ilerletilmez; kapsam/öncelik için iş kararı istenir. Bir paketin içindeki güvenlik adımları yeni paket veya alt task gibi raporlanmaz.
 
+### 1.5 Onaylı workspace-first execution revizyonu — 20 Eylül 2026
+
+Bu bölüm, Shopify Embedded kararından önceki standalone kullanıcı/OAuth modeli ile E10 sonrasında eklenen Shopify workspace modelinin birlikte incelenmesi üzerine verilmiş ileriye dönük execution kararıdır. Tarihsel task/evidence kayıtları silinmez; ancak aşağıdaki kararlarla çelişen eski “aktif provider”, `user_id` tenant authority, ikinci OAuth deposu veya Shopify currency varsayımları yeni iş için kullanılamaz. Çelişki sessizce yorumlanmaz; bu revizyon esas alınır ve ilgili executable contract/migration/runtime paketi kendi kabul kapısında güncellenir.
+
+#### Değiştirilemez hedef mimari
+
+- AdsTable canonical tenant anahtarı `workspace_id` olacaktır. `user_id`, `shopify_user_id`, `shop_id`, email veya provider account ID tenant authority değildir.
+- Shopify ilk commerce installation adapter'ıdır; analytics, reporting currency ve provider bağlantıları Shopify tablosuna değil AdsTable workspace'ine aittir. Ortak çekirdek ileride WooCommerce gibi ikinci bir commerce adapter'ını yeni Dataset veya ikinci provider OAuth sistemi kurmadan kabul edebilmelidir.
+- İlk aktif provider dilimi yalnız **Meta, Google Ads ve Klaviyo**'dur. **TikTok ve Pinterest `Parked`** durumundadır. TikTok için tamamlanmış adapter, güvenlik ve evidence artefaktları korunur; yeni Shopify Connect, OAuth/reconnect, refresh/shadow, provider teması ve production primary activation yapılmaz. Yeniden açılış ayrı açık kullanıcı kararı ve güncel resmi revalidation gerektirir.
+- Workspace reporting currency kullanıcı tarafından ilk kurulumda seçilir, server-authoritative workspace ayarı olarak saklanır ve kaydedilmeden Data Sources açılmaz. Shopify store/presentment currency okunmaz veya default yapılmaz.
+- Provider source currency ve workspace reporting currency ayrıdır. Örneğin Klaviyo plan maliyeti `USD`, workspace reporting currency `TRY` olabilir; FX canonical satırda gerçek rate/date/provider provenance ile uygulanır.
+- Yeni bağlantıların tek authority ve token deposu workspace-scoped canonical provider connection store'dur. Standalone `platform_connections` / `platform_connection_tokens` yeni OAuth, reconnect veya refresh kabul etmez; yalnız migration/rollback süresince legacy kaynak olarak korunur.
+- Dataset V2 yeni canonical analytics source-of-truth olmaya devam eder fakat tenant identity `user_id` yerine `workspace_id` olur. V1 ve snapshot verileri E9/E13/E14 kapıları tamamlanmadan silinmez veya körlemesine V2'ye kopyalanmaz.
+- Canlıda aynı Klaviyo account'un standalone ve Shopify workspace modellerinde bulunması duplicate authority olarak kabul edilir. Konsolidasyon tamamlanana kadar yeni Klaviyo OAuth/reconnect ve iki hattan refresh yasaktır; provider revoke çağrısı yeni canonical grant'i de etkileyebileceği için ayrı doğrulama/onay olmadan yapılmaz.
+
+#### Revize execution paketleri ve sıra kapısı
+
+| Sıra | Revizyon paketi | Mevcut Epic bağı | Durum ve zorunlu çıktı |
+|---|---|---|---|
+| R0 | Geçici duplicate/OAuth güvenlik kapısı | E7 + E10-T6 | `Ready` — yeni duplicate OAuth/refresh/revoke yok; veri silinmez. |
+| R1 | Workspace authority kararını contract'lara işleme | E10-T2 + E2/E3 | `Done` — canonical tenant `workspace_id`; versionlı contract, authority envanteri ve R2–R7 migration/release sırası donduruldu. R2 ayrı açık onay bekler. |
+| R2 | Platformdan bağımsız workspace ve currency şeması | E10-T2 + E10-T5-C4/C6/C7 | `Done` — R2-A ledger uzlaştırması ve foundation migration ayrı açık onaylarla tamamlandı; canlı postcheck `PASS`, currency kullanıcı seçimine kadar boş. |
+| R3 | Dataset V2 workspace tenant dönüşümü | E2 + E3 | `In progress / R3-A+B Done; R3-C held for R6 activation` — additive canlı şema ve server-authoritative workspace runtime sınırı tamamlandı; provider activation ve final tenant enforcement henüz yapılmadı. |
+| R4 | Workspace provider connection birleşimi | E10-T6 | `Done / R4-A+B+C` — kanonik boş tablo canlıda; standalone OAuth/refresh/write hattı fail-closed donduruldu; tarihsel kayıtlar korundu. |
+| R5 | Mevcut Klaviyo account konsolidasyonu | E7 + E10-T6 | `In progress / R5-A + human binding Done; R5-B deploy/verification pending` — server-only binding canlıda yalnız açıkça doğrulanan aday için kayıtlı; no-refresh provider verification repository'de hazır fakat deploy edilmedi; doğrulama olmadan taşıma yok, erken provider revoke yok. |
+| R6 | Embedded provider runtime → canonical V2 | E4 + E5 + E7 | `Blocked by R4–R5` — Meta/Google/Klaviyo workspace connection→Time→FX→V2; aktivasyon migration'ı legacy `user_id` alanını nullable yapar; V2 hatasında sessiz V1 fallback yok. |
+| R7 | Currency-first ve Shopify-native Connect/Disconnect UX | E10-T5 + E10-T6-C2I-V10 | `Blocked by R5–R6` — Currency→Data Sources→explanation modal→OAuth→verified account→conditional Klaviyo cost→Connected; warning modal ile Disconnect. |
+| R8 | V1 tarihsel geçiş ve resumable backfill | E9 | `Blocked by R3/R6` — doğrulanmış legacy binding, re-fetch veya canonical validation; fake/synthetic/ambiguous satır yok. |
+| R9 | Production read cutover | E13 | `Blocked by R6–R8` — provider bazlı canary, V2 read, SLO/parity/restore/rollback ve insan GO. |
+| R10 | Standalone OAuth ve V1 legacy retirement | E14 | `Blocked by R9 stabilization` — consumer-zero, read-disable observation, ayrı retirement migration ve restore noktası. |
+| R11 | WooCommerce readiness contract | E10 tenant model future extension | `Deferred` — WooCommerce implementation yok; ortak workspace/currency/connection/V2 çekirdeğinin Shopify'a kilitlenmediğini kanıtlayan contract. |
+
+#### Paketler için ortak uygulama ve kabul kuralları
+
+- **R0:** Eski ve embedded Klaviyo akışları aynı anda refresh üretemez. Hiçbir token/kayıt silinmez; Klaviyo `/oauth/revoke` çağrılmaz. Rollback, yalnız konfigürasyon kapısını eski güvenli duruma döndürür.
+- **R1 — Done:** `user_id` kullanan canonical envelope, Dataset V2, repository, query, job, backfill, ownership ve RLS noktaları; `workspace_id` kullanan Shopify installation/OAuth noktalarıyla birlikte envanterlendi. `contracts/r1-workspace-authority-v1.json` versionlı authority kararıdır; `docs/R1_WORKSPACE_AUTHORITY_DECISION.md` exact R2–R7 migration/release sırasını ve kabul kapılarını kaydeder. Kod/DB/provider mutation yapılmadı. R2 ayrı açık insan onayı almadan başlamaz.
+- **R2 — Done:** Additive `workspaces` ve `workspace_settings` migration'ı, versionlı currency contract'ı, salt okunur preflight/postcheck ve fail-closed rollback hazırlandı. 20 Eylül 2026 ilk canlı preflight'ta bulunan embedded migration ledger farkı, ayrı açık onayla R2-A kapsamında yalnız `20260911130000` ve `20260911150000` sürümleri işlenerek kapatıldı; E9/backfill sahte `applied` yapılmadı. İkinci ayrı açık onayla `20260920090105_create_workspace_currency_foundation` canlıya uygulandı. Postcheck `PASS`: bir doğrulanmış Shopify workspace'i canonical registry'ye seed edildi, `workspace_settings` boş bırakıldı, foreign key doğrulandı, RLS + force RLS açık, browser rolleri kapalı ve `service_role` yalnız explicit CRUD yetkili. OAuth/provider/Dataset V2 adetleri değişmedi. Shopify currency hiçbir alana kaynak olmadı. Advisor taramasında R2 kaynaklı yeni WARN/performance bulgusu yoktur; server-only tablolardaki policiesiz RLS bilgi kaydı beklenen deny-by-default modelidir. R3 ayrı kapsam ve onay kapısıyla başlar.
+- **R3 — In progress / R3-A Done; R3-B runtime verification:** 23 Eylül 2026 canlı preflight Dataset V2'nin `0` satır içerdiğini, canonical workspace'in bulunduğunu, `workspace_id` kolonunun ve `backfill_checkpoints` tablosunun bulunmadığını doğruladı. Açık production onayıyla additive `20260923083734_add_dataset_v2_workspace_tenant` migration'ı uygulandı; nullable `workspace_id`, doğrulanmış workspace foreign key'i, canonical unique index ve üç query indexi oluşturuldu. Postcheck `PASS`; Dataset V2 yine `0` satır, workspace-bound satır `0`; eski `user_id`, unique index, authenticated SELECT policy ve grant'ler korundu. Canonical contract V2, workspace-scoped repository/Query Service/backfill sınırı ile negatif cross-workspace testleri hazırdır. `NOT NULL`, eski unique/index/policy retirement, backfill ve provider runtime cutover yapılmadı. `backfill_checkpoints` canlıda hiç oluşmadığı için eski user-scoped E9 migration karantinada kalır; fiziksel workspace checkpoint tablosu R8'de lease/control semantiğiyle oluşturulacaktır. Sonraki kapı R3-B runtime doğrulaması; R3-C final enforcement ayrı onay ister.
+- **R3 — In progress / R3-A+B Done; R3-C held for R6 activation:** R3-A canlı sonucu korunur: migration `20260923083734`, postcheck `PASS`, Dataset V2 `0` satır ve workspace-bound satır `0`. R3-B'de server-resolved workspace authority kullanan ortak runtime sınırı eklendi; caller tenant alanları, cross-workspace write ve cross-workspace query fail-closed reddedilir. Contract V2'de `workspace_id` zorunlu tenant, `user_id` ise yalnız optional compatibility/actor alanıdır. Canlı metadata `user_id` kolonunun hâlâ `NOT NULL` ve `public.users(id)` foreign key'ine bağlı olduğunu doğruladı; Shopify embedded installation zorunlu Supabase user UUID taşımadığı için sahte/eşleştirilmiş user üretmek yasaktır. Bu nedenle provider aktivasyon migration'ı R6 ile aynı kapıda `user_id` alanını nullable yapacak; R6 writer kabulünden sonra R3-C `workspace_id NOT NULL`, workspace policy ve legacy index retirement ile final enforcement'ı tamamlayacaktır. Böylece eski R3↔R6 bağımlılık döngüsü kaldırıldı: R4 artık R3-A+B sonrasında açılır, R6 R4-R5'i bekler, R3-C R6 kabulünü bekler. Bu pakette provider/OAuth/runtime route/deployment aktive edilmedi.
+- **R4:** Canonical connection store `workspace_id + provider` başına tek state taşır; OAuth callback tek başına `Connected` değildir; active account server-side ownership doğrulaması ister. Token yalnız encrypted envelope'dur. Eski ve yeni OAuth runtime aynı anda authoritative olamaz.
+- **R4-A+B — Tamamlandı / R4-C write-freeze approval gate:** 23 Eylül 2026 canlı preflight `PASS` sonrasında açık production onayıyla `20260923091731_create_workspace_provider_connections` uygulandı. `workspace_id + provider` keyed kanonik tablo `0` satırla oluşturuldu; primary key, doğrulanmış workspace foreign key'i, lifecycle indexi, constraint'ler, force RLS, browser deny ve explicit service-role CRUD postcheck'i `PASS` verdi. Mevcut sayılar değişmedi: `1` Shopify-scoped connected Klaviyo, `8` legacy connection, `7` encrypted legacy token, `0` plaintext token. Embedded ve legacy Klaviyo aynı anda bulunduğu için hiçbir kayıt/token otomatik kopyalanmadı. OAuth route, runtime, provider grant/revoke, legacy write davranışı ve deployment değiştirilmedi. Advisor kontrolünde R4-B kaynaklı yeni WARN yoktur; server-only tablodaki policiesiz RLS ve boş tablonun kullanılmamış lifecycle indexi bilgi düzeyinde beklenen sonuçtur. R4-C standalone write freeze, R5 konsolidasyonundan önce ayrı açık onay ister.
+- **R4-C — Tamamlandı / R5 approval gate:** Açık onayla `20260923093756_r4c_freeze_legacy_provider_writes` uygulandı. Standalone Meta/Google/Klaviyo/TikTok/Pinterest OAuth transaction insert'leri ile legacy connection, encrypted token, ownership, schedule ve job write'ları database trigger'larıyla fail-closed donduruldu; Shopify embedded OAuth transaction'ları korunur. Canlı preflight, postcheck ve gerçek negatif yazma denemesi `PASS` verdi. Aktif `1` Google, `1` Klaviyo ve parked `1` TikTok schedule durduruldu. Dokuz gündür açık kalan `1` Google queued ve `1` TikTok running automation job silinmeden `failed` yapıldı; Klaviyo açık job sayısı zaten `0` idi. Legacy `8` connection ve `7` encrypted token değişmedi; plaintext token `0`, kanonik connection `0` kaldı. Uygulama katmanında standalone route, save ve refresh-job guard'ları ile cron provider filtresi hazırlandı; deployment yapılmadı. Provider revoke/decrypt/re-encrypt/veri taşıma yapılmadı. R5 ayrı açık onay ister.
+- **R5:** Eşleşen Klaviyo account ID destekleyici kanıttır, tek başına tenant sahipliği değildir. Embedded token yalnız ayrı açık provider-temas onayıyla Account API'de doğrulanır. Başarılı doğrulama sonrasında eski connection local `migrated/disabled` olur; historical V1/snapshot korunur; rollback süresi bitmeden token envelope temizliği yapılmaz.
+- **R5-A — Tamamlandı / R5-B verification gate:** Canlı redacted envanterde `2` legacy Klaviyo satırı, `1` Shopify embedded connected Klaviyo ve `0` canonical Klaviyo bulundu. Legacy satırlardan yalnız biri embedded account ID ile eşleşir; ikinci satırda seçilmiş account yoktur. OAuth kayıtlarında legacy `user_id` ile `workspace_id` birlikte bulunmadığı ve üyelik/binding tablosu olmadığı için otomatik tenant eşlemesi reddedildi. Açık R5 onayıyla additive `20260923132407_create_legacy_user_workspace_bindings` migration'ı uygulandı ve tablo bilinçli olarak `0` satır bırakıldı. Tek legacy user için birden fazla aktif workspace eşlemesi unique index ile engellenir; RLS + force RLS açık, browser rolleri kapalı, service role explicit CRUD yetkilidir. Provider teması, account taşıma, canonical insert, legacy disable, revoke veya token silme yapılmadı. R5-B, embedded token'ın Klaviyo Account API'de ayrı açık provider-temas onayıyla doğrulanmasını ve matching legacy aday için insan attestation kaydını bekler.
+- **R5-A human binding + R5-B repository hazırlığı:** Kullanıcı, embedded account ID ile eşleşen eski AdsTable Klaviyo hesabının bu workspace'e ait olduğunu açıkça beyan etti. Yalnız bu legacy aday için `1` aktif `human_attested` binding yazıldı; seçilmiş hesabı olmayan ikinci legacy satır unbound kaldı. Mevcut accounts endpoint'inin `401` halinde token refresh yazısı yapabildiği görülerek salt-okunur onay kapsamında çalıştırılması reddedildi. Bunun yerine Shopify session-bound `GET /api/shopify/providers/klaviyo/accounts/verify` ve R5 operatör parametresi hazırlandı: tek Account API GET çağrısı, refresh/write yok, `401` halinde fail-closed, account/token ifşası yok. Testler `16/16` Klaviyo ve `3/3` R5 PASS. Kod henüz deploy edilmediği için provider teması ve R5-C taşıması yapılmadı.
+- **R6:** İlk aktif dilim yalnız Meta, Google Ads ve Klaviyo'dur. Meta/Google V2-primary kodu workspace authority'ye taşınır. Klaviyo gerçek non-empty/empty sonucu aynı canonical sınırda doğrulanmadan primary olmaz. TikTok/Pinterest kodu production path'e kaydedilmez.
+- **R7:** Connect kartı önce açıklama modalı açar; modal dışı close/Cancel provider teması yapmaz. OAuth top-level'dır. Account selection ve Klaviyo plan cost/currency Shopify-native modal/form ile tamamlanır. Connected kartında Disconnect bulunur; Cancel non-destructive, tarihsel analytics korunur. Resmi Shopify componentleri, session token ve mobil acceptance zorunludur.
+- **R8:** V1 satırları doğrudan SQL copy ile V2'ye taşınmaz. Provider re-fetch tercih edilir; mümkün değilse yalnız canonical validation/provenance geçen legacy fact yazılır. Direct/Others, sentetik fallback ve belirsiz Organic otomatik taşınmaz. Backfill resumable/idempotent ve provider bazlı coverage ölçümlüdür.
+- **R9:** Read cutover provider/workspace canary ile ilerler. Error, lag, partial, FX rejection, currency consistency ve duplicate identity gözlenir. V2 read rollback'i V1 verisini değiştirmez.
+- **R10:** Standalone OAuth route, refresh/automation, V1 read/write ve compatibility alanları ancak consumer-zero ve stabilization sonrasında ayrı release/migration ile emekli edilir. Snapshot retention/audit ve token deletion kararları belgelenir; destructive işlem restore kanıtından önce yapılamaz.
+- **R11:** Ortak tablolarda zorunlu Shopify identity bulunmaz. Gelecekte `woocommerce_installations → workspace_id` adapter'ı eklenebilir; email/domain/provider account benzerliği workspace'leri otomatik birleştiremez. Aynı workspace'te birden fazla commerce installation ayrıca versionlı ürün kararı gerektirir.
+
+#### Revizyonun geçiş ve kanıt kuralı
+
+Her R paketi başlamadan zorunlu task aynasıyla ayrıntılandırılır; planlanan/gerçekleşen/sapma ayrımı korunur. Supabase DDL önce repository migration ve rollback olarak hazırlanır; canlı uygulama ayrı açık production onayı ister. Migration sonrası schema/constraint/RLS/grant sorguları, Supabase security/performance advisor, ilgili unit/integration/security testleri ve redacted acceptance evidence zorunludur. Bir R paketinin `PASS` olması sonraki provider teması, production mutation veya destructive retirement için örtük onay değildir.
+
 ## 2. V3 gerçekleşme haritası
 
 | V3 fazı | Planlanan | Doğrulanmış gerçekleşen | V4 kararı |
@@ -100,9 +157,9 @@ Her paket koordinasyon özetinde önce tek cümlelik **iş çıktısı** ve öl�
 | Phase 2 | Dataset V2 migration | Migration, corrective migration ve Supabase repository uygulanmış; canlı tablo mevcut | **Kod artefaktı tamam; canlı kabul E2'de açık** |
 | Phase 3 | Meta adapter | Provider→canonical→V2 production vertical slice | **Açık — E4** |
 | Phase 4 | Google adapter | Standard mapping; PMax contract hazırlığı | **Done — E5 canlı V2-primary kabulü tamamlandı** |
-| Phase 5 | TikTok adapter | Gerçek metrics ve synthetic ayrımı | **Açık — E6** |
+| Phase 5 | TikTok adapter | Gerçek metrics ve synthetic ayrımı | **Parked — tamamlanmış artefaktlar korunur; OAuth/refresh/activation kapalı** |
 | Phase 6 | Klaviyo adapter | Campaign/Flow/Message ve Email/SMS | **Açık — E7** |
-| Phase 7 | GA4 Organic | Property/domain/timezone/currency/provenance | **Açık — E8** |
+| Phase 7 | GA4 Organic | Property/domain/timezone/currency/provenance | **Parked — capability korunur; ingest/connect yüzeyi kapalı** |
 | Phase 8 | Shopify Public Embedded Foundation | Install/auth, shop-workspace, minimum scope, billing ve review readiness | **Açık — E10** |
 | Phase 9 | Funnel API | Shopify-aware, authenticated ve scope-aware backend output | **Açık — E11** |
 | Phase 10 | Embedded dashboard binding | App Bridge shell ve presentation-only Funnel UI | **Açık — E12** |
@@ -1479,7 +1536,7 @@ E4 referans slice kabulü; Google conversion action ve PMax reporting kararları
 
 ## 10. E6 — TikTok adapter
 
-**Durum:** `In progress` — E6-T1 `Done`; E6-T2 + E6-T3 read-only sandbox characterization `Verification`; E6-T4–T6 başlamadı.
+**Durum:** `Parked` — 20 Eylül 2026 ürün kararıyla Shopify ilk aktif provider diliminden çıkarıldı. Tamamlanmış E6 artefaktları ve tarihsel evidence korunur; yeni OAuth/reconnect, refresh/shadow, provider teması ve production activation yapılmaz. Yeniden açılış ayrı açık kullanıcı kararı ve güncel resmi revalidation gerektirir.
 
 ### Planlanan işler
 
@@ -1791,7 +1848,7 @@ Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handsha
 
 ### Planlanan işler
 
-- **E9-T1 — Done:** İlk hazırlama yesterday/finalized ardından today/provisional; Meta, Google, TikTok, Klaviyo; aktif ownership bulunan seçili hesaplardan provider başına en fazla 3; parked provider dışarıda; eski tarihçe otomatik değil; 14. günde günlük birikim devam eder.
+- **E9-T1 — Done; provider scope revised:** İlk hazırlama yesterday/finalized ardından today/provisional; Meta, Google Ads ve Klaviyo; aktif ownership bulunan seçili hesaplardan provider başına en fazla 3; TikTok, Pinterest ve diğer parked provider'lar dışarıda; eski tarihçe otomatik değil; 14. günde günlük birikim devam eder.
 - **E9-T2 — Done:** User/platform/account/business-date/date-key unique checkpoint; opaque cursor; terminal replay engeli; service-role-only persistence.
 - **E9-T3 — Done:** Atomic expiring worker lease; provider-isolated single-flight budgets; Retry-After + bounded backoff; three-attempt ceiling; parked providers excluded.
 - **E9-T4 — Done:** Checkpoint kapsam doğrulaması, batch içi duplicate engeli ve mevcut canonical conflict anahtarıyla idempotent upsert.
@@ -1857,12 +1914,12 @@ Shop, workspace, user ve entitlement authority server-side doğrulanır; browser
 
 ##### 2.1 Provider OAuth'ları Shopify içine nasıl monte edilir?
 
-Shopify App install/session OAuth'u ile Meta, Google, TikTok, Pinterest ve Klaviyo provider OAuth'ları iki ayrı authority zinciridir; birbirinin token'ını veya callback'ini kullanmaz.
+Shopify App install/session OAuth'u ile aktif ilk dilimdeki Meta, Google Ads ve Klaviyo provider OAuth'ları iki ayrı protokol zinciridir; fakat hepsi doğrulanmış Shopify session'dan türetilen aynı AdsTable `workspace_id` tenant authority'sinde birleşir ve tek canonical workspace connection store'a yazar. TikTok ve Pinterest parked olduğu sürece OAuth başlatmaz.
 
 1. Merchant provider bağlantısını Shopify embedded uygulamasındaki `Data Sources / Platforms` sayfasından, resmi Shopify Button/Card/Banner/Modal bileşenleriyle başlatır. Ayrı AdsTable login sayfasına veya bağımsız dashboard'a gönderilmez.
-2. Connect tıklaması önce embedded session token ile AdsTable backend'e gider. Backend doğrulanmış Shopify session'ından `shop → workspace → user`, entitlement, provider ve dönüş yüzeyini çözer; browser'dan gelen user/workspace/shop query değeri authority olamaz.
-3. Backend tek kullanımlık OAuth transaction oluşturur. Transaction `shop_id`, `workspace_id`, `user_id`, `provider`, exact callback URI, embedded return target, nonce/state, PKCE gereken provider için verifier, oluşturulma/sona erme zamanı ve `surface=shopify_embedded` bağlarını taşır.
-4. Meta/Google/TikTok/Pinterest/Klaviyo consent ekranları üçüncü taraf sayfalarıdır ve embedded iframe içinde açılmaz. Backend'in ürettiği authorization URL'ye, implementation anındaki güncel resmi App Bridge dış navigasyon yöntemiyle **top-level çıkış** yapılır. Özel nested iframe yasaktır; popup ancak güncel resmi Shopify yönlendirmesi ve browser davranışı ayrıca doğrulanırsa kullanılabilir.
+2. Connect tıklaması önce embedded session token ile AdsTable backend'e gider. Backend doğrulanmış Shopify session'ından `shop → workspace`, entitlement, provider ve dönüş yüzeyini çözer. Shopify kullanıcısı yalnızca doğrulanmış actor/audit bağlamıdır; browser'dan gelen user/workspace/shop query değeri authority olamaz.
+3. Backend tek kullanımlık OAuth transaction oluşturur. Transaction `shop_id`, `workspace_id`, gerektiğinde doğrulanmış actor kimliği, `provider`, exact callback URI, embedded return target, nonce/state, PKCE gereken provider için verifier, oluşturulma/sona erme zamanı ve `surface=shopify_embedded` bağlarını taşır. Actor kimliği hiçbir aşamada workspace tenant authority'sinin yerine geçemez.
+4. Aktif Meta/Google Ads/Klaviyo consent ekranları üçüncü taraf sayfalarıdır ve embedded iframe içinde açılmaz. Backend'in ürettiği authorization URL'ye, implementation anındaki güncel resmi App Bridge dış navigasyon yöntemiyle **top-level çıkış** yapılır. Özel nested iframe yasaktır; popup ancak güncel resmi Shopify yönlendirmesi ve browser davranışı ayrıca doğrulanırsa kullanılabilir. TikTok/Pinterest yeniden açılırsa aynı kural güncel resmî dokümanla yeniden doğrulanır.
 5. Provider callback AdsTable'ın provider'a kayıtlı server-side HTTPS callback endpoint'ine döner. Backend state'i atomik ve tek kullanımlık tüketir; provider, callback URI, shop/workspace/user ve embedded surface bağlarını doğrulamadan code exchange veya token persistence yapmaz.
 6. Token exchange ve encrypted persistence yalnız backend'de yapılır. Provider token'ı, OAuth code'u, secret veya ham provider error'u Shopify browser'ına, URL'ye ya da loga taşınmaz.
 7. Başarılı/başarısız callback sabit allowlist outcome ile Shopify Admin'deki canonical embedded app dönüş URL'sine **top-level** döner. Mevcut bağımsız `/dashboard?...` dönüşleri Shopify embedded akışında kullanılamaz. Uygulama yeniden embedded bağlama girdiğinde App Bridge/session token yenilenir ve connection status backend'den tekrar okunur.
@@ -2128,7 +2185,7 @@ Gösterim yalnız Shopify-native bir **Attribution comparison / overlap diagnost
    - **E10-T5-C2-A — `Done` — Ad Analysis UI:** Sales varsayılan ranking, Purchase/Sales/Revenue switch, compare growth ranking, Creative metadata-only sınırı ve Shopify component yönü onaylandı.
    - **E10-T5-C2-B — `Done` — Creative provider capability ve data model:** Provider-specific metadata sidecar kararı verildi; Creative performance kapalı, Dataset V2 ve Funnel hierarchy değişmez.
 3. **E10-T5-C3 — `Done` — Dashboard:** Completed-day dönemleri, proportional automatic compare, count+value Funnel Overview ve state-koruyan View Funnel kararı tamamlandı.
-4. **E10-T5-C4 — `Done` — Platforms:** Currency-first onboarding; Meta/Google/TikTok/Klaviyo açıklama modalı → OAuth → server-verified tek aktif account seçimi; warning modalı ile Disconnect.
+4. **E10-T5-C4 — `Done` — Platforms:** Currency-first onboarding; Meta/Google/Klaviyo açıklama modalı → OAuth → server-verified tek aktif account seçimi; warning modalı ile Disconnect. Provider scope revizyonuyla TikTok ve Pinterest `Parked`tır.
 5. **E10-T5-C5 — `Done for first slice` — Attribution:** C5-A `Done`; C5-B `Deferred`.
    - **E10-T5-C5-A — `Done` — Attribution Differences:** Nötr platform aggregate fark tablosu ve read-only Review modalı; compare/renk/decrease/adjustment yoktur.
    - **E10-T5-C5-B — `Deferred` — Verified Reconciliation:** Aynı order + click identity + server-resolved leaf Ad ve privacy/scope/idempotency kanıtı olmadan açılmaz.
@@ -2186,11 +2243,11 @@ Karar belgesi `docs/E10_T5C3_DASHBOARD_SHOPIFY_COMPONENT_FREEZE.md`, executable 
 #### E10-T5-C4 Platforms + C6 Settings — onaylı bağlantı, hesap ve ayar freeze'i
 
 - **İlk kullanım:** Shopify install sonrasında Currency zorunlu ilk adımdır; sonra Platforms açılır.
-- **Aktif provider'lar:** Meta, Google, TikTok ve Klaviyo. Pinterest `Parked` kalır; Organic ve Google Sheets ilk Shopify connect yüzeyinde yoktur.
+- **Aktif provider'lar:** İlk dilimde yalnız Meta, Google Ads ve Klaviyo. TikTok ve Pinterest `Parked` kalır; Organic ve Google Sheets ilk Shopify connect yüzeyinde yoktur. Parked provider için Connect/OAuth/reconnect/refresh/production activation sunulmaz.
 - **Connect:** Shopify-native açıklama modalındaki açık onaydan sonra top-level OAuth başlar. Callback sonrası server-side ownership doğrulamalı hesap seçilir; aktif hesap olmadan `Connected` olunmaz.
 - **Klaviyo farkı:** Hesap seçiminden sonra `Email Monthly Plan Cost` tutarı/para birimi kaydedilerek kurulum tamamlanır. `Estimated Monthly Spend` etiketi kullanılmaz.
 - **Disconnect/Reconnect:** Disconnect ikinci warning onayıyla provider erişimi ve refresh'i durdurur, tarihsel veriyi silmez. Reconnect aynı güvenli Connect zincirini yeniden kurar.
-- **Settings:** Currency, Klaviyo sabit aylık tutarı ve Ad Accounts bölümleri bulunur. OAuth ile doğrulanmış Meta/Google/TikTok hesapları arasından aynı anda yalnız bir aktif reklam hesabı seçilir; Funnel yalnız bu hesabı gösterir ve merchant seçimi sonradan değiştirebilir.
+- **Settings:** Currency, Klaviyo sabit aylık tutarı ve Ad Accounts bölümleri bulunur. İlk aktif dilimde OAuth ile doğrulanmış Meta/Google Ads hesapları arasından aynı anda yalnız bir aktif reklam hesabı seçilir; Funnel yalnız bu hesabı gösterir ve merchant seçimi sonradan değiştirebilir. TikTok parked olduğu sürece seçim listesine girmez.
 - **Shopify standardı:** Genel layout, modal, button, form, single-choice ve status kontrolleri güncel resmi Shopify componentleriyle kurulur. Mevcut dashboard özel CSS/HTML'si yalnız davranış referansıdır; embedded UI olarak taşınmaz. Exact component/API yönü E10-T6-A'da doğrulandı; implementation artifact'i ayrıca yeniden validate edilir.
 - **Sıra sapması:** Kullanıcı C4 ve C6 iş akışlarını birlikte verdiği için iki ürün kararı aynı pakette kapatılmıştır. C5 atlanmaz; C7 C5 sonrasında gelir.
 

@@ -56,9 +56,10 @@ function assertString(value, field, { nullable = false } = {}) {
   assert(typeof value === 'string' && value.trim() !== '', `${field} must be a non-empty string${nullable ? ' or null' : ''}`);
 }
 
-function validateIdentity(identity) {
+function validateIdentity(identity, { requireUserId = true } = {}) {
   assert(isPlainObject(identity), 'identity must be an object');
-  assertString(identity.user_id, 'identity.user_id');
+  if (requireUserId) assertString(identity.user_id, 'identity.user_id');
+  else if (identity.user_id !== null && identity.user_id !== undefined) assertString(identity.user_id, 'identity.user_id');
   assert(PLATFORMS.includes(identity.platform), `Unsupported platform: ${identity.platform}`);
   assert(TRAFFIC_TYPES.includes(identity.traffic_type), `Unsupported traffic_type: ${identity.traffic_type}`);
   assert(SOURCE_SYSTEMS.includes(identity.source_system), `Unsupported source_system: ${identity.source_system}`);
@@ -168,7 +169,7 @@ function validateEntityShape(entity) {
 
 function validateCanonicalRow(row, options = {}) {
   assert(isPlainObject(row), 'canonical row must be an object');
-  validateIdentity(row.identity);
+  validateIdentity(row.identity, options);
   validateEntityShape(row.entity);
   validateRawMetrics(row.raw_metrics, row.metric_support);
   validateCurrency(row.currency);

@@ -1,7 +1,7 @@
 "use strict";
 
 const {bearerToken} = require("./shopify-auth-routes");
-const SAFE_ERRORS = new Set(["INVALID_PLAN_COST", "INVALID_ACCOUNT", "KLAVIYO_REAUTHORIZE", "KLAVIYO_UNAVAILABLE", "CONNECTION_CHANGED"]);
+const SAFE_ERRORS = new Set(["INVALID_PLAN_COST", "INVALID_ACCOUNT", "KLAVIYO_REAUTHORIZE", "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", "KLAVIYO_UNAVAILABLE", "CONNECTION_CHANGED"]);
 
 function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selection}) {
   const handler = action => async (req, res) => {
@@ -20,6 +20,7 @@ function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selecti
     }
   };
   app.get("/api/shopify/providers/klaviyo/accounts/status", handler(authority => selection.status(authority)));
+  app.get("/api/shopify/providers/klaviyo/accounts/verify", handler(authority => selection.verifyReadOnly(authority)));
   app.get("/api/shopify/providers/klaviyo/accounts", handler(authority => selection.list(authority)));
   app.post("/api/shopify/providers/klaviyo/accounts/select", handler((authority, body) => selection.complete(authority, body)));
 }

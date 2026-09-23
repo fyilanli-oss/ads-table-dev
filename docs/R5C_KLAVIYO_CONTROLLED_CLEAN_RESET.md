@@ -4,7 +4,7 @@
 
 23 Eylül 2026 tarihli canlı R5-B doğrulama isteği Klaviyo Account API'ye bir kez gönderildi ve uygulama `409` ile durdu. Supabase'deki embedded kayıt `connected`, aktif hesaplı, `USD` source currency'li ve şifreli access/refresh token zarflarına sahipti. Buna rağmen no-refresh doğrulama geçmedi. Bu sonuç eski grant'in kanonik bağlantıya taşınmasına izin vermez; yeniden yetkilendirme gerekir.
 
-Kullanıcı temiz başlangıç kararı verdi. R5-C eski grant'i kontrollü olarak kapatmaya hazırlanır; yeni OAuth başlatmaz.
+Kullanıcı temiz başlangıç kararı verdi. R5-C eski grant'i kontrollü olarak kapatır; yeni OAuth başlatmaz. İşlem 23 Eylül 2026 tarihinde tamamlandı.
 
 ## Kullanıcı ve veri etkisi
 
@@ -23,16 +23,21 @@ Kullanıcı temiz başlangıç kararı verdi. R5-C eski grant'i kontrollü olara
 
 Kontrollü reset modülü Shopify session-token korumalı `POST /api/shopify/providers/klaviyo/accounts/reset` route'una bağlanmıştır. Data Sources ekranındaki **Remove old connection** düğmesi resmi Shopify `s-modal` bileşenini açar. Modalı açmak veya Cancel hiçbir provider/veritabanı işlemi yapmaz. Yalnız modal içindeki **Remove connection** eylemi exact confirmation değerini route'a gönderir.
 
-Başarılı reset sonrasında mevcut Connect düğmesi açılmaz; ekran temiz bağlantı akışının henüz açık olmadığını belirtir. Yeni OAuth yalnız R6/R7 kabulünden sonra sunulacaktır. Kodun merge/deploy edilmesi tek başına canlı revoke anlamına gelmez; merchant'ın modal onayı işlem-anı onayıdır.
+Başarılı reset sonrasında mevcut Connect düğmesi açılmaz; ekran temiz bağlantı akışının henüz açık olmadığını belirtir. Yeni OAuth yalnız R6/R7 kabulünden sonra sunulacaktır. Kodun merge/deploy edilmesi tek başına canlı revoke anlamına gelmemiş; merchant'ın modal onayı işlem-anı onayı olmuştur.
+
+## Canlı kapanış
+
+- PR #233 merge commit `8f183720fe1e64975ce8adabbeb8318f55257259` production'da `READY` olarak doğrulandı.
+- Merchant **Remove connection** eylemini onayladı; reset endpoint'i bir kez `200` döndü.
+- Supabase postcheck `PASS`: embedded bağlantı `revoked`, canonical Klaviyo satırı `0`.
+- Hesap, maliyet, currency, encrypted token zarfları ve tarihsel veriler korundu.
+- Yeni OAuth, refresh, Dataset V2 yazımı ve token silme yapılmadı.
 
 ## Sonraki sıra
 
-1. R5-C kod ve güvenlik testleri kabul edilir.
-2. Canlı preflight yalnız bir uygun embedded Klaviyo grant'i ve boş canonical Klaviyo durumu doğrular.
-3. Merchant Shopify modalında işlem anı revoke onayı verir.
-4. Tek revoke ve yerel `revoked` finalizasyonu çalıştırılır; postcheck yapılır.
-5. R6 canonical runtime hazırlanır.
-6. R7 Shopify-native Connect modalı üzerinden yeni OAuth, hesap seçimi, Klaviyo maliyeti ve Disconnect akışını açar.
+1. R5-C kod, güvenlik testleri, canlı revoke ve postcheck tamamlandı.
+2. R6 canonical runtime ayrı kapsam ve onayla hazırlanır.
+3. R7 Shopify-native Connect modalı üzerinden yeni OAuth, hesap seçimi, Klaviyo maliyeti ve Disconnect akışını açar.
 
 ## Kesin kapsam dışı
 
@@ -41,3 +46,4 @@ Başarılı reset sonrasında mevcut Connect düğmesi açılmaz; ekran temiz ba
 - Legacy tablo freeze'ini aşma.
 - Yeni OAuth/reconnect.
 - R6/R7 aktivasyonu.
+

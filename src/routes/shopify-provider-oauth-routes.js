@@ -8,25 +8,24 @@ const PROVIDERS = Object.freeze(["meta", "google_ads", "klaviyo"]);
 function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
   if (!app || typeof app.get !== "function" || typeof app.post !== "function") throw new TypeError("Express app is required");
   if (!adapters || typeof adapters !== "object" || Array.isArray(adapters)) throw new TypeError("adapters are required");
-  for (const provider of PROVIDERS) {
-    const adapter = adapters[provider];
-    if (!adapter || typeof adapter.start !== "function" || typeof adapter.callback !== "function") {
-      throw new TypeError(`adapter.${provider} is required`);
-    }
+  for (const [provider, adapter] of Object.entries(adapters)) {
+    if (!PROVIDERS.includes(provider) || !adapter || typeof adapter.start !== "function" || typeof adapter.callback !== "function") throw new TypeError(`adapter.${provider} is invalid`);
   }
 
   app.post("/api/shopify/providers/:provider/oauth/start", async (req, res, next) => {
     try {
-      const adapter = PROVIDERS.includes(req.params.provider) ? adapters[req.params.provider] : null;
-      if (!adapter) return res.status(404).json({code: "SHOPIFY_PROVIDER_NOT_FOUND"});
+      if (!PROVIDERS.includes(req.params.provider)) return res.status(404).json({code: "SHOPIFY_PROVIDER_NOT_FOUND"});
+      const adapter = adapters[req.params.provider];
+      if (!adapter) return res.status(503).json({code: "SHOPIFY_PROVIDER_NOT_CONFIGURED"});
       const result = await adapter.start({sessionToken: bearerToken(req.get("authorization"))});
       return res.status(200).json(result);
     } catch (error) { return next(error); }
   });
 
   app.get("/api/shopify/providers/:provider/oauth/callback", async (req, res) => {
-    const adapter = PROVIDERS.includes(req.params.provider) ? adapters[req.params.provider] : null;
-    if (!adapter) return res.redirect(`${RETURN_TARGET}?oauth_error=provider_not_found`);
+    if (!PROVIDERS.includes(req.params.provider)) return res.redirect(`${RETURN_TARGET}?oauth_error=provider_not_found`);
+    const adapter = adapters[req.params.provider];
+    if (!adapter) return res.redirect(`${RETURN_TARGET}?oauth_error=provider_not_configured`);
     try {
       const result = await adapter.callback({state: req.query.state, code: req.query.code});
       if (result?.redirect_to && result.redirect_to !== RETURN_TARGET) {
@@ -45,3 +44,4 @@ function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
 }
 
 module.exports = Object.freeze({registerShopifyProviderOAuthRoutes, PROVIDERS});
+

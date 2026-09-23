@@ -114,9 +114,25 @@ test("R5-C contract records the failed verification branch and keeps reset non-d
   const contract = JSON.parse(fs.readFileSync(path.join(root, "contracts/r5-klaviyo-consolidation-v2.json"), "utf8"));
   const doc = fs.readFileSync(path.join(root, "docs/R5C_KLAVIYO_CONTROLLED_CLEAN_RESET.md"), "utf8");
   assert.equal(contract.observed_live_outcome.result, "reauthorization_required");
+  assert.deepEqual(contract.controlled_reset_outcome, {
+    gate: "R5-C",
+    result: "passed",
+    http_status: 200,
+    action_time_human_confirmation: true,
+    embedded_connection_status: "revoked",
+    canonical_connection_created: false,
+    new_oauth_started: false,
+    token_refresh_performed: false,
+    token_envelopes_deleted: false,
+    historical_fields_preserved: true,
+    database_postcheck: "PASS",
+  });
   assert.deepEqual(contract.gates.map(gate => gate.id), ["R5-A", "R5-B", "R5-C"]);
+  assert.equal(contract.gates.find(gate => gate.id === "R5-C").result, "passed");
   assert.ok(contract.forbidden.includes("clear_token_envelopes_during_reset"));
   assert.ok(contract.forbidden.includes("start_oauth_in_the_revoke_request"));
   assert.match(doc, /POST \/api\/shopify\/providers\/klaviyo\/accounts\/reset/i);
   assert.match(doc, /Modalı açmak veya Cancel hiçbir provider\/veritabanı işlemi yapmaz/i);
+  assert.match(doc, /Supabase postcheck `PASS`/i);
 });
+

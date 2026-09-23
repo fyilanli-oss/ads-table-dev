@@ -9,6 +9,7 @@ const SPECS = Object.freeze({
   tiktok: {client: "TIKTOK_CLIENT_ID", secret: "TIKTOK_CLIENT_SECRET", scope: "", authorize: "https://business-api.tiktok.com/portal/auth"},
   pinterest: {client: "PINTEREST_CLIENT_ID", secret: "PINTEREST_CLIENT_SECRET", scope: "ads:read,user_accounts:read", authorize: "https://www.pinterest.com/oauth/"},
 });
+const ACTIVE_PROVIDERS = Object.freeze(["meta", "google_ads", "klaviyo"]);
 
 function value(env, name) {
   return typeof env[name] === "string" ? env[name].trim() : "";
@@ -24,7 +25,8 @@ function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCo
   if (!appUrl || typeof appUrl !== "string") throw new TypeError("appUrl is required");
   if (!exchangeCodeByProvider || typeof exchangeCodeByProvider !== "object") throw new TypeError("exchangeCodeByProvider is required");
   const strategies = {};
-  for (const [provider, spec] of Object.entries(SPECS)) {
+  for (const provider of ACTIVE_PROVIDERS) {
+    const spec = SPECS[provider];
     const clientId = value(env, spec.client);
     const clientSecret = value(env, spec.secret);
     const exchange = exchangeCodeByProvider[provider];
@@ -51,4 +53,4 @@ function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCo
   return Object.freeze(strategies);
 }
 
-module.exports = Object.freeze({createEmbeddedProviderStrategies, SPECS});
+module.exports = Object.freeze({createEmbeddedProviderStrategies, SPECS, ACTIVE_PROVIDERS});

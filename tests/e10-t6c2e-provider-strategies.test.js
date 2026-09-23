@@ -9,8 +9,8 @@ const exchanges = Object.fromEntries(Object.keys(SPECS).map(provider => [provide
 
 test("provider strategies fail closed when any credential or exchange is missing", () => {
   assert.throws(() => createEmbeddedProviderStrategies({env: {}, appUrl: "https://dev.example", exchangeCodeByProvider: exchanges}), /EMBEDDED_META_OAUTH_CONFIG_INCOMPLETE/);
-  const incomplete = {...exchanges}; delete incomplete.pinterest;
-  assert.throws(() => createEmbeddedProviderStrategies({env, appUrl: "https://dev.example", exchangeCodeByProvider: incomplete}), /EMBEDDED_PINTEREST_OAUTH_CONFIG_INCOMPLETE/);
+  const incomplete = {...exchanges}; delete incomplete.klaviyo;
+  assert.throws(() => createEmbeddedProviderStrategies({env, appUrl: "https://dev.example", exchangeCodeByProvider: incomplete}), /EMBEDDED_KLAVIYO_OAUTH_CONFIG_INCOMPLETE/);
 });
 
 test("all callbacks use canonical embedded routes instead of legacy dashboard callbacks", () => {

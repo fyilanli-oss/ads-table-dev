@@ -10,13 +10,14 @@ const {registerShopifyAuthRoutes} = require("../routes/shopify-auth-routes");
 const {registerEmbeddedAppHome} = require("./embedded-app-home");
 const {registerEmbeddedPlatforms} = require("./embedded-app-home");
 const {registerShopifyProviderOAuthRoutes} = require("../routes/shopify-provider-oauth-routes");
-const {createEmbeddedProviderStrategies, SPECS} = require("./embedded-provider-strategies");
+const {createEmbeddedProviderStrategies, SPECS, ACTIVE_PROVIDERS} = require("./embedded-provider-strategies");
 const {createEmbeddedProviderOAuthAdapters} = require("./embedded-provider-oauth-adapters");
 const {createEmbeddedProviderTokenExchanges} = require("./embedded-provider-token-exchange");
-const {createWorkspaceProviderConnectionStore} = require("./workspace-provider-connection-store");
+const {createCanonicalWorkspaceProviderConnectionStore} = require("../providers/workspace-provider-connection-store");
+const {createWorkspaceSettingsStore} = require("../providers/workspace-settings-store");
 const {createKlaviyoAccountSelection} = require("./klaviyo-account-selection");
-const {createKlaviyoControlledReset} = require("./klaviyo-controlled-reset");
 const {registerShopifyKlaviyoAccountRoutes} = require("../routes/shopify-klaviyo-account-routes");
+const {registerShopifyWorkspaceSettingsRoutes} = require("../routes/shopify-workspace-settings-routes");
 const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
 
 function enabled(value) {
@@ -34,7 +35,7 @@ function providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuth
   } catch {
     return false;
   }
-  return Object.values(SPECS).every(({client, secret}) =>
+  return ACTIVE_PROVIDERS.map(provider => SPECS[provider]).every(({client, secret}) =>
     typeof env[client] === "string" && Boolean(env[client].trim()) &&
     typeof env[secret] === "string" && Boolean(env[secret].trim()));
 }
@@ -50,6 +51,13 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
   const authConfig = {client_id: config.clientId, client_secret: config.clientSecret};
   const providerOAuthRequested = enabled(env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED);
   const providerOAuthEnabled = providerOAuthRequested && providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuthAdapters});
+  const authenticateEmbedded = ({session_token}) => authenticateEmbeddedRequest({session_token, config: authConfig, tenant_resolver: tenantResolver});
+  const serverWorkspaceAuthority = verified => Object.freeze({
+    authority: "server_resolved_workspace",
+    workspace_id: verified.workspace_id,
+    source: "shopify_verified_session",
+  });
+  const settingsStore = createWorkspaceSettingsStore({client: supabaseAdmin});
   registerEmbeddedAppHome(app, {clientId: config.clientId});
   registerEmbeddedPlatforms(app, {clientId: config.clientId, providerOAuthEnabled});
   registerShopifyAuthRoutes(app, {
@@ -70,13 +78,20 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       tenant_resolver: tenantResolver,
     }),
   });
+  registerShopifyWorkspaceSettingsRoutes(app, {
+    authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
+    settings: settingsStore,
+  });
   if (providerOAuthEnabled) {
     if (!oauthTransactionStore) throw new Error("Embedded provider OAuth requires transaction storage");
     const vault = createProviderTokenVaultFromEnv(env);
-    const connectionStore = createWorkspaceProviderConnectionStore({client: supabaseAdmin, vault});
-    const authenticateEmbedded = ({session_token}) => authenticateEmbeddedRequest({session_token, config: authConfig, tenant_resolver: tenantResolver});
+    const connectionStore = createCanonicalWorkspaceProviderConnectionStore({client: supabaseAdmin, vault});
     const adapters = embeddedProviderOAuthAdapters || createEmbeddedProviderOAuthAdapters({
-      authenticateEmbedded: ({session_token}) => authenticateEmbeddedRequest({session_token, config: authConfig, tenant_resolver: tenantResolver}),
+      authenticateEmbedded: async input => {
+        const verified = await authenticateEmbedded(input);
+        await settingsStore.resolveReportingCurrency(serverWorkspaceAuthority(verified));
+        return verified;
+      },
       createEmbeddedTransaction: (authority, provider, redirectUri, pkceVerifier) => oauthTransactionStore.createEmbedded({authority, provider, redirectUri, pkceVerifier, surface: "shopify_embedded", returnTarget: "/shopify/app/platforms"}),
       consumeTransaction: (state, provider, redirectUri) => oauthTransactionStore.consume({state, provider, redirectUri}),
       connectionStore,
@@ -85,11 +100,8 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});
     registerShopifyKlaviyoAccountRoutes(app, {
-      authenticateEmbedded,
+      authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createKlaviyoAccountSelection({
-        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
-      }),
-      reset: createKlaviyoControlledReset({
         store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
       }),
     });

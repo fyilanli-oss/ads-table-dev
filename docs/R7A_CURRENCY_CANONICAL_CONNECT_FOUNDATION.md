@@ -5,9 +5,9 @@
 R7-A tek seferde canlı OAuth kabulüne açılmayacaktır. Paket iki repository alt dilimine ayrılır:
 
 - **R7-A1:** Reporting currency seçimi, Data Sources erişim kapısı, Connect açıklama modalları, aktif/parked provider sınırı ve OAuth sonucunun canonical workspace connection store'a yazılması.
-- **R7-A2:** Meta ve Google Ads için provider tarafından doğrulanmış account discovery/seçim akışları ile üç aktif provider'ın repository kabulü.
+- **R7-A2:** Meta ve Google Ads için provider tarafından doğrulanmış account discovery/seçim akışları ile üç aktif provider'ın repository kabulü. Repository uygulaması tamamlandı.
 
-R7-A1 tamamlanmadan provider yetkilendirmesi başlayamaz. R7-A2 tamamlanmadan R6-D canlı provider kabulüne geçilemez. R6-D tamamlanmadan R7-B Connected/Disconnect deneyimi açılamaz.
+R7-A repository uygulaması tamamlanmıştır. Production deployment sonrasında merchant reporting currency seçimi ve kontrollü gerçek provider kabulü yapılmadan R6-D'ye geçilemez. R6-D tamamlanmadan R7-B Connected/Disconnect deneyimi açılamaz.
 
 ## Kullanıcı akışı
 
@@ -27,7 +27,13 @@ Tarayıcı `workspace_id`, `shop_id`, account adı veya currency için authority
 ## Bu pakette yapılmayanlar
 
 - Production deployment veya canlı provider teması yoktur.
-- Meta ve Google Ads account discovery/seçimi R7-A2'ye aittir.
 - Disconnect/revoke R7-B'ye aittir.
 - Dataset V2 provider runner aktivasyonu R6-D'ye aittir.
 - Yeni Supabase migration gerekmez; R2 ve R4 tabloları kullanılır.
+
+## R7-A2 doğrulanmış hesap seçimi
+
+- Meta account listesi Marketing API `me/adaccounts` cevabından alınır; account ID, ad ve currency kaydetme anında yeniden doğrulanır.
+- Google Ads doğrudan erişilebilir customer resource'larını listeler; `customer_client` sorgusuyla manager olmayan müşteri hesabının ad ve currency bilgisi doğrulanır.
+- Browser yalnız seçilen account ID'yi gönderir. Account adı, source currency veya workspace kimliği browser beyanından alınmaz.
+- OAuth access token ve Google developer token yalnız backend isteğinde kullanılır; response'a veya HTML'e yazılmaz.

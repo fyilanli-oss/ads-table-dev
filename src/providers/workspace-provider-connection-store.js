@@ -130,6 +130,46 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     });
   }
 
+  async function readPendingProvider({ authority: authorityInput, provider: providerInput } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    const provider = providerName(providerInput);
+    const { data, error } = await client.from(TABLE)
+      .select('status,active_account_id,active_account_name,source_currency,connection_version,access_token_envelope,refresh_token_envelope')
+      .eq('workspace_id', authority.workspace_id).eq('provider', provider).maybeSingle();
+    if (error) throw new Error('CONNECTION_READ_FAILED');
+    if (!data) return null;
+    return Object.freeze({
+      ...data,
+      accessToken: data.status === 'pending_account_selection' && data.access_token_envelope
+        ? vault.decrypt(data.access_token_envelope, tokenContext(authority.workspace_id, provider, 'access')) : null,
+      refreshToken: data.status === 'pending_account_selection' && data.refresh_token_envelope
+        ? vault.decrypt(data.refresh_token_envelope, tokenContext(authority.workspace_id, provider, 'refresh')) : null,
+    });
+  }
+
+  async function completeAccountSelection({ authority: authorityInput, provider: providerInput, version, account } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    const provider = providerName(providerInput);
+    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
+    const timestamp = now().toISOString();
+    const { data, error } = await client.from(TABLE).update({
+      status: 'connected',
+      active_account_id: required(account?.id, 'account.id'),
+      active_account_name: required(account?.name, 'account.name'),
+      source_currency: required(account?.currency, 'account.currency'),
+      monthly_plan_cost: null,
+      account_verified_at: timestamp,
+      connected_at: timestamp,
+      disconnected_at: null,
+      connection_version: version + 1,
+      updated_at: timestamp,
+    }).eq('workspace_id', authority.workspace_id).eq('provider', provider)
+      .eq('connection_version', version).eq('status', 'pending_account_selection')
+      .select('active_account_id').maybeSingle();
+    if (error) throw new Error('CONNECTION_WRITE_FAILED');
+    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+  }
+
   async function readKlaviyoStatus(authorityInput) {
     const row = await readStatus({ authority: authorityInput, provider: 'klaviyo' });
     if (!row) return null;
@@ -178,6 +218,8 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     writeFromOAuthTransaction,
     readStatus,
     resolveConnected,
+    readPendingProvider,
+    completeAccountSelection,
     readKlaviyo,
     readKlaviyoStatus,
     refreshKlaviyo,

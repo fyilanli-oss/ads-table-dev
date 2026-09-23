@@ -18,6 +18,8 @@ const {createWorkspaceSettingsStore} = require("../providers/workspace-settings-
 const {createKlaviyoAccountSelection} = require("./klaviyo-account-selection");
 const {registerShopifyKlaviyoAccountRoutes} = require("../routes/shopify-klaviyo-account-routes");
 const {registerShopifyWorkspaceSettingsRoutes} = require("../routes/shopify-workspace-settings-routes");
+const {registerShopifyAdAccountRoutes} = require("../routes/shopify-ad-account-routes");
+const {createAdAccountSelection, createMetaAccountDiscovery, createGoogleAdsAccountDiscovery} = require("./ad-account-selection");
 const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
 
 function enabled(value) {
@@ -37,7 +39,8 @@ function providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuth
   }
   return ACTIVE_PROVIDERS.map(provider => SPECS[provider]).every(({client, secret}) =>
     typeof env[client] === "string" && Boolean(env[client].trim()) &&
-    typeof env[secret] === "string" && Boolean(env[secret].trim()));
+    typeof env[secret] === "string" && Boolean(env[secret].trim())) &&
+    typeof env.GOOGLE_ADS_DEVELOPER_TOKEN === "string" && Boolean(env.GOOGLE_ADS_DEVELOPER_TOKEN.trim());
 }
 
 function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTransactionStore, fetchImpl = fetch, embeddedProviderOAuthAdapters}) {
@@ -103,6 +106,20 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createKlaviyoAccountSelection({
         store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+      }),
+    });
+    registerShopifyAdAccountRoutes(app, {
+      authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
+      selection: createAdAccountSelection({
+        store: connectionStore,
+        discoverByProvider: {
+          meta: createMetaAccountDiscovery({fetchImpl, graphVersion: env.META_GRAPH_VERSION || "v20.0"}),
+          google_ads: createGoogleAdsAccountDiscovery({
+            fetchImpl,
+            developerToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
+            apiVersion: env.GOOGLE_ADS_API_VERSION || "v25",
+          }),
+        },
       }),
     });
   }

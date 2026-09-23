@@ -55,6 +55,7 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
     async status(authority) {
       const connection = await store.readKlaviyoStatus(authority);
       if (!connection) return {status: "not_connected"};
+      if (connection.status === "revoked") return {status: "reset_complete"};
       if (connection.status === "connected") {
         const cost = typeof connection.email_monthly_plan_cost === "number"
           ? connection.email_monthly_plan_cost.toFixed(2)

@@ -78,7 +78,7 @@ function createWorkspaceProviderConnectionStore({client, vault, now = () => new 
     const {data, error} = await klaviyoQuery(authority, client.from("shopify_workspace_provider_connections")
       .select("status,email_monthly_plan_cost,account_currency")).maybeSingle();
     if (error) throw new Error("CONNECTION_READ_FAILED");
-    if (!data || data.status === "revoked") return null;
+    if (!data) return null;
     return {
       status: data.status,
       email_monthly_plan_cost: data.email_monthly_plan_cost,

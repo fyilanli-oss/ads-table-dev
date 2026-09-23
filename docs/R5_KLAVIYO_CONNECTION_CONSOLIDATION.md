@@ -67,7 +67,7 @@ R5-B doğrulaması geçseydi embedded bağlantının uyumlu şifreli token zarfl
 - Supabase kaydı salt okunur kontrolle `connected`, aktif hesaplı, `USD` currency'li ve access/refresh token zarflı bulundu.
 - Doğrulanamayan eski grant kanoniğe taşınmayacak; sonuç `reauthorization_required` olarak kaydedildi.
 - `contracts/r5-klaviyo-consolidation-v2.json` kontrollü temiz reset dalını tanımlar.
-- Hazırlanan reset modülü henüz route'a veya kullanıcı düğmesine bağlı değildir; canlı revoke ve yerel status mutation ayrı son onay bekler.
+- Kontrollü reset modülü Shopify session-bound POST route'una ve resmi `s-modal` onay yüzeyine bağlanmak üzere hazırlanmıştır. Modalı açmak/Cancel etkisizdir; yalnız **Remove connection** işlem-anı onayı canlı revoke ve yerel `revoked` finalizasyonunu başlatır.
 
 ## Değişmeyen sınırlar
 

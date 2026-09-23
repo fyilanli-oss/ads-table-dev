@@ -19,20 +19,24 @@ Kullanıcı temiz başlangıç kararı verdi. R5-C eski grant'i kontrollü olara
 
 `createKlaviyoControlledReset` yalnız exact `REVOKE_KLAVIYO_AND_START_FRESH` confirmation değeriyle çalışabilir. Shopify tarafından doğrulanmış workspace/shop authority'sine bağlı embedded refresh token'ı server tarafında okur. Provider `POST /oauth/revoke` başarılı olursa optimistic version kontrolüyle embedded satırı `revoked` yapar. Provider hatasında yerel durum korunur; eşzamanlı reconnect/değişiklik varsa `CONNECTION_CHANGED` ile fail-closed durur.
 
-Bu modül henüz route'a veya kullanıcı düğmesine bağlanmamıştır. Repository hazırlığının merge/deploy edilmesi canlı revoke anlamına gelmez.
+## İşlem anı onay yüzeyi
+
+Kontrollü reset modülü Shopify session-token korumalı `POST /api/shopify/providers/klaviyo/accounts/reset` route'una bağlanmıştır. Data Sources ekranındaki **Remove old connection** düğmesi resmi Shopify `s-modal` bileşenini açar. Modalı açmak veya Cancel hiçbir provider/veritabanı işlemi yapmaz. Yalnız modal içindeki **Remove connection** eylemi exact confirmation değerini route'a gönderir.
+
+Başarılı reset sonrasında mevcut Connect düğmesi açılmaz; ekran temiz bağlantı akışının henüz açık olmadığını belirtir. Yeni OAuth yalnız R6/R7 kabulünden sonra sunulacaktır. Kodun merge/deploy edilmesi tek başına canlı revoke anlamına gelmez; merchant'ın modal onayı işlem-anı onayıdır.
 
 ## Sonraki sıra
 
 1. R5-C kod ve güvenlik testleri kabul edilir.
 2. Canlı preflight yalnız bir uygun embedded Klaviyo grant'i ve boş canonical Klaviyo durumu doğrular.
-3. Kullanıcı işlem anında revoke için ayrıca açık onay verir.
+3. Merchant Shopify modalında işlem anı revoke onayı verir.
 4. Tek revoke ve yerel `revoked` finalizasyonu çalıştırılır; postcheck yapılır.
 5. R6 canonical runtime hazırlanır.
 6. R7 Shopify-native Connect modalı üzerinden yeni OAuth, hesap seçimi, Klaviyo maliyeti ve Disconnect akışını açar.
 
 ## Kesin kapsam dışı
 
-- Bu hazırlık aşamasında canlı provider çağrısı veya Supabase mutation.
+- Modal onayı verilmeden canlı provider çağrısı veya Supabase mutation.
 - Token refresh, token silme veya plaintext log.
 - Legacy tablo freeze'ini aşma.
 - Yeni OAuth/reconnect.

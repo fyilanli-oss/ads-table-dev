@@ -117,6 +117,6 @@ test("R5-C contract records the failed verification branch and keeps reset non-d
   assert.deepEqual(contract.gates.map(gate => gate.id), ["R5-A", "R5-B", "R5-C"]);
   assert.ok(contract.forbidden.includes("clear_token_envelopes_during_reset"));
   assert.ok(contract.forbidden.includes("start_oauth_in_the_revoke_request"));
-  assert.match(doc, /henüz route'a veya kullanıcı düğmesine bağlanmamıştır/i);
-  assert.match(doc, /canlı provider çağrısı veya Supabase mutation/i);
+  assert.match(doc, /POST \/api\/shopify\/providers\/klaviyo\/accounts\/reset/i);
+  assert.match(doc, /Modalı açmak veya Cancel hiçbir provider\/veritabanı işlemi yapmaz/i);
 });

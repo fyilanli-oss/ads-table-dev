@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {createEmbeddedProviderStrategies, SPECS} = require("../src/shopify/embedded-provider-strategies");
+const {createEmbeddedProviderStrategies, configuredOAuthProviders, SPECS} = require("../src/shopify/embedded-provider-strategies");
 
 const env = Object.fromEntries(Object.values(SPECS).flatMap(spec => [[spec.client, `${spec.client}-value`], [spec.secret, `${spec.secret}-value`]]));
 const exchanges = Object.fromEntries(Object.keys(SPECS).map(provider => [provider, async input => ({accessToken: `${provider}:${input.code}`})]));
@@ -16,6 +16,13 @@ test("provider strategies fail closed when any credential or exchange is missing
 test("all callbacks use canonical embedded routes instead of legacy dashboard callbacks", () => {
   const strategies = createEmbeddedProviderStrategies({env, appUrl: "https://dev.example", exchangeCodeByProvider: exchanges});
   for (const [provider, strategy] of Object.entries(strategies)) assert.equal(strategy.redirectUri, `https://dev.example/api/shopify/providers/${provider}/oauth/callback`);
+});
+
+test("one configured provider can be composed without unrelated provider credentials", () => {
+  const partialEnv = {KLAVIYO_CLIENT_ID: "client", KLAVIYO_CLIENT_SECRET: "secret"};
+  assert.deepEqual(configuredOAuthProviders(partialEnv), ["klaviyo"]);
+  const strategies = createEmbeddedProviderStrategies({env: partialEnv, appUrl: "https://dev.example", exchangeCodeByProvider: exchanges, providers: ["klaviyo"]});
+  assert.deepEqual(Object.keys(strategies), ["klaviyo"]);
 });
 
 test("authorization URLs bind client, state, callback and minimum provider scope", async () => {
@@ -42,3 +49,4 @@ test("secrets are passed only to server-side exchange and never authorization UR
     assert.deepEqual(await strategy.exchangeCode({code: "code", redirectUri: strategy.redirectUri}), {accessToken: `${provider}:code`});
   }
 });
+

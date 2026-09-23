@@ -7,7 +7,7 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const read = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf8');
-const migration = read('supabase/migrations/20260923153220_r6_dataset_v2_workspace_activation.sql');
+const migration = read('supabase/migrations/20260923154503_r6_dataset_v2_workspace_activation.sql');
 const preflight = read('docs/security/sql/R6C_DATASET_ACTIVATION_PREFLIGHT.sql');
 const postcheck = read('docs/security/sql/R6C_DATASET_ACTIVATION_POSTCHECK.sql');
 const rollback = read('docs/security/sql/R6C_DATASET_ACTIVATION_ROLLBACK.sql');
@@ -36,13 +36,15 @@ test('R6-C rollback fails closed after workspace-only rows exist', () => {
   assert.match(rollback, /alter column user_id set not null/i);
 });
 
-test('R6-C contract records preparation without live application or provider activation', () => {
-  assert.equal(contract.status, 'R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_PREPARED_NOT_APPLIED');
+test('R6-C contract records live schema acceptance without provider activation', () => {
+  assert.equal(contract.status, 'R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_LIVE_PASS_R7A_READY');
   assert.equal(contract.r6c_activation_migration.prepared, true);
-  assert.equal(contract.r6c_activation_migration.applied_live, false);
-  assert.equal(contract.r6c_activation_migration.explicit_production_approval_received, false);
+  assert.equal(contract.r6c_activation_migration.applied_live, true);
+  assert.equal(contract.r6c_activation_migration.live_migration_version, '20260923154503');
+  assert.equal(contract.r6c_activation_migration.explicit_production_approval_received, true);
+  assert.equal(contract.r6c_activation_migration.postcheck_result, 'PASS');
   assert.equal(contract.r6c_activation_migration.provider_runtime_activated, false);
   assert.equal(contract.r6b_runtime_boundary.production_registered, false);
-  assert.equal(contract.next_gate, 'R6-C_live_migration_explicit_approval');
+  assert.equal(contract.next_gate, 'R7-A_reporting_currency_and_canonical_connect_foundation');
 });
 

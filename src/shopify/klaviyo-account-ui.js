@@ -14,6 +14,8 @@ function initializeKlaviyoAccounts() {
   const retry = document.getElementById("klaviyo-retry");
   const retryStep = document.getElementById("klaviyo-retry-step");
   const connect = document.getElementById("klaviyo-connect");
+  const resetStep = document.getElementById("klaviyo-reset-step");
+  const resetConfirm = document.getElementById("klaviyo-reset-confirm");
   let accounts = [];
   let selected = null;
   let busy = false;
@@ -37,6 +39,7 @@ function initializeKlaviyoAccounts() {
       SHOPIFY_SESSION_REQUIRED: "Open AdsTable from Shopify Admin to continue.",
       KLAVIYO_REAUTHORIZE: "Your Klaviyo authorization needs to be renewed. Select Connect to authorize again.",
       KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED: "The existing Klaviyo authorization has expired. A clean connection must be prepared before reconnecting.",
+      KLAVIYO_REVOKE_FAILED: "The old Klaviyo authorization could not be removed. No local connection data was changed.",
       INVALID_PLAN_COST: "Enter a monthly cost of 0 or more, with up to two decimal places.",
       INVALID_ACCOUNT: "This account could not be verified. Reload the accounts and select again.",
       CONNECTION_CHANGED: "The connection changed. Reload the accounts before saving again.",
@@ -44,6 +47,7 @@ function initializeKlaviyoAccounts() {
     message.textContent = messages[error.message] || "Klaviyo could not be reached. Please try again shortly.";
     retryStep.hidden = false;
     if (error.message === "KLAVIYO_REAUTHORIZE") connect.hidden = false;
+    if (error.message === "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED") resetStep.hidden = false;
   }
 
   async function loadStatus() {
@@ -55,6 +59,7 @@ function initializeKlaviyoAccounts() {
       const result = await request("/status");
       if (result.status === "connected") {
         connect.hidden = true;
+        resetStep.hidden = false;
         const amount = result.email_monthly_plan_cost == null ? "" : " · " + result.email_monthly_plan_cost + " " + result.currency + "/month";
         message.textContent = "Connected" + amount;
       } else if (result.status === "account_selection_required") {
@@ -63,6 +68,10 @@ function initializeKlaviyoAccounts() {
       } else if (result.status === "not_connected") {
         connect.hidden = false;
         message.textContent = "Not connected";
+      } else if (result.status === "reset_complete") {
+        connect.hidden = true;
+        resetStep.hidden = true;
+        message.textContent = "Old Klaviyo connection removed. Clean connection setup is not open yet.";
       } else {
         connect.hidden = true;
         message.textContent = "Temporarily unavailable";
@@ -151,6 +160,21 @@ function initializeKlaviyoAccounts() {
     finally { busy = false; save.disabled = false; save.loading = false; }
   });
   retry.addEventListener("click", () => retryAction && retryAction());
+  resetConfirm.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
+    resetConfirm.disabled = true;
+    resetConfirm.loading = true;
+    retryStep.hidden = true;
+    try {
+      const result = await request("/reset", {confirmation: "REVOKE_KLAVIYO_AND_START_FRESH"});
+      if (result.status !== "revoked" && result.status !== "already_revoked") throw new Error("KLAVIYO_REVOKE_FAILED");
+      connect.hidden = true;
+      resetStep.hidden = true;
+      message.textContent = "Old Klaviyo connection removed. Clean connection setup is not open yet.";
+    } catch (error) { showError(error); }
+    finally { busy = false; resetConfirm.disabled = false; resetConfirm.loading = false; }
+  });
   const params = new URLSearchParams(location.search);
   if (params.get("r5_read_only_verify") === "1") verifyR5ReadOnly();
   else if (params.get("oauth_connected") === "klaviyo" && params.get("account_selection_required") === "1") loadAccounts();

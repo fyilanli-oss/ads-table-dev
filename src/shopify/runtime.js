@@ -15,6 +15,7 @@ const {createEmbeddedProviderOAuthAdapters} = require("./embedded-provider-oauth
 const {createEmbeddedProviderTokenExchanges} = require("./embedded-provider-token-exchange");
 const {createWorkspaceProviderConnectionStore} = require("./workspace-provider-connection-store");
 const {createKlaviyoAccountSelection} = require("./klaviyo-account-selection");
+const {createKlaviyoControlledReset} = require("./klaviyo-controlled-reset");
 const {registerShopifyKlaviyoAccountRoutes} = require("../routes/shopify-klaviyo-account-routes");
 const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
 
@@ -83,9 +84,15 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       providerStrategies: createEmbeddedProviderStrategies({env, appUrl: config.appUrl, exchangeCodeByProvider: createEmbeddedProviderTokenExchanges({fetchImpl})}),
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});
-    registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selection: createKlaviyoAccountSelection({
-      store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
-    })});
+    registerShopifyKlaviyoAccountRoutes(app, {
+      authenticateEmbedded,
+      selection: createKlaviyoAccountSelection({
+        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+      }),
+      reset: createKlaviyoControlledReset({
+        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+      }),
+    });
   }
   return Object.freeze({enabled: true, providerOAuthEnabled, providerOAuthRequested});
 }

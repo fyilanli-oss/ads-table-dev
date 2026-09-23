@@ -124,6 +124,17 @@ function renderProviderSection({id, label, description, parked = false}, provide
           <s-button id="klaviyo-save" variant="primary">Save and connect</s-button>
         </s-stack></div>
         <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Try again</s-button></div>
+        <div id="klaviyo-reset-step" hidden>
+          <s-button tone="critical" commandFor="klaviyo-reset-modal" command="--show">Remove old connection</s-button>
+          <s-modal id="klaviyo-reset-modal" heading="Remove old Klaviyo connection?">
+            <s-stack gap="base">
+              <s-paragraph>This removes the expired Klaviyo authorization so AdsTable can establish one clean workspace connection later.</s-paragraph>
+              <s-paragraph>Your historical analytics, selected account, currency, and recorded monthly cost will be preserved.</s-paragraph>
+            </s-stack>
+            <s-button slot="secondary-actions" commandFor="klaviyo-reset-modal" command="--hide">Cancel</s-button>
+            <s-button id="klaviyo-reset-confirm" slot="primary-action" variant="primary" tone="critical" commandFor="klaviyo-reset-modal" command="--hide">Remove connection</s-button>
+          </s-modal>
+        </div>
       </s-stack>` : ""}
     </s-section>`;
 }

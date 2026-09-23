@@ -18,6 +18,9 @@ test("embedded Platforms renders active provider Connect actions and keeps Pinte
   assert.match(html, /fetch\("\/api\/shopify\/providers\/klaviyo\/accounts" \+ path/);
   assert.match(html, /request\("\/status"\)/);
   assert.match(html, /window\.shopify\.idToken/);
+  assert.match(html, /<s-modal id="klaviyo-reset-modal" heading="Remove old Klaviyo connection\?">/);
+  assert.match(html, /commandFor="klaviyo-reset-modal" command="--show"/);
+  assert.match(html, /id="klaviyo-reset-confirm"/);
   assert.match(html, /\/api\/shopify\/providers\//);
   assert.match(html, /open\(body\.authorization_url, "_top"\)/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);

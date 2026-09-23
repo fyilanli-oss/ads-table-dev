@@ -1,0 +1,37 @@
+{
+  "version": "r7a-v2",
+  "status": "R7_A_REPOSITORY_COMPLETE_LIVE_ACCEPTANCE_PENDING",
+  "supersedes_forward_execution": "r7a-v1",
+  "active_providers": ["meta", "google_ads", "klaviyo"],
+  "parked_providers": ["tiktok", "pinterest"],
+  "reporting_currency_source": "merchant_selected",
+  "shopify_currency_used": false,
+  "canonical_connection_table": "workspace_provider_connections",
+  "verified_account_selection": {
+    "meta": "GET /me/adaccounts; identity and currency revalidated before save",
+    "google_ads": "ListAccessibleCustomers plus customer_client discovery; identity and currency revalidated before save",
+    "klaviyo": "Accounts API; identity and preferred currency revalidated before save",
+    "browser_account_fields_are_authority": false
+  },
+  "klaviyo_monthly_plan_cost": {
+    "required": true,
+    "currency": "verified_provider_source_currency",
+    "workspace_reporting_currency_is_separate": true
+  },
+  "ui": {
+    "shopify_native_components": true,
+    "iframe": false,
+    "connect_explanation_modal": true,
+    "account_selection_modal": true,
+    "top_level_oauth": true
+  },
+  "production_state": {
+    "deployment_pending": true,
+    "merchant_currency_selection_pending": true,
+    "live_provider_contact_performed": false,
+    "canonical_connection_created": false,
+    "provider_runner_activated": false
+  },
+  "next_gate": "R7-A_production_deployment_then_merchant_currency_and_controlled_provider_acceptance",
+  "blocked_until_acceptance": ["R6-D", "R7-B", "R3-C"]
+}

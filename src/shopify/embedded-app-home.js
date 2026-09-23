@@ -1,6 +1,7 @@
 "use strict";
 
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
+const {initializeAdAccounts} = require("./ad-account-ui");
 
 const EMBEDDED_HOME_RELEASE = "r7a-v1";
 
@@ -109,10 +110,10 @@ function renderProviderSection({id, label, description, parked = false}, provide
       <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
         <s-stack gap="tight">
           <s-paragraph>${description}</s-paragraph>
-          ${id === "klaviyo" ? `<s-paragraph id="klaviyo-message" aria-live="polite">${providerOAuthEnabled ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
+          ${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-paragraph id="${id}-message" aria-live="polite">${providerOAuthEnabled ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
           ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
         </s-stack>
-        ${parked ? '<s-button disabled>Unavailable</s-button>' : `${id === "klaviyo" ? '<div id="klaviyo-connect">' : ""}<s-button variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button>${id === "klaviyo" ? "</div>" : ""}`}
+        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<div id="${id}-connect"><s-button variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div>`}
       </s-stack>
       ${parked ? "" : `<s-modal id="${id}-connect-modal" heading="Connect ${label} to AdsTable?">
         <s-stack gap="base">
@@ -138,6 +139,18 @@ function renderProviderSection({id, label, description, parked = false}, provide
           </s-stack></div>
           <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Try again</s-button></div>
           <s-button slot="secondary-actions" commandFor="klaviyo-account-modal" command="--hide">Cancel</s-button>
+        </s-modal>
+      </s-stack>` : ""}
+      ${["meta", "google_ads"].includes(id) && providerOAuthEnabled ? `<s-stack id="${id}-accounts" gap="base">
+        <s-button id="${id}-account-open" commandFor="${id}-account-modal" command="--show" hidden>Open setup</s-button>
+        <s-button id="${id}-account-close" commandFor="${id}-account-modal" command="--hide" hidden>Close setup</s-button>
+        <s-modal id="${id}-account-modal" heading="Select ${label} account">
+          <s-stack gap="base">
+            <s-paragraph>Only an account returned by ${label} can be connected.</s-paragraph>
+            <s-select id="${id}-choice" label="${label} account"></s-select>
+            <s-button id="${id}-save" variant="primary">Save and connect</s-button>
+          </s-stack>
+          <s-button slot="secondary-actions" commandFor="${id}-account-modal" command="--hide">Cancel</s-button>
         </s-modal>
       </s-stack>` : ""}
     </s-section>`;
@@ -196,6 +209,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled}) {
         status.setAttribute("heading", "Reporting currency: " + reportingCurrency);
         status.setAttribute("tone", "success");
         status.textContent = "Choose a data source to connect to AdsTable.";
+        (${initializeAdAccounts.toString()})();
         (${initializeKlaviyoAccounts.toString()})();
       };
       const loadSettings = async () => {

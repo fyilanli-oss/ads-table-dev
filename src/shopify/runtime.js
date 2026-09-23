@@ -10,7 +10,7 @@ const {registerShopifyAuthRoutes} = require("../routes/shopify-auth-routes");
 const {registerEmbeddedAppHome} = require("./embedded-app-home");
 const {registerEmbeddedPlatforms} = require("./embedded-app-home");
 const {registerShopifyProviderOAuthRoutes} = require("../routes/shopify-provider-oauth-routes");
-const {createEmbeddedProviderStrategies, SPECS, ACTIVE_PROVIDERS} = require("./embedded-provider-strategies");
+const {createEmbeddedProviderStrategies, configuredOAuthProviders} = require("./embedded-provider-strategies");
 const {createEmbeddedProviderOAuthAdapters} = require("./embedded-provider-oauth-adapters");
 const {createEmbeddedProviderTokenExchanges} = require("./embedded-provider-token-exchange");
 const {createCanonicalWorkspaceProviderConnectionStore} = require("../providers/workspace-provider-connection-store");
@@ -37,10 +37,14 @@ function providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuth
   } catch {
     return false;
   }
-  return ACTIVE_PROVIDERS.map(provider => SPECS[provider]).every(({client, secret}) =>
-    typeof env[client] === "string" && Boolean(env[client].trim()) &&
-    typeof env[secret] === "string" && Boolean(env[secret].trim())) &&
-    typeof env.GOOGLE_ADS_DEVELOPER_TOKEN === "string" && Boolean(env.GOOGLE_ADS_DEVELOPER_TOKEN.trim());
+  return true;
+}
+
+function unavailableAccountDiscovery() {
+  const error = new Error("PROVIDER_ACCOUNTS_UNAVAILABLE");
+  error.code = "PROVIDER_ACCOUNTS_UNAVAILABLE";
+  error.status = 503;
+  throw error;
 }
 
 function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTransactionStore, fetchImpl = fetch, embeddedProviderOAuthAdapters}) {
@@ -53,7 +57,14 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
   const tenantResolver = createShopifyTenantResolver({client: supabaseAdmin});
   const authConfig = {client_id: config.clientId, client_secret: config.clientSecret};
   const providerOAuthRequested = enabled(env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED);
-  const providerOAuthEnabled = providerOAuthRequested && providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuthAdapters});
+  const runtimeReady = providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuthAdapters});
+  const oauthProviders = embeddedProviderOAuthAdapters ? Object.keys(embeddedProviderOAuthAdapters) : configuredOAuthProviders(env);
+  const providerOAuthEnabled = providerOAuthRequested && runtimeReady && oauthProviders.length > 0;
+  const providerAvailability = Object.freeze({
+    meta: providerOAuthEnabled && oauthProviders.includes("meta"),
+    google_ads: providerOAuthEnabled && oauthProviders.includes("google_ads") && Boolean(String(env.GOOGLE_ADS_DEVELOPER_TOKEN || "").trim()),
+    klaviyo: providerOAuthEnabled && oauthProviders.includes("klaviyo"),
+  });
   const authenticateEmbedded = ({session_token}) => authenticateEmbeddedRequest({session_token, config: authConfig, tenant_resolver: tenantResolver});
   const serverWorkspaceAuthority = verified => Object.freeze({
     authority: "server_resolved_workspace",
@@ -62,7 +73,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
   });
   const settingsStore = createWorkspaceSettingsStore({client: supabaseAdmin});
   registerEmbeddedAppHome(app, {clientId: config.clientId});
-  registerEmbeddedPlatforms(app, {clientId: config.clientId, providerOAuthEnabled});
+  registerEmbeddedPlatforms(app, {clientId: config.clientId, providerOAuthEnabled, providerAvailability});
   registerShopifyAuthRoutes(app, {
     bootstrap_managed_install: ({session_token}) => {
       const vault = createProviderTokenVaultFromEnv(env);
@@ -99,31 +110,33 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       consumeTransaction: (state, provider, redirectUri) => oauthTransactionStore.consume({state, provider, redirectUri}),
       connectionStore,
       resolveReturnTarget: createEmbeddedOAuthReturn({client: supabaseAdmin, clientId: config.clientId}),
-      providerStrategies: createEmbeddedProviderStrategies({env, appUrl: config.appUrl, exchangeCodeByProvider: createEmbeddedProviderTokenExchanges({fetchImpl})}),
+      providerStrategies: createEmbeddedProviderStrategies({env, appUrl: config.appUrl, exchangeCodeByProvider: createEmbeddedProviderTokenExchanges({fetchImpl}), providers: oauthProviders}),
+      providers: oauthProviders,
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});
-    registerShopifyKlaviyoAccountRoutes(app, {
+    if (adapters.klaviyo) registerShopifyKlaviyoAccountRoutes(app, {
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createKlaviyoAccountSelection({
         store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
       }),
     });
-    registerShopifyAdAccountRoutes(app, {
+    if (adapters.meta || adapters.google_ads) registerShopifyAdAccountRoutes(app, {
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createAdAccountSelection({
         store: connectionStore,
         discoverByProvider: {
-          meta: createMetaAccountDiscovery({fetchImpl, graphVersion: env.META_GRAPH_VERSION || "v20.0"}),
-          google_ads: createGoogleAdsAccountDiscovery({
+          meta: adapters.meta ? createMetaAccountDiscovery({fetchImpl, graphVersion: env.META_GRAPH_VERSION || "v20.0"}) : unavailableAccountDiscovery,
+          google_ads: adapters.google_ads && providerAvailability.google_ads ? createGoogleAdsAccountDiscovery({
             fetchImpl,
             developerToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
             apiVersion: env.GOOGLE_ADS_API_VERSION || "v25",
-          }),
+          }) : unavailableAccountDiscovery,
         },
       }),
     });
   }
-  return Object.freeze({enabled: true, providerOAuthEnabled, providerOAuthRequested});
+  return Object.freeze({enabled: true, providerOAuthEnabled, providerOAuthRequested, providerAvailability});
 }
 
 module.exports = Object.freeze({registerShopifyRuntime, enabled, providerRuntimeReady});
+

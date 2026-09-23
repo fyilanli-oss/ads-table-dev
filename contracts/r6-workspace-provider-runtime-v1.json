@@ -1,6 +1,6 @@
 {
   "contract_version": "r6-workspace-provider-runtime-v1",
-  "status": "R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_PENDING",
+  "status": "R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_PREPARED_NOT_APPLIED",
   "canonical_tenant": "workspace_id",
   "active_providers": ["meta", "google_ads", "klaviyo"],
   "parked_providers": ["tiktok", "pinterest"],
@@ -78,6 +78,21 @@
     "database_write_performed": false,
     "provider_contact": false
   },
-  "next_gate": "R6-C_activation_migration_preparation"
+  "r6c_activation_migration": {
+    "prepared": true,
+    "migration": "supabase/migrations/20260923153220_r6_dataset_v2_workspace_activation.sql",
+    "preflight": "docs/security/sql/R6C_DATASET_ACTIVATION_PREFLIGHT.sql",
+    "postcheck": "docs/security/sql/R6C_DATASET_ACTIVATION_POSTCHECK.sql",
+    "rollback": "docs/security/sql/R6C_DATASET_ACTIVATION_ROLLBACK.sql",
+    "schema_change": "performance_dataset_rows_v2.user_id becomes nullable",
+    "workspace_id_not_null_applied": false,
+    "legacy_index_or_policy_retired": false,
+    "applied_live": false,
+    "explicit_production_approval_received": false,
+    "provider_runtime_activated": false,
+    "database_write_performed": false,
+    "provider_contact": false
+  },
+  "next_gate": "R6-C_live_migration_explicit_approval"
 }
 

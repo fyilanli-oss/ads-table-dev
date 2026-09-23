@@ -56,6 +56,17 @@ Her provider çalışması şu sırayı izler:
 
 Shopify currency, provider currency veya sabit bir varsayılan reporting currency olamaz. Source ve target currency farklıysa FX verisi bulunmadan `1` oranı kullanılamaz.
 
+## R6-C repository hazırlığı
+
+- Resmî Supabase CLI `migration new` komutuyla `20260923153220_r6_dataset_v2_workspace_activation.sql` oluşturuldu.
+- Migration yalnız Dataset V2 `user_id` alanını nullable yapar. Böylece workspace-first yazıcı, zorunlu bir legacy kullanıcı üretmeden çalışabilir.
+- `workspace_id` bu aşamada nullable kalır; `NOT NULL` sıkılaştırması R6-D gerçek provider kabulünden sonra R3-C'de yapılır.
+- Eski user-scoped unique index, query indexleri ve authenticated SELECT policy kaldırılmaz.
+- Migration, `workspace_id` bulunmayan mevcut satır görürse fail-closed olur.
+- Preflight mevcut sıfır satırlı baseline'ı, postcheck beklenen staged şemayı, rollback ise null `user_id` satırı oluşmadan geri dönüş şartını doğrular.
+- Bu hazırlık production migration onayı değildir. Canlı uygulama, postcheck ve advisor kontrolü için ayrıca açık onay gerekir.
+- Provider runner hâlâ production'a kayıtlı değildir; OAuth, provider teması ve Dataset V2 yazımı kapalı kalır.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

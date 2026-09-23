@@ -3,7 +3,7 @@
 const {bearerToken} = require("./shopify-auth-routes");
 const {RETURN_TARGET} = require("../shopify/embedded-provider-oauth");
 
-const PROVIDERS = Object.freeze(["meta", "google_ads", "klaviyo", "tiktok", "pinterest"]);
+const PROVIDERS = Object.freeze(["meta", "google_ads", "klaviyo"]);
 
 function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
   if (!app || typeof app.get !== "function" || typeof app.post !== "function") throw new TypeError("Express app is required");

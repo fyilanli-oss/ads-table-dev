@@ -26,7 +26,7 @@ function fixture(overrides = {}) {
 test("composition requires one complete strategy for every allowlisted provider", () => {
   const required = {authenticateEmbedded() {}, createEmbeddedTransaction() {}, consumeTransaction() {}, connectionStore: {writeFromOAuthTransaction() {}}, providerStrategies: {}};
   assert.throws(() => createEmbeddedProviderOAuthAdapters(required), /providerStrategies\.meta\.redirectUri/);
-  assert.deepEqual(PROVIDERS, ["meta", "google_ads", "klaviyo", "tiktok", "pinterest"]);
+  assert.deepEqual(PROVIDERS, ["meta", "google_ads", "klaviyo"]);
 });
 
 test("all provider starts derive authority from the verified embedded session", async () => {

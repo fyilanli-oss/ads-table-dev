@@ -12,7 +12,7 @@ test("embedded App Home reuses an active installation and bootstraps only for re
   assert.match(html, /<s-app-nav>/);
   assert.match(html, /<s-page heading="AdsTable">/);
   assert.match(html, /<s-section heading="Data sources">/);
-  assert.match(html, /<s-button id="platforms" variant="primary" href="\/shopify\/app\/platforms">Manage data sources<\/s-button>/);
+  assert.match(html, /<s-button id="platforms" variant="primary" href="\/shopify\/app\/platforms">Set up data sources<\/s-button>/);
   assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 3);
   assert.equal((html.match(/request\("\/api\/shopify\/bootstrap", "POST"/g) || []).length, 1);
   assert.equal((html.match(/request\("\/api\/shopify\/session", "GET"/g) || []).length, 2);
@@ -20,7 +20,7 @@ test("embedded App Home reuses an active installation and bootstraps only for re
   assert.match(html, /Reference: /);
   assert.doesNotMatch(html, /<style>|class="primary-action"|data-release=/);
   assert.doesNotMatch(html, /<iframe/i);
-  assert.match(html, /Connect and manage Meta, Google Ads, TikTok, Klaviyo, and Pinterest/);
+  assert.match(html, /Choose your AdsTable reporting currency, then connect Meta, Google Ads, or Klaviyo/);
   assert.doesNotMatch(html, /console\.|localStorage|sessionStorage|shop_domain|workspace_id|access_token/);
 });
 

@@ -2,7 +2,7 @@
 
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "e10-t6c2k";
+const EMBEDDED_HOME_RELEASE = "r7a-v1";
 
 function escapeAttribute(value) {
   return String(value)
@@ -47,8 +47,8 @@ function renderEmbeddedAppHome({clientId}) {
     </s-section>
     <s-section heading="Data sources">
       <s-stack gap="base">
-        <s-paragraph>Connect and manage Meta, Google Ads, TikTok, Klaviyo, and Pinterest for this Shopify workspace.</s-paragraph>
-        <s-button id="platforms" variant="primary" href="/shopify/app/platforms">Manage data sources</s-button>
+        <s-paragraph>Choose your AdsTable reporting currency, then connect Meta, Google Ads, or Klaviyo.</s-paragraph>
+        <s-button id="platforms" variant="primary" href="/shopify/app/platforms">Set up data sources</s-button>
       </s-stack>
     </s-section>
   </s-page>
@@ -112,29 +112,33 @@ function renderProviderSection({id, label, description, parked = false}, provide
           ${id === "klaviyo" ? `<s-paragraph id="klaviyo-message" aria-live="polite">${providerOAuthEnabled ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
           ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
         </s-stack>
-        ${parked ? '<s-button disabled>Connect</s-button>' : `${id === "klaviyo" ? '<div id="klaviyo-connect">' : ""}<s-button variant="primary" data-provider="${id}"${disabled}>Connect</s-button>${id === "klaviyo" ? "</div>" : ""}`}
+        ${parked ? '<s-button disabled>Unavailable</s-button>' : `${id === "klaviyo" ? '<div id="klaviyo-connect">' : ""}<s-button variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button>${id === "klaviyo" ? "</div>" : ""}`}
       </s-stack>
+      ${parked ? "" : `<s-modal id="${id}-connect-modal" heading="Connect ${label} to AdsTable?">
+        <s-stack gap="base">
+          <s-paragraph>You will continue to ${label} to authorize AdsTable. Authorization alone does not complete the connection.</s-paragraph>
+          <s-paragraph>After authorization, you must select a verified account${id === "klaviyo" ? " and enter its Email Monthly Plan Cost" : ""}.</s-paragraph>
+        </s-stack>
+        <s-button slot="secondary-actions" commandFor="${id}-connect-modal" command="--hide">Cancel</s-button>
+        <s-button slot="primary-action" variant="primary" data-provider="${id}" commandFor="${id}-connect-modal" command="--hide">Continue to ${label}</s-button>
+      </s-modal>`}
       ${id === "klaviyo" && providerOAuthEnabled ? `<s-stack id="klaviyo-accounts" gap="base">
-        <div id="klaviyo-choice-step" hidden><s-stack gap="base">
-          <s-select id="klaviyo-choice" label="Klaviyo account"></s-select>
-          <s-button id="klaviyo-choose">Select account</s-button>
-        </s-stack></div>
-        <div id="klaviyo-cost-step" hidden><s-stack gap="base">
-          <s-number-field id="klaviyo-cost" label="Email Monthly Plan Cost" min="0" max="99999999.99" step="0.01"></s-number-field>
-          <s-button id="klaviyo-save" variant="primary">Save and connect</s-button>
-        </s-stack></div>
-        <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Try again</s-button></div>
-        <div id="klaviyo-reset-step" hidden>
-          <s-button tone="critical" commandFor="klaviyo-reset-modal" command="--show">Remove old connection</s-button>
-          <s-modal id="klaviyo-reset-modal" heading="Remove old Klaviyo connection?">
-            <s-stack gap="base">
-              <s-paragraph>This removes the expired Klaviyo authorization so AdsTable can establish one clean workspace connection later.</s-paragraph>
-              <s-paragraph>Your historical analytics, selected account, currency, and recorded monthly cost will be preserved.</s-paragraph>
-            </s-stack>
-            <s-button slot="secondary-actions" commandFor="klaviyo-reset-modal" command="--hide">Cancel</s-button>
-            <s-button id="klaviyo-reset-confirm" slot="primary-action" variant="primary" tone="critical" commandFor="klaviyo-reset-modal" command="--hide">Remove connection</s-button>
-          </s-modal>
-        </div>
+        <s-button id="klaviyo-account-open" commandFor="klaviyo-account-modal" command="--show" hidden>Open setup</s-button>
+        <s-button id="klaviyo-account-close" commandFor="klaviyo-account-modal" command="--hide" hidden>Close setup</s-button>
+        <s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">
+          <div id="klaviyo-choice-step" hidden><s-stack gap="base">
+            <s-paragraph>Select the Klaviyo account AdsTable may use.</s-paragraph>
+            <s-select id="klaviyo-choice" label="Klaviyo account"></s-select>
+            <s-button id="klaviyo-choose" variant="primary">Continue</s-button>
+          </s-stack></div>
+          <div id="klaviyo-cost-step" hidden><s-stack gap="base">
+            <s-paragraph>The plan cost remains in the verified Klaviyo account currency. AdsTable reporting currency is handled separately.</s-paragraph>
+            <s-number-field id="klaviyo-cost" label="Email Monthly Plan Cost" min="0" max="99999999.99" step="0.01"></s-number-field>
+            <s-button id="klaviyo-save" variant="primary">Save and connect</s-button>
+          </s-stack></div>
+          <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Try again</s-button></div>
+          <s-button slot="secondary-actions" commandFor="klaviyo-account-modal" command="--hide">Cancel</s-button>
+        </s-modal>
       </s-stack>` : ""}
     </s-section>`;
 }
@@ -145,7 +149,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled}) {
     {id: "meta", label: "Meta", description: "Meta advertising performance and spend."},
     {id: "google_ads", label: "Google Ads", description: "Google Ads performance and spend."},
     {id: "klaviyo", label: "Klaviyo", description: "Email performance and monthly plan cost."},
-    {id: "tiktok", label: "TikTok", description: "TikTok advertising performance and spend."},
+    {id: "tiktok", label: "TikTok", description: "TikTok connection is parked for a later release.", parked: true},
     {id: "pinterest", label: "Pinterest", description: "Pinterest connection is not available in this release.", parked: true},
   ];
   const sections = providers.map((provider) => renderProviderSection(provider, providerOAuthEnabled)).join("\n    ");
@@ -158,15 +162,69 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled}) {
   ${appNavigation()}
   <s-page heading="Data sources">
     <s-link slot="breadcrumb-actions" href="/shopify/app">Home</s-link>
-    <s-banner id="status" heading="Provider connections" tone="info">
-      Choose a provider to begin a secure connection.
-    </s-banner>
-    ${sections}
+    <s-banner id="status" heading="Preparing Data Sources" tone="info">AdsTable is checking your workspace settings.</s-banner>
+    <s-section id="currency-setup" heading="Reporting currency" hidden>
+      <s-stack gap="base">
+        <s-paragraph>Select the currency AdsTable will use for reporting. This is independent from Shopify and provider account currencies.</s-paragraph>
+        <s-select id="reporting-currency" label="Reporting currency">
+          ${["TRY","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","SEK","NOK","DKK","PLN"].map(currency => `<s-option value="${currency}">${currency}</s-option>`).join("")}
+        </s-select>
+        <s-button id="save-reporting-currency" variant="primary">Save reporting currency</s-button>
+      </s-stack>
+    </s-section>
+    <div id="provider-sections" hidden>${sections}</div>
   </s-page>
   <script>
     (() => {
       "use strict";
       const status = document.getElementById("status");
+      const currencySetup = document.getElementById("currency-setup");
+      const providerSections = document.getElementById("provider-sections");
+      const currency = document.getElementById("reporting-currency");
+      const saveCurrency = document.getElementById("save-reporting-currency");
+      const sessionRequest = async (path, options = {}) => {
+        if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
+        const token = await window.shopify.idToken();
+        const response = await fetch(path, {...options, headers: {Authorization: "Bearer " + token, ...(options.body ? {"Content-Type": "application/json"} : {})}});
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.code || "REQUEST_FAILED");
+        return body;
+      };
+      const showProviders = reportingCurrency => {
+        currencySetup.hidden = true;
+        providerSections.hidden = false;
+        status.setAttribute("heading", "Reporting currency: " + reportingCurrency);
+        status.setAttribute("tone", "success");
+        status.textContent = "Choose a data source to connect to AdsTable.";
+        (${initializeKlaviyoAccounts.toString()})();
+      };
+      const loadSettings = async () => {
+        try {
+          const settings = await sessionRequest("/api/shopify/workspace/settings");
+          if (settings.status === "configured") return showProviders(settings.reporting_currency);
+          currencySetup.hidden = false;
+          providerSections.hidden = true;
+          status.setAttribute("heading", "Choose your reporting currency");
+          status.setAttribute("tone", "info");
+          status.textContent = "Data Sources will open after you save this workspace setting.";
+        } catch {
+          status.setAttribute("heading", "Workspace settings could not be loaded");
+          status.setAttribute("tone", "critical");
+          status.textContent = "Open AdsTable from Shopify Admin and try again.";
+        }
+      };
+      saveCurrency.addEventListener("click", async () => {
+        saveCurrency.disabled = true;
+        saveCurrency.loading = true;
+        try {
+          const result = await sessionRequest("/api/shopify/workspace/reporting-currency", {method: "POST", body: JSON.stringify({currency: String(currency.value)})});
+          showProviders(result.reporting_currency);
+        } catch (error) {
+          status.setAttribute("heading", "Reporting currency was not saved");
+          status.setAttribute("tone", "critical");
+          status.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Reload Data Sources to use the saved setting." : "Please choose a supported currency and try again.";
+        } finally { saveCurrency.disabled = false; saveCurrency.loading = false; }
+      });
       document.querySelectorAll("s-button[data-provider]").forEach((button) => button.addEventListener("click", async () => {
         button.disabled = true;
         button.loading = true;
@@ -192,7 +250,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled}) {
         }
       }));
       const params = new URLSearchParams(location.search);
-      (${initializeKlaviyoAccounts.toString()})();
+      loadSettings();
       if (params.has("oauth_connected")) {
         status.setAttribute("heading", "Provider authorized");
         status.setAttribute("tone", "success");

@@ -6,27 +6,31 @@ const {renderEmbeddedPlatforms} = require("../src/shopify/embedded-app-home");
 const {enabled, registerShopifyRuntime} = require("../src/shopify/runtime");
 const {createEmbeddedProviderTokenExchanges, normalize} = require("../src/shopify/embedded-provider-token-exchange");
 
-test("embedded Platforms renders active provider Connect actions and keeps Pinterest parked", () => {
+test("embedded Platforms renders the R7-A currency gate, three active providers, and two parked providers", () => {
   const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: true});
-  for (const provider of ["meta", "google_ads", "klaviyo", "tiktok"]) {
+  for (const provider of ["meta", "google_ads", "klaviyo"]) {
     assert.match(html, new RegExp(`data-provider="${provider}"`));
   }
+  assert.doesNotMatch(html, /data-provider="tiktok"/);
   assert.doesNotMatch(html, /data-provider="pinterest"/);
+  assert.match(html, /TikTok connection is parked for a later release/);
   assert.match(html, /Pinterest connection is not available in this release/);
   assert.match(html, /<s-paragraph>Parked<\/s-paragraph>/);
   assert.doesNotMatch(html, /Connect (?:Meta|Google Ads|Klaviyo|TikTok|Pinterest) to this Shopify workspace/);
   assert.match(html, /fetch\("\/api\/shopify\/providers\/klaviyo\/accounts" \+ path/);
   assert.match(html, /request\("\/status"\)/);
   assert.match(html, /window\.shopify\.idToken/);
-  assert.match(html, /<s-modal id="klaviyo-reset-modal" heading="Remove old Klaviyo connection\?">/);
-  assert.match(html, /commandFor="klaviyo-reset-modal" command="--show"/);
-  assert.match(html, /id="klaviyo-reset-confirm"/);
+  assert.match(html, /id="currency-setup" heading="Reporting currency"/);
+  assert.match(html, /\/api\/shopify\/workspace\/reporting-currency/);
+  assert.match(html, /<s-modal id="klaviyo-connect-modal" heading="Connect Klaviyo to AdsTable\?">/);
+  assert.match(html, /<s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">/);
+  assert.match(html, /commandFor="klaviyo-connect-modal" command="--show"/);
   assert.match(html, /\/api\/shopify\/providers\//);
   assert.match(html, /open\(body\.authorization_url, "_top"\)/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
   assert.match(html, /<s-app-nav>/);
   assert.match(html, /<s-page heading="Data sources">/);
-  assert.equal((html.match(/<s-button variant="primary" data-provider=/g) || []).length, 4);
+  assert.equal((html.match(/data-provider=/g) || []).length, 3);
   assert.doesNotMatch(html, /<style>|<iframe/i);
   assert.doesNotMatch(html, /workspace[_-]id|shop[_-]id|user[_-]id/i);
 });

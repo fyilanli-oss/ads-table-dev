@@ -16,6 +16,8 @@ function initializeKlaviyoAccounts() {
   const connect = document.getElementById("klaviyo-connect");
   const resetStep = document.getElementById("klaviyo-reset-step");
   const resetConfirm = document.getElementById("klaviyo-reset-confirm");
+  const accountOpen = document.getElementById("klaviyo-account-open");
+  const accountClose = document.getElementById("klaviyo-account-close");
   let accounts = [];
   let selected = null;
   let busy = false;
@@ -47,11 +49,12 @@ function initializeKlaviyoAccounts() {
     message.textContent = messages[error.message] || "Klaviyo could not be reached. Please try again shortly.";
     retryStep.hidden = false;
     if (error.message === "KLAVIYO_REAUTHORIZE") connect.hidden = false;
-    if (error.message === "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED") resetStep.hidden = false;
+    if (error.message === "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED" && resetStep) resetStep.hidden = false;
   }
 
   async function loadStatus() {
     if (busy) return;
+    let loadPendingAccounts = false;
     busy = true;
     retryAction = loadStatus;
     retryStep.hidden = true;
@@ -59,28 +62,28 @@ function initializeKlaviyoAccounts() {
       const result = await request("/status");
       if (result.status === "connected") {
         connect.hidden = true;
-        resetStep.hidden = false;
+        if (resetStep) resetStep.hidden = false;
         const amount = result.email_monthly_plan_cost == null ? "" : " · " + result.email_monthly_plan_cost + " " + result.currency + "/month";
         message.textContent = "Connected" + amount;
       } else if (result.status === "account_selection_required") {
         connect.hidden = true;
         message.textContent = "Account selection required";
+        loadPendingAccounts = true;
       } else if (result.status === "not_connected") {
         connect.hidden = false;
         message.textContent = "Not connected";
       } else if (result.status === "reset_complete") {
         connect.hidden = true;
-        resetStep.hidden = true;
-        message.textContent = "Old Klaviyo connection removed. Clean connection setup is not open yet.";
+        if (resetStep) resetStep.hidden = true;
+        message.textContent = "Not connected";
       } else {
         connect.hidden = true;
         message.textContent = "Temporarily unavailable";
       }
     } catch (error) {
       showError(error);
-    } finally {
-      busy = false;
-    }
+    } finally { busy = false; }
+    if (loadPendingAccounts) await loadAccounts();
   }
 
   async function loadAccounts() {
@@ -116,6 +119,7 @@ function initializeKlaviyoAccounts() {
       if (!accounts.length) throw new Error("KLAVIYO_UNAVAILABLE");
       choices.value = accounts[0].id;
       choiceStep.hidden = false;
+      if (accountOpen) accountOpen.click();
       message.textContent = "Klaviyo is authorized. Select the account to connect.";
     } catch (error) { showError(error); }
     finally { busy = false; }
@@ -156,11 +160,12 @@ function initializeKlaviyoAccounts() {
       costStep.hidden = true;
       retryStep.hidden = true;
       message.textContent = "Connected: " + result.account_name + ". Email Monthly Plan Cost: " + result.email_monthly_plan_cost + " " + result.currency + ".";
+      if (accountClose) accountClose.click();
     } catch (error) { showError(error); }
     finally { busy = false; save.disabled = false; save.loading = false; }
   });
   retry.addEventListener("click", () => retryAction && retryAction());
-  resetConfirm.addEventListener("click", async () => {
+  if (resetConfirm) resetConfirm.addEventListener("click", async () => {
     if (busy) return;
     busy = true;
     resetConfirm.disabled = true;

@@ -1,0 +1,178 @@
+{
+  "contract_version": "r1-workspace-authority-v1",
+  "decision_date": "2026-09-20",
+  "status": "DECISION_COMPLETE_R2_REQUIRES_EXPLICIT_APPROVAL",
+  "canonical_tenant": {
+    "field": "workspace_id",
+    "database_type": "uuid",
+    "authority": "server_resolved",
+    "not_tenant_authority": [
+      "user_id",
+      "shopify_user_id",
+      "shop_id",
+      "email",
+      "provider_account_id"
+    ]
+  },
+  "actor_identity": {
+    "purpose": [
+      "authentication",
+      "authorization_input",
+      "audit"
+    ],
+    "must_not_replace_workspace_authority": true
+  },
+  "active_provider_scope": [
+    "meta",
+    "google_ads",
+    "klaviyo"
+  ],
+  "parked_provider_scope": [
+    "tiktok",
+    "pinterest"
+  ],
+  "current_authority_inventory": {
+    "legacy_user_scoped": [
+      {
+        "area": "canonical_envelope",
+        "artifact": "funnel-core/canonical-contract.js",
+        "current_key": "identity.user_id",
+        "target": "identity.workspace_id",
+        "delivery_package": "R3"
+      },
+      {
+        "area": "dataset_v2_schema_indexes_rls",
+        "artifact": "supabase/migrations/20260816101220_create_performance_dataset_rows_v2.sql",
+        "current_key": "user_id",
+        "target": "workspace_id",
+        "delivery_package": "R3"
+      },
+      {
+        "area": "dataset_repository_and_query",
+        "artifact": "funnel-core/supabase-dataset-repository.js",
+        "current_key": "user_id",
+        "target": "workspace_id",
+        "delivery_package": "R3"
+      },
+      {
+        "area": "query_service",
+        "artifact": "funnel-core/funnel-query-service.js",
+        "current_key": "user_id",
+        "target": "workspace_id",
+        "delivery_package": "R3"
+      },
+      {
+        "area": "provider_mappers_and_writers",
+        "artifact": "src/providers",
+        "current_key": "context.userId",
+        "target": "context.workspaceId",
+        "delivery_package": "R6"
+      },
+      {
+        "area": "refresh_and_snapshot_jobs",
+        "artifact": "src/jobs/refresh-job-boundary.js",
+        "current_key": "user_id",
+        "target": "workspace_id",
+        "delivery_package": "R6"
+      },
+      {
+        "area": "backfill_checkpoint_schema",
+        "artifact": "supabase/migrations/20260908074500_create_backfill_checkpoints.sql",
+        "current_key": "user_id",
+        "target": "workspace_id",
+        "delivery_package": "R3"
+      },
+      {
+        "area": "backfill_runtime",
+        "artifact": "src/backfill",
+        "current_key": "user_id",
+        "target": "workspace_id",
+        "delivery_package": "R3"
+      },
+      {
+        "area": "standalone_oauth_transactions",
+        "artifact": "supabase/migrations/20260818090000_create_oauth_transactions.sql",
+        "current_key": "user_id",
+        "target": "legacy_read_only_until_R10",
+        "delivery_package": "R4"
+      },
+      {
+        "area": "standalone_provider_connections",
+        "artifact": "platform_connections + platform_connection_tokens",
+        "current_key": "user_id + platform",
+        "target": "legacy_read_only_until_R10",
+        "delivery_package": "R4"
+      }
+    ],
+    "workspace_scoped": [
+      {
+        "area": "shopify_installation_binding",
+        "artifact": "supabase/migrations/20260910100000_create_shopify_managed_installations.sql",
+        "current_key": "shop_id -> workspace_id",
+        "disposition": "retain_as_commerce_adapter_binding"
+      },
+      {
+        "area": "embedded_oauth_transaction_authority",
+        "artifact": "supabase/migrations/20260911130000_add_embedded_oauth_authority.sql",
+        "current_key": "workspace_id + shop_id",
+        "disposition": "workspace_is_tenant_shop_is_verified_adapter_context"
+      },
+      {
+        "area": "embedded_provider_connections",
+        "artifact": "supabase/migrations/20260911150000_create_shopify_workspace_provider_connections.sql",
+        "current_key": "workspace_id + provider",
+        "disposition": "migrate_to_commerce_independent_workspace_store_in_R4"
+      },
+      {
+        "area": "verified_session_context",
+        "artifact": "src/shopify/tenant-model.js",
+        "current_key": "verified_shop_binding -> workspace_id",
+        "disposition": "retain_shopify_as_authority_adapter"
+      }
+    ]
+  },
+  "ordered_delivery": [
+    "R2.1_read_only_preflight_and_collision_inventory",
+    "R2.2_create_workspaces_and_workspace_settings_with_deny_by_default_rls_and_grants",
+    "R2.3_seed_verified_shopify_workspace_ids_without_email_or_provider_account_matching",
+    "R2.4_add_shopify_installations_workspace_foreign_key_and_currency_onboarding_gate",
+    "R3.1_add_nullable_workspace_id_to_dataset_v2_and_backfill_checkpoints",
+    "R3.2_release_canonical_contract_v2_and_workspace_scoped_repository_query_job_backfill_boundaries",
+    "R3.3_backfill_only_from_explicit_verified_bindings_then_validate_not_null_unique_indexes_and_rls",
+    "R4.1_create_commerce_independent_workspace_provider_connection_authority",
+    "R4.2_freeze_new_standalone_oauth_connection_and_refresh_writes",
+    "R4.3_copy_only_verified_embedded_connections_without_decrypting_token_envelopes",
+    "R5.1_reconcile_duplicate_klaviyo_authority_without_provider_revoke",
+    "R5.2_mark_legacy_klaviyo_local_state_migrated_or_disabled_after_acceptance",
+    "R6.1_cut_meta_google_ads_and_klaviyo_runtime_to_workspace_v2_without_silent_v1_fallback",
+    "R7.1_enable_currency_first_shopify_native_connect_account_selection_cost_and_disconnect_flow"
+  ],
+  "mandatory_gates": {
+    "before_any_ddl": [
+      "explicit_R2_approval",
+      "repository_migration_and_rollback_review",
+      "production_row_counts_and_collision_preflight"
+    ],
+    "after_each_schema_change": [
+      "schema_constraint_index_verification",
+      "rls_and_grant_verification",
+      "supabase_security_advisor",
+      "supabase_performance_advisor",
+      "focused_and_regression_tests"
+    ],
+    "forbidden": [
+      "derive_workspace_from_email",
+      "derive_workspace_from_provider_account_id",
+      "use_shopify_currency_as_reporting_currency",
+      "run_two_authoritative_refresh_paths",
+      "revoke_duplicate_klaviyo_grant_before_R5_acceptance",
+      "delete_v1_or_legacy_rows_before_R10"
+    ]
+  },
+  "r1_mutations": {
+    "runtime_code": false,
+    "database": false,
+    "provider": false,
+    "deployment": false
+  }
+}

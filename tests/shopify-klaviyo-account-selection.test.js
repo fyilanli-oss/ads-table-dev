@@ -118,6 +118,39 @@ test("provider 401 and 429 produce recoverable errors without retry loops", asyn
   }
 });
 
+test("R5 read-only verification never refreshes or writes and returns no account identity", async () => {
+  const connection = {
+    status: "connected",
+    active_account_id: "account-a",
+    account_currency: "USD",
+    accessToken: "secret-access",
+    refreshToken: "secret-refresh",
+    updated_at: "version-1",
+  };
+  let refreshCalls = 0;
+  let requests = 0;
+  const store = {
+    readKlaviyo: async () => connection,
+    refreshKlaviyo: async () => { refreshCalls++; },
+  };
+  const verified = createKlaviyoAccountSelection({store, clientId: "client", clientSecret: "secret", fetchImpl: async () => {
+    requests++;
+    return response(200, payload);
+  }});
+  const result = await verified.verifyReadOnly(authority);
+  assert.deepEqual(result, {status: "verified", active_account_verified: true, currency: "USD"});
+  assert.doesNotMatch(JSON.stringify(result), /account-a|secret|token|envelope/i);
+  assert.equal(requests, 1);
+  assert.equal(refreshCalls, 0);
+
+  const expired = createKlaviyoAccountSelection({store, clientId: "client", clientSecret: "secret", fetchImpl: async () => {
+    requests++;
+    return response(401, {});
+  }});
+  await assert.rejects(expired.verifyReadOnly(authority), error => error.code === "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED");
+  assert.equal(refreshCalls, 0);
+});
+
 test("persistence scopes updates to verified shop/workspace and rejects a concurrent reconnect", async () => {
   const filters = [];
   let mutation;
@@ -140,6 +173,21 @@ test("account routes require a Shopify bearer session and redact unexpected erro
   await routes["/api/shopify/providers/klaviyo/accounts"]({get:()=>"Bearer session"}, res);
   assert.equal(res.code, 503);
   assert.deepEqual(res.body, {code:"KLAVIYO_UNAVAILABLE"});
+});
+
+test("R5 verification route stays session-bound and calls the read-only operation", async () => {
+  const routes = {};
+  const app = {get: (path, handler) => { routes[path] = handler; }, post() {}};
+  let receivedAuthority;
+  registerShopifyKlaviyoAccountRoutes(app, {
+    authenticateEmbedded: async () => authority,
+    selection: {verifyReadOnly: async input => { receivedAuthority = input; return {status: "verified", active_account_verified: true, currency: "USD"}; }},
+  });
+  const res = {set() {}, status(code) {this.code = code; return this;}, json(body) {this.body = body; return body;}};
+  await routes["/api/shopify/providers/klaviyo/accounts/verify"]({get: () => "Bearer session"}, res);
+  assert.deepEqual(receivedAuthority, authority);
+  assert.equal(res.code, 200);
+  assert.deepEqual(res.body, {status: "verified", active_account_verified: true, currency: "USD"});
 });
 
 test("OAuth returns to installed Shopify shop and rejects external redirect targets", async () => {
@@ -200,4 +248,20 @@ test("UI reads stored status on page load without requesting Klaviyo accounts", 
   assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/status"]);
   assert.equal(elements.get("klaviyo-connect").hidden,true);
   assert.equal(elements.get("klaviyo-message").textContent,"Connected · 5.00 USD/month");
+});
+
+test("R5 operator parameter invokes only the no-refresh verification route", async () => {
+  const elements = new Map();
+  const element = () => ({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect"]) elements.set(id,element());
+  const requests = [];
+  const context = {URLSearchParams,location:{search:"?r5_read_only_verify=1"},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
+    requests.push({url,options});
+    return response(200,{status:"verified",active_account_verified:true,currency:"USD"});
+  }};
+  vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/verify"]);
+  assert.equal(requests[0].options.method,"GET");
+  assert.equal(elements.get("klaviyo-message").textContent,"Connected · Klaviyo account verified · USD");
 });

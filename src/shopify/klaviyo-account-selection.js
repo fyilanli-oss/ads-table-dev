@@ -12,7 +12,7 @@ function planCost(value) {
 }
 
 function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clientSecret}) {
-  async function accounts(authority) {
+  async function accounts(authority, {allowRefresh = true} = {}) {
     let connection = await store.readKlaviyo(authority);
     if (!connection || connection.status === "revoked") return {connection: null, accounts: []};
     const getAccounts = () => fetchImpl("https://a.klaviyo.com/api/accounts/", {
@@ -21,6 +21,7 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
       redirect: "error",
     });
     let response = await getAccounts();
+    if (response.status === 401 && !allowRefresh) throw failure("KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", 409);
     if (response.status === 401 && connection.refreshToken && clientId && clientSecret) {
       const refreshed = await fetchImpl("https://a.klaviyo.com/oauth/token", {
         method: "POST", redirect: "error", signal: AbortSignal.timeout(15000),
@@ -77,6 +78,17 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
         active_account_id: result.connection?.active_account_id || null,
         email_monthly_plan_cost: result.connection?.email_monthly_plan_cost ?? null,
       };
+    },
+    async verifyReadOnly(authority) {
+      const {connection, accounts: verified} = await accounts(authority, {allowRefresh: false});
+      if (!connection || connection.status !== "connected" || typeof connection.active_account_id !== "string") {
+        throw failure("INVALID_ACCOUNT", 409);
+      }
+      const account = verified.find(item => item.id === connection.active_account_id);
+      if (!account || !account.currency || account.currency !== connection.account_currency) {
+        throw failure("INVALID_ACCOUNT", 409);
+      }
+      return {status: "verified", active_account_verified: true, currency: account.currency};
     },
     async complete(authority, input) {
       const cost = planCost(input?.email_monthly_plan_cost);

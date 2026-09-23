@@ -1,0 +1,81 @@
+{
+  "evidence_version": "r4c-legacy-provider-write-freeze-v1",
+  "captured_at_date": "2026-09-23",
+  "project_name": "adstable-dev",
+  "project_id": "xnstrzhavqkztvmlwsrx",
+  "result": "PASS",
+  "explicit_approval_received": true,
+  "migration": {
+    "version": "20260923093756",
+    "name": "r4c_freeze_legacy_provider_writes"
+  },
+  "preflight": {
+    "result": "PASS",
+    "canonical_table_rows": 0,
+    "standalone_oauth_transactions": 0,
+    "active_frozen_provider_schedules": 3,
+    "active_klaviyo_schedules": 1,
+    "open_frozen_provider_jobs": 2,
+    "open_klaviyo_jobs": 0,
+    "legacy_connection_rows": 8,
+    "legacy_encrypted_token_rows": 7,
+    "legacy_plaintext_token_rows": 0
+  },
+  "stopped_runtime": {
+    "schedules": {
+      "google": 1,
+      "klaviyo": 1,
+      "tiktok": 1
+    },
+    "open_jobs_closed_as_failed": {
+      "google_queued": 1,
+      "tiktok_running": 1,
+      "klaviyo": 0
+    },
+    "oldest_open_job_dates": {
+      "google": "2026-09-13",
+      "tiktok": "2026-09-14"
+    }
+  },
+  "postcheck": {
+    "result": "PASS",
+    "freeze_triggers": 6,
+    "frozen_provider_active_schedules": 0,
+    "klaviyo_active_schedules": 0,
+    "frozen_provider_open_jobs": 0,
+    "klaviyo_open_jobs": 0,
+    "canonical_connection_rows": 0,
+    "legacy_connection_rows": 8,
+    "legacy_encrypted_token_rows": 7,
+    "legacy_plaintext_token_rows": 0
+  },
+  "negative_guard_test": {
+    "result": "PASS",
+    "legacy_connection_write_rejected": true,
+    "standalone_oauth_insert_rejected": true,
+    "synthetic_oauth_rows_after_test": 0
+  },
+  "security": {
+    "guard_functions_security_invoker": true,
+    "guard_functions_fixed_search_path": true,
+    "new_r4c_advisor_warnings": 0
+  },
+  "preserved": [
+    "shopify_embedded_oauth_transactions",
+    "legacy_connection_rows",
+    "encrypted_token_rows",
+    "historical_snapshots",
+    "historical_analytics"
+  ],
+  "not_performed": [
+    "provider_revoke",
+    "token_decrypt_or_reencrypt",
+    "connection_or_token_copy",
+    "canonical_runtime_activation",
+    "deployment",
+    "commit_or_pull_request"
+  ],
+  "next_gate": "explicit_R5_verified_connection_consolidation_approval",
+  "contains_identifiers": false,
+  "contains_tokens": false
+}

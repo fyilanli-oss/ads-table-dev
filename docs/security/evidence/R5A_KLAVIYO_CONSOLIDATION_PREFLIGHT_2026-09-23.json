@@ -1,0 +1,37 @@
+{
+  "scope": "R5-A read-only preflight",
+  "date": "2026-09-23",
+  "project": "xnstrzhavqkztvmlwsrx",
+  "result": "R5A_APPLIED_R5B_PENDING",
+  "migration": "20260923132407_create_legacy_user_workspace_bindings",
+  "counts": {
+    "legacy_klaviyo_rows": 2,
+    "legacy_connected_rows": 2,
+    "embedded_klaviyo_rows": 1,
+    "embedded_connected_rows": 1,
+    "canonical_klaviyo_rows": 0,
+    "matching_nonnull_account_pairs": 1,
+    "oauth_rows_with_both_user_and_workspace": 0
+  },
+  "observations": {
+    "legacy_binding_table_before_R5A": false,
+    "legacy_row_without_selected_account": 1,
+    "token_envelope_shapes_compatible": true,
+    "plaintext_tokens_observed": false,
+    "provider_contact_performed": false,
+    "provider_revoke_performed": false,
+    "automatic_binding_performed": false,
+    "binding_table_created": true,
+    "binding_rows_after_apply": 1,
+    "human_attested_active_bindings": 1,
+    "matching_connected_klaviyo_bindings": 1,
+    "unbound_unselected_legacy_klaviyo_rows": 1,
+    "browser_roles_have_privileges": false,
+    "service_role_has_crud": true,
+    "rls_and_force_rls_enabled": true,
+    "new_security_warn_findings": 0,
+    "read_only_verification_route_repository_ready": true,
+    "read_only_verification_tests_passed": true
+  },
+  "decision": "The user explicitly attested the single matching legacy candidate, and one active binding was recorded. The unmatched legacy row remains unbound. Canonical consolidation still waits for live read-only Klaviyo Account API verification."
+}

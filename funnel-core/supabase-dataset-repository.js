@@ -41,8 +41,8 @@ function requirePersistenceReadyCurrency(currency) {
   requireNonEmpty(currency.fx_engine_version, 'currency.fx_engine_version');
 }
 
-function canonicalToDbRow(row) {
-  validateCanonicalRow(row);
+function canonicalToDbRow(row, options = {}) {
+  validateCanonicalRow(row, options);
   validateEntityHierarchy(row.identity, row.entity);
   requirePersistenceReadyCurrency(row.currency);
 
@@ -101,7 +101,7 @@ function numberOrNull(value) {
   return number;
 }
 
-function dbToCanonicalRow(db) {
+function dbToCanonicalRow(db, options = {}) {
   if (!db || typeof db !== 'object') throw new Error('Dataset V2 DB row must be an object');
 
   const rawMetrics = {};
@@ -157,7 +157,7 @@ function dbToCanonicalRow(db) {
     canonical_contract_version: db.canonical_contract_version
   };
 
-  validateCanonicalRow(row);
+  validateCanonicalRow(row, options);
   validateEntityHierarchy(row.identity, row.entity);
   const expectedKey = buildEntityKey(row.identity, row.entity);
   if (db.entity_key !== expectedKey) throw new Error('Dataset V2 entity_key does not match canonical hierarchy identity');
@@ -177,14 +177,14 @@ class SupabaseDatasetRepository extends DatasetRepository {
     if (!Array.isArray(rows)) throw new Error('rows must be an array');
     if (rows.length === 0) return [];
 
-    const payload = rows.map(canonicalToDbRow);
+    const payload = rows.map((row) => canonicalToDbRow(row));
     const { data, error } = await this.supabase
       .from(TABLE)
       .upsert(payload, { onConflict: UPSERT_CONFLICT })
       .select('*');
 
     if (error) throw new Error(`Dataset V2 upsert failed: ${error.message || error}`);
-    return (data || []).map(dbToCanonicalRow).map(cloneCanonicalRow);
+    return (data || []).map((row) => dbToCanonicalRow(row)).map(cloneCanonicalRow);
   }
 
   async readCanonicalRawFacts({ user_id, from, to, platform = null, platform_account_id = null, traffic_type = null, entity_key = null } = {}) {
@@ -205,7 +205,7 @@ class SupabaseDatasetRepository extends DatasetRepository {
 
     const { data, error } = await query.order('business_date', { ascending: true }).order('entity_key', { ascending: true });
     if (error) throw new Error(`Dataset V2 read failed: ${error.message || error}`);
-    return (data || []).map(dbToCanonicalRow).map(cloneCanonicalRow);
+    return (data || []).map((row) => dbToCanonicalRow(row)).map(cloneCanonicalRow);
   }
 }
 

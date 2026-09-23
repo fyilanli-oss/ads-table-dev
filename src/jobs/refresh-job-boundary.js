@@ -2,7 +2,7 @@
 
 const TERMINAL_STATUSES = new Set(["completed", "failed"]);
 
-function createRefreshJobBoundary({ getClient, lifecycleVersion, now = () => new Date().toISOString() } = {}) {
+function createRefreshJobBoundary({ getClient, lifecycleVersion, now = () => new Date().toISOString(), isPlatformFrozen = () => false } = {}) {
   if (typeof getClient !== "function") throw new TypeError("getClient must be a function");
   if (typeof lifecycleVersion !== "string" || !lifecycleVersion) throw new TypeError("lifecycleVersion is required");
   if (typeof now !== "function") throw new TypeError("now must be a function");
@@ -14,6 +14,12 @@ function createRefreshJobBoundary({ getClient, lifecycleVersion, now = () => new
   }
 
   async function create({ userId, platform, platformAccountId, metadata = {} } = {}) {
+    if (isPlatformFrozen(platform)) {
+      const error = new Error(`Legacy ${platform} refresh is frozen by R4-C`);
+      error.code = 'LEGACY_PROVIDER_RUNTIME_FROZEN';
+      error.status = 409;
+      throw error;
+    }
     const client = database();
     const existing = await client.from("snapshot_jobs").select("id,status").eq("user_id", userId).eq("platform", platform).eq("platform_account_id", platformAccountId).in("status", ["queued", "running"]).limit(1).maybeSingle();
     if (existing.error) throw existing.error;

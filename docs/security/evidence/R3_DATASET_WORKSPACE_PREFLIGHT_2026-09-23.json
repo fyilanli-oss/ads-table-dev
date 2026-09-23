@@ -1,0 +1,30 @@
+{
+  "evidence_version": "r3-dataset-workspace-preflight-v1",
+  "captured_at_date": "2026-09-23",
+  "project_name": "adstable-dev",
+  "mode": "read_only_aggregate_and_schema_metadata",
+  "result": "PASS_REPOSITORY_PREPARATION_ONLY",
+  "counts": {
+    "dataset_v2_rows": 0,
+    "dataset_v2_distinct_users": 0,
+    "workspaces": 1,
+    "workspace_settings": 0
+  },
+  "schema": {
+    "dataset_v2_exists": true,
+    "dataset_v2_workspace_id_exists": false,
+    "backfill_checkpoints_exists": false,
+    "dataset_v2_rls_enabled": true,
+    "dataset_v2_rls_forced": false,
+    "current_tenant_scope": "user_id"
+  },
+  "migration": {
+    "repository_version": "20260923083734",
+    "name": "add_dataset_v2_workspace_tenant",
+    "applied_live": false
+  },
+  "contains_identifiers": false,
+  "contains_tokens": false,
+  "database_mutation": false,
+  "next_required_gate": "explicit_R3A_live_migration_approval"
+}

@@ -1,0 +1,34 @@
+{
+  "evidence_version": "r2-workspace-currency-preflight-v1",
+  "captured_at_date": "2026-09-20",
+  "project_name": "adstable-dev",
+  "mode": "read_only_aggregate_and_schema_metadata",
+  "result": "BLOCK_EMBEDDED_MIGRATION_LEDGER_DRIFT",
+  "counts": {
+    "shopify_installations": 1,
+    "shopify_workspace_nulls": 0,
+    "distinct_shopify_workspaces": 1,
+    "dataset_v2_rows": 0,
+    "embedded_provider_connections": 1,
+    "embedded_klaviyo_connections": 1,
+    "legacy_klaviyo_connections": 2,
+    "oauth_transactions": 5
+  },
+  "schema": {
+    "backfill_checkpoints_exists": false,
+    "workspaces_exists": false,
+    "workspace_settings_exists": false,
+    "embedded_oauth_workspace_column_exists": true,
+    "embedded_provider_table_exists": true
+  },
+  "migration_ledger": {
+    "20260908074500_backfill_recorded": false,
+    "20260911130000_embedded_oauth_recorded": false,
+    "20260911150000_embedded_provider_recorded": false,
+    "20260919194248_klaviyo_recorded": true
+  },
+  "contains_identifiers": false,
+  "contains_tokens": false,
+  "database_mutation": false,
+  "next_required_package": "R2-A_embedded_migration_ledger_reconciliation"
+}

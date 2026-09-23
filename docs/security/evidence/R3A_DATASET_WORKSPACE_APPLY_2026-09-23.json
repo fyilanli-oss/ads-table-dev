@@ -1,0 +1,45 @@
+{
+  "evidence_version": "r3a-dataset-workspace-apply-v1",
+  "captured_at_date": "2026-09-23",
+  "project_name": "adstable-dev",
+  "migration": {
+    "version": "20260923083734",
+    "name": "add_dataset_v2_workspace_tenant",
+    "applied_live": true
+  },
+  "preflight": {
+    "result": "PASS",
+    "dataset_v2_rows": 0,
+    "workspace_rows": 1,
+    "workspace_id_column_existed": false,
+    "backfill_checkpoints_existed": false
+  },
+  "postcheck": {
+    "result": "PASS",
+    "workspace_id_type": "uuid",
+    "workspace_id_nullable": true,
+    "workspace_foreign_key_validated": true,
+    "workspace_indexes_present": 4,
+    "legacy_unique_index_retained": true,
+    "dataset_v2_rows": 0,
+    "workspace_bound_rows": 0
+  },
+  "security_posture": {
+    "rls_enabled": true,
+    "rls_forced": false,
+    "legacy_authenticated_select_policy_retained": true,
+    "grants_changed_by_r3a": false
+  },
+  "advisors": {
+    "new_workspace_foreign_key_unindexed_warning": false,
+    "new_workspace_query_indexes_unused": 3,
+    "unused_reason": "expected_before_runtime_cutover_on_empty_dataset",
+    "pre_existing_findings_outside_r3a_scope": true
+  },
+  "data_backfill_performed": false,
+  "provider_contact_performed": false,
+  "runtime_cutover_performed": false,
+  "contains_identifiers": false,
+  "contains_tokens": false,
+  "next_gate": "R3-B_runtime_verification_then_R3-C_final_enforcement"
+}

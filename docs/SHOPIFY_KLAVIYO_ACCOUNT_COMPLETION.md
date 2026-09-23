@@ -10,7 +10,7 @@ OAuth success now returns to the installed shop's Shopify Admin app entry, deriv
 
 ## Release order
 
-1. Apply `supabase/migrations/20260919144434_shopify_klaviyo_account_completion.sql` to the AdsTable Supabase project before deploying the new application. It adds two nullable columns and constraints without changing grants, RLS, or existing pending connections. It deliberately fails if an existing connected Klaviyo row lacks cost/currency, rather than silently altering that row.
+1. Apply `supabase/migrations/20260919194248_shopify_klaviyo_account_completion.sql` to the AdsTable Supabase project before deploying the new application. It adds two nullable columns and constraints without changing grants, RLS, or existing pending connections. It deliberately fails if an existing connected Klaviyo row lacks cost/currency, rather than silently altering that row. The timestamp matches the migration version already recorded in the live ledger.
 2. Deploy this branch with the existing Shopify and Klaviyo credentials and `SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED=true`. Keep `SHOPIFY_APP_URL=https://dev.adstable.app`.
 3. In Shopify Admin, open AdsTable → Data sources. For an existing pending grant, choose the Klaviyo account, enter its monthly cost, and select **Save and connect**. If authorization was revoked, use Connect and consent again.
 4. Verify the persisted row is `connected` with an account ID, currency, and cost, then reopen Data sources to verify the saved state.

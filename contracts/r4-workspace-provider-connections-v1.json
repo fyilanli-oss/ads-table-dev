@@ -1,0 +1,79 @@
+{
+  "contract_version": "r4-workspace-provider-connections-v1",
+  "status": "R4_COMPLETE_R5_CONSOLIDATION_APPROVAL_PENDING",
+  "canonical_table": "public.workspace_provider_connections",
+  "canonical_owner": "workspace_id",
+  "primary_key": ["workspace_id", "provider"],
+  "active_providers": ["meta", "google_ads", "klaviyo"],
+  "parked_providers": ["tiktok", "pinterest"],
+  "commerce_adapter_role": {
+    "can_resolve_workspace_server_side": true,
+    "can_start_authorization_after_workspace_verification": true,
+    "owns_provider_connection": false,
+    "required_in_primary_key": false,
+    "required_foreign_key": false,
+    "audit_source_only": "last_authorized_via"
+  },
+  "connection_states": [
+    "pending_account_selection",
+    "connected",
+    "disconnected",
+    "revoked"
+  ],
+  "state_rules": {
+    "oauth_callback_result": "pending_account_selection",
+    "connected_requires_server_verified_account": true,
+    "connected_requires_source_currency": true,
+    "klaviyo_connected_requires_monthly_plan_cost": true,
+    "disconnect_preserves_historical_analytics": true,
+    "provider_revoke_is_not_implied_by_local_disconnect": true
+  },
+  "token_authority": {
+    "encrypted_envelopes_only": true,
+    "browser_access": false,
+    "single_authoritative_copy_after_r5": true,
+    "r4a_copies_existing_tokens": false
+  },
+  "live_preflight": {
+    "result": "PASS",
+    "canonical_table_exists": false,
+    "workspace_rows": 1,
+    "shopify_scoped_rows": 1,
+    "legacy_connection_rows": 8,
+    "legacy_encrypted_token_rows": 7,
+    "legacy_plaintext_token_rows": 0,
+    "embedded_and_legacy_klaviyo_both_exist": true,
+    "evidence": "docs/security/evidence/R4A_WORKSPACE_PROVIDER_CONNECTION_PREFLIGHT_2026-09-23.json"
+  },
+  "migration": "supabase/migrations/20260923091731_create_workspace_provider_connections.sql",
+  "production_gate": {
+    "explicit_approval_required": true,
+    "approval_received": true,
+    "live_migration_version": "20260923091731",
+    "result": "PASS",
+    "preflight": "docs/security/sql/R4_WORKSPACE_PROVIDER_CONNECTIONS_PREFLIGHT.sql",
+    "postcheck": "docs/security/sql/R4_WORKSPACE_PROVIDER_CONNECTIONS_POSTCHECK.sql",
+    "rollback": "docs/security/sql/R4_WORKSPACE_PROVIDER_CONNECTIONS_ROLLBACK.sql",
+    "evidence": "docs/security/evidence/R4B_WORKSPACE_PROVIDER_CONNECTION_APPLY_2026-09-23.json"
+  },
+  "r4c_write_freeze": {
+    "result": "PASS",
+    "live_migration_version": "20260923093756",
+    "migration": "supabase/migrations/20260923093756_r4c_freeze_legacy_provider_writes.sql",
+    "frozen_legacy_platforms": ["meta", "google", "klaviyo", "tiktok", "pinterest"],
+    "embedded_shopify_oauth_preserved": true,
+    "historical_rows_preserved": true,
+    "evidence": "docs/security/evidence/R4C_LEGACY_PROVIDER_WRITE_FREEZE_2026-09-23.json"
+  },
+  "forbidden_until_later_gate": [
+    "copy_existing_connections",
+    "decrypt_or_reencrypt_existing_tokens",
+    "change_oauth_routes",
+    "enable_provider_runtime",
+    "provider_revoke",
+    "delete_or_disable_legacy_records"
+  ],
+  "next_steps": [
+    "R5_verified_connection_consolidation"
+  ]
+}

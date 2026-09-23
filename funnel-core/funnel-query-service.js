@@ -92,8 +92,69 @@ class FunnelQueryService {
   }
 }
 
+class WorkspaceFunnelQueryService {
+  constructor({ repository }) {
+    if (!repository || typeof repository.readCanonicalRawFacts !== 'function') {
+      throw new Error('WorkspaceFunnelQueryService requires a dataset repository');
+    }
+    this.repository = repository;
+  }
+
+  async query({ workspace_id, from, to, platform = null, platform_account_id = null, entity_key = null, analysis_scope = ANALYSIS_SCOPES.PAID } = {}) {
+    if (!workspace_id) throw new Error('workspace_id is required');
+    ensureDateRange(from, to);
+    const scope = normalizeScope(analysis_scope);
+    const rawRows = await this.repository.readCanonicalRawFacts({
+      workspace_id,
+      from,
+      to,
+      platform,
+      platform_account_id,
+      entity_key
+    });
+    if (rawRows.some((row) => row.identity.workspace_id !== workspace_id)) {
+      throw new Error('Cross-workspace query result rejected');
+    }
+
+    const currency = inferTargetCurrency(rawRows);
+    const totalAggregate = aggregateScope(rawRows, scope);
+    const totals = { ...totalAggregate, ...calculateFunnelMetrics(totalAggregate) };
+    const paidIntentAggregate = aggregateIntentPaid(rawRows);
+    const intent = calculateIntentMetrics(paidIntentAggregate);
+    const rows = [];
+    for (const [groupKey, groupRows] of groupByEntity(rawRows)) {
+      const aggregate = aggregateScope(groupRows, scope);
+      if (aggregate.row_count === 0) continue;
+      rows.push({
+        entity_key: groupKey,
+        platform: groupRows[0].identity.platform,
+        platform_account_id: groupRows[0].identity.platform_account_id,
+        entity: groupRows[0].entity,
+        ...aggregate,
+        ...calculateFunnelMetrics(aggregate)
+      });
+    }
+    rows.sort((a, b) => a.entity_key.localeCompare(b.entity_key));
+    return {
+      period: { from, to },
+      rows,
+      totals,
+      intent,
+      meta: {
+        workspace_id,
+        analysis_scope: scope,
+        formula_engine_version: FORMULA_ENGINE_VERSION,
+        canonical_contract_version: 'v2',
+        currency,
+        metric_support: totals.metric_support
+      }
+    };
+  }
+}
+
 module.exports = Object.freeze({
   FunnelQueryService,
+  WorkspaceFunnelQueryService,
   inferTargetCurrency,
   groupByEntity
 });

@@ -5,6 +5,7 @@ const {
   renderEmbeddedAppHome,
   renderEmbeddedPlatforms,
 } = require("../src/shopify/embedded-app-home");
+const {configuredOAuthProviders} = require("../src/shopify/embedded-provider-strategies");
 
 function handler(req, res) {
   if (req.method && req.method !== "GET" && req.method !== "HEAD") {
@@ -27,10 +28,17 @@ function handler(req, res) {
   }
 
   const platforms = path === "/shopify/app/platforms";
+  const providerOAuthEnabled = process.env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED === "true";
+  const configuredProviders = new Set(configuredOAuthProviders(process.env));
   const html = platforms
     ? renderEmbeddedPlatforms({
         clientId,
-        providerOAuthEnabled: process.env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED === "true",
+        providerOAuthEnabled,
+        providerAvailability: {
+          meta: providerOAuthEnabled && configuredProviders.has("meta"),
+          google_ads: providerOAuthEnabled && configuredProviders.has("google_ads") && Boolean(String(process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "").trim()),
+          klaviyo: providerOAuthEnabled && configuredProviders.has("klaviyo"),
+        },
       })
     : renderEmbeddedAppHome({clientId});
 
@@ -47,3 +55,4 @@ function handler(req, res) {
 }
 
 module.exports = handler;
+

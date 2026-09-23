@@ -265,3 +265,14 @@ test("R5 operator parameter invokes only the no-refresh verification route", asy
   assert.equal(requests[0].options.method,"GET");
   assert.equal(elements.get("klaviyo-message").textContent,"Connected · Klaviyo account verified · USD");
 });
+
+test("expired R5 verification explains clean reconnect requirement and keeps early Connect hidden", async () => {
+  const elements = new Map();
+  const element = () => ({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect"]) elements.set(id,element());
+  const context = {URLSearchParams,location:{search:"?r5_read_only_verify=1"},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async()=>response(409,{code:"KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED"})};
+  vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(elements.get("klaviyo-connect").hidden,true);
+  assert.equal(elements.get("klaviyo-message").textContent,"The existing Klaviyo authorization has expired. A clean connection must be prepared before reconnecting.");
+});

@@ -12,7 +12,7 @@ Eski satırlardan yalnız birinin Klaviyo hesap numarası embedded kayıtla eşl
 
 ## Durum
 
-`R5-A complete, human binding recorded — R5-B live provider verification deployment pending`.
+`R5-A complete, human binding recorded — R5-B reauthorization required — R5-C controlled clean reset preparation`.
 
 ## R5 kapıları
 
@@ -24,9 +24,9 @@ Eski satırlardan yalnız birinin Klaviyo hesap numarası embedded kayıtla eşl
 
 Embedded token yalnız server tarafında çözülür ve Klaviyo Account API'ye salt okunur istek yapılır. R5 için ayrı `verifyReadOnly` yolu hazırlanmıştır: yalnız tek `GET /api/accounts/` isteği yapar; `401` halinde token refresh yapmadan durur; token veya provider cevabı loglanmaz. Dönen hesap listesinde seçilmiş hesap ve kayıtlı source currency doğrulanmadan R5-C açılamaz.
 
-### R5-C — Kanonik taşıma ve eski hattı yerelde kapatma
+### R5-C — Koşullu kanonik taşıma veya kontrollü temiz reset
 
-R5-A ve R5-B birlikte geçerse embedded bağlantının uyumlu şifreli token zarfları plaintext'e çevrilmeden `workspace_provider_connections` tablosuna alınır. Kanonik satır doğrulanmış `connected` olur. Yalnız eşlenmiş eski bağlantı yerel olarak `migrated/disabled` durumuna alınır. Klaviyo revoke çağrılmaz; eski token zarfı, V1 veri ve snapshot geçmişi silinmez.
+R5-B doğrulaması geçseydi embedded bağlantının uyumlu şifreli token zarfları plaintext'e çevrilmeden `workspace_provider_connections` tablosuna alınacaktı. Canlı doğrulama `409` ile fail-closed durduğu için bu yol kullanılmayacaktır. Kullanıcının temiz başlangıç kararıyla R5-C v2 kontrollü reset yoluna dönmüştür: ayrı işlem-anı onayı sonrasında eski refresh token bir kez revoke edilir; yalnız provider başarısından sonra embedded satır `revoked` olur. Kanonik satır yaratılmaz; token zarfı, hesap/maliyet/currency, V1 veri ve snapshot geçmişi silinmez.
 
 ## Canlı salt okunur envanter — 23 Eylül 2026
 
@@ -57,7 +57,17 @@ R5-A ve R5-B birlikte geçerse embedded bağlantının uyumlu şifreli token zar
 - Başarılı cevap account kimliğini veya tokenı dışarı vermez; yalnız doğrulama sonucu ve currency döner.
 - Geçici R5 operatör parametresi normal kullanıcı akışını değiştirmeden bu route'u çağırabilir.
 - İlgili Klaviyo testleri `16/16`, R5 contract testleri `3/3` geçti.
-- Kod henüz deploy edilmedi; provider teması henüz gerçekleşmedi.
+- Bu hazırlık PR #231 ile deploy edildi; canlı sonucun ayrıntısı aşağıdaki bölümde korunur.
+
+## R5-B canlı doğrulama sonucu ve R5-C kararı — 23 Eylül 2026
+
+- PR #231 production deployment'ı `READY` ve `dev.adstable.app` alias'ı merge commit'e bağlıdır.
+- Açık onayla tek no-refresh Account API doğrulaması çalıştırıldı; endpoint `409` döndürdü.
+- Retry, refresh, revoke, token silme veya canonical connection insert yapılmadı.
+- Supabase kaydı salt okunur kontrolle `connected`, aktif hesaplı, `USD` currency'li ve access/refresh token zarflı bulundu.
+- Doğrulanamayan eski grant kanoniğe taşınmayacak; sonuç `reauthorization_required` olarak kaydedildi.
+- `contracts/r5-klaviyo-consolidation-v2.json` kontrollü temiz reset dalını tanımlar.
+- Hazırlanan reset modülü henüz route'a veya kullanıcı düğmesine bağlı değildir; canlı revoke ve yerel status mutation ayrı son onay bekler.
 
 ## Değişmeyen sınırlar
 

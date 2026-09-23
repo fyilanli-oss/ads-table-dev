@@ -1,6 +1,6 @@
 {
   "contract_version": "r6-workspace-provider-runtime-v1",
-  "status": "R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_PREPARED_NOT_APPLIED",
+  "status": "R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_LIVE_PASS_R7A_READY",
   "canonical_tenant": "workspace_id",
   "active_providers": ["meta", "google_ads", "klaviyo"],
   "parked_providers": ["tiktok", "pinterest"],
@@ -80,19 +80,24 @@
   },
   "r6c_activation_migration": {
     "prepared": true,
-    "migration": "supabase/migrations/20260923153220_r6_dataset_v2_workspace_activation.sql",
+    "migration": "supabase/migrations/20260923154503_r6_dataset_v2_workspace_activation.sql",
     "preflight": "docs/security/sql/R6C_DATASET_ACTIVATION_PREFLIGHT.sql",
     "postcheck": "docs/security/sql/R6C_DATASET_ACTIVATION_POSTCHECK.sql",
     "rollback": "docs/security/sql/R6C_DATASET_ACTIVATION_ROLLBACK.sql",
     "schema_change": "performance_dataset_rows_v2.user_id becomes nullable",
     "workspace_id_not_null_applied": false,
     "legacy_index_or_policy_retired": false,
-    "applied_live": false,
-    "explicit_production_approval_received": false,
+    "applied_live": true,
+    "live_migration_version": "20260923154503",
+    "explicit_production_approval_received": true,
+    "preflight_result": "PASS_PREPARATION_ONLY",
+    "postcheck_result": "PASS",
+    "advisor_result": "PASS_NO_R6C_NEW_WARN_OR_ERROR",
+    "evidence": "docs/security/evidence/R6C_DATASET_ACTIVATION_LIVE.json",
     "provider_runtime_activated": false,
     "database_write_performed": false,
     "provider_contact": false
   },
-  "next_gate": "R6-C_live_migration_explicit_approval"
+  "next_gate": "R7-A_reporting_currency_and_canonical_connect_foundation"
 }
 

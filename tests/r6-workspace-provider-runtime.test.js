@@ -18,7 +18,7 @@ test('R6 contract keeps workspace authority independent from commerce channel', 
 });
 
 test('R6 live preflight records preparation-only state without claiming activation', () => {
-  assert.equal(contract.status, 'R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_PREPARED_NOT_APPLIED');
+  assert.equal(contract.status, 'R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_LIVE_PASS_R7A_READY');
   assert.equal(contract.live_preflight.result, 'PASS_PREPARATION_ONLY');
   assert.equal(contract.live_preflight.dataset_v2_rows, 0);
   assert.equal(contract.live_preflight.canonical_connection_rows, 0);
@@ -54,9 +54,9 @@ test('R6 preflight is read-only and fail-closed', () => {
 
 test('Execution Plan keeps R7-A behind the R6-C live apply and R6-D behind R7-A', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-A\+B Done; R6-C prepared, live apply approval pending/);
+  assert.match(plan, /R6-A\+B\+C Done; R7-A Ready/);
   assert.match(plan, /R6-D.*R7-A/i);
-  assert.match(plan, /R7-A.*R6-C live apply/i);
+  assert.match(plan, /R7-A Ready; R7-B blocked by R6-D/i);
   assert.doesNotMatch(plan, /\| R7 \|[^\n]+`Blocked by R5–R6`/);
 });
 

@@ -29,6 +29,24 @@ test("composition requires one complete strategy for every allowlisted provider"
   assert.deepEqual(PROVIDERS, ["meta", "google_ads", "klaviyo"]);
 });
 
+test("composition can isolate one configured provider without requiring unrelated providers", () => {
+  const {adapters} = fixture();
+  const partial = createEmbeddedProviderOAuthAdapters({
+    authenticateEmbedded() {},
+    createEmbeddedTransaction() {},
+    consumeTransaction() {},
+    connectionStore: {writeFromOAuthTransaction() {}},
+    providerStrategies: {klaviyo: {
+      redirectUri: "https://app.test/api/shopify/providers/klaviyo/oauth/callback",
+      buildAuthorizationUrl() {},
+      exchangeCode() {},
+    }},
+    providers: ["klaviyo"],
+  });
+  assert.deepEqual(Object.keys(partial), ["klaviyo"]);
+  assert.equal(typeof adapters.meta.start, "function");
+});
+
 test("all provider starts derive authority from the verified embedded session", async () => {
   const {adapters, calls} = fixture();
   for (const provider of PROVIDERS) {
@@ -54,3 +72,4 @@ test("replayed or cross-provider state stops before exchange and persistence", a
   assert.equal(calls.some(([name]) => name === "exchange"), false);
   assert.equal(calls.some(([name]) => name === "write"), false);
 });
+

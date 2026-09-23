@@ -1,0 +1,83 @@
+{
+  "contract_version": "r6-workspace-provider-runtime-v1",
+  "status": "R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_PENDING",
+  "canonical_tenant": "workspace_id",
+  "active_providers": ["meta", "google_ads", "klaviyo"],
+  "parked_providers": ["tiktok", "pinterest"],
+  "authorities": {
+    "connection": "public.workspace_provider_connections",
+    "reporting_currency": "public.workspace_settings.reporting_currency",
+    "dataset": "public.performance_dataset_rows_v2",
+    "commerce_channel_role": "authorization_adapter_only",
+    "browser_tenant_fields_are_authority": false
+  },
+  "required_runtime_order": [
+    "resolve_workspace_server_side",
+    "resolve_connected_canonical_provider_connection",
+    "resolve_merchant_selected_reporting_currency",
+    "fetch_provider_account_metadata_and_facts",
+    "normalize_time",
+    "normalize_fx_without_rate_1_fallback",
+    "write_workspace_bound_dataset_v2_rows"
+  ],
+  "live_preflight": {
+    "result": "PASS_PREPARATION_ONLY",
+    "workspace_rows": 1,
+    "workspace_settings_rows": 0,
+    "reporting_currency_rows": 0,
+    "canonical_connection_rows": 0,
+    "canonical_connected_rows": 0,
+    "dataset_v2_rows": 0,
+    "workspace_dataset_rows": 0,
+    "user_id_nullable": false,
+    "workspace_fk_valid": true,
+    "workspace_unique_index_exists": true,
+    "active_legacy_schedules": 0,
+    "open_legacy_jobs": 0,
+    "legacy_freeze_triggers": 6,
+    "revoked_embedded_klaviyo_rows": 1,
+    "database_mutation": false,
+    "provider_contact": false
+  },
+  "dependency_resolution": {
+    "problem": "R6 live acceptance needs reporting currency and canonical connections, while R7 was blocked by all of R6",
+    "sequence": [
+      "R6-A live inventory and versioned contract",
+      "R6-B workspace runtime composition with no provider activation",
+      "R6-C activation migration preparation and dry verification",
+      "R7-A reporting currency and canonical Connect foundation",
+      "R6-D provider live acceptance and controlled activation",
+      "R3-C final workspace tenant enforcement",
+      "R7-B final connected and disconnect experience"
+    ]
+  },
+  "acceptance": {
+    "meta": ["workspace_authority", "verified_account", "time_fx", "non_synthetic_v2_write"],
+    "google_ads": ["workspace_authority", "verified_customer", "standard_and_pmax", "time_fx", "non_synthetic_v2_write"],
+    "klaviyo": ["workspace_authority", "verified_account", "email_cost_and_source_currency", "non_empty_or_proven_empty_result", "time_fx", "non_synthetic_v2_write"],
+    "common": ["no_silent_v1_fallback", "no_cross_workspace_write", "no_browser_service_role", "no_parked_provider_activation"]
+  },
+  "forbidden_until_later_gate": [
+    "production_provider_runtime_activation",
+    "provider_contact",
+    "dataset_v2_write",
+    "synthetic_or_fake_dataset_rows",
+    "default_reporting_currency",
+    "shopify_currency_as_reporting_currency",
+    "silent_fx_rate_1_for_cross_currency",
+    "legacy_v1_fallback",
+    "tiktok_or_pinterest_activation",
+    "workspace_id_not_null_before_r6_live_acceptance"
+  ],
+  "r6b_runtime_boundary": {
+    "result": "PASS_CODE_ONLY",
+    "settings_store": "src/providers/workspace-settings-store.js",
+    "runtime_boundary": "src/providers/workspace-provider-runtime.js",
+    "production_registered": false,
+    "provider_runners_registered": false,
+    "database_write_performed": false,
+    "provider_contact": false
+  },
+  "next_gate": "R6-C_activation_migration_preparation"
+}
+

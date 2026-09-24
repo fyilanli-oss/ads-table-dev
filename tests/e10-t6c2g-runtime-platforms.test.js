@@ -20,7 +20,9 @@ test("embedded Platforms renders the R7-A currency gate, three active providers,
   assert.match(html, /fetch\("\/api\/shopify\/providers\/klaviyo\/accounts" \+ path/);
   assert.match(html, /request\("\/status"\)/);
   assert.match(html, /window\.shopify\.idToken/);
-  assert.match(html, /id="currency-setup" heading="Finish setup"/);
+  assert.match(html, /<div id="currency-setup" hidden>[\s\S]*heading="Finish setup"/);
+  assert.match(html, /currencySetup\.hidden = true;[\s\S]*providerSections\.hidden = true;[\s\S]*Open AdsTable from Shopify Admin/);
+  assert.doesNotMatch(html, /id="reporting-currency-summary"/);
   assert.match(html, /id="platforms-currency-modal" heading="Choose reporting currency" size="small-100"/);
   assert.match(html, /\/api\/shopify\/workspace\/reporting-currency/);
   assert.match(html, /<s-modal id="klaviyo-connect-modal" heading="Connect Klaviyo to AdsTable\?" size="small-100">/);

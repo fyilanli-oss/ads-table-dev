@@ -46,8 +46,8 @@ test("serves public entrypoints from static build outputs without booting Expres
 });
 
 test("isolates Shopify presentation while keeping API and OAuth routes on the application function", () => {
-  assert.equal(routeFor("/")?.dest, "/api/shopify-app.js");
-  assert.equal(routeFor("/shopify/app(?:/platforms)?")?.dest, "/api/shopify-app.js");
+  assert.equal(routeFor("/")?.dest, "/server.js");
+  assert.equal(routeFor("/shopify/app(?:/platforms)?")?.dest, "/server.js");
   assert.equal(routeFor("/api/e10/activation-preflight")?.dest, "/api/e10-activation-preflight.js");
   assert.equal(routeFor("/api/(.*)")?.dest, "/server.js");
   assert.equal(routeFor("/auth/(.*)")?.dest, "/server.js");
@@ -59,3 +59,4 @@ test("serves committed verification and direct HTML files statically", () => {
   assert.equal(routeFor("/(.*\\.txt)")?.dest, "/public/$1");
   assert.equal(routeFor("/(.*\\.html)")?.dest, "/public/$1");
 });
+

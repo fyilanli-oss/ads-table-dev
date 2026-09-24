@@ -7,7 +7,7 @@ R7-A tek seferde canlı OAuth kabulüne açılmayacaktır. Paket iki repository 
 - **R7-A1:** Reporting currency seçimi, Data Sources erişim kapısı, Connect açıklama modalları, aktif/parked provider sınırı ve OAuth sonucunun canonical workspace connection store'a yazılması.
 - **R7-A2:** Meta ve Google Ads için provider tarafından doğrulanmış 1–3 reklam hesabı; Klaviyo için tek doğrulanmış hesap discovery/seçim akışı. Seçimler tek OAuth grant'i altında kanonik bağlantıya atomik yazılır.
 
-R7-A repository uygulaması tamamlanmıştır. Account-cardinality migration'ı `20260924120453` sürümüyle production Supabase'e uygulanmış ve postcheck `PASS` vermiştir. PR #242 merge commit `a94201bf74c76cc57b5a357782c06a3b48bb3f67` production'a dağıtılmış; `dev.adstable.app` aynı READY deployment'a bağlanmıştır. Merchant reporting currency seçimi ve kontrollü gerçek provider kabulü yapılmadan R6-D'ye geçilemez. R6-D tamamlanmadan Meta/Google Disconnect deneyimi açılamaz.
+R7-A repository, deployment ve Klaviyo merchant acceptance adımları tamamlanmıştır. Account-cardinality migration'ı `20260924120453` sürümüyle production Supabase'e uygulanmış ve postcheck `PASS` vermiştir. Timestamp corrective PR #244 merge commit `3206563365219cfe1b9c8483a52294752f186fc7` production'a dağıtılmış; `dev.adstable.app` aynı READY deployment'a bağlanmıştır. Klaviyo Connect→OAuth→tek hesap→plan cost→Connected→revoke-first Disconnect zinciri canlıda PASS vermiştir. Sıradaki kapı R6-D'dir; R6-D tamamlanmadan Meta/Google Disconnect deneyimi açılamaz.
 
 ## Kullanıcı akışı
 

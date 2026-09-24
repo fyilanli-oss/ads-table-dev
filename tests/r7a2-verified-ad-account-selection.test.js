@@ -13,15 +13,16 @@ const response = (status, body) => ({status, ok: status >= 200 && status < 300, 
 
 test('R7-A v2 contract completes repository scope while preserving live gates', () => {
   const contract = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../contracts/r7a-currency-canonical-connect-foundation-v2.json'), 'utf8'));
-  assert.equal(contract.status, 'R7_A_REPOSITORY_COMPLETE_LIVE_ACCEPTANCE_PENDING');
+  assert.equal(contract.status, 'R7_A_KLAVIYO_MERCHANT_ACCEPTANCE_PASS_R6_D_NEXT');
   assert.equal(contract.verified_account_selection.browser_account_fields_are_authority, false);
   assert.match(contract.verified_account_selection.meta, /1-3 accounts/);
   assert.match(contract.verified_account_selection.google_ads, /1-3 accounts/);
   assert.match(contract.verified_account_selection.klaviyo, /Exactly 1 account/);
   assert.equal(contract.ui.app_home_model, 'shopify_admin_embedded_developer_hosted_iframe');
   assert.equal(contract.ui.nested_iframe, false);
-  assert.equal(contract.production_state.live_provider_contact_performed, false);
-  assert.deepEqual(contract.blocked_until_acceptance, ['R6-D', 'R7-B', 'R3-C']);
+  assert.equal(contract.production_state.live_provider_contact_performed, true);
+  assert.equal(contract.production_state.canonical_connection_created, true);
+  assert.deepEqual(contract.blocked_until_acceptance, ['R7-B', 'R3-C']);
 });
 
 test('additive migration stores verified selections with provider-specific cardinality', () => {

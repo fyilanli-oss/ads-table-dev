@@ -74,9 +74,9 @@ test('R6 preflight is read-only and fail-closed', () => {
   assert.doesNotMatch(sql, /\b(insert|update|delete|alter|drop|create|truncate)\b/i);
 });
 
-test('Execution Plan keeps R7-A behind the R6-C live apply and R6-D behind R7-A', () => {
+test('Execution Plan keeps R6-D2 after R6-D1 and R7-A merchant acceptance', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-A\+B\+C Done; R7-A Ready/);
+  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2 live acceptance next/);
   assert.match(plan, /R7-A.*R6-D/i);
   assert.match(plan, /R7-A merchant acceptance PASS; R6-D next; R7-B blocked by R6-D/i);
   assert.doesNotMatch(plan, /\| R7 \|[^\n]+`Blocked by R5–R6`/);

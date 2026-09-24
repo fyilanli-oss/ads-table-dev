@@ -32,7 +32,7 @@ function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedde
     try {
       const tokens = await exchangeCode({code, redirectUri, pkceVerifier: transaction.pkce_verifier || null});
       if (!tokens || typeof tokens.accessToken !== "string" || !tokens.accessToken) throw new Error("INVALID_PROVIDER_TOKEN_RESPONSE");
-      await connectionStore.writeFromOAuthTransaction({transaction, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken || null});
+      await connectionStore.writeFromOAuthTransaction({\n        transaction,\n        accessToken: tokens.accessToken,\n        refreshToken: tokens.refreshToken || null,\n        scopes: Array.isArray(tokens.scopes) ? tokens.scopes : [],\n      });
       return Object.freeze({redirect_to: returnTarget, outcome: "account_selection_required"});
     } catch (error) {
       // The transaction has already been consumed. Preserve only the verified Shopify Admin

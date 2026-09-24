@@ -1,6 +1,7 @@
 'use strict';
 
 const {validateCanonicalRow}=require('../../../funnel-core/canonical-contract');
+const {validateWorkspaceCanonicalRow}=require('../../../funnel-core/workspace-canonical-contract');
 const {buildEntityKey,validateEntityHierarchy}=require('../../../funnel-core/entity-hierarchy');
 const {normalizeCurrencyCode,normalizeMonetaryRawFields}=require('../../../funnel-core/fx-service');
 const {normalizeBusinessDate}=require('../../../funnel-core/time-service');
@@ -19,7 +20,7 @@ function normalizeKlaviyoTimeFxMessage(input,context={}){
   const mapped=mapKlaviyoMessage(input,{...context,accountId,businessDate:time.business_date,sourceCurrency,targetCurrency:sourceCurrency,sourceTimezone,timeEngineVersion:time.time_engine_version});
   const targetCurrency=normalizeCurrencyCode(context.targetCurrency??sourceCurrency,'context.targetCurrency'),crossCurrency=targetCurrency!==sourceCurrency;
   const row=normalizeMonetaryRawFields(mapped.row,{sourceCurrency,targetCurrency,fxRate:context.fxRate??null,fxRateDate:context.fxRateDate??time.business_date,fxProvider:crossCurrency?required(context.fxProvider,'context.fxProvider'):(context.fxProvider??'same_currency')});
-  row.identity.date=time.business_date;row.time=time;validateCanonicalRow(row);validateEntityHierarchy(row.identity,row.entity);
+  row.identity.date=time.business_date;row.time=time;if(context.workspaceId)validateWorkspaceCanonicalRow(row);else validateCanonicalRow(row);validateEntityHierarchy(row.identity,row.entity);
   return Object.freeze({row:Object.freeze(row),entityKey:buildEntityKey(row.identity,row.entity)});
 }
 
@@ -27,11 +28,11 @@ function createKlaviyoDatasetWriter({writeBoundary,resolveFxRate}={}){
   if(!writeBoundary||typeof writeBoundary.write!=='function')throw new TypeError('canonical write boundary is required');if(typeof resolveFxRate!=='function')throw new TypeError('FX resolver is required');
   return Object.freeze({async ingest(input={}){
     const context=input.context||{},rows=input.rows;if(!Array.isArray(rows))throw new TypeError('Klaviyo provider rows must be an array');
-    const userId=required(context.userId,'context.userId'),accountId=required(input.accountId,'accountId'),account=context.account,targetCurrency=required(context.targetCurrency,'context.targetCurrency'),providerDate=required(context.providerDate,'context.providerDate');
+    const workspaceMode=context.workspaceId!==undefined&&context.workspaceId!==null,userId=workspaceMode?null:required(context.userId,'context.userId'),accountId=required(input.accountId,'accountId'),account=context.account,targetCurrency=required(context.targetCurrency,'context.targetCurrency'),providerDate=required(context.providerDate,'context.providerDate');
     if(!account||required(account.id,'context.account.id')!==accountId)throw new Error('Klaviyo write account ownership mismatch');
     let fx;try{fx=await resolveFxRate(required(account.currency,'context.account.currency'),targetCurrency,{rateDate:providerDate});}catch(error){throw mark(error,'KLAVIYO_FX_LOOKUP');}
     let mapped;try{mapped=rows.map(row=>normalizeKlaviyoTimeFxMessage(row,{...context,accountId,providerDate,targetCurrency,fxRate:fx.fx_rate,fxRateDate:fx.fx_rate_date||providerDate,fxProvider:fx.fx_provider}));}catch(error){throw mark(error,'KLAVIYO_ADAPTER');}
-    const keys=new Set(),canonical=mapped.map(result=>{const row=result.row,key=`${row.identity.date}:${result.entityKey}`;if(keys.has(key))throw mark(new Error('Duplicate normalized Klaviyo message would double-count facts'),'KLAVIYO_ADAPTER');keys.add(key);if(row.identity.user_id!==userId||row.identity.platform_account_id!==accountId||row.identity.platform!=='klaviyo')throw mark(new Error('Klaviyo canonical row ownership mismatch'),'KLAVIYO_ADAPTER');return row;});
+    const keys=new Set(),canonical=mapped.map(result=>{const row=result.row,key=`${row.identity.date}:${result.entityKey}`;if(keys.has(key))throw mark(new Error('Duplicate normalized Klaviyo message would double-count facts'),'KLAVIYO_ADAPTER');keys.add(key);if((workspaceMode?row.identity.workspace_id!==context.workspaceId:row.identity.user_id!==userId)||row.identity.platform_account_id!==accountId||row.identity.platform!=='klaviyo')throw mark(new Error('Klaviyo canonical row ownership mismatch'),'KLAVIYO_ADAPTER');return row;});
     let persisted;try{persisted=await writeBoundary.write(canonical);}catch(error){throw mark(error,'KLAVIYO_DATASET_V2_WRITE');}if(!Array.isArray(persisted)||persisted.length!==canonical.length)throw mark(new Error('Klaviyo Dataset V2 write result cardinality mismatch'),'KLAVIYO_DATASET_V2_WRITE');
     return Object.freeze({attempted:canonical.length,persisted:persisted.length,empty_provider_result:rows.length===0,rows:persisted});
   }});

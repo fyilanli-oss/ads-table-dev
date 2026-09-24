@@ -1,6 +1,6 @@
 {
   "contract_version": "r6-workspace-provider-runtime-v1",
-  "status": "R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_LIVE_PASS_R7A_READY",
+  "status": "R7A_MERCHANT_ACCEPTANCE_PASS_R6D_PREPARATION",
   "canonical_tenant": "workspace_id",
   "active_providers": ["meta", "google_ads", "klaviyo"],
   "parked_providers": ["tiktok", "pinterest"],
@@ -98,6 +98,55 @@
     "database_write_performed": false,
     "provider_contact": false
   },
-  "next_gate": "R7-A_reporting_currency_and_canonical_connect_foundation"
+  "r6d_work_packages": {
+    "status": "R6_D1_COMPLETE_R6_D2_REPOSITORY_PREPARED_LIVE_CLOSED",
+    "sequence": [
+      "R6-D1 common fail-closed acceptance runner",
+      "R6-D2 Klaviyo workspace live acceptance",
+      "R6-D3 Meta workspace live acceptance",
+      "R6-D4 Google Ads workspace live acceptance",
+      "R6-D5 provider-by-provider controlled activation decision"
+    ],
+    "current_live_connection_state": {
+      "klaviyo": "disconnected",
+      "meta": "not_live_accepted",
+      "google_ads": "not_live_accepted"
+    },
+    "rules": [
+      "repository preparation does not authorize provider contact",
+      "repository preparation does not authorize Dataset V2 writes",
+      "each live provider acceptance requires a connected canonical connection",
+      "each live provider acceptance requires separate explicit production approval",
+      "a provider may be activated only after its own acceptance passes",
+      "one provider acceptance does not activate another provider",
+      "empty Klaviyo acceptance must be proven from the provider response and writes no synthetic row",
+      "TikTok and Pinterest remain parked"
+    ],
+    "r6_d1": {
+      "result": "PASS_REPOSITORY_ONLY",
+      "selected_account_coverage_enforced": true,
+      "provider_platform_match_enforced": true,
+      "source_and_target_currency_enforced": true,
+      "timezone_and_business_date_required": true,
+      "synthetic_rows_rejected": true,
+      "verified_empty_or_non_empty_required": true,
+      "production_registered": false
+    },
+    "r6_d2": {
+      "result": "PASS_REPOSITORY_PREPARATION_ONLY",
+      "provider_client": "src/providers/klaviyo/provider-client.js",
+      "workspace_runner": "src/providers/klaviyo/workspace-runner.js",
+      "api_revision": "2026-07-15",
+      "required_oauth_scopes": ["accounts:read", "campaigns:read", "flows:read", "metrics:read"],
+      "conversion_metric_id_must_be_explicit": true,
+      "sms_spend_currency": "USD_ONLY",
+      "current_connection": "disconnected",
+      "production_registered": false,
+      "provider_contact": false,
+      "dataset_v2_write": false,
+      "deployment_performed": false
+    }
+  },
+  "next_gate": "R6-D2_production_composition_and_read_only_preflight"
 }
 

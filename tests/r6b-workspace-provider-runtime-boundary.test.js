@@ -55,7 +55,16 @@ function runtimeFixture(overrides = {}) {
     resolveAuthority: async input => { calls.push(['authority', input]); return authority; },
     connectionStore: { resolveConnected: async input => { calls.push(['connection', input]); return connection; } },
     settingsStore: { resolveReportingCurrency: async input => { calls.push(['currency', input]); return { reportingCurrency: 'TRY', currencyVersion: 3 }; } },
-    runners: overrides.runners || { meta: async context => { calls.push(['runner', context]); return { rows: [{ identity: {} }] }; } },
+    runners: overrides.runners || { meta: async context => { calls.push(['runner', context]); return {
+      provider_result_status: 'non_empty',
+      checked_account_ids: ['act-1'],
+      rows: [{
+        identity: { platform: 'meta', platform_account_id: 'act-1' },
+        currency: { source_currency: 'USD', target_currency: 'TRY' },
+        time: { source_timezone: 'Europe/Istanbul', business_date: '2026-09-23' },
+        provenance: { synthetic: false },
+      }]
+    }; } },
     datasetRuntime: { write: async input => { calls.push(['write', input]); return input.rows; } },
   });
   return { calls, runtime };
@@ -66,13 +75,31 @@ test('workspace provider runtime resolves authority, connection and currency bef
   const result = await runtime.run({ authority_input: { session_token: 'opaque' }, provider: 'meta', request: { date: '2026-09-23' } });
   assert.deepEqual(result, {
     provider: 'meta', workspace_id: WORKSPACE, attempted: 1, persisted: 1,
-    empty_provider_result: false, currency_version: 3,
+    empty_provider_result: false, selected_account_count: 1,
+    provider_result_status: 'non_empty', production_activation: false, currency_version: 3,
   });
   assert.deepEqual(calls.map(([name]) => name), ['authority', 'connection', 'currency', 'runner', 'write']);
   assert.equal(calls[3][1].reportingCurrency, 'TRY');
   assert.equal(calls[4][1].authority_input.session_token, 'opaque');
   assert.equal(Object.hasOwn(result, 'accessToken'), false);
   assert.equal(Object.hasOwn(result, 'refreshToken'), false);
+});
+
+test('workspace provider runtime verifies selected-account coverage and rejects synthetic or mismatched facts', async () => {
+  const result = rows => ({ provider_result_status: rows.length ? 'non_empty' : 'empty', checked_account_ids: ['act-1'], rows });
+  const row = {
+    identity: { platform: 'meta', platform_account_id: 'act-1' },
+    currency: { source_currency: 'USD', target_currency: 'TRY' },
+    time: { source_timezone: 'Europe/Istanbul', business_date: '2026-09-23' },
+    provenance: { synthetic: false },
+  };
+  const run = runnerResult => runtimeFixture({ runners: { meta: async () => runnerResult } }).runtime
+    .run({ authority_input: { session_token: 'opaque' }, provider: 'meta' });
+  await assert.rejects(run(result([{ ...row, identity: { ...row.identity, platform_account_id: 'other' } }])), /PROVIDER_RUNTIME_UNSELECTED_ACCOUNT_ROW/);
+  await assert.rejects(run(result([{ ...row, provenance: { synthetic: true } }])), /PROVIDER_RUNTIME_SYNTHETIC_ROW_REJECTED/);
+  await assert.rejects(run(result([{ ...row, currency: { ...row.currency, source_currency: 'EUR' } }])), /PROVIDER_RUNTIME_SOURCE_CURRENCY_MISMATCH/);
+  await assert.rejects(run({ provider_result_status: 'empty', checked_account_ids: [], rows: [] }), /PROVIDER_RUNTIME_ACCOUNT_COVERAGE_INVALID/);
+  await assert.rejects(run({ provider_result_status: 'non_empty', checked_account_ids: ['act-1'], rows: [] }), /PROVIDER_RUNTIME_RESULT_NOT_VERIFIED/);
 });
 
 test('workspace provider runtime rejects missing connection, parked providers and caller tenant claims', async () => {

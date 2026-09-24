@@ -69,6 +69,37 @@ Shopify currency, provider currency veya sabit bir varsayılan reporting currenc
 - Provider runner hâlâ production'a kayıtlı değildir; OAuth, provider teması ve Dataset V2 yazımı kapalı kalır.
 - R6-C tamamlandı; sıradaki kapı R7-A reporting currency ve canonical Connect foundation'dır.
 
+## R7-A sonrası R6-D iş aynası
+
+R7-A Klaviyo merchant acceptance canlıda tamamlandı. Kullanıcı daha sonra bağlantıyı bilinçli olarak kaldırdı; canonical Klaviyo satırı `disconnected`, token ve hesap alanları temiz durumdadır. Bu nedenle OAuth deneyiminin başarılı olması R6-D provider runtime kabulü veya Dataset V2 aktivasyonu sayılmaz.
+
+R6-D aşağıdaki sabit sırayla yürütülür:
+
+1. **R6-D1 — Ortak fail-closed kabul koşucusu:** Workspace authority, canonical connected connection, merchant-selected reporting currency, seçilmiş provider hesabı, Time/FX, sentetik olmayan canonical sonuç ve Dataset V2 yazısı tek kontrollü akışta birleştirilir. Bu paket yalnız repository hazırlığıdır; provider teması, production deployment veya Dataset V2 yazısı yapmaz.
+2. **R6-D2 — Klaviyo canlı kabulü:** Kullanıcı Klaviyo'yu yeniden bağladıktan ve ayrı production onayı verdikten sonra tek verified account için gerçek provider sonucu alınır. Non-empty gerçek satırlar workspace-bound Dataset V2'ye yazılır. Provider gerçekten boş dönerse `empty_provider_result=true` kanıtlanır ve sahte satır yazılmaz.
+3. **R6-D3 — Meta canlı kabulü:** Ayrı bağlantı ve onayla, kullanıcının seçtiği 1–3 verified reklam hesabının her biri workspace/hesap sahipliği, timezone, source currency, Time/FX ve gerçek Dataset V2 sonucu bakımından doğrulanır.
+4. **R6-D4 — Google Ads canlı kabulü:** Ayrı bağlantı ve onayla, seçilen 1–3 verified customer için Standard ve PMax kapsamı, timezone, source currency, Time/FX ve gerçek Dataset V2 sonucu doğrulanır.
+5. **R6-D5 — Kontrollü aktivasyon kararı:** Her provider yalnız kendi canlı kabulü PASS olduktan sonra açılabilir. Bir provider'ın PASS sonucu diğerini açmaz. Üç provider sonucu Execution Plan'a işlendiğinde R6-D kapanır; ardından R3-C ve R7-B kapıları değerlendirilir.
+
+Her canlı kabul öncesinde salt-okunur preflight zorunludur. Provider teması, kalıcı Dataset V2 yazısı, production deployment ve runtime aktivasyonu repository hazırlığından ayrı açık onay ister. Klaviyo'nun mevcut `disconnected` durumu R6-D2'nin bugün çalıştırılamayacağı anlamına gelir; bu bir hata veya gizli blocker değil, bilinçli bağlantı kaldırma sonucudur.
+
+### R6-D1 repository sonucu — PASS
+
+Ortak runtime artık Dataset V2 yazısından önce şu kapıları uygular: canonical bağlantıda seçilmiş bütün hesapların kapsanması; provider/platform ve hesap eşleşmesi; provider source currency ile merchant reporting currency ayrımı; timezone ve business date varlığı; sentetik satır reddi; provider tarafından doğrulanmış `empty` veya `non_empty` sonucu. Sonuç yalnız redacted adet ve durum taşır, token/hesap kimliği/metrik taşımaz ve `production_activation=false` kalır. Provider runner production composition root'a kayıtlı değildir.
+
+### R6-D2 Klaviyo repository hazırlığı — PASS / canlı kapı kapalı
+
+- Klaviyo mapper workspace modunda `user_id` üretmez; doğrulanmış `workspace_id` kullanır.
+- Canonical bağlantıdaki tek hesap ID/currency, Klaviyo Accounts API sonucuyla tekrar eşleştirilir; timezone provider hesabından alınır.
+- Campaign ve Flow günlük raporları ile aynı ayın month-to-date gönderim toplamları ayrı alınır. Email plan maliyeti yalnız canonical connection kaydından kullanım payıyla dağıtılır.
+- `text_message_spend` Klaviyo sözleşmesinde USD'dir. Account currency USD değilse bu değer başka currency gibi etiketlenmez; `unsupported/null` kalır.
+- Conversion metric ID tahmin edilmez; production composition açık bir Placed Order metric ID olmadan fail-closed durur.
+- OAuth scope'a `flows:read` eklenmiştir. Mevcut bağlantı disconnected olduğu için bu scope ancak sonraki açık reconnect grant'inde alınabilir.
+- Empty kabul yalnız Accounts, Campaign reporting ve Flow reporting istekleri başarıyla döndükten ve iki günlük branch de boş olduktan sonra `verified_empty=true` olabilir; sahte satır üretilmez.
+- Kod production route/job/cron'a bağlı değildir. Deployment, provider çağrısı ve Dataset V2 yazısı yapılmamıştır.
+
+Resmî sözleşme referansları: Klaviyo [Get Accounts](https://developers.klaviyo.com/en/reference/get_accounts), [Reporting API overview](https://developers.klaviyo.com/en/reference/reporting_api_overview), [Get Campaigns](https://developers.klaviyo.com/en/reference/get_campaigns) ve [Get Flows](https://developers.klaviyo.com/en/reference/get_flows).
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

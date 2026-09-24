@@ -18,7 +18,7 @@ test('R6 contract keeps workspace authority independent from commerce channel', 
 });
 
 test('R6 live preflight records preparation-only state without claiming activation', () => {
-  assert.equal(contract.status, 'R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_LIVE_PASS_R7A_READY');
+  assert.equal(contract.status, 'R7A_MERCHANT_ACCEPTANCE_PASS_R6D_PREPARATION');
   assert.equal(contract.live_preflight.result, 'PASS_PREPARATION_ONLY');
   assert.equal(contract.live_preflight.dataset_v2_rows, 0);
   assert.equal(contract.live_preflight.canonical_connection_rows, 0);
@@ -26,6 +26,28 @@ test('R6 live preflight records preparation-only state without claiming activati
   assert.equal(contract.live_preflight.user_id_nullable, false);
   assert.equal(contract.live_preflight.database_mutation, false);
   assert.equal(contract.live_preflight.provider_contact, false);
+});
+
+test('R6-D is provider-by-provider and repository preparation grants no live authority', () => {
+  assert.equal(contract.r6d_work_packages.status, 'R6_D1_COMPLETE_R6_D2_REPOSITORY_PREPARED_LIVE_CLOSED');
+  assert.deepEqual(contract.r6d_work_packages.sequence, [
+    'R6-D1 common fail-closed acceptance runner',
+    'R6-D2 Klaviyo workspace live acceptance',
+    'R6-D3 Meta workspace live acceptance',
+    'R6-D4 Google Ads workspace live acceptance',
+    'R6-D5 provider-by-provider controlled activation decision'
+  ]);
+  assert.equal(contract.r6d_work_packages.current_live_connection_state.klaviyo, 'disconnected');
+  assert.ok(contract.r6d_work_packages.rules.includes('repository preparation does not authorize provider contact'));
+  assert.ok(contract.r6d_work_packages.rules.includes('repository preparation does not authorize Dataset V2 writes'));
+  assert.ok(contract.r6d_work_packages.rules.includes('one provider acceptance does not activate another provider'));
+  assert.equal(contract.r6d_work_packages.r6_d1.result, 'PASS_REPOSITORY_ONLY');
+  assert.equal(contract.r6d_work_packages.r6_d1.production_registered, false);
+  assert.equal(contract.r6d_work_packages.r6_d2.result, 'PASS_REPOSITORY_PREPARATION_ONLY');
+  assert.equal(contract.r6d_work_packages.r6_d2.current_connection, 'disconnected');
+  assert.equal(contract.r6d_work_packages.r6_d2.provider_contact, false);
+  assert.equal(contract.r6d_work_packages.r6_d2.dataset_v2_write, false);
+  assert.equal(contract.next_gate, 'R6-D2_production_composition_and_read_only_preflight');
 });
 
 test('R6 resolves the R6-R7 dependency cycle without early provider activation', () => {
@@ -59,3 +81,4 @@ test('Execution Plan keeps R7-A behind the R6-C live apply and R6-D behind R7-A'
   assert.match(plan, /R7-A merchant acceptance PASS; R6-D next; R7-B blocked by R6-D/i);
   assert.doesNotMatch(plan, /\| R7 \|[^\n]+`Blocked by R5–R6`/);
 });
+

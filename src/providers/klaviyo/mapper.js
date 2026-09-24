@@ -1,6 +1,7 @@
 'use strict';
 
 const {validateCanonicalRow}=require('../../../funnel-core/canonical-contract');
+const {validateWorkspaceCanonicalRow}=require('../../../funnel-core/workspace-canonical-contract');
 const {buildEntityKey,validateEntityHierarchy}=require('../../../funnel-core/entity-hierarchy');
 
 const ADAPTER_VERSION='klaviyo-v1';
@@ -41,7 +42,9 @@ function mapKlaviyoMessage(input,context={}){
   const branch=text(input.branch,'branch').toLowerCase(),channel=text(input.channel,'channel').toLowerCase();
   if(!Object.hasOwn(BRANCHES,branch))throw new Error('branch must be campaign|flow');
   if(!CHANNELS.includes(channel))throw new Error('channel must be email|sms');
-  const identity={user_id:text(context.userId,'context.userId'),platform:'klaviyo',traffic_type:'paid',source_system:'klaviyo',channel,platform_account_id:text(context.accountId,'context.accountId'),date:text(context.businessDate,'context.businessDate')};
+  const workspaceMode=context.workspaceId!==undefined&&context.workspaceId!==null;
+  if(workspaceMode&&context.userId!==undefined&&context.userId!==null)throw new Error('Klaviyo canonical tenant must be workspace or user, not both');
+  const identity={user_id:workspaceMode?null:text(context.userId,'context.userId'),...(workspaceMode?{workspace_id:text(context.workspaceId,'context.workspaceId')}:{}),platform:'klaviyo',traffic_type:'paid',source_system:'klaviyo',channel,platform_account_id:text(context.accountId,'context.accountId'),date:text(context.businessDate,'context.businessDate')};
   const entity={campaign_type:null,root_entity_type:branch,root_entity_id:text(input.root?.id,'root.id'),root_entity_name:text(input.root?.name,'root.name'),parent_entity_type:null,parent_entity_id:null,parent_entity_name:null,entity_type:BRANCHES[branch],entity_id:text(input.message?.id,'message.id'),entity_name:text(input.message?.name,'message.name')};
   const metrics=input.metrics||{},declared=input.metric_support||{};
   const impression=number(metrics.delivered,'metrics.delivered'),adClick=number(metrics.unique_clicks,'metrics.unique_clicks');
@@ -56,8 +59,9 @@ function mapKlaviyoMessage(input,context={}){
   const hasUnknown=Object.values(metricSupport).includes('unknown');
   const estimatedSpend=['allocated','estimated','allocated_plus_estimated_overage'].includes(spend.provenance.spend_kind);
   const row={identity,entity,raw_metrics:values,metric_support:metricSupport,currency:{source_currency:sourceCurrency,target_currency:targetCurrency,fx_rate:context.fxRate??null,fx_rate_date:context.fxRateDate??null,fx_provider:context.fxProvider??null,fx_engine_version:context.fxEngineVersion??null},time:{source_timezone:text(context.sourceTimezone,'context.sourceTimezone'),business_date:identity.date,time_engine_version:text(context.timeEngineVersion||'v1','context.timeEngineVersion')},provenance:{source_system:'klaviyo',adapter_version:ADAPTER_VERSION,source_confidence:hasUnknown?'partial':estimatedSpend?'fallback':'real',synthetic:false,ga4_property_id:null,source_job_id:context.sourceJobId||null,raw_reference:{branch,channel,open_count_present:opens!==null,click_source:'unique_clicks',spend:spend.provenance}}};
-  validateCanonicalRow(row);validateEntityHierarchy(identity,entity);
+  if(workspaceMode)validateWorkspaceCanonicalRow(row);else validateCanonicalRow(row);validateEntityHierarchy(identity,entity);
   return Object.freeze({row,entityKey:buildEntityKey(identity,entity)});
 }
 
 module.exports=Object.freeze({ADAPTER_VERSION,BRANCHES,CHANNELS,JOURNEY_METRICS,allocateKlaviyoDailySpend,mapKlaviyoMessage});
+

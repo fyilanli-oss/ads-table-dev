@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const SPECS = Object.freeze({
   meta: {client: "META_APP_ID", secret: "META_APP_SECRET", scope: "ads_read", authorize: "https://www.facebook.com/v20.0/dialog/oauth"},
   google_ads: {client: "GOOGLE_CLIENT_ID", secret: "GOOGLE_CLIENT_SECRET", scope: "https://www.googleapis.com/auth/adwords", authorize: "https://accounts.google.com/o/oauth2/v2/auth"},
-  klaviyo: {client: "KLAVIYO_CLIENT_ID", secret: "KLAVIYO_CLIENT_SECRET", scope: "accounts:read campaigns:read events:read metrics:read", authorize: "https://www.klaviyo.com/oauth/authorize"},
+  klaviyo: {client: "KLAVIYO_CLIENT_ID", secret: "KLAVIYO_CLIENT_SECRET", scope: "accounts:read campaigns:read flows:read events:read metrics:read", authorize: "https://www.klaviyo.com/oauth/authorize"},
   tiktok: {client: "TIKTOK_CLIENT_ID", secret: "TIKTOK_CLIENT_SECRET", scope: "", authorize: "https://business-api.tiktok.com/portal/auth"},
   pinterest: {client: "PINTEREST_CLIENT_ID", secret: "PINTEREST_CLIENT_SECRET", scope: "ads:read,user_accounts:read", authorize: "https://www.pinterest.com/oauth/"},
 });
@@ -64,3 +64,4 @@ function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCo
 }
 
 module.exports = Object.freeze({createEmbeddedProviderStrategies, configuredOAuthProviders, SPECS, ACTIVE_PROVIDERS});
+

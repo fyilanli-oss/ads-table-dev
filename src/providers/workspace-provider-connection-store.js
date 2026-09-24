@@ -124,7 +124,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,source_currency,selected_accounts,access_token_envelope,refresh_token_envelope,connection_version')
+      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,connection_version')
       .eq('workspace_id', workspace.workspace_id)
       .eq('provider', provider)
       .eq('status', 'connected')
@@ -137,6 +137,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       activeAccountId: data.active_account_id,
       sourceCurrency: data.source_currency,
       selectedAccounts: Array.isArray(data.selected_accounts) ? data.selected_accounts : [],
+      monthlyPlanCost: data.monthly_plan_cost,
       accessToken: vault.decrypt(data.access_token_envelope, tokenContext(workspace.workspace_id, provider, 'access')),
       refreshToken: data.refresh_token_envelope
         ? vault.decrypt(data.refresh_token_envelope, tokenContext(workspace.workspace_id, provider, 'refresh'))
@@ -298,3 +299,4 @@ module.exports = Object.freeze({
   authorityFromEmbeddedTransaction,
   createCanonicalWorkspaceProviderConnectionStore
 });
+

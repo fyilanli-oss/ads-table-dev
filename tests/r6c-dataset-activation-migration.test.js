@@ -37,7 +37,7 @@ test('R6-C rollback fails closed after workspace-only rows exist', () => {
 });
 
 test('R6-C contract records live schema acceptance without provider activation', () => {
-  assert.equal(contract.status, 'R6A_PREFLIGHT_PASS_R6B_CODE_COMPLETE_R6C_LIVE_PASS_R7A_READY');
+  assert.equal(contract.status, 'R7A_MERCHANT_ACCEPTANCE_PASS_R6D_PREPARATION');
   assert.equal(contract.r6c_activation_migration.prepared, true);
   assert.equal(contract.r6c_activation_migration.applied_live, true);
   assert.equal(contract.r6c_activation_migration.live_migration_version, '20260923154503');
@@ -45,6 +45,6 @@ test('R6-C contract records live schema acceptance without provider activation',
   assert.equal(contract.r6c_activation_migration.postcheck_result, 'PASS');
   assert.equal(contract.r6c_activation_migration.provider_runtime_activated, false);
   assert.equal(contract.r6b_runtime_boundary.production_registered, false);
-  assert.equal(contract.next_gate, 'R7-A_reporting_currency_and_canonical_connect_foundation');
+  assert.equal(contract.next_gate, 'R6-D2_production_composition_and_read_only_preflight');
 });
 

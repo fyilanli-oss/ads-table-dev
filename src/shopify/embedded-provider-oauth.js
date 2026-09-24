@@ -29,12 +29,20 @@ function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedde
       throw new Error("INVALID_EMBEDDED_OAUTH_TRANSACTION");
     }
     const returnTarget = await resolveReturnTarget(transaction);
-    const tokens = await exchangeCode({code, redirectUri, pkceVerifier: transaction.pkce_verifier || null});
-    if (!tokens || typeof tokens.accessToken !== "string" || !tokens.accessToken) throw new Error("INVALID_PROVIDER_TOKEN_RESPONSE");
-    await connectionStore.writeFromOAuthTransaction({transaction, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken || null});
-    return Object.freeze({redirect_to: returnTarget, outcome: "account_selection_required"});
+    try {
+      const tokens = await exchangeCode({code, redirectUri, pkceVerifier: transaction.pkce_verifier || null});
+      if (!tokens || typeof tokens.accessToken !== "string" || !tokens.accessToken) throw new Error("INVALID_PROVIDER_TOKEN_RESPONSE");
+      await connectionStore.writeFromOAuthTransaction({transaction, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken || null});
+      return Object.freeze({redirect_to: returnTarget, outcome: "account_selection_required"});
+    } catch (error) {
+      // The transaction has already been consumed. Preserve only the verified Shopify Admin
+      // return target so the route can fail inside the embedded app without exposing secrets.
+      error.embedded_return_target = returnTarget;
+      throw error;
+    }
   }
 
   return Object.freeze({start, callback});
 }
 module.exports = Object.freeze({createEmbeddedProviderOAuth, RETURN_TARGET});
+

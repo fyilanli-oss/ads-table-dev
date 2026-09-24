@@ -60,6 +60,15 @@ test("unknown providers and replay failures cannot escape the canonical surface"
   assert.match(failed.location, /^\/shopify\/app\/platforms\?oauth_/);
 });
 
+test("a callback failure after transaction resolution returns to Shopify Admin", async () => {
+  const error = new Error("PROVIDER_TOKEN_EXCHANGE_FAILED");
+  error.embedded_return_target = "https://verified.myshopify.com/admin/apps/client-id";
+  const failed = response();
+  const callbackFailure = fixture({meta: {start: async () => ({}), callback: async () => { throw error; }}});
+  await callbackFailure.routes["GET /api/shopify/providers/:provider/oauth/callback"]({params: {provider: "meta"}, query: {state: "opaque", code: "code"}}, failed);
+  assert.equal(failed.location, "https://verified.myshopify.com/admin/apps/client-id?oauth_error=connection_failed");
+});
+
 test("a configured Klaviyo adapter remains available when another known provider is not ready", async () => {
   const routes = {};
   registerShopifyProviderOAuthRoutes({

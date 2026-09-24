@@ -14,10 +14,13 @@ function initializeKlaviyoAccounts() {
   const retry = document.getElementById("klaviyo-retry");
   const retryStep = document.getElementById("klaviyo-retry-step");
   const connect = document.getElementById("klaviyo-connect");
+  const connected = document.getElementById("klaviyo-connected");
+  const accountModal = document.getElementById("klaviyo-account-modal");
+  const disconnectModal = document.getElementById("klaviyo-disconnect-modal");
+  const disconnectConfirm = document.getElementById("klaviyo-disconnect-confirm");
+  const disconnectMessage = document.getElementById("klaviyo-disconnect-message");
   const resetStep = document.getElementById("klaviyo-reset-step");
   const resetConfirm = document.getElementById("klaviyo-reset-confirm");
-  const accountOpen = document.getElementById("klaviyo-account-open");
-  const accountClose = document.getElementById("klaviyo-account-close");
   let accounts = [];
   let selected = null;
   let busy = false;
@@ -62,22 +65,27 @@ function initializeKlaviyoAccounts() {
       const result = await request("/status");
       if (result.status === "connected") {
         connect.hidden = true;
+        if (connected) connected.hidden = false;
         if (resetStep) resetStep.hidden = false;
         const amount = result.email_monthly_plan_cost == null ? "" : " · " + result.email_monthly_plan_cost + " " + result.currency + "/month";
         message.textContent = "Connected" + amount;
       } else if (result.status === "account_selection_required") {
         connect.hidden = true;
+        if (connected) connected.hidden = true;
         message.textContent = "Account selection required";
         loadPendingAccounts = true;
       } else if (result.status === "not_connected") {
         connect.hidden = false;
+        if (connected) connected.hidden = true;
         message.textContent = "Not connected";
       } else if (result.status === "reset_complete") {
-        connect.hidden = true;
+        connect.hidden = false;
+        if (connected) connected.hidden = true;
         if (resetStep) resetStep.hidden = true;
         message.textContent = "Not connected";
       } else {
         connect.hidden = true;
+        if (connected) connected.hidden = true;
         message.textContent = "Temporarily unavailable";
       }
     } catch (error) {
@@ -104,6 +112,7 @@ function initializeKlaviyoAccounts() {
         return;
       }
       connect.hidden = true;
+      if (connected) connected.hidden = true;
       if (result.status === "connected" && accounts.some(account => account.id === result.active_account_id)) {
         const account = accounts.find(account => account.id === result.active_account_id);
         message.textContent = "Connected: " + account.name + ". Email Monthly Plan Cost: " + result.email_monthly_plan_cost + " " + account.currency + ".";
@@ -119,7 +128,7 @@ function initializeKlaviyoAccounts() {
       if (!accounts.length) throw new Error("KLAVIYO_UNAVAILABLE");
       choices.value = accounts[0].id;
       choiceStep.hidden = false;
-      if (accountOpen) accountOpen.click();
+      if (accountModal && typeof accountModal.showOverlay === "function") accountModal.showOverlay();
       message.textContent = "Klaviyo is authorized. Select the account to connect.";
     } catch (error) { showError(error); }
     finally { busy = false; }
@@ -160,11 +169,36 @@ function initializeKlaviyoAccounts() {
       costStep.hidden = true;
       retryStep.hidden = true;
       message.textContent = "Connected: " + result.account_name + ". Email Monthly Plan Cost: " + result.email_monthly_plan_cost + " " + result.currency + ".";
-      if (accountClose) accountClose.click();
+      if (connected) connected.hidden = false;
+      if (accountModal && typeof accountModal.hideOverlay === "function") accountModal.hideOverlay();
     } catch (error) { showError(error); }
     finally { busy = false; save.disabled = false; save.loading = false; }
   });
   retry.addEventListener("click", () => retryAction && retryAction());
+  if (disconnectConfirm && disconnectModal) disconnectConfirm.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
+    disconnectConfirm.disabled = true;
+    disconnectConfirm.loading = true;
+    disconnectMessage.textContent = "Disconnecting…";
+    try {
+      const result = await request("/disconnect", {confirmation: "DISCONNECT_KLAVIYO"});
+      if (result.status !== "not_connected") throw new Error("KLAVIYO_UNAVAILABLE");
+      connect.hidden = false;
+      if (connected) connected.hidden = true;
+      message.textContent = "Not connected";
+      disconnectMessage.textContent = "";
+      if (typeof disconnectModal.hideOverlay === "function") disconnectModal.hideOverlay();
+    } catch (error) {
+      disconnectMessage.textContent = error.message === "KLAVIYO_REVOKE_FAILED"
+        ? "Klaviyo access could not be revoked. The connection remains active."
+        : "The connection could not be disconnected. Please try again.";
+    } finally {
+      busy = false;
+      disconnectConfirm.disabled = false;
+      disconnectConfirm.loading = false;
+    }
+  });
   if (resetConfirm) resetConfirm.addEventListener("click", async () => {
     if (busy) return;
     busy = true;

@@ -45,4 +45,3 @@ function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedde
   return Object.freeze({start, callback});
 }
 module.exports = Object.freeze({createEmbeddedProviderOAuth, RETURN_TARGET});
-

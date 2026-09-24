@@ -2,7 +2,7 @@
 
 const {bearerToken} = require('./shopify-auth-routes');
 const {PROVIDERS} = require('../shopify/ad-account-selection');
-const SAFE = new Set(['INVALID_ACCOUNT','PROVIDER_REAUTHORIZE','PROVIDER_ACCOUNTS_UNAVAILABLE','CONNECTION_CHANGED']);
+const SAFE = new Set(['INVALID_ACCOUNT','ACCOUNT_SELECTION_LIMIT','PROVIDER_REAUTHORIZE','PROVIDER_ACCOUNTS_UNAVAILABLE','CONNECTION_CHANGED']);
 
 function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection} = {}) {
   const handler = (provider, action) => async (req, res) => {

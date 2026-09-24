@@ -64,4 +64,3 @@ function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCo
 }
 
 module.exports = Object.freeze({createEmbeddedProviderStrategies, configuredOAuthProviders, SPECS, ACTIVE_PROVIDERS});
-

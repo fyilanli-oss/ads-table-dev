@@ -1,0 +1,43 @@
+{
+  "contract_version": "r7a-account-cardinality-live-v1",
+  "executed_at": "2026-09-24T12:04:53Z",
+  "result": "PASS",
+  "migration": {
+    "ledger_version": "20260924120453",
+    "name": "add_workspace_provider_selected_accounts",
+    "applied_live": true
+  },
+  "preflight": {
+    "result": "PASS",
+    "canonical_table_exists": true,
+    "total_connection_rows": 0,
+    "connected_rows": 0,
+    "invalid_connected_rows": 0,
+    "selected_accounts_column_before": 0,
+    "target_constraints_before": 0,
+    "rls_enabled": true,
+    "rls_forced": true
+  },
+  "postcheck": {
+    "result": "PASS",
+    "selected_accounts_column_count": 1,
+    "selected_accounts_not_null": true,
+    "selected_accounts_default_empty_array": true,
+    "validated_target_constraints": 3,
+    "total_connection_rows": 0,
+    "connected_rows": 0,
+    "browser_grant_count": 0,
+    "rls_enabled": true,
+    "rls_forced": true
+  },
+  "advisors": {
+    "migration_related_security_warning_or_error": false,
+    "migration_related_performance_warning_or_error": false,
+    "server_only_no_policy_info_expected": true,
+    "unrelated_existing_findings_changed": false
+  },
+  "provider_contact": false,
+  "oauth_started": false,
+  "application_deployed": false,
+  "canonical_connection_created": false
+}

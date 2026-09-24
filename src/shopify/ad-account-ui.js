@@ -3,12 +3,12 @@
 function initializeAdAccounts() {
   for (const provider of ['meta', 'google_ads']) {
     const message = document.getElementById(provider + '-message');
-    const select = document.getElementById(provider + '-choice');
+    const choices = document.getElementById(provider + '-choice');
     const save = document.getElementById(provider + '-save');
-    const openModal = document.getElementById(provider + '-account-open');
-    const closeModal = document.getElementById(provider + '-account-close');
+    const modal = document.getElementById(provider + '-account-modal');
     const connect = document.getElementById(provider + '-connect');
-    if (!message || !select || !save) continue;
+    const connected = document.getElementById(provider + '-connected');
+    if (!message || !choices || !save || !modal) continue;
     let accounts = [];
     let busy = false;
     const request = async (path, body) => {
@@ -31,34 +31,49 @@ function initializeAdAccounts() {
       try {
         const result = await request('');
         accounts = result.accounts || [];
-        select.replaceChildren();
+        choices.replaceChildren();
         for (const account of accounts) {
-          const option = document.createElement('s-option');
+          const option = document.createElement('s-choice');
           option.value = account.id;
           option.textContent = account.name + ' (' + account.id + ') · ' + account.currency;
-          select.append(option);
+          choices.append(option);
         }
         if (!accounts.length) throw new Error('PROVIDER_ACCOUNTS_UNAVAILABLE');
-        select.value = accounts[0].id;
         connect.hidden = true;
+        if (connected) connected.hidden = true;
         message.textContent = 'Authorization complete. Select the account to connect.';
-        openModal.click();
+        if (typeof modal.showOverlay === 'function') modal.showOverlay();
       } catch (error) { showError(error); }
     };
     save.addEventListener('click', async () => {
-      if (busy || !accounts.some(account => account.id === select.value)) return;
+      const selectedIds = Array.isArray(choices.values) ? choices.values : [];
+      if (busy || selectedIds.length < 1 || selectedIds.length > 3 || selectedIds.some(id => !accounts.some(account => account.id === id))) {
+        choices.error = 'Select between 1 and 3 accounts.';
+        return;
+      }
       busy = true; save.disabled = true; save.loading = true;
       try {
-        const result = await request('/select', {account_id: String(select.value)});
-        message.textContent = 'Connected: ' + result.account_name + ' · ' + result.currency;
-        closeModal.click();
+        const result = await request('/select', {account_ids: selectedIds.map(String)});
+        const selected = result.accounts || [];
+        message.textContent = 'Connected · ' + selected.length + ' account' + (selected.length === 1 ? '' : 's');
+        connect.hidden = true;
+        if (connected) connected.hidden = false;
+        if (typeof modal.hideOverlay === 'function') modal.hideOverlay();
       } catch (error) { showError(error); }
       finally { busy = false; save.disabled = false; save.loading = false; }
     });
     request('/status').then(result => {
       if (result.status === 'pending_account_selection') return loadAccounts();
-      if (result.status === 'connected') { connect.hidden = true; message.textContent = 'Connected'; }
-      else message.textContent = 'Not connected';
+      if (result.status === 'connected') {
+        connect.hidden = true;
+        if (connected) connected.hidden = false;
+        const count = Array.isArray(result.accounts) ? result.accounts.length : 0;
+        message.textContent = 'Connected' + (count ? ' · ' + count + ' account' + (count === 1 ? '' : 's') : '');
+      } else {
+        connect.hidden = false;
+        if (connected) connected.hidden = true;
+        message.textContent = 'Not connected';
+      }
     }).catch(showError);
   }
 }

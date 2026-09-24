@@ -62,4 +62,3 @@ function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
 }
 
 module.exports = Object.freeze({registerShopifyProviderOAuthRoutes, PROVIDERS});
-

@@ -59,4 +59,3 @@ test("dedicated Shopify entrypoint only serves its allowlisted read routes", () 
   assert.equal(head.statusCode, 200);
   assert.equal(head.body, undefined);
 });
-

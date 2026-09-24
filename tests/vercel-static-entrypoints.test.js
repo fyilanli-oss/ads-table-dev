@@ -59,4 +59,3 @@ test("serves committed verification and direct HTML files statically", () => {
   assert.equal(routeFor("/(.*\\.txt)")?.dest, "/public/$1");
   assert.equal(routeFor("/(.*\\.html)")?.dest, "/public/$1");
 });
-

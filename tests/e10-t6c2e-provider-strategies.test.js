@@ -49,4 +49,3 @@ test("secrets are passed only to server-side exchange and never authorization UR
     assert.deepEqual(await strategy.exchangeCode({code: "code", redirectUri: strategy.redirectUri}), {accessToken: `${provider}:code`});
   }
 });
-

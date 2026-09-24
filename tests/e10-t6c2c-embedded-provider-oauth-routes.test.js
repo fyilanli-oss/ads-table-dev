@@ -88,4 +88,3 @@ test("a configured Klaviyo adapter remains available when another known provider
   assert.equal(google.statusCode, 503);
   assert.deepEqual(google.body, {code: "SHOPIFY_PROVIDER_NOT_CONFIGURED"});
 });
-

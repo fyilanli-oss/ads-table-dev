@@ -72,4 +72,3 @@ test("replayed or cross-provider state stops before exchange and persistence", a
   assert.equal(calls.some(([name]) => name === "exchange"), false);
   assert.equal(calls.some(([name]) => name === "write"), false);
 });
-

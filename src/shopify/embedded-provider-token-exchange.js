@@ -4,7 +4,7 @@ function normalize(payload) {
   const data = payload?.data && typeof payload.data === "object" ? payload.data : payload;
   const accessToken = data?.access_token;
   if (typeof accessToken !== "string" || !accessToken) throw new Error("INVALID_PROVIDER_TOKEN_RESPONSE");
-  return Object.freeze({accessToken, refreshToken: typeof data.refresh_token === "string" && data.refresh_token ? data.refresh_token : null});
+  const rawScopes = Array.isArray(data.scope) ? data.scope : (typeof data.scope === "string" ? data.scope.split(/[\\s,]+/) : []);\n  const scopes = [...new Set(rawScopes.map(scope => typeof scope === "string" ? scope.trim() : "").filter(Boolean))];\n  return Object.freeze({\n    accessToken,\n    refreshToken: typeof data.refresh_token === "string" && data.refresh_token ? data.refresh_token : null,\n    scopes: Object.freeze(scopes),\n  });
 }
 
 async function requestToken(fetchImpl, url, options) {

@@ -12,8 +12,10 @@ test("embedded App Home reuses an active installation and bootstraps only for re
   assert.match(html, /<s-app-nav>/);
   assert.match(html, /<s-page heading="AdsTable">/);
   assert.match(html, /<s-section heading="Data sources">/);
-  assert.match(html, /<s-button id="platforms" variant="primary" href="\/shopify\/app\/platforms">Set up data sources<\/s-button>/);
-  assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 3);
+  assert.match(html, /id="setup-data-sources"[^>]+commandFor="currency-modal"/);
+  assert.match(html, /id="currency-modal" heading="Choose reporting currency" size="small-100"/);
+  assert.match(html, /id="manage-data-sources"[^>]+href="\/shopify\/app\/platforms"/);
+  assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 4);
   assert.equal((html.match(/request\("\/api\/shopify\/bootstrap", "POST"/g) || []).length, 1);
   assert.equal((html.match(/request\("\/api\/shopify\/session", "GET"/g) || []).length, 2);
   assert.match(html, /error\.message !== "SHOP_REAUTHORIZATION_REQUIRED"/);
@@ -53,3 +55,4 @@ test("App Home handler serves queryless Shopify launches and disables caching", 
   assert.doesNotMatch(response.body, /<s-section heading="Klaviyo">/);
   assert.doesNotMatch(response.body, /platforms#klaviyo/);
 });
+

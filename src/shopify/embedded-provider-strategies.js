@@ -21,11 +21,21 @@ function createPkce() {
   return Object.freeze({verifier, challenge});
 }
 
-function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCodeByProvider} = {}) {
+function configuredOAuthProviders(env = process.env) {
+  return ACTIVE_PROVIDERS.filter(provider => {
+    const spec = SPECS[provider];
+    return Boolean(value(env, spec.client) && value(env, spec.secret));
+  });
+}
+
+function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCodeByProvider, providers = ACTIVE_PROVIDERS} = {}) {
   if (!appUrl || typeof appUrl !== "string") throw new TypeError("appUrl is required");
   if (!exchangeCodeByProvider || typeof exchangeCodeByProvider !== "object") throw new TypeError("exchangeCodeByProvider is required");
   const strategies = {};
-  for (const provider of ACTIVE_PROVIDERS) {
+  if (!Array.isArray(providers) || providers.some(provider => !ACTIVE_PROVIDERS.includes(provider))) {
+    throw new TypeError("providers must contain only active providers");
+  }
+  for (const provider of providers) {
     const spec = SPECS[provider];
     const clientId = value(env, spec.client);
     const clientSecret = value(env, spec.secret);
@@ -53,4 +63,5 @@ function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCo
   return Object.freeze(strategies);
 }
 
-module.exports = Object.freeze({createEmbeddedProviderStrategies, SPECS, ACTIVE_PROVIDERS});
+module.exports = Object.freeze({createEmbeddedProviderStrategies, configuredOAuthProviders, SPECS, ACTIVE_PROVIDERS});
+

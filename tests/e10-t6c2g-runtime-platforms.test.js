@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {renderEmbeddedPlatforms} = require("../src/shopify/embedded-app-home");
-const {enabled, registerShopifyRuntime} = require("../src/shopify/runtime");
+const {enabled, providerRuntimeReady, registerShopifyRuntime} = require("../src/shopify/runtime");
 const {createEmbeddedProviderTokenExchanges, normalize} = require("../src/shopify/embedded-provider-token-exchange");
 
 test("embedded Platforms renders the R7-A currency gate, three active providers, and two parked providers", () => {
@@ -20,9 +20,10 @@ test("embedded Platforms renders the R7-A currency gate, three active providers,
   assert.match(html, /fetch\("\/api\/shopify\/providers\/klaviyo\/accounts" \+ path/);
   assert.match(html, /request\("\/status"\)/);
   assert.match(html, /window\.shopify\.idToken/);
-  assert.match(html, /id="currency-setup" heading="Reporting currency"/);
+  assert.match(html, /id="currency-setup" heading="Finish setup"/);
+  assert.match(html, /id="platforms-currency-modal" heading="Choose reporting currency" size="small-100"/);
   assert.match(html, /\/api\/shopify\/workspace\/reporting-currency/);
-  assert.match(html, /<s-modal id="klaviyo-connect-modal" heading="Connect Klaviyo to AdsTable\?">/);
+  assert.match(html, /<s-modal id="klaviyo-connect-modal" heading="Connect Klaviyo to AdsTable\?" size="small-100">/);
   assert.match(html, /<s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">/);
   assert.match(html, /commandFor="klaviyo-connect-modal" command="--show"/);
   assert.match(html, /\/api\/shopify\/providers\//);
@@ -68,6 +69,15 @@ test("provider OAuth remains off unless the explicit activation flag is true", (
   assert.equal(enabled("true"), true);
 });
 
+test("Google Ads account-discovery configuration cannot disable Klaviyo OAuth routing", () => {
+  const env = {
+    PROVIDER_TOKEN_ACTIVE_KEY_ID: "v1",
+    PROVIDER_TOKEN_ENCRYPTION_KEYS: JSON.stringify({v1: Buffer.alloc(32, 1).toString("base64")}),
+  };
+  assert.equal(providerRuntimeReady({env, oauthTransactionStore: {}}), true);
+  assert.equal(env.GOOGLE_ADS_DEVELOPER_TOKEN, undefined);
+});
+
 test("incomplete provider activation stays isolated without crashing Shopify App Home", () => {
   const routes = {};
   const app = {
@@ -85,8 +95,9 @@ test("incomplete provider activation stays isolated without crashing Shopify App
     },
     supabaseAdmin: {from: () => ({})},
   });
-  assert.deepEqual(result, {enabled: true, providerOAuthEnabled: false, providerOAuthRequested: true});
+  assert.deepEqual(result, {enabled: true, providerOAuthEnabled: false, providerOAuthRequested: true, providerAvailability: {meta: false, google_ads: false, klaviyo: false}});
   assert.equal(typeof routes["GET /"], "function");
   assert.equal(typeof routes["GET /shopify/app/platforms"], "function");
   assert.equal(routes["POST /api/shopify/providers/meta/oauth/start"], undefined);
 });
+

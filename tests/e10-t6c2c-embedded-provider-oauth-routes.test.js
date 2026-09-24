@@ -59,3 +59,24 @@ test("unknown providers and replay failures cannot escape the canonical surface"
   await replay.routes["GET /api/shopify/providers/:provider/oauth/callback"]({params: {provider: "meta"}, query: {}}, failed);
   assert.match(failed.location, /^\/shopify\/app\/platforms\?oauth_/);
 });
+
+test("a configured Klaviyo adapter remains available when another known provider is not ready", async () => {
+  const routes = {};
+  registerShopifyProviderOAuthRoutes({
+    post(path, handler) { routes[`POST ${path}`] = handler; },
+    get(path, handler) { routes[`GET ${path}`] = handler; },
+  }, {adapters: {klaviyo: {
+    start: async () => ({authorization_url: "https://consent", navigation: "top_level"}),
+    callback: async () => ({redirect_to: "/shopify/app/platforms"}),
+  }}});
+
+  const klaviyo = response();
+  await routes["POST /api/shopify/providers/:provider/oauth/start"]({params: {provider: "klaviyo"}, get: () => "Bearer token"}, klaviyo, assert.fail);
+  assert.equal(klaviyo.statusCode, 200);
+
+  const google = response();
+  await routes["POST /api/shopify/providers/:provider/oauth/start"]({params: {provider: "google_ads"}, get: () => "Bearer token"}, google, assert.fail);
+  assert.equal(google.statusCode, 503);
+  assert.deepEqual(google.body, {code: "SHOPIFY_PROVIDER_NOT_CONFIGURED"});
+});
+

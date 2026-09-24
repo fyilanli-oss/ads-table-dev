@@ -25,7 +25,7 @@ test("dedicated Shopify entrypoint renders the native App Home without booting t
   const res = response();
   withShopifyApiKey("test-key", () => handler({method: "GET", url: "/shopify/app"}, res));
   assert.equal(res.statusCode, 200);
-  assert.equal(res.headers.get("x-adstable-release"), "r7a-v1");
+  assert.equal(res.headers.get("x-adstable-release"), "r7a-v2");
   assert.equal(res.headers.get("surrogate-control"), "no-store");
   assert.match(res.body, /<s-page heading="AdsTable">/);
   assert.doesNotMatch(res.body, /<iframe|<style/i);
@@ -59,3 +59,4 @@ test("dedicated Shopify entrypoint only serves its allowlisted read routes", () 
   assert.equal(head.statusCode, 200);
   assert.equal(head.body, undefined);
 });
+

@@ -15,6 +15,7 @@ function createEmbeddedProviderOAuthAdapters({
   connectionStore,
   providerStrategies,
   resolveReturnTarget,
+  providers = PROVIDERS,
 } = {}) {
   requiredFunction(authenticateEmbedded, "authenticateEmbedded");
   requiredFunction(createEmbeddedTransaction, "createEmbeddedTransaction");
@@ -23,7 +24,8 @@ function createEmbeddedProviderOAuthAdapters({
   if (!providerStrategies || typeof providerStrategies !== "object" || Array.isArray(providerStrategies)) throw new TypeError("providerStrategies are required");
 
   const adapters = {};
-  for (const provider of PROVIDERS) {
+  if (!Array.isArray(providers) || providers.some(provider => !PROVIDERS.includes(provider))) throw new TypeError("providers are invalid");
+  for (const provider of providers) {
     const strategy = providerStrategies[provider];
     if (!strategy || typeof strategy.redirectUri !== "string" || !strategy.redirectUri) throw new TypeError(`providerStrategies.${provider}.redirectUri is required`);
     requiredFunction(strategy.buildAuthorizationUrl, `providerStrategies.${provider}.buildAuthorizationUrl`);
@@ -45,3 +47,4 @@ function createEmbeddedProviderOAuthAdapters({
 }
 
 module.exports = Object.freeze({createEmbeddedProviderOAuthAdapters});
+

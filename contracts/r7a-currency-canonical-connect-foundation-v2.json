@@ -1,6 +1,6 @@
 {
   "version": "r7a-v2",
-  "status": "R7_A_REPOSITORY_COMPLETE_LIVE_ACCEPTANCE_PENDING",
+  "status": "R7_A_KLAVIYO_MERCHANT_ACCEPTANCE_PASS_R6_D_NEXT",
   "supersedes_forward_execution": "r7a-v1",
   "active_providers": ["meta", "google_ads", "klaviyo"],
   "parked_providers": ["tiktok", "pinterest"],
@@ -29,12 +29,12 @@
   "production_state": {
     "account_cardinality_migration_version": "20260924120453",
     "account_cardinality_migration_applied": true,
-    "deployment_pending": true,
-    "merchant_currency_selection_pending": true,
-    "live_provider_contact_performed": false,
-    "canonical_connection_created": false,
+    "deployment_pending": false,
+    "merchant_currency_selection_pending": false,
+    "live_provider_contact_performed": true,
+    "canonical_connection_created": true,
     "provider_runner_activated": false
   },
-  "next_gate": "R7-A_production_deployment_then_merchant_currency_and_controlled_provider_acceptance",
-  "blocked_until_acceptance": ["R6-D", "R7-B", "R3-C"]
+  "next_gate": "R6-D_provider_runtime_and_dataset_v2_controlled_acceptance",
+  "blocked_until_acceptance": ["R7-B", "R3-C"]
 }

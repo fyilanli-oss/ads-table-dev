@@ -19,6 +19,7 @@ function query(result, calls) {
     update(row) { calls.push(['update', row]); return value; },
     select(columns) { calls.push(['select', columns]); return value; },
     eq(field, expected) { calls.push(['eq', field, expected]); return value; },
+    in(field, expected) { calls.push(['in', field, expected]); return value; },
     maybeSingle: async () => result,
   };
   return value;

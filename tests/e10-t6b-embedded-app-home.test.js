@@ -55,4 +55,3 @@ test("App Home handler serves queryless Shopify launches and disables caching", 
   assert.doesNotMatch(response.body, /<s-section heading="Klaviyo">/);
   assert.doesNotMatch(response.body, /platforms#klaviyo/);
 });
-

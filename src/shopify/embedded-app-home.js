@@ -49,8 +49,8 @@ function renderEmbeddedAppHome({clientId}) {
     <s-section heading="Data sources">
       <s-stack gap="base">
         <s-paragraph>Choose your AdsTable reporting currency, then connect Meta, Google Ads, or Klaviyo.</s-paragraph>
-        <s-button id="setup-data-sources" variant="primary" commandFor="currency-modal" command="--show" disabled>Set up data sources</s-button>
-        <s-button id="manage-data-sources" variant="primary" href="/shopify/app/platforms" hidden>Manage data sources</s-button>
+        <div id="setup-data-sources-container" hidden><s-button id="setup-data-sources" variant="primary" commandFor="currency-modal" command="--show">Set up data sources</s-button></div>
+        <div id="manage-data-sources-container" hidden><s-button id="manage-data-sources" variant="primary" href="/shopify/app/platforms">Manage data sources</s-button></div>
       </s-stack>
     </s-section>
     <s-modal id="currency-modal" heading="Choose reporting currency" size="small-100">
@@ -71,6 +71,8 @@ function renderEmbeddedAppHome({clientId}) {
       const status = document.getElementById("status");
       const setupDataSources = document.getElementById("setup-data-sources");
       const manageDataSources = document.getElementById("manage-data-sources");
+      const setupDataSourcesContainer = document.getElementById("setup-data-sources-container");
+      const manageDataSourcesContainer = document.getElementById("manage-data-sources-container");
       const reportingCurrency = document.getElementById("reporting-currency");
       const saveReportingCurrency = document.getElementById("save-reporting-currency");
       const currencyMessage = document.getElementById("currency-message");
@@ -115,10 +117,11 @@ function renderEmbeddedAppHome({clientId}) {
         status.textContent = "Your verified Shopify workspace is ready.";
         const settings = await sessionRequest("/api/shopify/workspace/settings");
         if (settings.status === "configured") {
-          setupDataSources.hidden = true;
-          manageDataSources.hidden = false;
+          setupDataSourcesContainer.hidden = true;
+          manageDataSourcesContainer.hidden = false;
         } else {
-          setupDataSources.disabled = false;
+          setupDataSourcesContainer.hidden = false;
+          manageDataSourcesContainer.hidden = true;
         }
         document.documentElement.dataset.smoke = "pass";
       };
@@ -159,7 +162,7 @@ function renderProviderSection({id, label, description, parked = false}, provide
           ${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
           ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
         </s-stack>
-        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<div id="${id}-connect"><s-button variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div>`}
+        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-connected" hidden>${id === "klaviyo" ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
       </s-stack>
       ${parked ? "" : `<s-modal id="${id}-connect-modal" heading="Connect ${label} to AdsTable?" size="small-100">
         <s-stack gap="base">
@@ -169,9 +172,16 @@ function renderProviderSection({id, label, description, parked = false}, provide
         <s-button slot="secondary-actions" commandFor="${id}-connect-modal" command="--hide">Cancel</s-button>
         <s-button slot="primary-action" variant="primary" data-provider="${id}" commandFor="${id}-connect-modal" command="--hide">Continue to ${label}</s-button>
       </s-modal>`}
+      ${id === "klaviyo" && !parked ? `<s-modal id="${id}-disconnect-modal" heading="Disconnect ${label}?" size="small-100">
+        <s-stack gap="base">
+          <s-paragraph>AdsTable will stop new provider access and refresh activity for this connection.</s-paragraph>
+          <s-paragraph>Historical analytics will be preserved.</s-paragraph>
+          <s-paragraph id="${id}-disconnect-message" aria-live="polite"></s-paragraph>
+        </s-stack>
+        <s-button slot="secondary-actions" commandFor="${id}-disconnect-modal" command="--hide">Cancel</s-button>
+        <s-button id="${id}-disconnect-confirm" slot="primary-action" variant="primary" tone="critical">Disconnect</s-button>
+      </s-modal>` : ""}
       ${id === "klaviyo" && providerAvailable ? `<s-stack id="klaviyo-accounts" gap="base">
-        <s-button id="klaviyo-account-open" commandFor="klaviyo-account-modal" command="--show" hidden>Open setup</s-button>
-        <s-button id="klaviyo-account-close" commandFor="klaviyo-account-modal" command="--hide" hidden>Close setup</s-button>
         <s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">
           <div id="klaviyo-choice-step" hidden><s-stack gap="base">
             <s-paragraph>Select the Klaviyo account AdsTable may use.</s-paragraph>
@@ -188,12 +198,10 @@ function renderProviderSection({id, label, description, parked = false}, provide
         </s-modal>
       </s-stack>` : ""}
       ${["meta", "google_ads"].includes(id) && providerAvailable ? `<s-stack id="${id}-accounts" gap="base">
-        <s-button id="${id}-account-open" commandFor="${id}-account-modal" command="--show" hidden>Open setup</s-button>
-        <s-button id="${id}-account-close" commandFor="${id}-account-modal" command="--hide" hidden>Close setup</s-button>
         <s-modal id="${id}-account-modal" heading="Select ${label} account">
           <s-stack gap="base">
-            <s-paragraph>Only an account returned by ${label} can be connected.</s-paragraph>
-            <s-select id="${id}-choice" label="${label} account"></s-select>
+            <s-paragraph>Select between 1 and 3 accounts returned by ${label}.</s-paragraph>
+            <s-choice-list id="${id}-choice" name="${id}-accounts" label="${label} accounts" details="You can connect up to 3 accounts." multiple></s-choice-list>
             <s-button id="${id}-save" variant="primary">Save and connect</s-button>
           </s-stack>
           <s-button slot="secondary-actions" commandFor="${id}-account-modal" command="--hide">Cancel</s-button>
@@ -363,4 +371,3 @@ function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}
 }
 
 module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms});
-

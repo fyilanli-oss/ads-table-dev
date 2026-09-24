@@ -16,6 +16,7 @@ const {createEmbeddedProviderTokenExchanges} = require("./embedded-provider-toke
 const {createCanonicalWorkspaceProviderConnectionStore} = require("../providers/workspace-provider-connection-store");
 const {createWorkspaceSettingsStore} = require("../providers/workspace-settings-store");
 const {createKlaviyoAccountSelection} = require("./klaviyo-account-selection");
+const {createKlaviyoDisconnect} = require("./klaviyo-disconnect");
 const {registerShopifyKlaviyoAccountRoutes} = require("../routes/shopify-klaviyo-account-routes");
 const {registerShopifyWorkspaceSettingsRoutes} = require("../routes/shopify-workspace-settings-routes");
 const {registerShopifyAdAccountRoutes} = require("../routes/shopify-ad-account-routes");
@@ -119,6 +120,9 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       selection: createKlaviyoAccountSelection({
         store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
       }),
+      disconnect: createKlaviyoDisconnect({
+        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+      }),
     });
     if (adapters.meta || adapters.google_ads) registerShopifyAdAccountRoutes(app, {
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
@@ -139,4 +143,3 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
 }
 
 module.exports = Object.freeze({registerShopifyRuntime, enabled, providerRuntimeReady});
-

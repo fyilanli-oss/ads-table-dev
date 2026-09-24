@@ -102,4 +102,3 @@ test("incomplete provider activation stays isolated without crashing Shopify App
   assert.equal(typeof routes["GET /shopify/app/platforms"], "function");
   assert.equal(routes["POST /api/shopify/providers/meta/oauth/start"], undefined);
 });
-

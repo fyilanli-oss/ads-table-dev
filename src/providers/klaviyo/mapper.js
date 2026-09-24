@@ -64,4 +64,3 @@ function mapKlaviyoMessage(input,context={}){
 }
 
 module.exports=Object.freeze({ADAPTER_VERSION,BRANCHES,CHANNELS,JOURNEY_METRICS,allocateKlaviyoDailySpend,mapKlaviyoMessage});
-

@@ -221,13 +221,12 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
   ${appNavigation()}
   <s-page heading="Data sources">
     <s-link slot="breadcrumb-actions" href="/shopify/app">Home</s-link>
-    <s-banner id="status" heading="Preparing Data Sources" tone="info">AdsTable is checking your workspace settings.</s-banner>
-    <s-section id="currency-setup" heading="Finish setup" hidden>
-      <s-stack gap="base">
-        <s-paragraph>Choose the currency AdsTable will use before connecting a data source.</s-paragraph>
+    <s-banner id="status" heading="Data sources" tone="info" hidden></s-banner>
+    <div id="currency-setup" hidden>
+      <s-section heading="Finish setup">
         <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
-      </s-stack>
-    </s-section>
+      </s-section>
+    </div>
     <s-modal id="platforms-currency-modal" heading="Choose reporting currency" size="small-100">
       <s-stack gap="base">
         <s-paragraph>This is independent from Shopify and provider account currencies.</s-paragraph>
@@ -239,7 +238,6 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       <s-button slot="secondary-actions" commandFor="platforms-currency-modal" command="--hide">Cancel</s-button>
       <s-button id="save-reporting-currency" slot="primary-action" variant="primary">Save and continue</s-button>
     </s-modal>
-    <s-paragraph id="reporting-currency-summary" hidden></s-paragraph>
     <div id="provider-sections" hidden>${sections}</div>
   </s-page>
   <script>
@@ -251,7 +249,6 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const currency = document.getElementById("reporting-currency");
       const saveCurrency = document.getElementById("save-reporting-currency");
       const currencyMessage = document.getElementById("platforms-currency-message");
-      const currencySummary = document.getElementById("reporting-currency-summary");
       const sessionRequest = async (path, options = {}) => {
         if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
         const token = await window.shopify.idToken();
@@ -264,8 +261,6 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         currencySetup.hidden = true;
         providerSections.hidden = false;
         status.hidden = true;
-        currencySummary.hidden = false;
-        currencySummary.textContent = "Reporting currency: " + reportingCurrency;
         (${initializeAdAccounts.toString()})();
         (${initializeKlaviyoAccounts.toString()})();
       };
@@ -277,10 +272,12 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           providerSections.hidden = true;
           status.hidden = true;
         } catch {
+          currencySetup.hidden = true;
+          providerSections.hidden = true;
           status.hidden = false;
-          status.setAttribute("heading", "Workspace settings could not be loaded");
+          status.setAttribute("heading", "Open AdsTable from Shopify Admin");
           status.setAttribute("tone", "critical");
-          status.textContent = "Open AdsTable from Shopify Admin and try again.";
+          status.textContent = "";
         }
       };
       saveCurrency.addEventListener("click", async () => {

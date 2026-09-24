@@ -84,6 +84,7 @@ test('OAuth completion begins as pending and writes only canonical workspace aut
   assert.equal(insert[1].workspace_id, authority.workspace_id);
   assert.equal(insert[1].last_authorized_via, 'shopify_verified_session');
   assert.equal(insert[1].active_account_id, null);
+  assert.equal(Object.hasOwn(insert[1], 'updated_at'), false);
   assert.equal(JSON.stringify(insert[1]).includes('shop_id'), false);
 });
 

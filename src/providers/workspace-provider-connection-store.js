@@ -62,7 +62,6 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     required(accessToken, 'accessToken');
-    const timestamp = now().toISOString();
     const row = {
       workspace_id: workspace.workspace_id,
       provider,
@@ -80,8 +79,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       last_authorized_via: workspace.source,
       account_verified_at: null,
       connected_at: null,
-      disconnected_at: null,
-      updated_at: timestamp
+      disconnected_at: null
     };
     const { data, error } = await client.from(TABLE)
       .insert(row)
@@ -91,7 +89,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       const reopenQuery = client.from(TABLE);
       if (typeof reopenQuery.update !== 'function') throw new Error('CANONICAL_CONNECTION_ALREADY_EXISTS');
       const { data: reopened, error: reopenError } = await reopenQuery
-        .update(row)
+        .update({ ...row, updated_at: now().toISOString() })
         .eq('workspace_id', workspace.workspace_id)
         .eq('provider', provider)
         .in('status', ['disconnected', 'revoked'])

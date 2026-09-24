@@ -54,6 +54,16 @@ test("revoked embedded grant stays disconnected without reopening early OAuth", 
   assert.deepEqual(await selection.status(authority), {status: "reset_complete"});
 });
 
+test("disconnected canonical Klaviyo connection reopens Connect after page reload", async () => {
+  let contacted = false;
+  const selection = createKlaviyoAccountSelection({
+    store: {readKlaviyoStatus: async () => ({status: "disconnected"})},
+    fetchImpl: async () => { contacted = true; },
+  });
+  assert.deepEqual(await selection.status(authority), {status: "not_connected"});
+  assert.equal(contacted, false);
+});
+
 test("lists verified accounts without disclosing encrypted or plaintext credentials", async () => {
   const {selection} = fixture();
   const result = await selection.list(authority);

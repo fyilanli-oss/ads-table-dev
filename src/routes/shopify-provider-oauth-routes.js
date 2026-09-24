@@ -5,6 +5,20 @@ const {RETURN_TARGET} = require("../shopify/embedded-provider-oauth");
 
 const PROVIDERS = Object.freeze(["meta", "google_ads", "klaviyo"]);
 
+function verifiedAdminTarget(value) {
+  const target = new URL(value);
+  if (target.protocol !== "https:" || !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(target.hostname) ||
+    target.port || target.username || target.password || !/^\/admin\/apps\/[A-Za-z0-9_-]+$/.test(target.pathname) || target.search || target.hash) {
+    throw new Error("INVALID_EMBEDDED_RETURN_TARGET");
+  }
+  return target;
+}
+
+function safeErrorCode(error) {
+  const code = error?.code || error?.message;
+  return typeof code === "string" && /^[A-Z0-9_]{1,64}$/.test(code) ? code : "EMBEDDED_OAUTH_CALLBACK_FAILED";
+}
+
 function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
   if (!app || typeof app.get !== "function" || typeof app.post !== "function") throw new TypeError("Express app is required");
   if (!adapters || typeof adapters !== "object" || Array.isArray(adapters)) throw new TypeError("adapters are required");
@@ -29,15 +43,19 @@ function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
     try {
       const result = await adapter.callback({state: req.query.state, code: req.query.code});
       if (result?.redirect_to && result.redirect_to !== RETURN_TARGET) {
-        const target = new URL(result.redirect_to);
-        if (target.protocol !== "https:" || !/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(target.hostname) ||
-          target.port || target.username || target.password || !/^\/admin\/apps\/[A-Za-z0-9_-]+$/.test(target.pathname) || target.search || target.hash) {
-          throw new Error("INVALID_EMBEDDED_RETURN_TARGET");
-        }
+        const target = verifiedAdminTarget(result.redirect_to);
         return res.redirect(target.href);
       }
       return res.redirect(`${RETURN_TARGET}?oauth_connected=${encodeURIComponent(req.params.provider)}&account_selection_required=1`);
-    } catch {
+    } catch (error) {
+      console.error(JSON.stringify({event: "embedded_provider_oauth_callback_failed", provider: req.params.provider, code: safeErrorCode(error)}));
+      if (error?.embedded_return_target) {
+        try {
+          const target = verifiedAdminTarget(error.embedded_return_target);
+          target.searchParams.set("oauth_error", "connection_failed");
+          return res.redirect(target.href);
+        } catch {}
+      }
       return res.redirect(`${RETURN_TARGET}?oauth_error=connection_failed`);
     }
   });

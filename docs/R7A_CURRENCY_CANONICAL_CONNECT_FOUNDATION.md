@@ -7,7 +7,7 @@ R7-A tek seferde canlı OAuth kabulüne açılmayacaktır. Paket iki repository 
 - **R7-A1:** Reporting currency seçimi, Data Sources erişim kapısı, Connect açıklama modalları, aktif/parked provider sınırı ve OAuth sonucunun canonical workspace connection store'a yazılması.
 - **R7-A2:** Meta ve Google Ads için provider tarafından doğrulanmış 1–3 reklam hesabı; Klaviyo için tek doğrulanmış hesap discovery/seçim akışı. Seçimler tek OAuth grant'i altında kanonik bağlantıya atomik yazılır.
 
-R7-A repository uygulaması tamamlanmıştır. Account-cardinality migration'ı `20260924120453` sürümüyle production Supabase'e uygulanmış ve postcheck `PASS` vermiştir. Application deployment sonrasında merchant reporting currency seçimi ve kontrollü gerçek provider kabulü yapılmadan R6-D'ye geçilemez. R6-D tamamlanmadan Meta/Google Disconnect deneyimi açılamaz.
+R7-A repository uygulaması tamamlanmıştır. Account-cardinality migration'ı `20260924120453` sürümüyle production Supabase'e uygulanmış ve postcheck `PASS` vermiştir. PR #242 merge commit `a94201bf74c76cc57b5a357782c06a3b48bb3f67` production'a dağıtılmış; `dev.adstable.app` aynı READY deployment'a bağlanmıştır. Merchant reporting currency seçimi ve kontrollü gerçek provider kabulü yapılmadan R6-D'ye geçilemez. R6-D tamamlanmadan Meta/Google Disconnect deneyimi açılamaz.
 
 ## Kullanıcı akışı
 
@@ -27,7 +27,7 @@ Tarayıcı `workspace_id`, `shop_id`, account adı veya currency için authority
 
 ## Bu pakette yapılmayanlar
 
-- Application production deployment veya canlı provider teması yoktur.
+- Application production deployment tamamlanmıştır; canlı provider teması ve OAuth kabulü henüz yapılmamıştır.
 - Klaviyo Disconnect/revoke güvenli zinciri repository'de hazırlanır; Meta/Google Disconnect provider semantiği doğrulanmadan işlevsiz kontrol gösterilmez.
 - Dataset V2 provider runner aktivasyonu R6-D'ye aittir.
 - `workspace_provider_connections.selected_accounts` additive migration'ı production'da uygulanmıştır; RLS/FORCE RLS korunmuş, browser grant sayısı `0` kalmıştır.

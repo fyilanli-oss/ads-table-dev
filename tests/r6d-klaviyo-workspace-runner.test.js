@@ -21,6 +21,7 @@ function context(patch = {}) {
     connection: {
       provider: 'klaviyo', status: 'connected', accessToken: 'secret', sourceCurrency: 'USD', monthlyPlanCost: '50.00',
       selectedAccounts: [{ id: 'account-1', name: 'Account', currency: 'USD' }],
+      conversionMetric: { id: 'metric-1', name: 'Placed Order', integrationName: 'Shopify' },
     },
     reportingCurrency: 'TRY', currencyVersion: 1,
     request: { provider_date: '2026-09-24' },
@@ -69,3 +70,9 @@ test('Klaviyo workspace runner uses canonical monthly plan cost, not caller or p
   assert.equal(result.rows[0].raw_metrics.spend_value, 200);
 });
 
+test('Klaviyo workspace runner requires a canonical account-scoped conversion metric', async () => {
+  await assert.rejects(
+    runner()(context({ connection: { ...context().connection, conversionMetric: null } })),
+    /connection\.conversionMetric\.id is required/
+  );
+});

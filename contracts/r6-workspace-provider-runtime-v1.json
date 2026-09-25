@@ -99,7 +99,7 @@
     "provider_contact": false
   },
   "r6d_work_packages": {
-    "status": "R6_D1_COMPLETE_R6_D2_REPOSITORY_PREPARED_LIVE_CLOSED",
+    "status": "R6_D1_COMPLETE_R6_D2_C1_MIGRATION_PASS_APPLICATION_DEPLOYMENT_CLOSED",
     "sequence": [
       "R6-D1 common fail-closed acceptance runner",
       "R6-D2 Klaviyo workspace live acceptance",
@@ -108,7 +108,7 @@
       "R6-D5 provider-by-provider controlled activation decision"
     ],
     "current_live_connection_state": {
-      "klaviyo": "disconnected",
+      "klaviyo": "connected_merchant_confirmed",
       "meta": "not_live_accepted",
       "google_ads": "not_live_accepted"
     },
@@ -139,14 +139,43 @@
       "api_revision": "2026-07-15",
       "required_oauth_scopes": ["accounts:read", "campaigns:read", "flows:read", "metrics:read"],
       "conversion_metric_id_must_be_explicit": true,
+      "conversion_metric_scope": "workspace_provider_account_connection",
+      "global_conversion_metric_env_allowed": false,
+      "metric_discovery": {
+        "source": "Klaviyo Metrics API",
+        "pagination_required": true,
+        "exact_name": "Placed Order",
+        "integration_provenance_required": true,
+        "zero_or_multiple_candidates_are_not_auto_selected": true
+      },
+      "metric_binding_migration": "supabase/migrations/20260925072801_add_workspace_provider_conversion_metric.sql",
+      "metric_binding_migration_applied": true,
+      "metric_binding_live_postcheck": {
+        "result": "PASS",
+        "target_column_count": 5,
+        "target_constraint_count": 1,
+        "constraint_validated": true,
+        "browser_grant_count": 0,
+        "bound_metric_count": 0,
+        "invalid_binding_count": 0,
+        "evidence": "docs/security/evidence/R6D2C1_KLAVIYO_METRIC_BINDING_MIGRATION_LIVE.json"
+      },
+      "metric_binding_live_preflight": {
+        "result": "PASS",
+        "database_mutation": false,
+        "provider_contact": false,
+        "evidence": "docs/security/evidence/R6D2C1_KLAVIYO_METRIC_BINDING_PREFLIGHT_LIVE.json"
+      },
+      "r6_d2_c1_repository_result": "PASS_FOCUSED_TESTS_FULL_REGRESSION_NOT_GREEN",
       "sms_spend_currency": "USD_ONLY",
-      "current_connection": "disconnected",
-      "production_registered": false,
+      "current_connection": "connected_merchant_confirmed",
+      "last_live_preflight_result": "KLAVIYO_PREFLIGHT_NOT_CONFIGURED",
+      "production_registered": true,
       "provider_contact": false,
       "dataset_v2_write": false,
-      "deployment_performed": false
+      "deployment_performed": true,
+      "corrective_deployment_performed": false
     }
   },
-  "next_gate": "R6-D2_production_composition_and_read_only_preflight"
+  "next_gate": "R6-D2-C1_application_deployment_review_and_explicit_approval"
 }
-

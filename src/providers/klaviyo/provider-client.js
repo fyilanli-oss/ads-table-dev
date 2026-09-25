@@ -76,8 +76,30 @@ function reportRows(payload, branch) {
   });
 }
 
-function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId, now = () => new Date() } = {}) {
-  const metricId = required(conversionMetricId, 'Klaviyo conversion metric id');
+function metricPagePath(value) {
+  const url = new URL(value, API_BASE);
+  if (url.origin !== API_BASE || !['/api/metrics', '/api/metrics/'].includes(url.pathname)) {
+    throw new Error('KLAVIYO_METRIC_PAGINATION_INVALID');
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+function metricCandidate(item) {
+  const name = required(item?.attributes?.name, 'metric.name');
+  if (name.trim().toLowerCase() !== 'placed order') return null;
+  const integration = item?.attributes?.integration;
+  return Object.freeze({
+    id: required(item?.id, 'metric.id'),
+    name,
+    integration_name: required(integration?.name, 'metric.integration.name'),
+    integration_category: typeof integration?.category === 'string' && integration.category.trim()
+      ? integration.category.trim() : null,
+  });
+}
+
+function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId = null, now = () => new Date() } = {}) {
+  const defaultMetricId = typeof conversionMetricId === 'string' && conversionMetricId.trim()
+    ? conversionMetricId.trim() : null;
 
   async function request(accessToken, path, options = {}) {
     const response = await fetchImpl(`${API_BASE}${path}`, {
@@ -108,7 +130,25 @@ function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId, no
     });
   }
 
-  async function report(accessToken, branch, timeframe) {
+  async function fetchPlacedOrderMetricCandidates({ accessToken } = {}) {
+    let path = '/api/metrics/?fields[metric]=name,integration&page[size]=200';
+    const candidates = new Map();
+    for (let page = 0; page < 100 && path; page += 1) {
+      const payload = await request(accessToken, path);
+      if (!Array.isArray(payload?.data)) throw new Error('KLAVIYO_METRIC_RESPONSE_INVALID');
+      for (const item of payload.data) {
+        const candidate = metricCandidate(item);
+        if (candidate) candidates.set(candidate.id, candidate);
+      }
+      const next = payload?.links?.next;
+      path = next ? metricPagePath(next) : null;
+      if (page === 99 && path) throw new Error('KLAVIYO_METRIC_PAGINATION_LIMIT');
+    }
+    return Object.freeze([...candidates.values()].sort((left, right) => left.id.localeCompare(right.id)));
+  }
+
+  async function report(accessToken, branch, timeframe, conversionMetricIdInput) {
+    const metricId = required(conversionMetricIdInput || defaultMetricId, 'Klaviyo conversion metric id');
     const type = `${branch}-values-report`;
     const groupBy = branch === 'campaign'
       ? ['campaign_message_id', 'campaign_message_name', 'campaign_id', 'send_channel']
@@ -122,13 +162,15 @@ function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId, no
     return reportRows(payload, branch);
   }
 
-  async function fetchMessageFacts({ accessToken, account, providerDate } = {}) {
+  async function fetchMessageFacts({ accessToken, account, providerDate, conversionMetricId: conversionMetricIdInput } = {}) {
     validateTimeZone(account?.timezone);
     const dailyWindow = { start: zonedInstant(providerDate, account.timezone), end: zonedInstant(providerDate, account.timezone, true) };
     const monthlyWindow = { start: zonedInstant(monthStart(providerDate), account.timezone), end: dailyWindow.end };
     const [dailyCampaign, dailyFlow, monthlyCampaign, monthlyFlow] = await Promise.all([
-      report(accessToken, 'campaign', dailyWindow), report(accessToken, 'flow', dailyWindow),
-      report(accessToken, 'campaign', monthlyWindow), report(accessToken, 'flow', monthlyWindow),
+      report(accessToken, 'campaign', dailyWindow, conversionMetricIdInput),
+      report(accessToken, 'flow', dailyWindow, conversionMetricIdInput),
+      report(accessToken, 'campaign', monthlyWindow, conversionMetricIdInput),
+      report(accessToken, 'flow', monthlyWindow, conversionMetricIdInput),
     ]);
     const monthly = new Map([...monthlyCampaign, ...monthlyFlow].map(row => [row.key, row]));
     const periodClosed = providerDate.slice(0, 7) < businessDateFromTimestamp(now(), account.timezone).slice(0, 7);
@@ -155,8 +197,7 @@ function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId, no
     return Object.freeze({ rows, verified_empty: rows.length === 0 });
   }
 
-  return Object.freeze({ fetchAccount, fetchMessageFacts });
+  return Object.freeze({ fetchAccount, fetchPlacedOrderMetricCandidates, fetchMessageFacts });
 }
 
-module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, zonedInstant, reportRows, createKlaviyoProviderClient });
-
+module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, zonedInstant, reportRows, metricPagePath, metricCandidate, createKlaviyoProviderClient });

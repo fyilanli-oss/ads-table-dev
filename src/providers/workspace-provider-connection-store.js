@@ -39,6 +39,16 @@ function selectedAccounts(provider, accounts) {
   return Object.freeze(unique);
 }
 
+function conversionMetric(metric) {
+  return Object.freeze({
+    id: required(metric?.id, 'metric.id'),
+    name: required(metric?.name, 'metric.name'),
+    integrationName: required(metric?.integration_name, 'metric.integration_name'),
+    integrationCategory: typeof metric?.integration_category === 'string' && metric.integration_category.trim()
+      ? metric.integration_category.trim() : null,
+  });
+}
+
 function authorityFromEmbeddedTransaction(transaction) {
   if (!transaction || transaction.surface !== 'shopify_embedded' || transaction.user_id !== null ||
     transaction.return_target !== '/shopify/app/platforms') throw new Error('EMBEDDED_OAUTH_TRANSACTION_REQUIRED');
@@ -71,6 +81,11 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       source_currency: null,
       monthly_plan_cost: null,
       selected_accounts: [],
+      conversion_metric_id: null,
+      conversion_metric_name: null,
+      conversion_metric_integration_name: null,
+      conversion_metric_integration_category: null,
+      conversion_metric_verified_at: null,
       access_token_envelope: vault.encrypt(accessToken, tokenContext(workspace.workspace_id, provider, 'access')),
       refresh_token_envelope: refreshToken ? vault.encrypt(refreshToken, tokenContext(workspace.workspace_id, provider, 'refresh')) : null,
       access_token_expires_at: expiresAt,
@@ -124,7 +139,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,connection_version')
+      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at')
       .eq('workspace_id', workspace.workspace_id)
       .eq('provider', provider)
       .eq('status', 'connected')
@@ -138,6 +153,13 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       sourceCurrency: data.source_currency,
       selectedAccounts: Array.isArray(data.selected_accounts) ? data.selected_accounts : [],
       monthlyPlanCost: data.monthly_plan_cost,
+      conversionMetric: data.conversion_metric_id ? Object.freeze({
+        id: data.conversion_metric_id,
+        name: data.conversion_metric_name,
+        integrationName: data.conversion_metric_integration_name,
+        integrationCategory: data.conversion_metric_integration_category,
+        verifiedAt: data.conversion_metric_verified_at,
+      }) : null,
       accessToken: vault.decrypt(data.access_token_envelope, tokenContext(workspace.workspace_id, provider, 'access')),
       refreshToken: data.refresh_token_envelope
         ? vault.decrypt(data.refresh_token_envelope, tokenContext(workspace.workspace_id, provider, 'refresh'))
@@ -194,6 +216,11 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       source_currency: primary.currency,
       selected_accounts: verifiedAccounts,
       monthly_plan_cost: null,
+      conversion_metric_id: null,
+      conversion_metric_name: null,
+      conversion_metric_integration_name: null,
+      conversion_metric_integration_category: null,
+      conversion_metric_verified_at: null,
       account_verified_at: timestamp,
       connected_at: timestamp,
       disconnected_at: null,
@@ -239,6 +266,11 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       source_currency: verifiedAccount.currency,
       selected_accounts: [verifiedAccount],
       monthly_plan_cost: cost,
+      conversion_metric_id: null,
+      conversion_metric_name: null,
+      conversion_metric_integration_name: null,
+      conversion_metric_integration_category: null,
+      conversion_metric_verified_at: null,
       account_verified_at: timestamp,
       connected_at: timestamp,
       disconnected_at: null,
@@ -262,6 +294,11 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       source_currency: null,
       monthly_plan_cost: null,
       selected_accounts: [],
+      conversion_metric_id: null,
+      conversion_metric_name: null,
+      conversion_metric_integration_name: null,
+      conversion_metric_integration_category: null,
+      conversion_metric_verified_at: null,
       access_token_envelope: null,
       refresh_token_envelope: null,
       access_token_expires_at: null,
@@ -277,6 +314,29 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     return data;
   }
 
+  async function bindKlaviyoConversionMetric({ authority: authorityInput, version, accountId, metric: metricInput } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
+    const verifiedAccountId = required(accountId, 'accountId');
+    const metric = conversionMetric(metricInput);
+    const timestamp = now().toISOString();
+    const { data, error } = await client.from(TABLE).update({
+      conversion_metric_id: metric.id,
+      conversion_metric_name: metric.name,
+      conversion_metric_integration_name: metric.integrationName,
+      conversion_metric_integration_category: metric.integrationCategory,
+      conversion_metric_verified_at: timestamp,
+      connection_version: version + 1,
+      updated_at: timestamp,
+    }).eq('workspace_id', authority.workspace_id).eq('provider', 'klaviyo')
+      .eq('status', 'connected').eq('active_account_id', verifiedAccountId)
+      .eq('connection_version', version)
+      .select('connection_version').maybeSingle();
+    if (error) throw new Error('CONNECTION_WRITE_FAILED');
+    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+    return data;
+  }
+
   return Object.freeze({
     beginAccountSelection,
     writeFromOAuthTransaction,
@@ -289,6 +349,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     refreshKlaviyo,
     completeKlaviyo,
     disconnectKlaviyo,
+    bindKlaviyoConversionMetric,
   });
 }
 
@@ -296,7 +357,7 @@ module.exports = Object.freeze({
   TABLE,
   ACTIVE_PROVIDERS,
   selectedAccounts,
+  conversionMetric,
   authorityFromEmbeddedTransaction,
   createCanonicalWorkspaceProviderConnectionStore
 });
-

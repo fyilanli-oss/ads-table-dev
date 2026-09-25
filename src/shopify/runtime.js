@@ -24,6 +24,7 @@ const {createAdAccountSelection, createMetaAccountDiscovery, createGoogleAdsAcco
 const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
 const {createKlaviyoProviderClient} = require("../providers/klaviyo/provider-client");
 const {createKlaviyoReadOnlyPreflight} = require("../providers/klaviyo/read-only-preflight");
+const {createKlaviyoMetricBinding} = require("../providers/klaviyo/metric-binding");
 
 function enabled(value) {
   if (value === undefined || value === "") return false;
@@ -118,24 +119,25 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});
     if (adapters.klaviyo) {
-      const metricId = String(env.KLAVIYO_PLACED_ORDER_METRIC_ID || "").trim();
-      const preflight = metricId && typeof resolveFxRate === "function"
+      const providerClient = createKlaviyoProviderClient({fetchImpl});
+      const preflight = typeof resolveFxRate === "function"
         ? createKlaviyoReadOnlyPreflight({
           connectionStore,
           settingsStore,
-          providerClient: createKlaviyoProviderClient({fetchImpl, conversionMetricId: metricId}),
+          providerClient,
           resolveFxRate,
         })
         : {execute: async () => {throw Object.assign(new Error("KLAVIYO_PREFLIGHT_NOT_CONFIGURED"), {code: "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", status: 503});}};
       registerShopifyKlaviyoAccountRoutes(app, {
-        authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
-        selection: createKlaviyoAccountSelection({
-          store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
-        }),
-        disconnect: createKlaviyoDisconnect({
-          store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
-        }),
-        preflight,
+      authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
+      selection: createKlaviyoAccountSelection({
+        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+      }),
+      disconnect: createKlaviyoDisconnect({
+        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+      }),
+      preflight,
+      metricBinding: createKlaviyoMetricBinding({connectionStore, providerClient}),
       });
     }
     if (adapters.meta || adapters.google_ads) registerShopifyAdAccountRoutes(app, {

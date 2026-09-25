@@ -1,0 +1,19 @@
+{
+  "evidence_version": "r6d2c1-klaviyo-metric-binding-preflight-v1",
+  "captured_at_utc": "2026-09-25T07:26:03.440Z",
+  "project": "adstable-dev",
+  "project_ref": "xnstrzhavqkztvmlwsrx",
+  "check_name": "R6D2C1_KLAVIYO_METRIC_BINDING_PREFLIGHT",
+  "canonical_table_exists": true,
+  "rls_enabled": true,
+  "force_rls_enabled": true,
+  "target_column_count": 0,
+  "target_constraint_count": 0,
+  "browser_grant_count": 0,
+  "canonical_connection_count": 1,
+  "connected_klaviyo_count": 1,
+  "provider_contact": false,
+  "database_mutation": false,
+  "dataset_v2_write": false,
+  "result": "PASS"
+}

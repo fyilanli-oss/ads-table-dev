@@ -80,3 +80,31 @@ test('Klaviyo provider client fails closed on auth, response or account drift wi
   await assert.rejects(drift.fetchAccount({ accessToken: 'secret', accountId: 'account-1' }), /KLAVIYO_PROVIDER_ACCOUNT_MISMATCH/);
 });
 
+test('Klaviyo metric discovery paginates and returns only exact provider-reported Placed Order candidates', async () => {
+  const calls = [];
+  const fetchImpl = async url => {
+    calls.push(url);
+    if (calls.length === 1) return response({
+      data: [
+        { id: 'metric-other', attributes: { name: 'Ordered Product', integration: { name: 'Shopify', category: 'Ecommerce' } } },
+        { id: 'metric-b', attributes: { name: 'Placed Order', integration: { name: 'WooCommerce', category: 'Ecommerce' } } },
+      ],
+      links: { next: 'https://a.klaviyo.com/api/metrics/?page[cursor]=next' },
+    });
+    return response({
+      data: [{ id: 'metric-a', attributes: { name: 'Placed Order', integration: { name: 'Shopify', category: 'Ecommerce' } } }],
+      links: { next: null },
+    });
+  };
+  const client = createKlaviyoProviderClient({ fetchImpl });
+  assert.deepEqual(await client.fetchPlacedOrderMetricCandidates({ accessToken: 'secret' }), [
+    { id: 'metric-a', name: 'Placed Order', integration_name: 'Shopify', integration_category: 'Ecommerce' },
+    { id: 'metric-b', name: 'Placed Order', integration_name: 'WooCommerce', integration_category: 'Ecommerce' },
+  ]);
+  assert.equal(calls.length, 2);
+});
+
+test('Klaviyo metric discovery rejects pagination outside the provider origin', async () => {
+  const client = createKlaviyoProviderClient({ fetchImpl: async () => response({ data: [], links: { next: 'https://attacker.invalid/steal' } }) });
+  await assert.rejects(client.fetchPlacedOrderMetricCandidates({ accessToken: 'secret' }), /KLAVIYO_METRIC_PAGINATION_INVALID/);
+});

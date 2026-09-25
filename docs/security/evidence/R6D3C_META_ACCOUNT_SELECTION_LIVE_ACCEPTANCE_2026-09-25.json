@@ -1,0 +1,56 @@
+{
+  "evidence_version": "r6d3c-meta-account-selection-live-acceptance-v1",
+  "captured_at_utc": "2026-09-25T17:03:10.0506378Z",
+  "project": "adstable-dev",
+  "project_ref": "xnstrzhavqkztvmlwsrx",
+  "pull_request": 261,
+  "merge_commit": "d7dfaa4baf8ba89af65873d1f00718ae3de5258d",
+  "post_merge_checks": "PASS",
+  "production_deployment": {
+    "status": "SUCCESS",
+    "deployment_id": 6665425462,
+    "immutable_url": "https://ads-table-8ld8iab7g-firats-projects-d22284db.vercel.app",
+    "canonical_alias": "https://dev.adstable.app",
+    "alias_content_match": true,
+    "response_sha256": "791c9e4bb1d46a78e5137515edade121367d057270c3ad42cc9f3dd8ef077ef9"
+  },
+  "read_only_preflight": {
+    "result": "PASS",
+    "canonical_meta_count": 0,
+    "dataset_v2_meta_count": 0,
+    "active_legacy_meta_schedule_count": 0,
+    "open_legacy_meta_job_count": 0,
+    "legacy_meta_connection_baseline": 1,
+    "browser_grant_count": 0
+  },
+  "merchant_acceptance": {
+    "connect_modal": "PASS",
+    "oauth_completed": true,
+    "account_selection_modal": "PASS",
+    "selected_account_count": 1,
+    "connected_ui": "PASS",
+    "reload_persistence": "PASS",
+    "screenshots_required": false
+  },
+  "supabase_read_only_postcheck": {
+    "result": "PASS",
+    "canonical_meta_count": 1,
+    "connected_meta_count": 1,
+    "pending_meta_count": 0,
+    "invalid_connected_meta_count": 0,
+    "invalid_selected_account_count": 0,
+    "dataset_v2_meta_count": 0,
+    "active_legacy_meta_schedule_count": 0,
+    "open_legacy_meta_job_count": 0,
+    "legacy_meta_connection_after": 1,
+    "browser_grant_count": 0
+  },
+  "data_movement": {
+    "dataset_v2_meta_rows": 0,
+    "active_legacy_meta_schedules": 0,
+    "open_legacy_meta_jobs": 0,
+    "production_activation": false
+  },
+  "decision": "PASS_META_CONNECTION_AND_ACCOUNT_SELECTION_ONLY",
+  "next_gate": "R6-D3_META_DATA_RUNTIME_ANALYST_BRIEF"
+}

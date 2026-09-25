@@ -48,11 +48,11 @@ test('R6-D3-C reuses the canonical R7-A2 runtime without activating data movemen
     duplicates_allowed: false,
     database_constraint: 'workspace_provider_connected_account_count',
   });
-  assert.equal(contract.production_mutation, false);
-  assert.equal(contract.provider_contact, false);
+  assert.equal(contract.production_mutation, true);
+  assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
   assert.deepEqual(contract.production_acceptance_preparation, {
-    status: 'PREPARED_LOCALLY_NOT_EXECUTED',
+    status: 'EXECUTED_PASS',
     runbook: 'docs/R6D3C_META_PRODUCTION_MERCHANT_ACCEPTANCE_RUNBOOK.md',
     read_only_preflight: 'docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_PREFLIGHT.sql',
     read_only_postcheck: 'docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_POSTCHECK.sql',
@@ -60,6 +60,12 @@ test('R6-D3-C reuses the canonical R7-A2 runtime without activating data movemen
     requires_explicit_production_approval: true,
     screenshots_required: false,
     final_pass_requires_legacy_meta_count_unchanged: true,
+    evidence: 'docs/security/evidence/R6D3C_META_ACCOUNT_SELECTION_LIVE_ACCEPTANCE_2026-09-25.json',
+    selected_account_count: 1,
+    reload_persistence_verified: true,
+    dataset_v2_meta_rows_after: 0,
+    legacy_meta_connection_before: 1,
+    legacy_meta_connection_after: 1,
   });
 });
 
@@ -159,7 +165,25 @@ test('production acceptance runbook requires a real modal, persistence and uncha
   assert.match(runbook, /Dataset V2 Meta satırı, aktif Meta schedule ve açık Meta job sayısı `0`/);
   assert.match(runbook, /Legacy Meta kayıt sayısı değişir/);
   assert.match(runbook, /Ekran görüntüsü zorunlu değildir/);
-  assert.match(runbook, /not deployed, not executed, production merchant acceptance pending/);
+  assert.match(runbook, /Executed PASS/);
+});
+
+test('live acceptance evidence records only redacted aggregate PASS results', () => {
+  const evidenceText = read('docs/security/evidence/R6D3C_META_ACCOUNT_SELECTION_LIVE_ACCEPTANCE_2026-09-25.json');
+  const evidence = JSON.parse(evidenceText);
+  assert.equal(evidence.pull_request, 261);
+  assert.equal(evidence.merge_commit, 'd7dfaa4baf8ba89af65873d1f00718ae3de5258d');
+  assert.equal(evidence.production_deployment.status, 'SUCCESS');
+  assert.equal(evidence.production_deployment.alias_content_match, true);
+  assert.equal(evidence.read_only_preflight.result, 'PASS');
+  assert.equal(evidence.merchant_acceptance.selected_account_count, 1);
+  assert.equal(evidence.merchant_acceptance.reload_persistence, 'PASS');
+  assert.equal(evidence.merchant_acceptance.screenshots_required, false);
+  assert.equal(evidence.supabase_read_only_postcheck.result, 'PASS');
+  assert.equal(evidence.supabase_read_only_postcheck.dataset_v2_meta_count, 0);
+  assert.equal(evidence.supabase_read_only_postcheck.legacy_meta_connection_after, 1);
+  assert.equal(evidence.data_movement.production_activation, false);
+  assert.doesNotMatch(evidenceText, /access[_ -]?token|refresh[_ -]?token|authorization[_ -]?code|account[_ -]?id|workspace[_ -]?id|user[_ -]?id/i);
 });
 
 test('production preflight is read-only and blocks an already-started canonical Meta flow', () => {

@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d3c-meta-account-selection-acceptance-v1",
-  "status": "PASS_REPOSITORY_PREFLIGHT_PRODUCTION_ACCEPTANCE_PENDING",
+  "status": "PASS_PRODUCTION_MERCHANT_ACCEPTANCE",
   "provider": "meta",
   "business_outcome": "A verified Meta authorization becomes Connected only after the merchant selects between one and three Meta-supplied ad accounts.",
   "reuse_decision": {
@@ -45,22 +45,26 @@
     "connected_before_save": false
   },
   "production_acceptance_preparation": {
-    "status": "PREPARED_LOCALLY_NOT_EXECUTED",
+    "status": "EXECUTED_PASS",
     "runbook": "docs/R6D3C_META_PRODUCTION_MERCHANT_ACCEPTANCE_RUNBOOK.md",
     "read_only_preflight": "docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_PREFLIGHT.sql",
     "read_only_postcheck": "docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_POSTCHECK.sql",
     "requires_real_merchant_session": true,
     "requires_explicit_production_approval": true,
     "screenshots_required": false,
-    "final_pass_requires_legacy_meta_count_unchanged": true
+    "final_pass_requires_legacy_meta_count_unchanged": true,
+    "evidence": "docs/security/evidence/R6D3C_META_ACCOUNT_SELECTION_LIVE_ACCEPTANCE_2026-09-25.json",
+    "selected_account_count": 1,
+    "reload_persistence_verified": true,
+    "dataset_v2_meta_rows_after": 0,
+    "legacy_meta_connection_before": 1,
+    "legacy_meta_connection_after": 1
   },
   "official_shopify_references": [
     "https://shopify.dev/docs/api/app-home/latest/web-components/forms/choice-list",
     "https://shopify.dev/docs/apps/build/app-home/migrate-from-polaris-react"
   ],
   "excluded": [
-    "production_meta_oauth",
-    "live_meta_account_selection",
     "provider_performance_read",
     "dataset_v2_write",
     "schedule_or_backfill",
@@ -68,7 +72,7 @@
     "google_ads_acceptance",
     "e4_redevelopment"
   ],
-  "production_mutation": false,
-  "provider_contact": false,
+  "production_mutation": true,
+  "provider_contact": true,
   "dataset_v2_write": false
 }

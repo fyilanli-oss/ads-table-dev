@@ -22,6 +22,8 @@ const {registerShopifyWorkspaceSettingsRoutes} = require("../routes/shopify-work
 const {registerShopifyAdAccountRoutes} = require("../routes/shopify-ad-account-routes");
 const {createAdAccountSelection, createMetaAccountDiscovery, createGoogleAdsAccountDiscovery} = require("./ad-account-selection");
 const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
+const {createKlaviyoProviderClient} = require("../providers/klaviyo/provider-client");
+const {createKlaviyoReadOnlyPreflight} = require("../providers/klaviyo/read-only-preflight");
 
 function enabled(value) {
   if (value === undefined || value === "") return false;
@@ -48,7 +50,7 @@ function unavailableAccountDiscovery() {
   throw error;
 }
 
-function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTransactionStore, fetchImpl = fetch, embeddedProviderOAuthAdapters}) {
+function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTransactionStore, fetchImpl = fetch, embeddedProviderOAuthAdapters, resolveFxRate}) {
   const config = loadShopifyConfig(env);
   if (!config.enabled) return Object.freeze({enabled: false});
   if (!supabaseAdmin) throw new Error("Shopify managed installation requires Supabase service-role configuration");
@@ -115,15 +117,27 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       providers: oauthProviders,
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});
-    if (adapters.klaviyo) registerShopifyKlaviyoAccountRoutes(app, {
-      authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
-      selection: createKlaviyoAccountSelection({
-        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
-      }),
-      disconnect: createKlaviyoDisconnect({
-        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
-      }),
-    });
+    if (adapters.klaviyo) {
+      const metricId = String(env.KLAVIYO_PLACED_ORDER_METRIC_ID || "").trim();
+      const preflight = metricId && typeof resolveFxRate === "function"
+        ? createKlaviyoReadOnlyPreflight({
+          connectionStore,
+          settingsStore,
+          providerClient: createKlaviyoProviderClient({fetchImpl, conversionMetricId: metricId}),
+          resolveFxRate,
+        })
+        : {execute: async () => {throw Object.assign(new Error("KLAVIYO_PREFLIGHT_NOT_CONFIGURED"), {code: "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", status: 503});}};
+      registerShopifyKlaviyoAccountRoutes(app, {
+        authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
+        selection: createKlaviyoAccountSelection({
+          store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+        }),
+        disconnect: createKlaviyoDisconnect({
+          store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+        }),
+        preflight,
+      });
+    }
     if (adapters.meta || adapters.google_ads) registerShopifyAdAccountRoutes(app, {
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createAdAccountSelection({

@@ -1,0 +1,47 @@
+{
+  "evidence_version": "r6d3d-meta-read-only-live-acceptance-v1",
+  "captured_at_utc": "2026-09-25T18:04:19.6633995Z",
+  "project": "adstable-dev",
+  "project_ref": "xnstrzhavqkztvmlwsrx",
+  "pull_request": 263,
+  "merge_commit": "e558ec69d25b6f5aeee314d592cd5cac231662a8",
+  "post_merge_checks": "PASS",
+  "production_deployment": {
+    "status": "SUCCESS",
+    "deployment_id": 6666937846,
+    "immutable_url": "https://ads-table-2obdixs05-firats-projects-d22284db.vercel.app",
+    "canonical_alias": "https://dev.adstable.app"
+  },
+  "merchant_acceptance": {
+    "result": "PASS",
+    "selected_account_count": 1,
+    "verified_row_count": 0,
+    "provider_result_status": "empty",
+    "account_api_verified": true,
+    "insights_verified": true,
+    "time_fx_verified": true,
+    "dataset_v2_writes_reported": 0
+  },
+  "supabase_read_only_postcheck": {
+    "result": "PASS",
+    "canonical_meta_count": 1,
+    "connected_meta_count": 1,
+    "pending_meta_count": 0,
+    "invalid_connected_meta_count": 0,
+    "invalid_selected_account_count": 0,
+    "selected_meta_account_count": 1,
+    "dataset_v2_meta_count": 0,
+    "active_legacy_meta_schedule_count": 0,
+    "open_legacy_meta_job_count": 0,
+    "legacy_meta_connection_count": 1,
+    "browser_grant_count": 0
+  },
+  "data_movement": {
+    "dataset_v2_meta_rows": 0,
+    "active_legacy_meta_schedules": 0,
+    "open_legacy_meta_jobs": 0,
+    "production_activation": false
+  },
+  "decision": "PASS_META_READ_ONLY_RUNTIME_VERIFIED_EMPTY",
+  "next_gate": "R6-D3_CONTROLLED_DATASET_V2_ACCEPTANCE_BRIEF"
+}

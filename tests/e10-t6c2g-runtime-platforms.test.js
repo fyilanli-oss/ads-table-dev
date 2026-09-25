@@ -53,16 +53,72 @@ test("provider token exchanges normalize object and nested TikTok token response
 
 test("provider token exchange clients keep credentials server-side and use exact endpoints", async () => {
   const calls = [];
-  const exchanges = createEmbeddedProviderTokenExchanges({fetchImpl: async (url, options) => {
+  const exchanges = createEmbeddedProviderTokenExchanges({now: () => new Date("2026-09-25T12:00:00.000Z"), fetchImpl: async (url, options) => {
     calls.push({url, options});
-    return {ok: true, json: async () => ({access_token: "access", refresh_token: "refresh"})};
+    if (url.includes("/debug_token")) return {ok: true, json: async () => ({data: {app_id: "client", is_valid: true, expires_at: 1790341200, scopes: ["ads_read"]}})};
+    const metaLongLived = url.includes("graph.facebook.com") && String(options.body || "").includes("fb_exchange_token");
+    return {ok: true, json: async () => ({access_token: metaLongLived ? "meta-long" : "access", refresh_token: "refresh"})};
   }});
   for (const exchange of Object.values(exchanges)) {
     await exchange({code: "code", redirectUri: "https://app.test/callback", pkceVerifier: "verifier", clientId: "client", clientSecret: "secret"});
   }
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 7);
   assert.equal(calls.every(call => !call.url.includes("secret")), true);
-  assert.deepEqual(calls.map(call => new URL(call.url).hostname), ["graph.facebook.com", "oauth2.googleapis.com", "a.klaviyo.com", "business-api.tiktok.com", "api.pinterest.com"]);
+  assert.deepEqual(calls.map(call => new URL(call.url).hostname), ["graph.facebook.com", "graph.facebook.com", "graph.facebook.com", "oauth2.googleapis.com", "a.klaviyo.com", "business-api.tiktok.com", "api.pinterest.com"]);
+  assert.equal(calls[1].options.body.includes("grant_type=fb_exchange_token"), true);
+  assert.equal(calls[2].options.headers.Authorization, "Bearer client|secret");
+  assert.equal(calls[2].url.includes("meta-long"), true);
+});
+
+test("Meta exchange stores only a validated long-lived token with authoritative scopes and expiry", async () => {
+  const calls = [];
+  const exchange = createEmbeddedProviderTokenExchanges({
+    now: () => new Date("2026-09-25T12:00:00.000Z"),
+    fetchImpl: async (url, options) => {
+      calls.push({url, options});
+      if (url.includes("/debug_token")) return {ok: true, json: async () => ({data: {app_id: "app-1", is_valid: true, expires_at: 1790341200, scopes: ["public_profile", "ads_read"]}})};
+      if (String(options.body || "").includes("fb_exchange_token")) return {ok: true, json: async () => ({access_token: "long-lived"})};
+      return {ok: true, json: async () => ({access_token: "short-lived"})};
+    },
+  });
+  assert.deepEqual(await exchange.meta({code: "code", redirectUri: "https://app/callback", clientId: "app-1", clientSecret: "secret"}), {
+    accessToken: "long-lived",
+    refreshToken: null,
+    expiresIn: 3600,
+    scopes: ["public_profile", "ads_read"],
+  });
+  assert.equal(calls.length, 3);
+});
+
+test("Meta validation fails closed for wrong app, missing ads_read, and expired authority", async () => {
+  const cases = [
+    [{app_id: "other", is_valid: true, expires_at: 1790341200, scopes: ["ads_read"]}, "META_TOKEN_APP_MISMATCH"],
+    [{app_id: "app-1", is_valid: true, expires_at: 1790341200, scopes: ["public_profile"]}, "META_TOKEN_SCOPE_MISSING"],
+    [{app_id: "app-1", is_valid: true, expires_at: 1790337599, scopes: ["ads_read"]}, "META_TOKEN_REAUTHORIZATION_REQUIRED"],
+  ];
+  for (const [data, code] of cases) {
+    const exchange = createEmbeddedProviderTokenExchanges({
+      now: () => new Date("2026-09-25T12:00:00.000Z"),
+      fetchImpl: async (url, options) => {
+        if (url.includes("/debug_token")) return {ok: true, json: async () => ({data})};
+        if (String(options.body || "").includes("fb_exchange_token")) return {ok: true, json: async () => ({access_token: "long-lived"})};
+        return {ok: true, json: async () => ({access_token: "short-lived"})};
+      },
+    });
+    await assert.rejects(
+      () => exchange.meta({code: "code", redirectUri: "https://app/callback", clientId: "app-1", clientSecret: "secret"}),
+      error => error.code === code && !JSON.stringify(error).includes("long-lived") && !JSON.stringify(error).includes("secret"),
+    );
+  }
+});
+
+test("Platforms surfaces a controlled Meta reconnect action without exposing token details", () => {
+  const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: true});
+  assert.match(html, /id="meta-connect-action"/);
+  assert.match(html, /oauth_error"\) === "reauthorization_required"/);
+  assert.match(html, /reconnect\.textContent = "Reconnect Meta"/);
+  assert.match(html, /connectAction\.textContent = 'Reconnect Meta'/);
+  assert.match(html, /Meta authorization must be renewed before account selection/);
 });
 
 test("provider OAuth remains off unless the explicit activation flag is true", () => {

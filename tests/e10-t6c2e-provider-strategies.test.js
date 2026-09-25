@@ -41,6 +41,12 @@ test("authorization URLs bind client, state, callback and minimum provider scope
   await assert.rejects(() => strategies.klaviyo.buildAuthorizationUrl({state: "s"}), /KLAVIYO_PKCE_REQUIRED/);
 });
 
+test("Meta authorization uses the configured Graph version shared with exchange and discovery", async () => {
+  const strategies = createEmbeddedProviderStrategies({env: {...env, META_GRAPH_VERSION: "v24.0"}, appUrl: "https://dev.example", exchangeCodeByProvider: exchanges});
+  const url = new URL(await strategies.meta.buildAuthorizationUrl({state: "s"}));
+  assert.equal(url.pathname, "/v24.0/dialog/oauth");
+});
+
 test("secrets are passed only to server-side exchange and never authorization URLs", async () => {
   const strategies = createEmbeddedProviderStrategies({env, appUrl: "https://dev.example", exchangeCodeByProvider: exchanges});
   for (const [provider, strategy] of Object.entries(strategies)) {

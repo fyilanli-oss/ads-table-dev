@@ -142,6 +142,30 @@ PR #259 merge commit `9039180442768a2dab9b80c09d24217d8249588f` post-merge Secur
 
 Supabase salt-okunur postcheck Dataset V2 toplam/Klaviyo satırını `0/0`; connected canonical Klaviyo, access-token expiry, encrypted refresh token ve metric binding sayılarını `1/1/1/1` doğruladı. R6-D2 Klaviyo canlı kabulü PASS ile kapanmıştır. Bu sonuç Meta veya Google Ads'i aktive etmez; sıradaki ayrı kapı R6-D3 Meta analist brief'i ve açık production onayıdır. Redacted kanıt `docs/security/evidence/R6D2C6D_KLAVIYO_LIVE_ACCEPTANCE_2026-09-25.json` içindedir.
 
+### R6-D3-A Meta bağlantı ve token yaşam döngüsü — contract PASS / R6-D3-B implementation gate
+
+Canlı salt-okunur envanter, legacy Meta bağlantısının durum olarak `connected` ve encrypted access token sahibi olmasına karşın expiry'sinin geçmiş olduğunu, refresh token taşımadığını ve active schedule/open job sayısının `0/0` kaldığını gösterdi. Canonical workspace Meta bağlantısı `0`dır. Bu nedenle legacy kayıt tarihsel kanıt olarak korunur; silinmez, canonical workspace'e taşınmaz ve access token'ı yeniden kullanılmaz.
+
+Yeni Meta bağlantısı temiz Shopify embedded OAuth ile başlar. Authorization code server-side token'a çevrildikten sonra supported long-lived access-token exchange uygulanır; token validity, configured Meta app, required scope ve gelecekteki expiry canonical save öncesinde doğrulanır. Meta'nın mevcut OAuth sözleşmesinde bulunmayan bir refresh token akışı uydurulmaz. Yenileme desteklenmiyor veya doğrulama geçmiyorsa kullanıcı kontrollü `Reconnect Meta` durumuna alınır.
+
+Callback yalnız `pending_account_selection` üretir. Bağlantı, server Meta'dan hesap listesini yeniden aldıktan ve kullanıcı en az `1`, en fazla `3` doğrulanmış reklam hesabını seçtikten sonra `Connected` olur. R6-D3-A yalnız plan ve sözleşme kararıdır; provider teması, production OAuth, Dataset V2 yazısı, schedule/backfill, Disconnect/revoke ve tamamlanmış E4 veri motorunun yeniden geliştirilmesi yoktur. Versionlı karar `contracts/r6d3a-meta-connection-lifecycle-v1.json`, analist belgesi `docs/R6D3A_META_CONNECTION_LIFECYCLE_DECISION.md` içindedir.
+
+### R6-D3-B Meta token doğrulama — repository PASS / R6-D3-C account-selection acceptance gate
+
+Embedded Meta callback'te server-side short-lived → long-lived user token exchange ve token debugger doğrulaması uygulanmıştır. `is_valid`, configured app ID, `ads_read` ve gelecekteki expiry koşullarından biri geçmezse canonical connection store çağrılmaz. Meta için refresh token beklenmez; yalnız doğrulanmış long-lived access token, debugger kaynaklı scope ve expiry mevcut encrypted store sınırına gönderilir.
+
+Validation kaynaklı güvenli hatalar Meta'ya bağlı `Reconnect Meta` durumu üretir; token, app secret ve provider response kullanıcıya veya loga çıkmaz. Başarılı callback `pending_account_selection` olarak kalır ve 1–3 provider-doğrulanmış hesap seçilmeden `Connected` olmaz. R6-D3-B production'a deploy edilmemiş, provider'a çağrı yapmamış ve Dataset V2/schedule/backfill açmamıştır. Versionlı sonuç `contracts/r6d3b-meta-token-validation-v1.json`, analist kaydı `docs/R6D3B_META_TOKEN_VALIDATION.md` içindedir.
+
+### R6-D3-C Meta hesap seçimi — repository preflight PASS / production merchant acceptance gate
+
+R7-A2'de tamamlanan canonical hesap seçimi runtime'ı yeniden incelendi ve R6-D3-C için yeniden geliştirilmesine gerek olmadığı doğrulandı. Eski `server.js + dashboard.html` akışının aksine browser tam hesap nesnesi veya tenant bilgisi sağlayamaz; yalnız seçilen ID'leri gönderir. Server save sırasında Meta `/me/adaccounts` listesini yeniden alır ve yalnız provider-doğrulanmış 1–3 hesabı optimistic connection version sınırıyla canonical kayda yazar.
+
+Shopify-native `s-choice-list` çoklu seçim ve `s-modal` programatik açma kullanımı güncel resmi Shopify App Home sözleşmesiyle doğrulandı. Supabase `selected_accounts` alanı pending durumda boş, connected Meta durumunda 1–3 hesap olacak şekilde validated constraint ile korunmaktadır. Paket-spesifik uçtan uca repository testleri session authority, provider re-fetch, browser alanlarının reddi, 1–3 sınırı, duplicate/yabancı hesap reddi ve `Connected` geçişini doğrular.
+
+Bu preflight production deployment, canlı Meta OAuth, provider teması, Dataset V2, schedule/backfill veya E4 değişikliği yapmaz. Sıradaki kapı gerçek Shopify oturumunda ayrı onaylı merchant acceptance'tır. Versionlı sonuç `contracts/r6d3c-meta-account-selection-acceptance-v1.json`, analist kaydı `docs/R6D3C_META_ACCOUNT_SELECTION_ACCEPTANCE.md` içindedir.
+
+Canlı kabul için analist koşucusu ile salt-okunur Supabase preflight/postcheck yerel olarak hazırlanmıştır. Koşucu gerçek merchant oturumunda Connect→OAuth→1–3 hesap→Save→Connected→reload zincirini; database kontrolleri canonical Meta şekli, legacy kayıt sayısının korunması ve Dataset V2/schedule/job izolasyonunu ölçer. Hazırlık henüz production'a dağıtılmamış veya çalıştırılmamıştır; R6-D3-C production kabulü verilmemiştir.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

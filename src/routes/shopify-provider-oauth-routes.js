@@ -19,6 +19,20 @@ function safeErrorCode(error) {
   return typeof code === "string" && /^[A-Z0-9_]{1,64}$/.test(code) ? code : "EMBEDDED_OAUTH_CALLBACK_FAILED";
 }
 
+const META_REAUTHORIZATION_CODES = new Set([
+  "META_TOKEN_VALIDATION_FAILED",
+  "META_TOKEN_REAUTHORIZATION_REQUIRED",
+  "META_TOKEN_APP_MISMATCH",
+  "META_TOKEN_SCOPE_MISSING",
+]);
+
+function callbackErrorQuery(provider, error) {
+  const code = safeErrorCode(error);
+  return provider === "meta" && META_REAUTHORIZATION_CODES.has(code)
+    ? Object.freeze({oauth_error: "reauthorization_required", provider: "meta"})
+    : Object.freeze({oauth_error: "connection_failed"});
+}
+
 function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
   if (!app || typeof app.get !== "function" || typeof app.post !== "function") throw new TypeError("Express app is required");
   if (!adapters || typeof adapters !== "object" || Array.isArray(adapters)) throw new TypeError("adapters are required");
@@ -49,16 +63,17 @@ function registerShopifyProviderOAuthRoutes(app, {adapters} = {}) {
       return res.redirect(`${RETURN_TARGET}?oauth_connected=${encodeURIComponent(req.params.provider)}&account_selection_required=1`);
     } catch (error) {
       console.error(JSON.stringify({event: "embedded_provider_oauth_callback_failed", provider: req.params.provider, code: safeErrorCode(error)}));
+      const query = callbackErrorQuery(req.params.provider, error);
       if (error?.embedded_return_target) {
         try {
           const target = verifiedAdminTarget(error.embedded_return_target);
-          target.searchParams.set("oauth_error", "connection_failed");
+          for (const [key, value] of Object.entries(query)) target.searchParams.set(key, value);
           return res.redirect(target.href);
         } catch {}
       }
-      return res.redirect(`${RETURN_TARGET}?oauth_error=connection_failed`);
+      return res.redirect(`${RETURN_TARGET}?${new URLSearchParams(query)}`);
     }
   });
 }
 
-module.exports = Object.freeze({registerShopifyProviderOAuthRoutes, PROVIDERS});
+module.exports = Object.freeze({registerShopifyProviderOAuthRoutes, PROVIDERS, safeErrorCode, callbackErrorQuery});

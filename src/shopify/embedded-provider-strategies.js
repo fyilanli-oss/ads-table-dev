@@ -39,6 +39,9 @@ function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCo
     const spec = SPECS[provider];
     const clientId = value(env, spec.client);
     const clientSecret = value(env, spec.secret);
+    const authorizeUrl = provider === "meta"
+      ? `https://www.facebook.com/${value(env, "META_GRAPH_VERSION") || "v20.0"}/dialog/oauth`
+      : spec.authorize;
     const exchange = exchangeCodeByProvider[provider];
     if (!clientId || !clientSecret || typeof exchange !== "function") throw new Error(`EMBEDDED_${provider.toUpperCase()}_OAUTH_CONFIG_INCOMPLETE`);
     const redirectUri = `${appUrl}/api/shopify/providers/${provider}/oauth/callback`;
@@ -54,7 +57,7 @@ function createEmbeddedProviderStrategies({env = process.env, appUrl, exchangeCo
           params.set("code_challenge_method", "S256");
           params.set("code_challenge", pkceChallenge);
         }
-        return `${spec.authorize}?${params}`;
+        return `${authorizeUrl}?${params}`;
       },
       exchangeCode: input => exchange({...input, clientId, clientSecret}),
       ...(provider === "klaviyo" ? {createPkce} : {}),

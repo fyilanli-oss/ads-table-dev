@@ -117,7 +117,12 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       consumeTransaction: (state, provider, redirectUri) => oauthTransactionStore.consume({state, provider, redirectUri}),
       connectionStore,
       resolveReturnTarget: createEmbeddedOAuthReturn({client: supabaseAdmin, clientId: config.clientId}),
-      providerStrategies: createEmbeddedProviderStrategies({env, appUrl: config.appUrl, exchangeCodeByProvider: createEmbeddedProviderTokenExchanges({fetchImpl}), providers: oauthProviders}),
+      providerStrategies: createEmbeddedProviderStrategies({
+        env,
+        appUrl: config.appUrl,
+        exchangeCodeByProvider: createEmbeddedProviderTokenExchanges({fetchImpl, metaGraphVersion: env.META_GRAPH_VERSION || "v20.0"}),
+        providers: oauthProviders,
+      }),
       providers: oauthProviders,
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});

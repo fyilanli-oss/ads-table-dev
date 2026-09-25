@@ -1,6 +1,6 @@
 {
   "contract_version": "r6-workspace-provider-runtime-v1",
-  "status": "R6_D2_C2_PRODUCT_CONTRACT_PASS_C3_APPROVAL_GATE",
+  "status": "R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_APPROVAL_GATE",
   "canonical_tenant": "workspace_id",
   "active_providers": ["meta", "google_ads", "klaviyo"],
   "parked_providers": ["tiktok", "pinterest"],
@@ -99,7 +99,7 @@
     "provider_contact": false
   },
   "r6d_work_packages": {
-    "status": "R6_D1_COMPLETE_R6_D2_C1_DEPLOYED_R6_D2_C2_PRODUCT_CONTRACT_PASS",
+    "status": "R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_APPROVAL_GATE",
     "sequence": [
       "R6-D1 common fail-closed acceptance runner",
       "R6-D2 Klaviyo workspace live acceptance",
@@ -108,7 +108,7 @@
       "R6-D5 provider-by-provider controlled activation decision"
     ],
     "current_live_connection_state": {
-      "klaviyo": "connected_merchant_confirmed",
+      "klaviyo": "live_accepted_verified_empty",
       "meta": "not_live_accepted",
       "google_ads": "not_live_accepted"
     },
@@ -133,7 +133,7 @@
       "production_registered": false
     },
     "r6_d2": {
-      "result": "PASS_REPOSITORY_PREPARATION_ONLY",
+      "result": "PASS_LIVE_VERIFIED_EMPTY",
       "provider_client": "src/providers/klaviyo/provider-client.js",
       "workspace_runner": "src/providers/klaviyo/workspace-runner.js",
       "api_revision": "2026-07-15",
@@ -184,13 +184,28 @@
       "r6_d2_c1_repository_result": "PASS_FOCUSED_TESTS_FULL_REGRESSION_NOT_GREEN",
       "sms_spend_currency": "USD_ONLY",
       "current_connection": "connected_merchant_confirmed",
-      "last_live_preflight_result": "KLAVIYO_PREFLIGHT_NOT_CONFIGURED",
+      "last_live_preflight_result": "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT",
       "production_registered": true,
-      "provider_contact": false,
+      "provider_contact": true,
       "dataset_v2_write": false,
       "deployment_performed": true,
-      "corrective_deployment_performed": false
+      "corrective_deployment_performed": true,
+      "r6_d2_c6d_live_acceptance": {
+        "merge_commit": "9039180442768a2dab9b80c09d24217d8249588f",
+        "controlled_request_count": 1,
+        "automatic_retries": 0,
+        "attempted": 0,
+        "persisted": 0,
+        "verified_empty": true,
+        "synthetic_rows_written": 0,
+        "dataset_v2_rows_after": 0,
+        "connected_with_access_expiry": 1,
+        "connected_with_encrypted_refresh": 1,
+        "connected_with_metric_binding": 1,
+        "production_activation": false,
+        "evidence": "docs/security/evidence/R6D2C6D_KLAVIYO_LIVE_ACCEPTANCE_2026-09-25.json"
+      }
     }
   },
-  "next_gate": "R6-D2-C3_read_only_sales_source_discovery_review_and_explicit_approval"
+  "next_gate": "R6-D3_META_ANALYST_BRIEF_AND_EXPLICIT_PRODUCTION_APPROVAL"
 }

@@ -299,7 +299,8 @@ test('Execution Plan moves first-write tenant enforcement ahead of the C6 retry 
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
   assert.match(plan, /R3-A\+B Done; R3-C1 first-write enforcement prepared/);
   assert.match(plan, /R3-C1.*ilk Dataset V2 satırından önce/i);
-  assert.match(plan, /C6 ilk canlı deneme.*FAILED.*Dataset V2.*0/i);
+  assert.match(plan, /first write FAILED \/ rows 0/);
+  assert.match(plan, /C6 ilk canlı deneme HTTP `503`.*Dataset V2 upsert oluşmadı.*satır sayısı `0`/i);
   assert.match(plan, /Done \/ R4-A\+B\+C/);
   assert.doesNotMatch(plan, /\| R4 \|[^\n]+`Blocked by R3`/);
 });

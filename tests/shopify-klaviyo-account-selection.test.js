@@ -336,3 +336,21 @@ test("reset confirmation performs one session-bound POST and keeps reconnect clo
   assert.equal(elements.get("klaviyo-reset-step").hidden,true);
   assert.equal(elements.get("klaviyo-message").textContent,"Old Klaviyo connection removed. Clean connection setup is not open yet.");
 });
+
+test('C6-B route returns allowlisted diagnostic codes but still redacts arbitrary errors', async () => {
+  const routes = {};
+  const app = {get: (path, handler) => { routes[path] = handler; }, post: (path, handler) => { routes[path] = handler; }};
+  let failure = Object.assign(new Error('hidden'), {code: 'KLAVIYO_DATASET_ACCEPTANCE_FAILED_FX_RESOLUTION', status: 503});
+  registerShopifyKlaviyoAccountRoutes(app, {
+    authenticateEmbedded: async () => authority,
+    selection: {},
+    datasetAcceptance: {execute: async () => { throw failure; }},
+  });
+  const res = {set() {}, status(code) {this.code = code; return this;}, json(body) {this.body = body; return body;}};
+  await routes['/api/shopify/providers/klaviyo/runtime/acceptance']({get: () => 'Bearer session', body: {confirmation: 'x'}}, res);
+  assert.equal(res.code, 503);
+  assert.deepEqual(res.body, {code: 'KLAVIYO_DATASET_ACCEPTANCE_FAILED_FX_RESOLUTION'});
+  failure = Object.assign(new Error('secret provider body'), {code: 'KLAVIYO_DATASET_ACCEPTANCE_FAILED_NOT_ALLOWLISTED'});
+  await routes['/api/shopify/providers/klaviyo/runtime/acceptance']({get: () => 'Bearer session', body: {confirmation: 'x'}}, res);
+  assert.deepEqual(res.body, {code: 'KLAVIYO_UNAVAILABLE'});
+});

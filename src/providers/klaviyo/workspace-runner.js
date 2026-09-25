@@ -23,6 +23,24 @@ function onlySelectedAccount(connection) {
   });
 }
 
+function stageFailure(stage, error, preserveInternalMessage = false) {
+  const failure = new Error(preserveInternalMessage ? String(error?.message || 'KLAVIYO_RUNTIME_STAGE_FAILED') : 'KLAVIYO_RUNTIME_STAGE_FAILED');
+  const code = String(error?.code || '');
+  failure.code = /^[A-Z0-9_]{1,96}$/.test(code) ? code : 'KLAVIYO_RUNTIME_STAGE_FAILED';
+  failure.diagnosticStage = stage;
+  return failure;
+}
+
+function syncStage(stage, action) {
+  try { return action(); }
+  catch (error) { throw stageFailure(stage, error, true); }
+}
+
+async function asyncStage(stage, action) {
+  try { return await action(); }
+  catch (error) { throw stageFailure(stage, error, false); }
+}
+
 function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
   if (!providerClient || typeof providerClient.fetchAccount !== 'function' ||
     typeof providerClient.fetchMessageFacts !== 'function') {
@@ -31,64 +49,71 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
   if (typeof resolveFxRate !== 'function') throw new TypeError('FX resolver is required');
 
   return async function runKlaviyoWorkspace(context = {}) {
-    const workspaceId = required(context?.authority?.workspace_id, 'authority.workspace_id');
-    const connection = context.connection;
-    if (!connection || connection.provider !== 'klaviyo' || connection.status !== 'connected') {
-      throw new Error('KLAVIYO_CANONICAL_CONNECTION_REQUIRED');
-    }
-    const selected = onlySelectedAccount(connection);
-    const conversionMetricId = required(connection?.conversionMetric?.id, 'connection.conversionMetric.id');
-    const providerDate = required(context?.request?.provider_date, 'request.provider_date');
-    const reportingCurrency = normalizeCurrencyCode(context.reportingCurrency, 'reportingCurrency');
-    const account = await providerClient.fetchAccount({
-      accessToken: required(connection.accessToken, 'connection.accessToken'),
-      accountId: selected.id,
-    });
-    if (!account || required(account.id, 'provider_account.id') !== selected.id) {
-      throw new Error('KLAVIYO_PROVIDER_ACCOUNT_MISMATCH');
-    }
-    const sourceCurrency = normalizeCurrencyCode(account.currency, 'provider_account.currency');
-    if (sourceCurrency !== selected.currency || sourceCurrency !== normalizeCurrencyCode(connection.sourceCurrency, 'connection.sourceCurrency')) {
-      throw new Error('KLAVIYO_PROVIDER_CURRENCY_MISMATCH');
-    }
-    const timezone = required(account.timezone, 'provider_account.timezone');
-    const monthlyPlanCost = positiveCost(connection.monthlyPlanCost);
-    const providerResult = await providerClient.fetchMessageFacts({
-      accessToken: connection.accessToken,
-      account: Object.freeze({ id: selected.id, currency: sourceCurrency, timezone }),
-      providerDate,
-      conversionMetricId,
-    });
-    if (!providerResult || !Array.isArray(providerResult.rows)) throw new Error('KLAVIYO_PROVIDER_RESULT_INVALID');
-    if (providerResult.rows.length === 0 && providerResult.verified_empty !== true) {
-      throw new Error('KLAVIYO_EMPTY_RESULT_NOT_VERIFIED');
-    }
-    const fx = await resolveFxRate(sourceCurrency, reportingCurrency, { rateDate: providerDate });
-    const keys = new Set();
-    const rows = providerResult.rows.map(input => {
-      const spendAllocation = input.channel === 'email'
-        ? { ...(input.spend_allocation || {}), monthlyPlanCost }
-        : { ...(input.spend_allocation || {}) };
-      const normalized = normalizeKlaviyoTimeFxMessage({ ...input, spend_allocation: spendAllocation }, {
+    const runtime = syncStage('RUNTIME_CONTEXT', () => {
+      const workspaceId = required(context?.authority?.workspace_id, 'authority.workspace_id');
+      const connection = context.connection;
+      if (!connection || connection.provider !== 'klaviyo' || connection.status !== 'connected') {
+        throw new Error('KLAVIYO_CANONICAL_CONNECTION_REQUIRED');
+      }
+      return Object.freeze({
         workspaceId,
-        accountId: selected.id,
-        account: { id: selected.id, currency: sourceCurrency, timezone },
-        providerDate,
-        targetCurrency: reportingCurrency,
-        fxRate: fx.fx_rate,
-        fxRateDate: fx.fx_rate_date || providerDate,
-        fxProvider: fx.fx_provider,
+        connection,
+        selected: onlySelectedAccount(connection),
+        conversionMetricId: required(connection?.conversionMetric?.id, 'connection.conversionMetric.id'),
+        providerDate: required(context?.request?.provider_date, 'request.provider_date'),
+        reportingCurrency: normalizeCurrencyCode(context.reportingCurrency, 'reportingCurrency'),
+        accessToken: required(connection.accessToken, 'connection.accessToken'),
+        monthlyPlanCost: positiveCost(connection.monthlyPlanCost),
       });
-      const key = `${normalized.row.identity.date}:${normalized.entityKey}`;
-      if (keys.has(key)) throw new Error('KLAVIYO_DUPLICATE_PROVIDER_FACT');
-      keys.add(key);
-      return normalized.row;
     });
-    return Object.freeze({
-      rows,
-      checked_account_ids: [selected.id],
-      provider_result_status: rows.length === 0 ? 'empty' : 'non_empty',
+    const account = await asyncStage('PROVIDER_ACCOUNT', () => providerClient.fetchAccount({
+      accessToken: runtime.accessToken,
+      accountId: runtime.selected.id,
+    }));
+    const verifiedAccount = syncStage('PROVIDER_ACCOUNT_VALIDATION', () => {
+      if (!account || required(account.id, 'provider_account.id') !== runtime.selected.id) {
+        throw new Error('KLAVIYO_PROVIDER_ACCOUNT_MISMATCH');
+      }
+      const sourceCurrency = normalizeCurrencyCode(account.currency, 'provider_account.currency');
+      if (sourceCurrency !== runtime.selected.currency || sourceCurrency !== normalizeCurrencyCode(runtime.connection.sourceCurrency, 'connection.sourceCurrency')) {
+        throw new Error('KLAVIYO_PROVIDER_CURRENCY_MISMATCH');
+      }
+      return Object.freeze({ sourceCurrency, timezone: required(account.timezone, 'provider_account.timezone') });
     });
+    const providerResult = await asyncStage('PROVIDER_FACTS', () => providerClient.fetchMessageFacts({
+      accessToken: runtime.accessToken,
+      account: Object.freeze({ id: runtime.selected.id, currency: verifiedAccount.sourceCurrency, timezone: verifiedAccount.timezone }),
+      providerDate: runtime.providerDate,
+      conversionMetricId: runtime.conversionMetricId,
+    }));
+    syncStage('PROVIDER_RESULT_VALIDATION', () => {
+      if (!providerResult || !Array.isArray(providerResult.rows)) throw new Error('KLAVIYO_PROVIDER_RESULT_INVALID');
+      if (providerResult.rows.length === 0 && providerResult.verified_empty !== true) throw new Error('KLAVIYO_EMPTY_RESULT_NOT_VERIFIED');
+    });
+    const fx = await asyncStage('FX_RESOLUTION', () => resolveFxRate(verifiedAccount.sourceCurrency, runtime.reportingCurrency, { rateDate: runtime.providerDate }));
+    const rows = syncStage('ROW_NORMALIZATION', () => {
+      const keys = new Set();
+      return providerResult.rows.map(input => {
+        const spendAllocation = input.channel === 'email'
+          ? { ...(input.spend_allocation || {}), monthlyPlanCost: runtime.monthlyPlanCost }
+          : { ...(input.spend_allocation || {}) };
+        const normalized = normalizeKlaviyoTimeFxMessage({ ...input, spend_allocation: spendAllocation }, {
+          workspaceId: runtime.workspaceId,
+          accountId: runtime.selected.id,
+          account: { id: runtime.selected.id, currency: verifiedAccount.sourceCurrency, timezone: verifiedAccount.timezone },
+          providerDate: runtime.providerDate,
+          targetCurrency: runtime.reportingCurrency,
+          fxRate: fx.fx_rate,
+          fxRateDate: fx.fx_rate_date || runtime.providerDate,
+          fxProvider: fx.fx_provider,
+        });
+        const key = `${normalized.row.identity.date}:${normalized.entityKey}`;
+        if (keys.has(key)) throw new Error('KLAVIYO_DUPLICATE_PROVIDER_FACT');
+        keys.add(key);
+        return normalized.row;
+      });
+    });
+    return Object.freeze({ rows, checked_account_ids: [runtime.selected.id], provider_result_status: rows.length === 0 ? 'empty' : 'non_empty' });
   };
 }
 

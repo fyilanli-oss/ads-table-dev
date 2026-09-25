@@ -76,3 +76,20 @@ test('Klaviyo workspace runner requires a canonical account-scoped conversion me
     /connection\.conversionMetric\.id is required/
   );
 });
+
+test('workspace runner tags provider and FX failures without exposing upstream error bodies', async () => {
+  const cases = [
+    ['PROVIDER_ACCOUNT', { providerClient: { fetchAccount: async () => { throw new Error('secret account body'); }, fetchMessageFacts: async () => ({ rows: [], verified_empty: true }) }, resolveFxRate: async () => ({}) }],
+    ['PROVIDER_FACTS', { providerClient: { fetchAccount: async () => ({ id: 'account-1', currency: 'USD', timezone: 'UTC' }), fetchMessageFacts: async () => { throw new Error('secret facts body'); } }, resolveFxRate: async () => ({}) }],
+    ['FX_RESOLUTION', { providerClient: { fetchAccount: async () => ({ id: 'account-1', currency: 'USD', timezone: 'UTC' }), fetchMessageFacts: async () => ({ rows: [fact], verified_empty: false }) }, resolveFxRate: async () => { throw new Error('secret fx body'); } }],
+  ];
+  for (const [stage, dependencies] of cases) {
+    const execute = createKlaviyoWorkspaceRunner(dependencies);
+    await assert.rejects(execute(context()), error => {
+      assert.equal(error.diagnosticStage, stage);
+      assert.equal(error.message, 'KLAVIYO_RUNTIME_STAGE_FAILED');
+      assert.doesNotMatch(`${error.code}:${error.message}`, /secret|body/i);
+      return true;
+    });
+  }
+});

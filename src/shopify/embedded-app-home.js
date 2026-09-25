@@ -3,7 +3,7 @@
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 const {initializeAdAccounts} = require("./ad-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "r6d2-read-only-preflight";
+const EMBEDDED_HOME_RELEASE = "r7a-v2";
 
 function escapeAttribute(value) {
   return String(value)

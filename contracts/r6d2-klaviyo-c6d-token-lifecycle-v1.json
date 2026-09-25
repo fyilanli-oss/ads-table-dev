@@ -1,0 +1,25 @@
+{
+  "contract_version": "r6d2-klaviyo-c6d-token-lifecycle-v1",
+  "status": "REPOSITORY_PASS_DEPLOYMENT_PENDING",
+  "purpose": "keep a connected Klaviyo OAuth grant operational without recurring merchant authorization",
+  "access_token_expiry_persisted": true,
+  "latest_refresh_token_persisted_encrypted": true,
+  "connected_refresh_optimistic_versioned": true,
+  "unexpected_401_refresh_limit": 1,
+  "unexpected_401_retry_limit": 1,
+  "parallel_refresh_deduplicated_per_process": true,
+  "reauthorization_only_on_invalid_or_revoked_refresh_grant": true,
+  "safe_error_classes": [
+    "reauthorize",
+    "access_forbidden",
+    "provider_rate_limited",
+    "refresh_rate_limited",
+    "refresh_configuration_failed",
+    "refresh_unavailable"
+  ],
+  "metric_policy_changed": false,
+  "dataset_write_in_package_acceptance": false,
+  "provider_contact_in_package_acceptance": false,
+  "production_deployment_in_package_acceptance": false,
+  "next_gate": "review, PR, production deployment, then separate approval for real token refresh and C6 retry"
+}

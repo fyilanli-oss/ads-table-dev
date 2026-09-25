@@ -46,8 +46,8 @@ test("embedded Platforms keeps Connect actions disabled until runtime activation
 });
 
 test("provider token exchanges normalize object and nested TikTok token responses", () => {
-  assert.deepEqual(normalize({access_token: "access", refresh_token: "refresh", scope: "accounts:read campaigns:read,flows:read"}), {accessToken: "access", refreshToken: "refresh", scopes: ["accounts:read", "campaigns:read", "flows:read"]});
-  assert.deepEqual(normalize({data: {access_token: "access"}}), {accessToken: "access", refreshToken: null, scopes: []});
+  assert.deepEqual(normalize({access_token: "access", refresh_token: "refresh", expires_in: 3600, scope: "accounts:read campaigns:read,flows:read"}), {accessToken: "access", refreshToken: "refresh", expiresIn: 3600, scopes: ["accounts:read", "campaigns:read", "flows:read"]});
+  assert.deepEqual(normalize({data: {access_token: "access"}}), {accessToken: "access", refreshToken: null, expiresIn: null, scopes: []});
   assert.throws(() => normalize({data: {}}), /INVALID_PROVIDER_TOKEN_RESPONSE/);
 });
 

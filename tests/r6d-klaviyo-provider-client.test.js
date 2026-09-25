@@ -80,7 +80,9 @@ test('Klaviyo USD-only SMS spend is not mislabeled as a non-USD account currency
 
 test('Klaviyo provider client fails closed on auth, response or account drift without returning provider bodies', async () => {
   const unauthorized = createKlaviyoProviderClient({ fetchImpl: async () => response({ secret: 'raw' }, 401), conversionMetricId: 'metric-1' });
-  await assert.rejects(unauthorized.fetchAccount({ accessToken: 'secret', accountId: 'account-1' }), error => error.message === 'KLAVIYO_REAUTHORIZE');
+  await assert.rejects(unauthorized.fetchAccount({ accessToken: 'secret', accountId: 'account-1' }), error => error.code === 'KLAVIYO_ACCESS_TOKEN_INVALID' && error.status === 401);
+  const forbidden = createKlaviyoProviderClient({ fetchImpl: async () => response({ secret: 'raw' }, 403), conversionMetricId: 'metric-1' });
+  await assert.rejects(forbidden.fetchAccount({ accessToken: 'secret', accountId: 'account-1' }), error => error.code === 'KLAVIYO_ACCESS_FORBIDDEN' && error.status === 403);
   const drift = createKlaviyoProviderClient({ fetchImpl: async () => response({ data: [{ id: 'other', attributes: { preferred_currency: 'USD', timezone: 'UTC' } }] }), conversionMetricId: 'metric-1' });
   await assert.rejects(drift.fetchAccount({ accessToken: 'secret', accountId: 'account-1' }), /KLAVIYO_PROVIDER_ACCOUNT_MISMATCH/);
 });
@@ -156,4 +158,24 @@ test('Klaviyo provider client respects Retry-After before retrying a 429 respons
   assert.equal(calls, 5);
   assert.deepEqual(waits, [1000]);
   assert.deepEqual(result, { rows: [], verified_empty: true });
+});
+
+test('Klaviyo provider client returns a safe rate-limit error after the bounded retry is exhausted', async () => {
+  let calls = 0;
+  const client = createKlaviyoProviderClient({
+    fetchImpl: async () => {
+      calls += 1;
+      return response({ provider_secret: 'must-not-leak' }, 429, { 'retry-after': '0' });
+    },
+    conversionMetricId: 'metric-1',
+    sleepImpl: async () => {},
+    random: () => 0,
+  });
+  await assert.rejects(client.fetchAccount({ accessToken: 'secret', accountId: 'account-1' }), error => {
+    assert.equal(error.code, 'KLAVIYO_PROVIDER_RATE_LIMITED');
+    assert.equal(error.status, 503);
+    assert.doesNotMatch(`${error.code}:${error.message}`, /provider_secret|must-not-leak|account-1/i);
+    return true;
+  });
+  assert.equal(calls, 3);
 });

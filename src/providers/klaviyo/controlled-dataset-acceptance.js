@@ -9,17 +9,33 @@ const { createKlaviyoWorkspaceRunner } = require('./workspace-runner');
 const CONFIRMATION = 'RUN_R6_D2_C6_KLAVIYO_WRITE';
 const SAFE_FAILURE_STAGES = new Set([
   'CONNECTION', 'CURRENCY', 'ACCOUNT_SELECTION', 'DATASET_GUARD', 'RUNTIME_CONTEXT',
+  'TOKEN_REFRESH',
   'PROVIDER_ACCOUNT', 'PROVIDER_ACCOUNT_VALIDATION', 'PROVIDER_FACTS', 'PROVIDER_RESULT_VALIDATION',
   'FX_RESOLUTION', 'ROW_NORMALIZATION', 'RESULT_VERIFICATION', 'DATASET_PERSISTENCE', 'PERSISTENCE_CARDINALITY',
 ]);
 
 function codedError(code, status) { return Object.assign(new Error(code), { code, status }); }
 function diagnosticFailure(error, fallbackStage) {
+  const reason = String(error?.code || error?.message || '');
+  const safeCodes = new Map([
+    ['KLAVIYO_REAUTHORIZE', ['KLAVIYO_DATASET_ACCEPTANCE_REAUTHORIZE', 409]],
+    ['KLAVIYO_ACCESS_FORBIDDEN', ['KLAVIYO_DATASET_ACCEPTANCE_ACCESS_FORBIDDEN', 403]],
+    ['KLAVIYO_PROVIDER_RATE_LIMITED', ['KLAVIYO_DATASET_ACCEPTANCE_PROVIDER_RATE_LIMITED', 503]],
+    ['KLAVIYO_TOKEN_REFRESH_RATE_LIMITED', ['KLAVIYO_DATASET_ACCEPTANCE_TOKEN_REFRESH_RATE_LIMITED', 503]],
+    ['KLAVIYO_TOKEN_REFRESH_UNAVAILABLE', ['KLAVIYO_DATASET_ACCEPTANCE_TOKEN_REFRESH_UNAVAILABLE', 503]],
+    ['KLAVIYO_TOKEN_REFRESH_CONFIGURATION_FAILED', ['KLAVIYO_DATASET_ACCEPTANCE_TOKEN_REFRESH_CONFIGURATION_FAILED', 503]],
+    ['KLAVIYO_TOKEN_REFRESH_RESPONSE_INVALID', ['KLAVIYO_DATASET_ACCEPTANCE_TOKEN_REFRESH_RESPONSE_INVALID', 503]],
+    ['KLAVIYO_TOKEN_REFRESH_FAILED', ['KLAVIYO_DATASET_ACCEPTANCE_TOKEN_REFRESH_FAILED', 503]],
+  ]);
+  if (safeCodes.has(reason)) {
+    const [code, status] = safeCodes.get(reason);
+    return codedError(code, status);
+  }
   const stage = SAFE_FAILURE_STAGES.has(error?.diagnosticStage) ? error.diagnosticStage : fallbackStage;
   return codedError(`KLAVIYO_DATASET_ACCEPTANCE_FAILED_${SAFE_FAILURE_STAGES.has(stage) ? stage : 'RUNTIME_CONTEXT'}`, 503);
 }
 
-function createKlaviyoControlledDatasetAcceptance({ connectionStore, settingsStore, providerClient, resolveFxRate, repository, now = () => new Date() } = {}) {
+function createKlaviyoControlledDatasetAcceptance({ connectionStore, settingsStore, providerClient, tokenLifecycle = null, resolveFxRate, repository, now = () => new Date() } = {}) {
   if (!connectionStore || typeof connectionStore.resolveConnected !== 'function') throw new TypeError('canonical connection store is required');
   if (!settingsStore || typeof settingsStore.resolveReportingCurrency !== 'function') throw new TypeError('workspace settings store is required');
   if (!repository || typeof repository.readCanonicalRawFacts !== 'function') throw new TypeError('workspace Dataset V2 read repository is required');
@@ -31,7 +47,7 @@ function createKlaviyoControlledDatasetAcceptance({ connectionStore, settingsSto
     const authority = requireServerWorkspaceAuthority(authorityInput);
     let stage = 'CONNECTION';
     try {
-      const connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
+      let connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       stage = 'CURRENCY';
       const currency = await settingsStore.resolveReportingCurrency(authority);
@@ -43,8 +59,13 @@ function createKlaviyoControlledDatasetAcceptance({ connectionStore, settingsSto
       const existingRows = await repository.readCanonicalRawFacts({ workspace_id: authority.workspace_id, from: providerDate, to: providerDate, platform: 'klaviyo', platform_account_id: selectedAccounts[0].id.trim() });
       if (!Array.isArray(existingRows)) throw new Error('WORKSPACE_DATASET_READ_INVALID');
       if (existingRows.length > 0) throw codedError('KLAVIYO_DATASET_ACCEPTANCE_ALREADY_EXECUTED', 409);
-      stage = 'RUNTIME_CONTEXT';
-      const result = await runner(Object.freeze({ authority, connection, reportingCurrency: currency.reportingCurrency, currencyVersion: currency.currencyVersion, request: Object.freeze({ provider_date: providerDate }) }));
+      const operation = activeConnection => runner(Object.freeze({ authority, connection: activeConnection, reportingCurrency: currency.reportingCurrency, currencyVersion: currency.currencyVersion, request: Object.freeze({ provider_date: providerDate }) }));
+      stage = tokenLifecycle ? 'TOKEN_REFRESH' : 'RUNTIME_CONTEXT';
+      const execution = tokenLifecycle
+        ? await tokenLifecycle.run({ authority, connection, operation })
+        : { value: await operation(connection), connection };
+      connection = execution.connection;
+      const result = execution.value;
       stage = 'RESULT_VERIFICATION';
       const verified = verifyProviderResult({ provider: 'klaviyo', connection, reportingCurrency: currency.reportingCurrency, result });
       stage = 'DATASET_PERSISTENCE';

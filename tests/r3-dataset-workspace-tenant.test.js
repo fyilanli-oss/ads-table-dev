@@ -301,13 +301,14 @@ test('R3 security scripts preserve a fail-closed live gate', () => {
   assert.match(rollback, /R3_ROLLBACK_BLOCKED_WORKSPACE_ROWS_EXIST/);
 });
 
-test('Execution Plan moves first-write tenant enforcement ahead of the C6 retry without activating providers', () => {
+test('Execution Plan preserves first-write tenant enforcement across the controlled C6 attempts', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
   assert.match(plan, /R3-A\+B\+C1 Done; first-write tenant enforcement live PASS/);
   assert.match(plan, /20260925103312_r3c1_dataset_workspace_first_write_enforcement/);
   assert.match(plan, /postcheck `PASS` verdi: Dataset V2 `0` satır kaldı/);
-  assert.match(plan, /first write FAILED \/ rows 0/);
-  assert.match(plan, /C6 ilk canlı deneme HTTP `503`.*Dataset V2 upsert oluşmadı.*satır sayısı `0`/i);
+  assert.match(plan, /C6-A first write FAILED; C6-B diagnostics PASS; C6-C second attempt FAILED_PROVIDER_ACCOUNT \/ rows 0/);
+  assert.match(plan, /C6-A ilk canlı write denemesi fail-closed `503` verdi ve Dataset V2 `0` kaldı/);
+  assert.match(plan, /C6-C ikinci deneme `KLAVIYO_DATASET_ACCEPTANCE_FAILED_PROVIDER_ACCOUNT` ile fail-closed kaldı; Dataset V2 hâlâ `0` satırdır/);
   assert.match(plan, /Done \/ R4-A\+B\+C/);
   assert.doesNotMatch(plan, /\| R4 \|[^\n]+`Blocked by R3`/);
 });

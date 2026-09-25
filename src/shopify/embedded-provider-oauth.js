@@ -7,7 +7,7 @@ function requiredFunction(value, name) {
   return value;
 }
 
-function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode, createPkce = null, connectionStore, resolveReturnTarget = async () => RETURN_TARGET} = {}) {
+function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode, createPkce = null, connectionStore, resolveReturnTarget = async () => RETURN_TARGET, now = () => new Date()} = {}) {
   if (typeof provider !== "string" || !provider) throw new TypeError("provider is required");
   if (typeof redirectUri !== "string" || !redirectUri) throw new TypeError("redirectUri is required");
   for (const [name, value] of Object.entries({authenticateEmbedded, createEmbeddedTransaction, consumeTransaction, buildAuthorizationUrl, exchangeCode})) requiredFunction(value, name);
@@ -36,6 +36,9 @@ function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedde
         transaction,
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken || null,
+        expiresAt: Number.isSafeInteger(tokens.expiresIn) && tokens.expiresIn > 0
+          ? new Date(now().getTime() + (tokens.expiresIn * 1000)).toISOString()
+          : null,
         scopes: Array.isArray(tokens.scopes) ? tokens.scopes : [],
       });
       return Object.freeze({redirect_to: returnTarget, outcome: "account_selection_required"});

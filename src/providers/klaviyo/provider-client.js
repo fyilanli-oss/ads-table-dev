@@ -122,7 +122,8 @@ function createKlaviyoProviderClient({
           ...(options.headers || {}),
         },
       });
-      if (response.status === 401 || response.status === 403) throw new Error('KLAVIYO_REAUTHORIZE');
+      if (response.status === 401) throw codedError('KLAVIYO_ACCESS_TOKEN_INVALID', 401);
+      if (response.status === 403) throw codedError('KLAVIYO_ACCESS_FORBIDDEN', 403);
       if (response.ok) {
         try { return await response.json(); }
         catch { throw new Error('KLAVIYO_PROVIDER_RESPONSE_INVALID'); }
@@ -133,18 +134,19 @@ function createKlaviyoProviderClient({
         path: new URL(path, API_BASE).pathname,
         status: response.status,
       });
-      if (response.status !== 429 || attempt === MAX_RATE_LIMIT_RETRIES) {
+      if (response.status !== 429) {
         throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
       }
+      if (attempt === MAX_RATE_LIMIT_RETRIES) throw codedError('KLAVIYO_PROVIDER_RATE_LIMITED', 503);
 
       const retryAfter = response.headers?.get?.('retry-after');
       if (typeof retryAfter !== 'string' || !/^\d+$/.test(retryAfter.trim())) {
-        throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
+        throw codedError('KLAVIYO_PROVIDER_RATE_LIMITED', 503);
       }
       const providerDelay = Number(retryAfter.trim()) * 1000;
       const delay = (providerDelay * (2 ** attempt)) + Math.floor(random() * RATE_LIMIT_JITTER_MS);
       if (!Number.isSafeInteger(delay) || delay < providerDelay || delay > MAX_RATE_LIMIT_WAIT_MS) {
-        throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
+        throw codedError('KLAVIYO_PROVIDER_RATE_LIMITED', 503);
       }
       await sleepImpl(delay);
     }
@@ -229,6 +231,10 @@ function createKlaviyoProviderClient({
   }
 
   return Object.freeze({ fetchAccount, fetchPlacedOrderMetricCandidates, fetchMessageFacts });
+}
+
+function codedError(code, status) {
+  return Object.assign(new Error(code), { code, status });
 }
 
 module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, zonedInstant, reportRows, metricPagePath, metricCandidate, createKlaviyoProviderClient });

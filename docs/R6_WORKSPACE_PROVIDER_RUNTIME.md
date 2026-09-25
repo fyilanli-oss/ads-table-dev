@@ -166,11 +166,13 @@ Repository hazırlığı PR #261 ile production'a dağıtılmıştır. Gerçek S
 
 R6-D3-C production kabulü yalnız bağlantı ve hesap seçimi kapsamıyla verilmiştir. Meta Insights/performance okuma, Time/FX ve kontrollü Dataset V2 sonucu ayrıca analiz edilip kanıtlanmadan R6-D3 bütünü `Done` sayılmaz; production veri hareketi halen kapalıdır.
 
-### R6-D3-D Meta workspace salt-okunur preflight — repository PASS / production acceptance gate
+### R6-D3-D Meta workspace salt-okunur preflight — production read-only acceptance PASS
 
 Tamamlanmış E4 Meta Client, Campaign→AdSet→Ad mapper, sabit metrik sözleşmesi ve Time/FX katmanı korunmuştur. Yeni ince workspace runner yalnız Shopify session'dan çözülen authority, canonical `connected` Meta bağlantısı ve merchant-selected reporting currency ile bu katmanları compose eder. Seçili 1–3 hesabın tamamı Meta Account API'den yeniden doğrulanır; her hesap kendi currency ve timezone bilgisiyle önceki kapanmış business date için günlük Ad Insights okur.
 
-Sonuç yalnız aggregate hesap/satır sayısı, verified empty/non-empty, Time/FX ve yazma durumunu dışarı verir. Token, hesap/entity kimliği ve ham metrik response'a çıkmaz. Dataset V2/V1 yazısı, schedule, backfill ve production activation yapılmaz. Normal Data Sources görünümü değişmez; salt-okunur kabul yüzeyi yalnız `?acceptance=r6d3-meta` operatör parametresiyle açılır. Repository sonucu `contracts/r6d3d-meta-read-only-preflight-v1.json`, analist kaydı `docs/R6D3D_META_READ_ONLY_PREFLIGHT.md` içindedir. Gerçek provider teması henüz yapılmamış ve production acceptance verilmemiştir.
+Sonuç yalnız aggregate hesap/satır sayısı, verified empty/non-empty, Time/FX ve yazma durumunu dışarı verir. Token, hesap/entity kimliği ve ham metrik response'a çıkmaz. Dataset V2/V1 yazısı, schedule, backfill ve production activation yapılmaz. Normal Data Sources görünümü değişmez; salt-okunur kabul yüzeyi yalnız `?acceptance=r6d3-meta` operatör parametresiyle açılır.
+
+PR #263 production'a dağıtıldıktan sonra gerçek merchant oturumundaki kabul `PASS — 1 account(s), 0 verified row(s), Time and FX checks succeeded. Dataset V2 writes: 0.` verdi. Bu, provider tarafından doğrulanmış boş sonuçtur; hata veya sentetik satır değildir. Supabase postcheck canonical Meta bağlantısını `connected · 1 account`, pending/invalid `0`; Dataset V2 Meta/schedule/job ve browser grant sayılarını `0` olarak doğruladı. Versionlı sonuç `contracts/r6d3d-meta-read-only-preflight-v1.json`, analist kaydı `docs/R6D3D_META_READ_ONLY_PREFLIGHT.md`, redacted kanıt `docs/security/evidence/R6D3D_META_READ_ONLY_LIVE_ACCEPTANCE_2026-09-25.json` içindedir.
 
 ## Fail-closed kurallar
 

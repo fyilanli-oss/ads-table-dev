@@ -34,15 +34,18 @@ test('R6-D3-D derives the previous closed date from each Meta account timezone',
 });
 
 test('R6-D3-D contract reuses E4 and keeps all production data movement closed', () => {
-  assert.equal(contract.status, 'PASS_REPOSITORY_ONLY_PRODUCTION_ACCEPTANCE_PENDING');
+  assert.equal(contract.status, 'PASS_PRODUCTION_READ_ONLY_ACCEPTANCE');
   assert.equal(contract.reuse.e4_client, true);
   assert.equal(contract.reuse.e4_mapper, true);
   assert.equal(contract.reuse.new_metric_contract, false);
   assert.equal(contract.acceptance.normal_data_sources_ui_changed, false);
   assert.equal(contract.production_mutation, false);
-  assert.equal(contract.provider_contact, false);
+  assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
-  assert.equal(contract.next_gate, 'R6-D3-D_META_PRODUCTION_READ_ONLY_ACCEPTANCE');
+  assert.equal(contract.live_acceptance.selected_account_count, 1);
+  assert.equal(contract.live_acceptance.verified_row_count, 0);
+  assert.equal(contract.live_acceptance.time_fx_verified, true);
+  assert.equal(contract.next_gate, 'R6-D3_CONTROLLED_DATASET_V2_ACCEPTANCE_BRIEF');
 });
 
 test('Meta workspace runner reuses E4 mapping with workspace authority and no persistence', async () => {

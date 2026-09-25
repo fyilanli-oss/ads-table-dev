@@ -44,14 +44,19 @@ E4 Meta motoru legacy `user_id`, eski connection/ownership ve `server.js` manuel
 
 Normal Data Sources görünümü değişmez. Kabul yüzeyi yalnız açık operatör parametresiyle `/shopify/app/platforms?acceptance=r6d3-meta` adresinde görünür.
 
-## Repository kanıtı
+## Kanıt
 
 - Workspace runner: `src/providers/meta/workspace-runner.js`
 - Salt-okunur preflight: `src/providers/meta/read-only-preflight.js`
 - Shopify session-bound route: `src/routes/shopify-ad-account-routes.js`
 - Gizli operatör yüzeyi: `src/shopify/embedded-app-home.js`
 - Kabul testleri: `tests/r6d3d-meta-read-only-preflight.test.js`
+- Canlı redacted aggregate kanıt: `docs/security/evidence/R6D3D_META_READ_ONLY_LIVE_ACCEPTANCE_2026-09-25.json`
 
 ## Durum
 
-`PASS repository only — production deployment ve gerçek Meta read-only acceptance bekliyor`
+`PASS production read-only acceptance`
+
+PR #263 merge commit `e558ec69d25b6f5aeee314d592cd5cac231662a8` production'a dağıtıldı. Gerçek Shopify merchant oturumundaki kabul sonucu `1` hesabın Account API üzerinden doğrulandığını, önceki kapanmış gün Insights isteğinin provider tarafından başarıyla cevaplandığını, sonucun doğrulanmış boş (`0` satır) olduğunu ve Time/FX kontrollerinin geçtiğini gösterdi. Supabase salt-okunur postcheck canonical Meta `1`, connected `1`, selected account `1`, pending/invalid `0`; Dataset V2 Meta/schedule/job ve browser grant sayılarını `0` olarak doğruladı. Legacy Meta kaydı `1` olarak değişmeden kaldı.
+
+Bu PASS Meta salt-okunur runtime kabulüdür. Dataset V2'ye kalıcı yazma, schedule, backfill veya provider aktivasyonu değildir. Sıradaki adım ancak ayrı analist brief'i ve açık onayla kontrollü Dataset V2 kabul kararıdır.

@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d3d-meta-read-only-preflight-v1",
-  "status": "PASS_REPOSITORY_ONLY_PRODUCTION_ACCEPTANCE_PENDING",
+  "status": "PASS_PRODUCTION_READ_ONLY_ACCEPTANCE",
   "provider": "meta",
   "business_outcome": "Prove that every selected canonical Meta account can supply its own timezone, source currency and one closed business day of E4 Insights without writing Dataset V2.",
   "reuse": {
@@ -46,7 +46,17 @@
     "google_ads_runtime"
   ],
   "production_mutation": false,
-  "provider_contact": false,
+  "provider_contact": true,
   "dataset_v2_write": false,
-  "next_gate": "R6-D3-D_META_PRODUCTION_READ_ONLY_ACCEPTANCE"
+  "live_acceptance": {
+    "selected_account_count": 1,
+    "verified_row_count": 0,
+    "provider_result_status": "empty",
+    "account_api_verified": true,
+    "insights_verified": true,
+    "time_fx_verified": true,
+    "supabase_postcheck": "PASS",
+    "evidence": "docs/security/evidence/R6D3D_META_READ_ONLY_LIVE_ACCEPTANCE_2026-09-25.json"
+  },
+  "next_gate": "R6-D3_CONTROLLED_DATASET_V2_ACCEPTANCE_BRIEF"
 }

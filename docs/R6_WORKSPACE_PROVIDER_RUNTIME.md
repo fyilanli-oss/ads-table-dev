@@ -96,9 +96,9 @@ Ortak runtime artık Dataset V2 yazısından önce şu kapıları uygular: canon
 - Conversion metric ID global environment değerinden alınmaz ve isim benzerliğiyle tahmin edilmez. Klaviyo Metrics API'nin bütün sayfaları okunur; yalnız provider'ın tam `Placed Order` adıyla döndürdüğü adaylar ve integration provenance kullanıcıya sunulur. Seçim workspace + Klaviyo account + connection version ile canonical connection kaydına bağlanır.
 - OAuth scope'a `flows:read` eklenmiştir. Mevcut bağlantı disconnected olduğu için bu scope ancak sonraki açık reconnect grant'inde alınabilir.
 - Empty kabul yalnız Accounts, Campaign reporting ve Flow reporting istekleri başarıyla döndükten ve iki günlük branch de boş olduktan sonra `verified_empty=true` olabilir; sahte satır üretilmez.
-- Kod production route/job/cron'a bağlı değildir. Deployment, provider çağrısı ve Dataset V2 yazısı yapılmamıştır.
+- Provider runner production job/cron'a bağlı değildir. C1 read-only kabul yüzeyi production'a deploy edilmiştir; provider discovery ve Dataset V2 yazısı yapılmamıştır.
 
-### R6-D2-C1 metric binding corrective — repository hazır / production kapalı
+### R6-D2-C1 metric binding corrective — migration ve application deployment PASS
 
 PR #250 ile production'a alınan ilk Shopify-session-bound read-only preflight, provider çağrısından önce `KLAVIYO_PREFLIGHT_NOT_CONFIGURED` ile fail-closed durdu. Canlı PASS verilmedi. Kök neden production composition'ın global `KLAVIYO_PLACED_ORDER_METRIC_ID` beklemesiydi. Tek global ID çok-workspace ve gelecekteki commerce adapter'ları için canonical değildir.
 
@@ -112,11 +112,21 @@ C1 repository düzeltmesi şu sınırı kurar:
 - Read-only preflight yalnız canonical metric bağı mevcutsa Campaign/Flow raporlarına geçer; aksi halde `KLAVIYO_PREFLIGHT_METRIC_REQUIRED` ile durur.
 - Normal Data Sources yüzeyi değişmez. Seçim yalnız `acceptance=r6d2-klaviyo` kabul yüzeyindedir.
 
-Focused C1 + Shopify regresyonu 101/101 PASS'tir. Tam yerel suite 1049 testin 1002'sini geçirmiş, 46 tarihsel checksum/Windows spawn-CRLF testi başarısız olmuş ve 1 test skip kalmıştır; bu nedenle full regression PASS iddiası yoktur. Migration uygulanmadı, C1 deploy edilmedi, yeni provider çağrısı yapılmadı ve Dataset V2 yazısı yapılmadı.
+Focused C1 ve Shopify regresyonu PASS'tir. Migration production'a uygulanmış ve PR #251 merge commit `b482ed7bd6506225ec9b95ca0cd9c5eef243ee50` production'da `READY` olmuştur. `dev.adstable.app` alias'ı aynı deployment'a bağlı, deploy sonrası runtime error taraması temizdir. Provider discovery, canonical metric yazısı ve Dataset V2 yazısı yapılmamıştır.
 
 Production salt-okunur migration preflight 2026-09-25 tarihinde `PASS` verdi: canonical tablo mevcut, RLS ve FORCE RLS açık, browser grant `0`, hedef kolon/constraint `0/0`, canonical connection `1` ve connected Klaviyo `1`. Sorgu mutation veya provider teması yapmadı. Redacted kanıt `docs/security/evidence/R6D2C1_KLAVIYO_METRIC_BINDING_PREFLIGHT_LIVE.json` içindedir. Bu sonuç migration uygulama onayı değildir.
 
-Production migration açık onayla `20260925072801_add_workspace_provider_conversion_metric` ledger sürümüyle uygulandı. Zorunlu postcheck `PASS`: hedef kolon `5`, validated constraint `1`, RLS/FORCE RLS açık, browser grant `0`, bound metric `0`, invalid binding `0`. Migration mevcut connection verisini değiştirmedi; provider teması ve Dataset V2 yazısı yapılmadı. Advisor taraması C1'e ait yeni bir bulgu üretmedi; mevcut proje genelindeki uyarılar ayrı backlog kapsamındadır. Redacted kanıt `docs/security/evidence/R6D2C1_KLAVIYO_METRIC_BINDING_MIGRATION_LIVE.json` içindedir. Sıradaki kapı application deployment review ve ayrı açık onaydır.
+Production migration açık onayla `20260925072801_add_workspace_provider_conversion_metric` ledger sürümüyle uygulandı. Zorunlu postcheck `PASS`: hedef kolon `5`, validated constraint `1`, RLS/FORCE RLS açık, browser grant `0`, bound metric `0`, invalid binding `0`. Migration mevcut connection verisini değiştirmedi; provider teması ve Dataset V2 yazısı yapılmadı. Advisor taraması C1'e ait yeni bir bulgu üretmedi; mevcut proje genelindeki uyarılar ayrı backlog kapsamındadır. Redacted kanıt `docs/security/evidence/R6D2C1_KLAVIYO_METRIC_BINDING_MIGRATION_LIVE.json` içindedir.
+
+### R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS / C3 approval gate
+
+- Merchant teknik metric ID görmez; ürün dili **Klaviyo sales source** ve güvenli integration/store provenance kullanır.
+- Tek doğrulanmış `Placed Order` adayı varsa ayrı seçim ekranı açılmaz. Email Monthly Plan Cost adımının final onayında salt-okunur satış kaynağı özeti gösterilir ve aynı `Save and connect` eylemi kullanılır.
+- Birden fazla doğrulanmış aday varsa aynı Shopify-native setup modalında yalnız güvenli integration/store adıyla tek seçim yapılır. Sıfır adayda bağlantı `Connected` olmaz ve sistem kaynak tahmin etmez.
+- Seçim normal akışta connection binding başına bir kez istenir. Yalnız reconnect, Klaviyo account değişimi, provider bağının geçersizleşmesi veya Settings'teki açık değişiklik yeniden seçim gerektirir. Aylık plan maliyeti değişikliği satış kaynağını sıfırlamaz.
+- C2 yalnız ürün/UX sözleşmesidir. Provider çağrısı, database write, Dataset V2 write, yeni adapter, mapping veya formula yoktur. Meta ve Google davranışı değişmez; TikTok ve Pinterest parked kalır.
+
+Sıradaki kapı **R6-D2-C3 salt-okunur satış kaynağı keşfi** için analist brief, review ve ayrı açık onaydır.
 
 Resmî sözleşme referansları: Klaviyo [Get Accounts](https://developers.klaviyo.com/en/reference/get_accounts), [Reporting API overview](https://developers.klaviyo.com/en/reference/reporting_api_overview), [Get Campaigns](https://developers.klaviyo.com/en/reference/get_campaigns) ve [Get Flows](https://developers.klaviyo.com/en/reference/get_flows).
 

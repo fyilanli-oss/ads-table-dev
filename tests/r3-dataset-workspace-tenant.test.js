@@ -62,7 +62,7 @@ test('R3-A migration is additive and keeps legacy compatibility during staging',
 });
 
 test('R3 contract preserves exact workspace tenant and production gates', () => {
-  assert.equal(contract.status, 'R3C1_FIRST_WRITE_TENANT_ENFORCEMENT_PREPARED');
+  assert.equal(contract.status, 'R3C1_FIRST_WRITE_TENANT_ENFORCEMENT_LIVE_PASS');
   assert.equal(contract.canonical_tenant, 'workspace_id');
   assert.equal(contract.canonical_contract_version, 'v2');
   assert.deepEqual(contract.workspace_unique_key, [
@@ -103,9 +103,15 @@ test('R3-C1 enforces the workspace tenant before the first Dataset V2 write', ()
   ]) assert.match(enforcementMigration, new RegExp(`drop index if exists public\\.${index}`));
   assert.doesNotMatch(enforcementMigration, /drop\s+column\s+user_id/i);
   assert.doesNotMatch(enforcementMigration, /insert\s+into\s+public\.performance_dataset_rows_v2/i);
-  assert.equal(contract.r3c1_first_write_enforcement.status, 'PREPARED_PRODUCTION_APPLY_PENDING');
+  assert.equal(contract.r3c1_first_write_enforcement.status, 'LIVE_PASS');
   assert.equal(contract.r3c1_first_write_enforcement.provider_contact, false);
   assert.equal(contract.r3c1_first_write_enforcement.dataset_write, false);
+  assert.equal(contract.r3c1_first_write_enforcement.postcheck_result, 'PASS');
+  assert.equal(contract.r3c1_first_write_enforcement.live_dataset_rows, 0);
+  assert.equal(contract.r3c1_first_write_enforcement.c6_retry_performed, false);
+  const r3c1Evidence = JSON.parse(read(contract.r3c1_first_write_enforcement.evidence));
+  assert.equal(r3c1Evidence.postcheck.result, 'PASS');
+  assert.equal(r3c1Evidence.postcheck.dataset_v2_rows, 0);
 });
 
 test('R3-C1 live scripts are zero-row fail-closed and reversible only before facts exist', () => {
@@ -297,7 +303,7 @@ test('R3 security scripts preserve a fail-closed live gate', () => {
 
 test('Execution Plan moves first-write tenant enforcement ahead of the C6 retry without activating providers', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R3-A\+B Done; R3-C1 first-write enforcement prepared/);
+  assert.match(plan, /R3-A\+B\+C1 Done; first-write tenant enforcement live PASS/);
   assert.match(plan, /R3-C1.*ilk Dataset V2 satırından önce/i);
   assert.match(plan, /first write FAILED \/ rows 0/);
   assert.match(plan, /C6 ilk canlı deneme HTTP `503`.*Dataset V2 upsert oluşmadı.*satır sayısı `0`/i);

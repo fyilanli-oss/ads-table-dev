@@ -1,6 +1,6 @@
 {
   "contract_version": "r3-dataset-workspace-v1",
-  "status": "R3C1_FIRST_WRITE_TENANT_ENFORCEMENT_PREPARED",
+  "status": "R3C1_FIRST_WRITE_TENANT_ENFORCEMENT_LIVE_PASS",
   "depends_on": "r2-workspace-currency-v1",
   "canonical_tenant": "workspace_id",
   "canonical_contract_version": "v2",
@@ -46,8 +46,15 @@
     "physical_workspace_checkpoint_activation": "R8",
     "reason": "backfill_checkpoints_does_not_exist_live"
   },
-  "active_providers": ["meta", "google_ads", "klaviyo"],
-  "parked_providers": ["tiktok", "pinterest"],
+  "active_providers": [
+    "meta",
+    "google_ads",
+    "klaviyo"
+  ],
+  "parked_providers": [
+    "tiktok",
+    "pinterest"
+  ],
   "forbidden_in_this_package": [
     "dataset_row_backfill",
     "provider_runtime_cutover",
@@ -55,7 +62,7 @@
     "oauth_or_provider_contact"
   ],
   "r3c1_first_write_enforcement": {
-    "status": "PREPARED_PRODUCTION_APPLY_PENDING",
+    "status": "LIVE_PASS",
     "decision": "move tenant enforcement before the first Dataset V2 row",
     "migration": "supabase/migrations/20260925103000_r3c1_dataset_workspace_first_write_enforcement.sql",
     "workspace_id_required": true,
@@ -69,7 +76,14 @@
     "preflight": "docs/security/sql/R3C1_DATASET_FIRST_WRITE_PREFLIGHT.sql",
     "postcheck": "docs/security/sql/R3C1_DATASET_FIRST_WRITE_POSTCHECK.sql",
     "rollback": "docs/security/sql/R3C1_DATASET_FIRST_WRITE_ROLLBACK.sql",
-    "next_gate": "production_preflight_then_explicitly_approved_migration_apply"
+    "next_gate": "C6-B_SAFE_STAGE_DIAGNOSTICS_REQUIRES_SEPARATE_APPROVAL",
+    "explicit_approval_received": true,
+    "live_migration_version": "20260925103312",
+    "postcheck_result": "PASS",
+    "live_dataset_rows": 0,
+    "live_workspace_id_nullable": false,
+    "c6_retry_performed": false,
+    "evidence": "docs/security/evidence/R3C1_DATASET_FIRST_WRITE_ENFORCEMENT_2026-09-25.json"
   },
   "production_gate": {
     "explicit_approval_required": true,

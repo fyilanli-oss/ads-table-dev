@@ -1,0 +1,45 @@
+{
+  "artifact": "R3-C1 Dataset V2 first-write tenant enforcement production apply",
+  "date": "2026-09-25",
+  "project_ref": "xnstrzhavqkztvmlwsrx",
+  "explicit_approval_received": true,
+  "migration": {
+    "version": "20260925103312",
+    "name": "r3c1_dataset_workspace_first_write_enforcement",
+    "applied_live": true
+  },
+  "preflight": {
+    "result": "PASS",
+    "dataset_v2_rows": 0,
+    "unbound_rows": 0,
+    "workspace_fk_validated": true,
+    "no_dependent_views": true,
+    "no_dependent_functions": true,
+    "no_dataset_triggers": true
+  },
+  "postcheck": {
+    "result": "PASS",
+    "dataset_v2_rows": 0,
+    "workspace_required": true,
+    "compatibility_actor_nullable": true,
+    "workspace_fk_validated": true,
+    "workspace_indexes_present": true,
+    "legacy_user_indexes_retired": true,
+    "legacy_browser_policy_retired": true,
+    "authenticated_direct_select_revoked": true,
+    "service_role_workspace_access_preserved": true,
+    "rls_enabled": true
+  },
+  "advisor_review": {
+    "new_critical_or_error": 0,
+    "expected_dataset_info": [
+      "RLS enabled with no browser policy: intentional server-only fail-closed access",
+      "user_id foreign key unindexed: optional non-authoritative compatibility actor"
+    ],
+    "unrelated_existing_warnings_not_changed": true
+  },
+  "provider_contact": false,
+  "dataset_write_performed": false,
+  "c6_retry_performed": false,
+  "rollback_performed": false
+}

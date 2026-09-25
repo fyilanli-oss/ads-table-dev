@@ -236,6 +236,13 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d2-klaviyo-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d2-klaviyo-run" variant="primary">Run read-only acceptance</s-button>
+          <div id="r6d2-klaviyo-c6-step">
+            <s-stack gap="base">
+              <s-paragraph>This controlled acceptance may write real verified Klaviyo rows to Dataset V2. It never creates synthetic rows and does not enable scheduled production activation.</s-paragraph>
+              <s-paragraph id="r6d2-klaviyo-c6-message" aria-live="polite"></s-paragraph>
+              <s-button id="r6d2-klaviyo-c6-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
+            </s-stack>
+          </div>
           <div id="r6d2-klaviyo-metric-step" hidden>
             <s-stack gap="base">
               <s-paragraph>Confirming stores only this workspace account's verified reporting metric. It does not write Dataset V2.</s-paragraph>
@@ -279,6 +286,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const metricStep = document.getElementById("r6d2-klaviyo-metric-step");
       const metricSelect = document.getElementById("r6d2-klaviyo-metric");
       const metricConfirm = document.getElementById("r6d2-klaviyo-metric-confirm");
+      const datasetAcceptanceButton = document.getElementById("r6d2-klaviyo-c6-run");
+      const datasetAcceptanceMessage = document.getElementById("r6d2-klaviyo-c6-message");
       const params = new URLSearchParams(location.search);
       const sessionRequest = async (path, options = {}) => {
         if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
@@ -357,6 +366,22 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             }
             acceptanceButton.disabled = false;
           } finally { acceptanceButton.loading = false; }
+        });
+        datasetAcceptanceButton.addEventListener("click", async () => {
+          datasetAcceptanceButton.disabled = true;
+          datasetAcceptanceButton.loading = true;
+          datasetAcceptanceMessage.textContent = "Running one controlled Dataset V2 acceptance…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/acceptance", {
+              method: "POST",
+              body: JSON.stringify({confirmation: "RUN_R6_D2_C6_KLAVIYO_WRITE"}),
+            });
+            datasetAcceptanceMessage.textContent = result.status === "PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE"
+              ? "PASS — attempted: " + result.attempted + ", persisted: " + result.persisted + ", verified empty: " + result.empty_provider_result + "."
+              : "The Dataset V2 acceptance result could not be verified.";
+          } catch (error) {
+            datasetAcceptanceMessage.textContent = (/^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_DATASET_ACCEPTANCE_FAILED") + ". Do not retry; review runtime evidence.";
+          } finally { datasetAcceptanceButton.loading = false; }
         });
         metricConfirm.addEventListener("click", async () => {
           metricConfirm.disabled = true;

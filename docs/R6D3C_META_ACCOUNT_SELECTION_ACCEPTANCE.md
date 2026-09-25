@@ -57,6 +57,18 @@ OAuth izni, kullanıcının hangi Meta reklam hesaplarını AdsTable'a bağlamak
 6. Supabase postcheck yalnız canonical Meta bağlantısının doğrulanmış hesap kapsamıyla `connected` olduğunu gösterir.
 7. Dataset V2, schedule ve backfill sayıları değişmez.
 
+## Canlı kabul hazırlığı
+
+Merchant kabulünü tek geçişte ve tahmin yürütmeden yapabilmek için aşağıdaki yerel hazırlıklar tamamlanmıştır:
+
+- Analist koşucusu: `docs/R6D3C_META_PRODUCTION_MERCHANT_ACCEPTANCE_RUNBOOK.md`
+- Salt-okunur ön kontrol: `docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_PREFLIGHT.sql`
+- Salt-okunur son kontrol: `docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_POSTCHECK.sql`
+
+Ön kontrol canonical Meta kaydının temiz başlangıçta olduğunu; son kontrol ise yalnız doğrulanmış 1–3 hesabın `connected` kayda dönüştüğünü ölçer. İki sorgu da Dataset V2 Meta satırlarının, aktif Meta schedule'ın ve açık Meta job'ın `0` kaldığını kontrol eder. Legacy Meta kayıt sayısı başlangıçta kaydedilir ve son kontrolde aynı kalmak zorundadır. Token veya hesap kimliği çıktıya alınmaz; ekran görüntüsü kabul şartı değildir.
+
+Bu hazırlık production'a dağıtılmamış ve çalıştırılmamıştır. Dolayısıyla production merchant acceptance hâlâ beklemektedir.
+
 ## Kapsam dışı
 
 - Canlı Meta OAuth ve gerçek hesap seçimi bu repository preflight'ın parçası değildir.
@@ -68,4 +80,4 @@ OAuth izni, kullanıcının hangi Meta reklam hesaplarını AdsTable'a bağlamak
 
 ## Durum
 
-`Repository preflight PASS — production merchant acceptance pending`
+`Repository preflight PASS; production acceptance runner prepared locally — not deployed, not executed`

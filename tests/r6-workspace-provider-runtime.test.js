@@ -117,7 +117,7 @@ test('Execution Plan records the failed C6 attempts and the verified-empty live 
   assert.match(plan, /R6-D2-C7 postcheck ve Klaviyo PASS kararı — PASS \/ R6-D2 Done \/ R6-D3 approval gate/);
   assert.match(plan, /R6-D3-A Meta bağlantı ve token yaşam döngüsü — Done \/ contract only \/ R6-D3-B implementation gate/);
   assert.match(plan, /R6-D3-B Meta token doğrulama uygulaması — Done \/ repository only \/ R6-D3-C account-selection acceptance gate/);
-  assert.match(plan, /R6-D3-C Meta 1–3 hesap seçimi — Repository preflight PASS \/ production merchant acceptance pending/);
+  assert.match(plan, /R6-D3-C Meta 1–3 hesap seçimi — Repository preflight PASS \/ production acceptance runner prepared locally \/ merchant acceptance pending/);
   assert.match(plan, /tamamlanmış E4\/E5\/E7.*yeniden geliştirilmedi/i);
   assert.match(plan, /R7-A.*R6-D/i);
   assert.match(plan, /R7-A merchant acceptance PASS; R6-D next; R7-B blocked by R6-D/i);

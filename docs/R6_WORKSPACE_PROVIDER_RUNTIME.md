@@ -164,6 +164,8 @@ Shopify-native `s-choice-list` çoklu seçim ve `s-modal` programatik açma kull
 
 Bu preflight production deployment, canlı Meta OAuth, provider teması, Dataset V2, schedule/backfill veya E4 değişikliği yapmaz. Sıradaki kapı gerçek Shopify oturumunda ayrı onaylı merchant acceptance'tır. Versionlı sonuç `contracts/r6d3c-meta-account-selection-acceptance-v1.json`, analist kaydı `docs/R6D3C_META_ACCOUNT_SELECTION_ACCEPTANCE.md` içindedir.
 
+Canlı kabul için analist koşucusu ile salt-okunur Supabase preflight/postcheck yerel olarak hazırlanmıştır. Koşucu gerçek merchant oturumunda Connect→OAuth→1–3 hesap→Save→Connected→reload zincirini; database kontrolleri canonical Meta şekli, legacy kayıt sayısının korunması ve Dataset V2/schedule/job izolasyonunu ölçer. Hazırlık henüz production'a dağıtılmamış veya çalıştırılmamıştır; R6-D3-C production kabulü verilmemiştir.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

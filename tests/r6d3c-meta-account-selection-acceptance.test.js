@@ -51,6 +51,16 @@ test('R6-D3-C reuses the canonical R7-A2 runtime without activating data movemen
   assert.equal(contract.production_mutation, false);
   assert.equal(contract.provider_contact, false);
   assert.equal(contract.dataset_v2_write, false);
+  assert.deepEqual(contract.production_acceptance_preparation, {
+    status: 'PREPARED_LOCALLY_NOT_EXECUTED',
+    runbook: 'docs/R6D3C_META_PRODUCTION_MERCHANT_ACCEPTANCE_RUNBOOK.md',
+    read_only_preflight: 'docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_PREFLIGHT.sql',
+    read_only_postcheck: 'docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_POSTCHECK.sql',
+    requires_real_merchant_session: true,
+    requires_explicit_production_approval: true,
+    screenshots_required: false,
+    final_pass_requires_legacy_meta_count_unchanged: true,
+  });
 });
 
 test('Meta list and save stay Shopify-session-bound and save only re-fetched provider accounts', async () => {
@@ -139,4 +149,38 @@ test('Shopify-native modal and Supabase constraints preserve pending then 1-3 co
   const store = read('src/providers/workspace-provider-connection-store.js');
   assert.match(store, /\.eq\('connection_version', version\)\.eq\('status', 'pending_account_selection'\)/);
   assert.match(store, /status: 'connected'[\s\S]*selected_accounts: verifiedAccounts/);
+});
+
+test('production acceptance runbook requires a real modal, persistence and unchanged data movement', () => {
+  const runbook = read('docs/R6D3C_META_PRODUCTION_MERCHANT_ACCEPTANCE_RUNBOOK.md');
+  assert.match(runbook, /hesap seçim modalının kendiliğinden açıldığı/);
+  assert.match(runbook, /en az 1, en fazla 3/);
+  assert.match(runbook, /bir kez yenilenir/);
+  assert.match(runbook, /Dataset V2 Meta satırı, aktif Meta schedule ve açık Meta job sayısı `0`/);
+  assert.match(runbook, /Legacy Meta kayıt sayısı değişir/);
+  assert.match(runbook, /Ekran görüntüsü zorunlu değildir/);
+  assert.match(runbook, /not deployed, not executed, production merchant acceptance pending/);
+});
+
+test('production preflight is read-only and blocks an already-started canonical Meta flow', () => {
+  const sql = read('docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_PREFLIGHT.sql');
+  assert.doesNotMatch(sql, /\b(insert|update|delete|alter|drop|truncate|create)\b/i);
+  assert.match(sql, /canonical_meta_count = 0/);
+  assert.match(sql, /dataset_v2_meta_count = 0/);
+  assert.match(sql, /active_legacy_meta_schedule_count = 0/);
+  assert.match(sql, /open_legacy_meta_job_count = 0/);
+  assert.match(sql, /browser_grants\.grant_count = 0/);
+  assert.match(sql, /legacy_meta_connection_baseline/);
+});
+
+test('production postcheck proves a secure 1-3 account connection without activating data movement', () => {
+  const sql = read('docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_POSTCHECK.sql');
+  assert.doesNotMatch(sql, /\b(insert|update|delete|alter|drop|truncate|create)\b/i);
+  assert.match(sql, /jsonb_array_length\(selected_accounts\) not between 1 and 3/);
+  assert.match(sql, /active_account_id is distinct from selected_accounts->0->>'id'/);
+  assert.match(sql, /refresh_token_envelope is not null/);
+  assert.match(sql, /'ads_read' = any\(granted_scopes\)/);
+  assert.match(sql, /invalid_selected_account_count = 0/);
+  assert.match(sql, /dataset_v2_meta_count = 0/);
+  assert.match(sql, /legacy_meta_connection_after/);
 });

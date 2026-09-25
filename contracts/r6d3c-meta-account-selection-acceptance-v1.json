@@ -44,6 +44,16 @@
     "modal": "s-modal",
     "connected_before_save": false
   },
+  "production_acceptance_preparation": {
+    "status": "PREPARED_LOCALLY_NOT_EXECUTED",
+    "runbook": "docs/R6D3C_META_PRODUCTION_MERCHANT_ACCEPTANCE_RUNBOOK.md",
+    "read_only_preflight": "docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_PREFLIGHT.sql",
+    "read_only_postcheck": "docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_POSTCHECK.sql",
+    "requires_real_merchant_session": true,
+    "requires_explicit_production_approval": true,
+    "screenshots_required": false,
+    "final_pass_requires_legacy_meta_count_unchanged": true
+  },
   "official_shopify_references": [
     "https://shopify.dev/docs/api/app-home/latest/web-components/forms/choice-list",
     "https://shopify.dev/docs/apps/build/app-home/migrate-from-polaris-react"

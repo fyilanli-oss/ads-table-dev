@@ -37,6 +37,7 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
       throw new Error('KLAVIYO_CANONICAL_CONNECTION_REQUIRED');
     }
     const selected = onlySelectedAccount(connection);
+    const conversionMetricId = required(connection?.conversionMetric?.id, 'connection.conversionMetric.id');
     const providerDate = required(context?.request?.provider_date, 'request.provider_date');
     const reportingCurrency = normalizeCurrencyCode(context.reportingCurrency, 'reportingCurrency');
     const account = await providerClient.fetchAccount({
@@ -56,6 +57,7 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
       accessToken: connection.accessToken,
       account: Object.freeze({ id: selected.id, currency: sourceCurrency, timezone }),
       providerDate,
+      conversionMetricId,
     });
     if (!providerResult || !Array.isArray(providerResult.rows)) throw new Error('KLAVIYO_PROVIDER_RESULT_INVALID');
     if (providerResult.rows.length === 0 && providerResult.verified_empty !== true) {
@@ -91,4 +93,3 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
 }
 
 module.exports = Object.freeze({ createKlaviyoWorkspaceRunner });
-

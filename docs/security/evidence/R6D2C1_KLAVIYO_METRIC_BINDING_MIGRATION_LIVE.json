@@ -1,0 +1,30 @@
+{
+  "evidence_version": "r6d2c1-klaviyo-metric-binding-migration-v1",
+  "captured_at_utc": "2026-09-25T07:28:45.384Z",
+  "project": "adstable-dev",
+  "project_ref": "xnstrzhavqkztvmlwsrx",
+  "migration_version": "20260925072801",
+  "migration_name": "add_workspace_provider_conversion_metric",
+  "migration_result": "PASS",
+  "postcheck": {
+    "target_column_count": 5,
+    "target_constraint_count": 1,
+    "constraint_validated": true,
+    "rls_enabled": true,
+    "force_rls_enabled": true,
+    "browser_grant_count": 0,
+    "canonical_connection_count": 1,
+    "connected_klaviyo_count": 1,
+    "bound_metric_count": 0,
+    "invalid_binding_count": 0,
+    "result": "PASS"
+  },
+  "advisors": {
+    "c1_specific_new_findings": 0,
+    "existing_project_security_findings_present": true,
+    "existing_project_performance_findings_present": true,
+    "remediation_in_scope": false
+  },
+  "provider_contact": false,
+  "dataset_v2_write": false
+}

@@ -45,6 +45,5 @@ test('R6-C contract records live schema acceptance without provider activation',
   assert.equal(contract.r6c_activation_migration.postcheck_result, 'PASS');
   assert.equal(contract.r6c_activation_migration.provider_runtime_activated, false);
   assert.equal(contract.r6b_runtime_boundary.production_registered, false);
-  assert.equal(contract.next_gate, 'R6-D2_production_composition_and_read_only_preflight');
+  assert.equal(contract.next_gate, 'R6-D2-C1_application_deployment_review_and_explicit_approval');
 });
-

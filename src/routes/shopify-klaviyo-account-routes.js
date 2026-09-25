@@ -1,9 +1,9 @@
 "use strict";
 
 const {bearerToken} = require("./shopify-auth-routes");
-const SAFE_ERRORS = new Set(["INVALID_PLAN_COST", "INVALID_ACCOUNT", "KLAVIYO_REAUTHORIZE", "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", "KLAVIYO_UNAVAILABLE", "KLAVIYO_RESET_CONFIRMATION_REQUIRED", "KLAVIYO_DISCONNECT_CONFIRMATION_REQUIRED", "KLAVIYO_REAUTHORIZATION_REQUIRED", "KLAVIYO_REVOKE_FAILED", "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", "KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED", "KLAVIYO_PREFLIGHT_CURRENCY_REQUIRED", "KLAVIYO_PREFLIGHT_FAILED", "CONNECTION_CHANGED"]);
+const SAFE_ERRORS = new Set(["INVALID_PLAN_COST", "INVALID_ACCOUNT", "KLAVIYO_REAUTHORIZE", "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", "KLAVIYO_UNAVAILABLE", "KLAVIYO_RESET_CONFIRMATION_REQUIRED", "KLAVIYO_DISCONNECT_CONFIRMATION_REQUIRED", "KLAVIYO_REAUTHORIZATION_REQUIRED", "KLAVIYO_REVOKE_FAILED", "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", "KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED", "KLAVIYO_PREFLIGHT_CURRENCY_REQUIRED", "KLAVIYO_PREFLIGHT_METRIC_REQUIRED", "KLAVIYO_PREFLIGHT_FAILED", "KLAVIYO_METRIC_DISCOVERY_FAILED", "KLAVIYO_CONVERSION_METRIC_NOT_FOUND", "KLAVIYO_CONVERSION_METRIC_SELECTION_INVALID", "CONNECTION_CHANGED"]);
 
-function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selection, reset, disconnect, preflight}) {
+function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selection, reset, disconnect, preflight, metricBinding}) {
   const handler = action => async (req, res) => {
     res.set("Cache-Control", "no-store");
     let authority;
@@ -24,6 +24,10 @@ function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selecti
   app.get("/api/shopify/providers/klaviyo/accounts", handler(authority => selection.list(authority)));
   app.post("/api/shopify/providers/klaviyo/accounts/select", handler((authority, body) => selection.complete(authority, body)));
   if (preflight) app.post("/api/shopify/providers/klaviyo/runtime/preflight", handler(authority => preflight.execute(authority)));
+  if (metricBinding) {
+    app.get("/api/shopify/providers/klaviyo/runtime/metrics", handler(authority => metricBinding.discover(authority)));
+    app.post("/api/shopify/providers/klaviyo/runtime/metrics/select", handler((authority, body) => metricBinding.select(authority, body)));
+  }
   if (disconnect) app.post("/api/shopify/providers/klaviyo/accounts/disconnect", handler((authority, body) => disconnect.execute(authority, body?.confirmation)));
   if (reset) app.post("/api/shopify/providers/klaviyo/accounts/reset", handler((authority, body) => reset.execute(authority, body?.confirmation)));
 }

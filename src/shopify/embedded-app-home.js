@@ -236,6 +236,13 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d2-klaviyo-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d2-klaviyo-run" variant="primary">Run read-only acceptance</s-button>
+          <div id="r6d2-klaviyo-metric-step" hidden>
+            <s-stack gap="base">
+              <s-paragraph>Confirming stores only this workspace account's verified reporting metric. It does not write Dataset V2.</s-paragraph>
+              <s-select id="r6d2-klaviyo-metric" label="Placed Order metric"></s-select>
+              <s-button id="r6d2-klaviyo-metric-confirm" variant="primary">Confirm metric and continue</s-button>
+            </s-stack>
+          </div>
         </s-stack>
       </s-section>
     </div>
@@ -269,6 +276,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const acceptancePanel = document.getElementById("r6d2-klaviyo-acceptance");
       const acceptanceButton = document.getElementById("r6d2-klaviyo-run");
       const acceptanceMessage = document.getElementById("r6d2-klaviyo-message");
+      const metricStep = document.getElementById("r6d2-klaviyo-metric-step");
+      const metricSelect = document.getElementById("r6d2-klaviyo-metric");
+      const metricConfirm = document.getElementById("r6d2-klaviyo-metric-confirm");
       const params = new URLSearchParams(location.search);
       const sessionRequest = async (path, options = {}) => {
         if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
@@ -313,19 +323,54 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       });
       if (params.get("acceptance") === "r6d2-klaviyo") {
         acceptancePanel.hidden = false;
+        const showAcceptanceResult = result => {
+          acceptanceMessage.textContent = result.status === "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT"
+            ? "PASS — Account, Campaign, Flow, Time and FX checks succeeded. Dataset V2 writes: 0."
+            : "The acceptance result could not be verified.";
+        };
         acceptanceButton.addEventListener("click", async () => {
           acceptanceButton.disabled = true;
           acceptanceButton.loading = true;
           acceptanceMessage.textContent = "Running the read-only checks…";
           try {
             const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"});
-            acceptanceMessage.textContent = result.status === "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT"
-              ? "PASS — Account, Campaign, Flow, Time and FX checks succeeded. Dataset V2 writes: 0."
-              : "The acceptance result could not be verified.";
+            showAcceptanceResult(result);
           } catch (error) {
-            acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
+            if (error.message === "KLAVIYO_PREFLIGHT_METRIC_REQUIRED") {
+              try {
+                const discovery = await sessionRequest("/api/shopify/providers/klaviyo/runtime/metrics");
+                metricSelect.replaceChildren();
+                discovery.candidates.forEach(candidate => {
+                  const option = document.createElement("s-option");
+                  option.value = candidate.id;
+                  option.textContent = candidate.name + " — " + candidate.integration_name + (candidate.integration_category ? " (" + candidate.integration_category + ")" : "");
+                  metricSelect.appendChild(option);
+                });
+                metricSelect.value = discovery.candidates[0]?.id || "";
+                metricStep.hidden = false;
+                acceptanceMessage.textContent = "Select the provider-verified Placed Order metric, then confirm it for this workspace and Klaviyo account.";
+              } catch (discoveryError) {
+                acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(discoveryError.message || "") ? discoveryError.message : "KLAVIYO_METRIC_DISCOVERY_FAILED";
+              }
+            } else {
+              acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
+            }
             acceptanceButton.disabled = false;
           } finally { acceptanceButton.loading = false; }
+        });
+        metricConfirm.addEventListener("click", async () => {
+          metricConfirm.disabled = true;
+          metricConfirm.loading = true;
+          acceptanceMessage.textContent = "Verifying and binding the selected metric…";
+          try {
+            await sessionRequest("/api/shopify/providers/klaviyo/runtime/metrics/select", {method: "POST", body: JSON.stringify({metric_id: String(metricSelect.value || "")})});
+            metricStep.hidden = true;
+            acceptanceMessage.textContent = "Metric confirmed. Running the read-only acceptance…";
+            showAcceptanceResult(await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"}));
+          } catch (error) {
+            acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
+            metricConfirm.disabled = false;
+          } finally { metricConfirm.loading = false; }
         });
       }
       document.querySelectorAll("s-button[data-provider]").forEach((button) => button.addEventListener("click", async () => {

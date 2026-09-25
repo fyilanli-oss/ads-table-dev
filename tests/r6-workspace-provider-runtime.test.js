@@ -92,7 +92,7 @@ test('R6 preflight is read-only and fail-closed', () => {
 
 test('Execution Plan records the single failed C6 write attempt without claiming Dataset persistence', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2-C1\+C2\+C3\+C4\+C5 live PASS; R6-D2-C6-A gate deployed; first write FAILED \/ rows 0/);
+  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2-C1\+C2\+C3\+C4\+C5 live PASS; R6-D2-C6-A first write FAILED \/ rows 0; C6-B safe-stage diagnostics complete; retry not run/);
   assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS \/ C3 next/);
   assert.match(plan, /R6-D2-C3 salt-okunur satış kaynağı keşfi — Live PASS/);
   assert.match(plan, /R6-D2-C4 canonical satış kaynağı bağı — Live PASS/);

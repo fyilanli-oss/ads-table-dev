@@ -26,7 +26,8 @@ function onlySelectedAccount(connection) {
 function stageFailure(stage, error, preserveInternalMessage = false) {
   const failure = new Error(preserveInternalMessage ? String(error?.message || 'KLAVIYO_RUNTIME_STAGE_FAILED') : 'KLAVIYO_RUNTIME_STAGE_FAILED');
   const code = String(error?.code || '');
-  failure.code = /^[A-Z0-9_]{1,96}$/.test(code) ? code : 'KLAVIYO_RUNTIME_STAGE_FAILED';
+  if (/^[A-Z0-9_]{1,96}$/.test(code)) failure.code = code;
+  else if (!preserveInternalMessage) failure.code = 'KLAVIYO_RUNTIME_STAGE_FAILED';
   failure.diagnosticStage = stage;
   return failure;
 }

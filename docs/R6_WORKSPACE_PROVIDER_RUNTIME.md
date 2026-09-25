@@ -150,6 +150,12 @@ Yeni Meta bağlantısı temiz Shopify embedded OAuth ile başlar. Authorization 
 
 Callback yalnız `pending_account_selection` üretir. Bağlantı, server Meta'dan hesap listesini yeniden aldıktan ve kullanıcı en az `1`, en fazla `3` doğrulanmış reklam hesabını seçtikten sonra `Connected` olur. R6-D3-A yalnız plan ve sözleşme kararıdır; provider teması, production OAuth, Dataset V2 yazısı, schedule/backfill, Disconnect/revoke ve tamamlanmış E4 veri motorunun yeniden geliştirilmesi yoktur. Versionlı karar `contracts/r6d3a-meta-connection-lifecycle-v1.json`, analist belgesi `docs/R6D3A_META_CONNECTION_LIFECYCLE_DECISION.md` içindedir.
 
+### R6-D3-B Meta token doğrulama — repository PASS / R6-D3-C account-selection acceptance gate
+
+Embedded Meta callback'te server-side short-lived → long-lived user token exchange ve token debugger doğrulaması uygulanmıştır. `is_valid`, configured app ID, `ads_read` ve gelecekteki expiry koşullarından biri geçmezse canonical connection store çağrılmaz. Meta için refresh token beklenmez; yalnız doğrulanmış long-lived access token, debugger kaynaklı scope ve expiry mevcut encrypted store sınırına gönderilir.
+
+Validation kaynaklı güvenli hatalar Meta'ya bağlı `Reconnect Meta` durumu üretir; token, app secret ve provider response kullanıcıya veya loga çıkmaz. Başarılı callback `pending_account_selection` olarak kalır ve 1–3 provider-doğrulanmış hesap seçilmeden `Connected` olmaz. R6-D3-B production'a deploy edilmemiş, provider'a çağrı yapmamış ve Dataset V2/schedule/backfill açmamıştır. Versionlı sonuç `contracts/r6d3b-meta-token-validation-v1.json`, analist kaydı `docs/R6D3B_META_TOKEN_VALIDATION.md` içindedir.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

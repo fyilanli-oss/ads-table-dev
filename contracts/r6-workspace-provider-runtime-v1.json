@@ -1,6 +1,6 @@
 {
   "contract_version": "r6-workspace-provider-runtime-v1",
-  "status": "R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_META_CONTRACT_PASS_R6_D3B_IMPLEMENTATION_GATE",
+  "status": "R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_D3B_META_REPOSITORY_PASS_R6_D3C_ACCOUNT_SELECTION_GATE",
   "canonical_tenant": "workspace_id",
   "active_providers": ["meta", "google_ads", "klaviyo"],
   "parked_providers": ["tiktok", "pinterest"],
@@ -99,7 +99,7 @@
     "provider_contact": false
   },
   "r6d_work_packages": {
-    "status": "R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_META_CONTRACT_PASS_R6_D3B_IMPLEMENTATION_GATE",
+    "status": "R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_D3B_META_REPOSITORY_PASS_R6_D3C_ACCOUNT_SELECTION_GATE",
     "sequence": [
       "R6-D1 common fail-closed acceptance runner",
       "R6-D2 Klaviyo workspace live acceptance",
@@ -109,7 +109,7 @@
     ],
     "current_live_connection_state": {
       "klaviyo": "live_accepted_verified_empty",
-      "meta": "r6_d3a_contract_only_not_live_accepted",
+      "meta": "r6_d3b_repository_only_not_live_accepted",
       "google_ads": "not_live_accepted"
     },
     "rules": [
@@ -224,7 +224,23 @@
       "production_mutation": false,
       "provider_contact": false,
       "dataset_v2_write": false
+    },
+    "r6_d3b": {
+      "result": "PASS_REPOSITORY_ONLY",
+      "decision_contract": "contracts/r6d3b-meta-token-validation-v1.json",
+      "analyst_record": "docs/R6D3B_META_TOKEN_VALIDATION.md",
+      "short_to_long_lived_exchange": true,
+      "token_debugger_validation": true,
+      "configured_app_match_required": true,
+      "required_scope": "ads_read",
+      "known_future_expiry_required": true,
+      "refresh_token_expected": false,
+      "callback_state": "pending_account_selection",
+      "reconnect_meta_state": true,
+      "production_deployed": false,
+      "provider_contact": false,
+      "dataset_v2_write": false
     }
   },
-  "next_gate": "R6-D3-B_META_TOKEN_LIFECYCLE_IMPLEMENTATION_REVIEW"
+  "next_gate": "R6-D3-C_META_1_TO_3_ACCOUNT_SELECTION_ACCEPTANCE_REVIEW"
 }

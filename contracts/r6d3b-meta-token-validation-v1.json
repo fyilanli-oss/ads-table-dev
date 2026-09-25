@@ -1,0 +1,67 @@
+{
+  "contract_version": "r6d3b-meta-token-validation-v1",
+  "status": "PASS_REPOSITORY_ONLY_R6_D3_C_ACCOUNT_SELECTION_ACCEPTANCE_GATE",
+  "provider": "meta",
+  "business_outcome": "Meta authorization is verified before AdsTable stores workspace authority, and account selection remains mandatory before Connected.",
+  "token_sequence": [
+    "authorization_code_to_short_lived_user_token",
+    "short_lived_to_long_lived_user_token",
+    "debug_long_lived_token",
+    "validate_app_scope_and_expiry",
+    "persist_encrypted_pending_connection"
+  ],
+  "required_validation": {
+    "is_valid": true,
+    "configured_app_id_match": true,
+    "required_scopes": ["ads_read"],
+    "known_future_expiry": true
+  },
+  "persistence": {
+    "access_token": "encrypted_envelope_only",
+    "refresh_token_expected": false,
+    "expiry_required": true,
+    "granted_scopes_source": "meta_token_debugger",
+    "status_after_callback": "pending_account_selection"
+  },
+  "safe_failures": [
+    "META_TOKEN_CODE_EXCHANGE_FAILED",
+    "META_LONG_LIVED_TOKEN_EXCHANGE_FAILED",
+    "META_TOKEN_VALIDATION_FAILED",
+    "META_TOKEN_REAUTHORIZATION_REQUIRED",
+    "META_TOKEN_APP_MISMATCH",
+    "META_TOKEN_SCOPE_MISSING"
+  ],
+  "merchant_reauthorization": {
+    "query_state": "reauthorization_required",
+    "provider_bound": "meta",
+    "action_label": "Reconnect Meta",
+    "token_or_provider_body_exposed": false
+  },
+  "account_selection": {
+    "minimum": 1,
+    "maximum": 3,
+    "provider_refetch_required": true,
+    "connected_before_selection": false
+  },
+  "implementation": [
+    "src/shopify/embedded-provider-token-exchange.js",
+    "src/shopify/embedded-provider-strategies.js",
+    "src/shopify/runtime.js",
+    "src/routes/shopify-provider-oauth-routes.js",
+    "src/shopify/embedded-app-home.js",
+    "src/shopify/ad-account-ui.js"
+  ],
+  "official_reference": "https://www.postman.com/meta/facebook-marketing-api/documentation/0zr4mes/facebook-marketing-api-mapi",
+  "excluded": [
+    "production_deployment",
+    "production_meta_oauth",
+    "provider_performance_read",
+    "dataset_v2_write",
+    "schedule_or_backfill",
+    "disconnect_or_revoke",
+    "e4_redevelopment"
+  ],
+  "production_mutation": false,
+  "provider_contact": false,
+  "dataset_v2_write": false
+}

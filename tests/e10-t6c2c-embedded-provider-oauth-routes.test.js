@@ -69,6 +69,17 @@ test("a callback failure after transaction resolution returns to Shopify Admin",
   assert.equal(failed.location, "https://verified.myshopify.com/admin/apps/client-id?oauth_error=connection_failed");
 });
 
+test("a failed Meta token validation returns a controlled reauthorization state", async () => {
+  const error = Object.assign(new Error("META_TOKEN_SCOPE_MISSING"), {
+    code: "META_TOKEN_SCOPE_MISSING",
+    embedded_return_target: "https://verified.myshopify.com/admin/apps/client-id",
+  });
+  const failed = response();
+  const callbackFailure = fixture({meta: {start: async () => ({}), callback: async () => { throw error; }}});
+  await callbackFailure.routes["GET /api/shopify/providers/:provider/oauth/callback"]({params: {provider: "meta"}, query: {state: "opaque", code: "code"}}, failed);
+  assert.equal(failed.location, "https://verified.myshopify.com/admin/apps/client-id?oauth_error=reauthorization_required&provider=meta");
+});
+
 test("a configured Klaviyo adapter remains available when another known provider is not ready", async () => {
   const routes = {};
   registerShopifyProviderOAuthRoutes({

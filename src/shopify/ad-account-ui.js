@@ -7,7 +7,10 @@ function initializeAdAccounts() {
     const save = document.getElementById(provider + '-save');
     const modal = document.getElementById(provider + '-account-modal');
     const connect = document.getElementById(provider + '-connect');
+    const connectAction = document.getElementById(provider + '-connect-action');
     const connected = document.getElementById(provider + '-connected');
+    const query = new URLSearchParams(location.search);
+    const reauthorizationRequired = provider === 'meta' && query.get('oauth_error') === 'reauthorization_required' && query.get('provider') === 'meta';
     if (!message || !choices || !save || !modal) continue;
     let accounts = [];
     let busy = false;
@@ -72,7 +75,10 @@ function initializeAdAccounts() {
       } else {
         connect.hidden = false;
         if (connected) connected.hidden = true;
-        message.textContent = 'Not connected';
+        if (reauthorizationRequired) {
+          if (connectAction) connectAction.textContent = 'Reconnect Meta';
+          message.textContent = 'Meta authorization must be renewed before account selection.';
+        } else message.textContent = 'Not connected';
       }
     }).catch(showError);
   }

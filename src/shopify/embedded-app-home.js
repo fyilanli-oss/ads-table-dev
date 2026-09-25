@@ -162,7 +162,7 @@ function renderProviderSection({id, label, description, parked = false}, provide
           ${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
           ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
         </s-stack>
-        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-connected" hidden>${id === "klaviyo" ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
+        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button id="${id}-connect-action" variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-connected" hidden>${id === "klaviyo" ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
       </s-stack>
       ${parked ? "" : `<s-modal id="${id}-connect-modal" heading="Connect ${label} to AdsTable?" size="small-100">
         <s-stack gap="base">
@@ -425,7 +425,16 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         }
       }));
       loadSettings();
-      if (params.has("oauth_connected")) {
+      if (params.get("oauth_error") === "reauthorization_required" && params.get("provider") === "meta") {
+        const reconnect = document.getElementById("meta-connect-action");
+        const message = document.getElementById("meta-message");
+        if (reconnect) reconnect.textContent = "Reconnect Meta";
+        if (message) message.textContent = "Meta authorization must be renewed before account selection.";
+        status.setAttribute("heading", "Reconnect Meta");
+        status.setAttribute("tone", "critical");
+        status.textContent = "AdsTable could not verify a valid Meta authorization.";
+        status.hidden = false;
+      } else if (params.has("oauth_connected")) {
         status.setAttribute("heading", "Provider authorized");
         status.setAttribute("tone", "success");
         status.textContent = "Account selection is next.";

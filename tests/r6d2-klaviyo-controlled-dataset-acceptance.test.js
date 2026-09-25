@@ -31,7 +31,7 @@ const fact = Object.freeze({
   spend_allocation: { dailySentCount: 100, monthlySentCount: 1000, periodClosed: true },
 });
 
-function acceptance({ result = { rows: [fact], verified_empty: false } } = {}) {
+function acceptance({ result = { rows: [fact], verified_empty: false }, existingRows = [] } = {}) {
   const calls = [];
   const service = createKlaviyoControlledDatasetAcceptance({
     connectionStore: { resolveConnected: async input => { calls.push(['connection', input]); return connection; } },
@@ -41,7 +41,10 @@ function acceptance({ result = { rows: [fact], verified_empty: false } } = {}) {
       fetchMessageFacts: async input => { calls.push(['facts', input]); return result; },
     },
     resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: '2026-09-23', fx_provider: 'test_fx' }),
-    repository: { upsertCanonicalRawFacts: async rows => { calls.push(['write', rows]); return rows; } },
+    repository: {
+      readCanonicalRawFacts: async input => { calls.push(['read', input]); return existingRows; },
+      upsertCanonicalRawFacts: async rows => { calls.push(['write', rows]); return rows; },
+    },
     now: () => new Date('2026-09-25T12:00:00Z'),
   });
   return { calls, service };
@@ -80,4 +83,14 @@ test('C6 controlled acceptance preserves verified-empty without synthetic rows',
   assert.equal(result.persisted, 0);
   assert.equal(result.empty_provider_result, true);
   assert.deepEqual(calls.find(([name]) => name === 'write')[1], []);
+});
+
+test('C6 controlled acceptance blocks an already persisted workspace/account/date before provider contact', async () => {
+  const { calls, service } = acceptance({ existingRows: [{ id: 'existing-row' }] });
+  await assert.rejects(service.execute(authority, CONFIRMATION), error =>
+    error.code === 'KLAVIYO_DATASET_ACCEPTANCE_ALREADY_EXECUTED' && error.status === 409);
+  assert.equal(calls.filter(([name]) => name === 'read').length, 1);
+  assert.equal(calls.some(([name]) => name === 'account'), false);
+  assert.equal(calls.some(([name]) => name === 'facts'), false);
+  assert.equal(calls.some(([name]) => name === 'write'), false);
 });

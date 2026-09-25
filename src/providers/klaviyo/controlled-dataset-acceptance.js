@@ -26,6 +26,9 @@ function createKlaviyoControlledDatasetAcceptance({
   if (!settingsStore || typeof settingsStore.resolveReportingCurrency !== 'function') {
     throw new TypeError('workspace settings store is required');
   }
+  if (!repository || typeof repository.readCanonicalRawFacts !== 'function') {
+    throw new TypeError('workspace Dataset V2 read repository is required');
+  }
   const runner = createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate });
   const writeBoundary = new WorkspaceCanonicalWriteBoundary({ repository });
 
@@ -39,6 +42,21 @@ function createKlaviyoControlledDatasetAcceptance({
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       const currency = await settingsStore.resolveReportingCurrency(authority);
       const providerDate = closedProviderDate(now());
+      const selectedAccounts = Array.isArray(connection.selectedAccounts) ? connection.selectedAccounts : [];
+      if (selectedAccounts.length !== 1 || typeof selectedAccounts[0]?.id !== 'string' || !selectedAccounts[0].id.trim()) {
+        throw new Error('KLAVIYO_SINGLE_ACCOUNT_REQUIRED');
+      }
+      const existingRows = await repository.readCanonicalRawFacts({
+        workspace_id: authority.workspace_id,
+        from: providerDate,
+        to: providerDate,
+        platform: 'klaviyo',
+        platform_account_id: selectedAccounts[0].id.trim(),
+      });
+      if (!Array.isArray(existingRows)) throw new Error('WORKSPACE_DATASET_READ_INVALID');
+      if (existingRows.length > 0) {
+        throw codedError('KLAVIYO_DATASET_ACCEPTANCE_ALREADY_EXECUTED', 409);
+      }
       const result = await runner(Object.freeze({
         authority,
         connection,
@@ -67,7 +85,8 @@ function createKlaviyoControlledDatasetAcceptance({
         production_activation: false,
         currency_version: currency.currencyVersion,
       });
-    } catch {
+    } catch (error) {
+      if (error?.code === 'KLAVIYO_DATASET_ACCEPTANCE_ALREADY_EXECUTED') throw error;
       throw codedError('KLAVIYO_DATASET_ACCEPTANCE_FAILED', 503);
     }
   }

@@ -31,19 +31,20 @@ const fact = Object.freeze({
   spend_allocation: { dailySentCount: 100, monthlySentCount: 1000, periodClosed: true },
 });
 
-function acceptance({ result = { rows: [fact], verified_empty: false }, existingRows = [] } = {}) {
+function acceptance({ result = { rows: [fact], verified_empty: false }, existingRows = [], failAt = null } = {}) {
   const calls = [];
+  const fail = stage => { if (failAt === stage) throw new Error(`secret--must-not-leak`); };
   const service = createKlaviyoControlledDatasetAcceptance({
-    connectionStore: { resolveConnected: async input => { calls.push(['connection', input]); return connection; } },
-    settingsStore: { resolveReportingCurrency: async input => { calls.push(['currency', input]); return { reportingCurrency: 'TRY', currencyVersion: 2 }; } },
+    connectionStore: { resolveConnected: async input => { calls.push(['connection', input]); fail('connection'); return connection; } },
+    settingsStore: { resolveReportingCurrency: async input => { calls.push(['currency', input]); fail('currency'); return { reportingCurrency: 'TRY', currencyVersion: 2 }; } },
     providerClient: {
-      fetchAccount: async input => { calls.push(['account', input]); return { id: 'account-1', currency: 'USD', timezone: 'UTC' }; },
-      fetchMessageFacts: async input => { calls.push(['facts', input]); return result; },
+      fetchAccount: async input => { calls.push(['account', input]); fail('provider_account'); return { id: 'account-1', currency: 'USD', timezone: 'UTC' }; },
+      fetchMessageFacts: async input => { calls.push(['facts', input]); fail('provider_facts'); return result; },
     },
-    resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: '2026-09-23', fx_provider: 'test_fx' }),
+    resolveFxRate: async () => { fail('fx'); return { fx_rate: 40, fx_rate_date: '2026-09-23', fx_provider: 'test_fx' }; },
     repository: {
-      readCanonicalRawFacts: async input => { calls.push(['read', input]); return existingRows; },
-      upsertCanonicalRawFacts: async rows => { calls.push(['write', rows]); return rows; },
+      readCanonicalRawFacts: async input => { calls.push(['read', input]); fail('guard'); return existingRows; },
+      upsertCanonicalRawFacts: async rows => { calls.push(['write', rows]); fail('write'); return rows; },
     },
     now: () => new Date('2026-09-25T12:00:00Z'),
   });
@@ -93,4 +94,21 @@ test('C6 controlled acceptance blocks an already persisted workspace/account/dat
   assert.equal(calls.some(([name]) => name === 'account'), false);
   assert.equal(calls.some(([name]) => name === 'facts'), false);
   assert.equal(calls.some(([name]) => name === 'write'), false);
+});
+
+test('C6-B returns only allowlisted failure stages and never the underlying error text', async () => {
+  const cases = [
+    ['connection', 'CONNECTION'], ['currency', 'CURRENCY'], ['guard', 'DATASET_GUARD'],
+    ['provider_account', 'PROVIDER_ACCOUNT'], ['provider_facts', 'PROVIDER_FACTS'],
+    ['fx', 'FX_RESOLUTION'], ['write', 'DATASET_PERSISTENCE'],
+  ];
+  for (const [failAt, stage] of cases) {
+    const { service } = acceptance({ failAt });
+    await assert.rejects(service.execute(authority, CONFIRMATION), error => {
+      assert.equal(error.code, `KLAVIYO_DATASET_ACCEPTANCE_FAILED_${stage}`);
+      assert.equal(error.status, 503);
+      assert.doesNotMatch(`${error.code}:${error.message}`, /secret-|token|account-1/i);
+      return true;
+    });
+  }
 });

@@ -1,0 +1,27 @@
+{
+  "status": "DIAGNOSTICS_COMPLETE_RETRY_NOT_RUN",
+  "c6_retry_performed": false,
+  "purpose": "distinguish the fail-closed C6 stage without exposing upstream errors or retrying production",
+  "next_gate": "separate analyst brief and explicit production approval",
+  "token_or_provider_payload_logged": false,
+  "dataset_write_in_package_acceptance": false,
+  "raw_error_exposed": false,
+  "provider_contact_in_package_acceptance": false,
+  "safe_stages": [
+    "CONNECTION",
+    "CURRENCY",
+    "ACCOUNT_SELECTION",
+    "DATASET_GUARD",
+    "RUNTIME_CONTEXT",
+    "PROVIDER_ACCOUNT",
+    "PROVIDER_ACCOUNT_VALIDATION",
+    "PROVIDER_FACTS",
+    "PROVIDER_RESULT_VALIDATION",
+    "FX_RESOLUTION",
+    "ROW_NORMALIZATION",
+    "RESULT_VERIFICATION",
+    "DATASET_PERSISTENCE",
+    "PERSISTENCE_CARDINALITY"
+  ],
+  "contract_version": "r6d2-klaviyo-c6b-diagnostics-v1"
+}

@@ -27,6 +27,7 @@ const {createKlaviyoReadOnlyPreflight} = require("../providers/klaviyo/read-only
 const {createKlaviyoMetricBinding} = require("../providers/klaviyo/metric-binding");
 const {createKlaviyoControlledDatasetAcceptance} = require("../providers/klaviyo/controlled-dataset-acceptance");
 const {createKlaviyoTokenLifecycle} = require("../providers/klaviyo/token-lifecycle");
+const {createMetaReadOnlyPreflight} = require("../providers/meta/read-only-preflight");
 const {WorkspaceSupabaseDatasetRepository} = require("../../funnel-core/workspace-supabase-dataset-repository");
 
 function enabled(value) {
@@ -179,6 +180,17 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           }) : unavailableAccountDiscovery,
         },
       }),
+      metaPreflight: adapters.meta && typeof resolveFxRate === "function"
+        ? createMetaReadOnlyPreflight({
+          connectionStore,
+          settingsStore,
+          transport: fetchImpl,
+          graphVersion: env.META_GRAPH_VERSION || "v20.0",
+          resolveFxRate,
+        })
+        : adapters.meta
+          ? {execute: async () => {throw Object.assign(new Error("META_PREFLIGHT_NOT_CONFIGURED"), {code: "META_PREFLIGHT_NOT_CONFIGURED", status: 503});}}
+          : null,
     });
   }
   return Object.freeze({enabled: true, providerOAuthEnabled, providerOAuthRequested, providerAvailability});

@@ -1,0 +1,52 @@
+{
+  "contract_version": "r6d3d-meta-read-only-preflight-v1",
+  "status": "PASS_REPOSITORY_ONLY_PRODUCTION_ACCEPTANCE_PENDING",
+  "provider": "meta",
+  "business_outcome": "Prove that every selected canonical Meta account can supply its own timezone, source currency and one closed business day of E4 Insights without writing Dataset V2.",
+  "reuse": {
+    "e4_client": true,
+    "e4_mapper": true,
+    "e4_time_fx": true,
+    "new_metric_contract": false,
+    "legacy_server_runtime_reactivated": false,
+    "dashboard_manual_refresh_reactivated": false
+  },
+  "authority": {
+    "workspace": "verified_shopify_session",
+    "connection": "public.workspace_provider_connections",
+    "reporting_currency": "public.workspace_settings.merchant_selected",
+    "browser_tenant_fields_are_authority": false
+  },
+  "provider_scope": {
+    "selected_account_minimum": 1,
+    "selected_account_maximum": 3,
+    "account_metadata": ["id", "currency", "timezone_name"],
+    "insights_level": "ad",
+    "time_increment_days": 1,
+    "date_strategy": "previous_closed_business_date_per_account_timezone",
+    "metrics": "E4_FIXED_CONTRACT"
+  },
+  "acceptance": {
+    "all_selected_accounts_must_be_refetched": true,
+    "source_currency_must_match_canonical_selection": true,
+    "reporting_currency_must_be_merchant_selected": true,
+    "time_fx_must_validate": true,
+    "empty_result_must_be_provider_verified": true,
+    "aggregate_response_only": true,
+    "normal_data_sources_ui_changed": false,
+    "operator_surface": "/shopify/app/platforms?acceptance=r6d3-meta"
+  },
+  "excluded": [
+    "dataset_v2_write",
+    "schedule_or_backfill",
+    "production_activation",
+    "v1_snapshot_write",
+    "legacy_connection_or_ownership",
+    "new_metric_selection",
+    "google_ads_runtime"
+  ],
+  "production_mutation": false,
+  "provider_contact": false,
+  "dataset_v2_write": false,
+  "next_gate": "R6-D3-D_META_PRODUCTION_READ_ONLY_ACCEPTANCE"
+}

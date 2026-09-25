@@ -260,7 +260,21 @@
       "live_postcheck_result": "PASS",
       "evidence": "docs/security/evidence/R6D3C_META_ACCOUNT_SELECTION_LIVE_ACCEPTANCE_2026-09-25.json",
       "dataset_v2_write": false
+    },
+    "r6_d3d": {
+      "result": "PASS_REPOSITORY_ONLY_PRODUCTION_ACCEPTANCE_PENDING",
+      "decision_contract": "contracts/r6d3d-meta-read-only-preflight-v1.json",
+      "analyst_record": "docs/R6D3D_META_READ_ONLY_PREFLIGHT.md",
+      "e4_runtime_reused": true,
+      "new_metric_contract_created": false,
+      "workspace_authority_required": true,
+      "all_selected_accounts_refetched": true,
+      "provider_date_strategy": "previous_closed_business_date_per_account_timezone",
+      "aggregate_response_only": true,
+      "production_deployed": false,
+      "provider_contact": false,
+      "dataset_v2_write": false
     }
   },
-  "next_gate": "R6-D3_META_DATA_RUNTIME_ANALYST_BRIEF"
+  "next_gate": "R6-D3-D_META_PRODUCTION_READ_ONLY_ACCEPTANCE"
 }

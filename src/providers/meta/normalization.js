@@ -1,6 +1,7 @@
 'use strict';
 
 const { validateCanonicalRow } = require('../../../funnel-core/canonical-contract');
+const { validateWorkspaceCanonicalRow } = require('../../../funnel-core/workspace-canonical-contract');
 const { buildEntityKey } = require('../../../funnel-core/entity-hierarchy');
 const { normalizeCurrencyCode, normalizeMonetaryRawFields } = require('../../../funnel-core/fx-service');
 const { normalizeBusinessDate } = require('../../../funnel-core/time-service');
@@ -42,7 +43,8 @@ function normalizeMetaMappedResult(mapped, insight, input) {
   });
   row.identity.date = time.business_date;
   row.time = time;
-  validateCanonicalRow(row);
+  if (context.workspaceId !== undefined && context.workspaceId !== null) validateWorkspaceCanonicalRow(row);
+  else validateCanonicalRow(row);
   return Object.freeze({ row: Object.freeze(row), entityKey: buildEntityKey(row.identity, row.entity) });
 }
 

@@ -230,6 +230,15 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
   <s-page heading="Data sources">
     <s-link slot="breadcrumb-actions" href="/shopify/app">Home</s-link>
     <s-banner id="status" heading="Data sources" tone="info" hidden></s-banner>
+    <div id="r6d3-meta-acceptance" hidden>
+      <s-section heading="Meta acceptance check">
+        <s-stack gap="base">
+          <s-paragraph>This one-time check reads the selected Meta accounts and daily Insights through the completed E4 contract. It does not write Dataset V2.</s-paragraph>
+          <s-paragraph id="r6d3-meta-message" aria-live="polite"></s-paragraph>
+          <s-button id="r6d3-meta-run" variant="primary">Run read-only acceptance</s-button>
+        </s-stack>
+      </s-section>
+    </div>
     <div id="r6d2-klaviyo-acceptance" hidden>
       <s-section heading="Klaviyo acceptance check">
         <s-stack gap="base">
@@ -280,6 +289,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const currency = document.getElementById("reporting-currency");
       const saveCurrency = document.getElementById("save-reporting-currency");
       const currencyMessage = document.getElementById("platforms-currency-message");
+      const metaAcceptancePanel = document.getElementById("r6d3-meta-acceptance");
+      const metaAcceptanceButton = document.getElementById("r6d3-meta-run");
+      const metaAcceptanceMessage = document.getElementById("r6d3-meta-message");
       const acceptancePanel = document.getElementById("r6d2-klaviyo-acceptance");
       const acceptanceButton = document.getElementById("r6d2-klaviyo-run");
       const acceptanceMessage = document.getElementById("r6d2-klaviyo-message");
@@ -396,6 +408,23 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
             metricConfirm.disabled = false;
           } finally { metricConfirm.loading = false; }
+        });
+      }
+      if (params.get("acceptance") === "r6d3-meta") {
+        metaAcceptancePanel.hidden = false;
+        metaAcceptanceButton.addEventListener("click", async () => {
+          metaAcceptanceButton.disabled = true;
+          metaAcceptanceButton.loading = true;
+          metaAcceptanceMessage.textContent = "Running the read-only checks…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/meta/runtime/preflight", {method: "POST"});
+            metaAcceptanceMessage.textContent = result.status === "PASS_R6_D3_D_META_READ_ONLY_PREFLIGHT"
+              ? "PASS — " + result.selected_account_count + " account(s), " + result.row_count + " verified row(s), Time and FX checks succeeded. Dataset V2 writes: 0."
+              : "The acceptance result could not be verified.";
+          } catch (error) {
+            metaAcceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "META_PREFLIGHT_FAILED";
+            metaAcceptanceButton.disabled = false;
+          } finally { metaAcceptanceButton.loading = false; }
         });
       }
       document.querySelectorAll("s-button[data-provider]").forEach((button) => button.addEventListener("click", async () => {

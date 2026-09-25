@@ -2,9 +2,9 @@
 
 const {bearerToken} = require('./shopify-auth-routes');
 const {PROVIDERS} = require('../shopify/ad-account-selection');
-const SAFE = new Set(['INVALID_ACCOUNT','ACCOUNT_SELECTION_LIMIT','PROVIDER_REAUTHORIZE','PROVIDER_ACCOUNTS_UNAVAILABLE','CONNECTION_CHANGED']);
+const SAFE = new Set(['INVALID_ACCOUNT','ACCOUNT_SELECTION_LIMIT','PROVIDER_REAUTHORIZE','PROVIDER_ACCOUNTS_UNAVAILABLE','CONNECTION_CHANGED','META_PREFLIGHT_NOT_CONFIGURED','META_PREFLIGHT_CONNECTION_REQUIRED','META_PREFLIGHT_CURRENCY_REQUIRED','META_PREFLIGHT_REAUTHORIZE','META_PREFLIGHT_FAILED']);
 
-function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection} = {}) {
+function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection, metaPreflight = null} = {}) {
   const handler = (provider, action) => async (req, res) => {
     res.set('Cache-Control', 'no-store');
     let authority;
@@ -18,6 +18,7 @@ function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection} =
     app.get(`/api/shopify/providers/${provider}/accounts`, handler(provider, (authority, value) => selection.list(authority, value)));
     app.post(`/api/shopify/providers/${provider}/accounts/select`, handler(provider, (authority, value, body) => selection.complete(authority, value, body)));
   }
+  if (metaPreflight) app.post('/api/shopify/providers/meta/runtime/preflight', handler('meta', authority => metaPreflight.execute(authority)));
 }
 
 module.exports = Object.freeze({registerShopifyAdAccountRoutes});

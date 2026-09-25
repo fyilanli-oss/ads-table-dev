@@ -130,13 +130,17 @@ Sıradaki kapı **R6-D2-C3 salt-okunur satış kaynağı keşfi** için analist 
 
 Resmî sözleşme referansları: Klaviyo [Get Accounts](https://developers.klaviyo.com/en/reference/get_accounts), [Reporting API overview](https://developers.klaviyo.com/en/reference/reporting_api_overview), [Get Campaigns](https://developers.klaviyo.com/en/reference/get_campaigns) ve [Get Flows](https://developers.klaviyo.com/en/reference/get_flows).
 
-### R6-D2-C6-D connected token lifecycle corrective — repository PASS / deployment pending
+### R6-D2-C6-D connected token lifecycle corrective — live PASS / verified empty / rows `0`
 
 C6-C ikinci kontrollü deneme `KLAVIYO_DATASET_ACCEPTANCE_FAILED_PROVIDER_ACCOUNT` ile Account API aşamasında durdu; Dataset V2 satırı `0` kaldı. Production canonical Klaviyo kaydı encrypted refresh token ve `accounts:read` scope taşırken access-token expiry alanı boştu. Connected runtime kısa ömürlü access token için refresh uygulamıyordu.
 
 C6-D, OAuth grant'ini kalıcı ürün bağlantısı olarak yönetir: `expires_in` canonical expiry alanına yazılır; expiry bilinmiyor/yaklaşıyorsa token provider'da yenilenir; dönen en güncel access/refresh token encrypted envelope olarak aynı workspace connection'a optimistic version ile kaydedilir. Beklenmeyen `401` yalnız bir refresh ve bir tekrar üretir. `invalid_grant` veya ikinci auth hatası yeniden yetkilendirme ister. Paralel istekler aynı process'te tek refresh paylaşır. Metric seçimi, mapping, Dataset writer ve E4/E5/E7 kapsamı değişmez.
 
 Repository ilgili kapsam regresyonu `120/120 PASS` verdi. Production deployment, gerçek token yenilemesi, provider teması veya Dataset V2 yeniden denemesi yapılmadı; bunlar ayrı kabul kapılarıdır.
+
+PR #259 merge commit `9039180442768a2dab9b80c09d24217d8249588f` post-merge Security/Full Regression PASS ve otomatik Vercel Production deployment SUCCESS ile canlıya alındı. Açık production onayıyla salt-okunur preflight tek kez çalıştı; Account, Campaign, Flow, Time ve FX kapıları PASS verdi. Ardından tek kontrollü C6 isteği `attempted 0`, `persisted 0`, `verified empty true` sonucu verdi. Provider doğrulanmış boş sonuç döndürdüğü için sentetik satır üretilmedi.
+
+Supabase salt-okunur postcheck Dataset V2 toplam/Klaviyo satırını `0/0`; connected canonical Klaviyo, access-token expiry, encrypted refresh token ve metric binding sayılarını `1/1/1/1` doğruladı. R6-D2 Klaviyo canlı kabulü PASS ile kapanmıştır. Bu sonuç Meta veya Google Ads'i aktive etmez; sıradaki ayrı kapı R6-D3 Meta analist brief'i ve açık production onayıdır. Redacted kanıt `docs/security/evidence/R6D2C6D_KLAVIYO_LIVE_ACCEPTANCE_2026-09-25.json` içindedir.
 
 ## Fail-closed kurallar
 

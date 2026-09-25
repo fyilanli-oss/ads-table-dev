@@ -1,6 +1,6 @@
 {
   "contract_version": "r3-dataset-workspace-v1",
-  "status": "R3A_R3B_COMPLETE_R3C_DEFERRED_TO_R6_GATE",
+  "status": "R3C1_FIRST_WRITE_TENANT_ENFORCEMENT_PREPARED",
   "depends_on": "r2-workspace-currency-v1",
   "canonical_tenant": "workspace_id",
   "canonical_contract_version": "v2",
@@ -13,8 +13,9 @@
     "legacy_user_id_is_optional_in_contract_v2": true,
     "legacy_user_id_nullable_requires_activation_migration": true,
     "legacy_user_indexes_retained_during_r3a": true,
-    "workspace_not_null_requires_later_gate": true,
-    "workspace_runtime_cutover_package": "R6"
+    "workspace_not_null_requires_later_gate": false,
+    "workspace_runtime_cutover_package": "R6",
+    "first_write_enforcement_package": "R3-C1"
   },
   "workspace_unique_key": [
     "workspace_id",
@@ -50,11 +51,26 @@
   "forbidden_in_this_package": [
     "dataset_row_backfill",
     "provider_runtime_cutover",
-    "workspace_id_not_null",
     "drop_user_id",
-    "drop_legacy_user_indexes",
     "oauth_or_provider_contact"
   ],
+  "r3c1_first_write_enforcement": {
+    "status": "PREPARED_PRODUCTION_APPLY_PENDING",
+    "decision": "move tenant enforcement before the first Dataset V2 row",
+    "migration": "supabase/migrations/20260925103000_r3c1_dataset_workspace_first_write_enforcement.sql",
+    "workspace_id_required": true,
+    "user_id_retained_as_nullable_non_authoritative_actor": true,
+    "legacy_user_indexes_retired": true,
+    "legacy_authenticated_policy_retired": true,
+    "browser_direct_dataset_access": false,
+    "service_role_workspace_access": true,
+    "provider_contact": false,
+    "dataset_write": false,
+    "preflight": "docs/security/sql/R3C1_DATASET_FIRST_WRITE_PREFLIGHT.sql",
+    "postcheck": "docs/security/sql/R3C1_DATASET_FIRST_WRITE_POSTCHECK.sql",
+    "rollback": "docs/security/sql/R3C1_DATASET_FIRST_WRITE_ROLLBACK.sql",
+    "next_gate": "production_preflight_then_explicitly_approved_migration_apply"
+  },
   "production_gate": {
     "explicit_approval_required": true,
     "explicit_approval_received": true,
@@ -81,7 +97,7 @@
     "evidence": "docs/security/evidence/R3B_WORKSPACE_RUNTIME_VERIFICATION_2026-09-23.json",
     "dependency_correction": {
       "r4_unblocked_after": "R3-A_and_R3-B",
-      "r3c_runs_after": "R6_workspace_runtime_acceptance",
+      "r3c_runs_after": "R6_D2_C6_first_attempt_failed_before_write_and_user_moved_R3C1_before_retry",
       "reason": "R3-C NOT NULL enforcement cannot precede the R6 writer cutover it must validate"
     }
   }

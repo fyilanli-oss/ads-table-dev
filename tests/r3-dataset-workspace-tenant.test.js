@@ -34,6 +34,10 @@ const { createWorkspaceIdempotentBackfillBatchWriter } = require('../src/backfil
 const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 const migration = read('supabase/migrations/20260923083734_add_dataset_v2_workspace_tenant.sql');
+const enforcementMigration = read('supabase/migrations/20260925103000_r3c1_dataset_workspace_first_write_enforcement.sql');
+const enforcementPreflight = read('docs/security/sql/R3C1_DATASET_FIRST_WRITE_PREFLIGHT.sql');
+const enforcementPostcheck = read('docs/security/sql/R3C1_DATASET_FIRST_WRITE_POSTCHECK.sql');
+const enforcementRollback = read('docs/security/sql/R3C1_DATASET_FIRST_WRITE_ROLLBACK.sql');
 const contract = JSON.parse(read('contracts/r3-dataset-workspace-v1.json'));
 const WORKSPACE_A = '11111111-1111-4111-8111-111111111111';
 const WORKSPACE_B = '22222222-2222-4222-8222-222222222222';
@@ -58,7 +62,7 @@ test('R3-A migration is additive and keeps legacy compatibility during staging',
 });
 
 test('R3 contract preserves exact workspace tenant and production gates', () => {
-  assert.equal(contract.status, 'R3A_R3B_COMPLETE_R3C_DEFERRED_TO_R6_GATE');
+  assert.equal(contract.status, 'R3C1_FIRST_WRITE_TENANT_ENFORCEMENT_PREPARED');
   assert.equal(contract.canonical_tenant, 'workspace_id');
   assert.equal(contract.canonical_contract_version, 'v2');
   assert.deepEqual(contract.workspace_unique_key, [
@@ -84,6 +88,35 @@ test('R3 contract preserves exact workspace tenant and production gates', () => 
   assert.equal(evidence.counts.dataset_v2_rows, 0);
   assert.equal(evidence.schema.backfill_checkpoints_exists, false);
   assert.equal(evidence.database_mutation, false);
+});
+
+test('R3-C1 enforces the workspace tenant before the first Dataset V2 write', () => {
+  assert.match(enforcementMigration, /R3C1_BLOCKED_UNBOUND_DATASET_ROWS/);
+  assert.match(enforcementMigration, /alter column workspace_id set not null/i);
+  assert.match(enforcementMigration, /drop policy if exists performance_dataset_rows_v2_select_own/i);
+  assert.match(enforcementMigration, /revoke select on table public\.performance_dataset_rows_v2 from authenticated/i);
+  for (const index of [
+    'performance_dataset_rows_v2_canonical_uidx',
+    'performance_dataset_rows_v2_user_date_idx',
+    'performance_dataset_rows_v2_account_scope_date_idx',
+    'performance_dataset_rows_v2_entity_history_idx'
+  ]) assert.match(enforcementMigration, new RegExp(`drop index if exists public\\.${index}`));
+  assert.doesNotMatch(enforcementMigration, /drop\s+column\s+user_id/i);
+  assert.doesNotMatch(enforcementMigration, /insert\s+into\s+public\.performance_dataset_rows_v2/i);
+  assert.equal(contract.r3c1_first_write_enforcement.status, 'PREPARED_PRODUCTION_APPLY_PENDING');
+  assert.equal(contract.r3c1_first_write_enforcement.provider_contact, false);
+  assert.equal(contract.r3c1_first_write_enforcement.dataset_write, false);
+});
+
+test('R3-C1 live scripts are zero-row fail-closed and reversible only before facts exist', () => {
+  assert.match(enforcementPreflight, /BLOCK_DATASET_NOT_EMPTY/);
+  assert.match(enforcementPreflight, /BLOCK_DEPENDENT_VIEWS/);
+  assert.match(enforcementPostcheck, /workspace_required/);
+  assert.match(enforcementPostcheck, /legacy_user_indexes_retired/);
+  assert.match(enforcementPostcheck, /authenticated_direct_select_revoked/);
+  assert.match(enforcementPostcheck, /service_role_workspace_access_preserved/);
+  assert.match(enforcementRollback, /R3C1_ROLLBACK_BLOCKED_DATASET_ROWS_EXIST/);
+  assert.match(enforcementRollback, /create policy performance_dataset_rows_v2_select_own/);
 });
 
 test('workspace canonical contract requires a real workspace UUID', () => {
@@ -262,10 +295,11 @@ test('R3 security scripts preserve a fail-closed live gate', () => {
   assert.match(rollback, /R3_ROLLBACK_BLOCKED_WORKSPACE_ROWS_EXIST/);
 });
 
-test('Execution Plan removes the R3/R6 dependency cycle without activating providers', () => {
+test('Execution Plan moves first-write tenant enforcement ahead of the C6 retry without activating providers', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R3-A\+B Done; R3-C held for R6 activation/);
+  assert.match(plan, /R3-A\+B Done; R3-C1 first-write enforcement prepared/);
+  assert.match(plan, /R3-C1.*ilk Dataset V2 satırından önce/i);
+  assert.match(plan, /C6 ilk canlı deneme.*FAILED.*Dataset V2.*0/i);
   assert.match(plan, /Done \/ R4-A\+B\+C/);
-  assert.match(plan, /R3-C.*R6.*kabul/i);
   assert.doesNotMatch(plan, /\| R4 \|[^\n]+`Blocked by R3`/);
 });

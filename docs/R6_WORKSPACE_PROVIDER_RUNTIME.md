@@ -174,6 +174,12 @@ Sonuç yalnız aggregate hesap/satır sayısı, verified empty/non-empty, Time/F
 
 PR #263 production'a dağıtıldıktan sonra gerçek merchant oturumundaki kabul `PASS — 1 account(s), 0 verified row(s), Time and FX checks succeeded. Dataset V2 writes: 0.` verdi. Bu, provider tarafından doğrulanmış boş sonuçtur; hata veya sentetik satır değildir. Supabase postcheck canonical Meta bağlantısını `connected · 1 account`, pending/invalid `0`; Dataset V2 Meta/schedule/job ve browser grant sayılarını `0` olarak doğruladı. Versionlı sonuç `contracts/r6d3d-meta-read-only-preflight-v1.json`, analist kaydı `docs/R6D3D_META_READ_ONLY_PREFLIGHT.md`, redacted kanıt `docs/security/evidence/R6D3D_META_READ_ONLY_LIVE_ACCEPTANCE_2026-09-25.json` içindedir.
 
+### R6-D3-E Meta kontrollü Dataset V2 kabulü — repository PASS / production acceptance gate
+
+Mevcut Meta workspace runner, ortak provider-result doğrulaması, workspace canonical write boundary ve Workspace Supabase Dataset V2 repository tek bir kontrollü kabul işleminde compose edilmiştir. İşlem exact action-time confirmation ister; canonical bağlantı ve reporting currency yalnız server authority'den gelir. Seçilmiş 1–3 hesap için yakın business-date penceresinde mevcut satır varsa provider temasından önce fail-closed durur.
+
+Gerçek provider satırı varsa yalnız doğrulanmış workspace canonical satırları UPSERT edilir ve `attempted == persisted` zorunludur. Provider doğrulanmış boş sonuç döndürürse `0/0`, fake-free başarı kabul edilir; non-empty fiziksel UPSERT'in gözlenmediği kanıtta ayrıca belirtilir. Normal Data Sources görünümü değişmez; gizli operatör yüzeyi `?acceptance=r6d3-meta` altında kalır. Schedule, backfill, V1 write ve production activation yoktur. Sözleşme `contracts/r6d3e-meta-controlled-dataset-acceptance-v1.json`, analist kaydı `docs/R6D3E_META_CONTROLLED_DATASET_ACCEPTANCE.md` içindedir. Production provider teması ve Dataset V2 isteği henüz yapılmamıştır.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

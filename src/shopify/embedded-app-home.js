@@ -236,6 +236,13 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-paragraph>This one-time check reads the selected Meta accounts and daily Insights through the completed E4 contract. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d3-meta-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d3-meta-run" variant="primary">Run read-only acceptance</s-button>
+          <div id="r6d3-meta-dataset-step">
+            <s-stack gap="base">
+              <s-paragraph>This controlled acceptance may write real provider-verified Meta rows to Dataset V2. A verified empty result writes no synthetic rows and does not enable schedules or backfill.</s-paragraph>
+              <s-paragraph id="r6d3-meta-dataset-message" aria-live="polite"></s-paragraph>
+              <s-button id="r6d3-meta-dataset-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
+            </s-stack>
+          </div>
         </s-stack>
       </s-section>
     </div>
@@ -292,6 +299,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const metaAcceptancePanel = document.getElementById("r6d3-meta-acceptance");
       const metaAcceptanceButton = document.getElementById("r6d3-meta-run");
       const metaAcceptanceMessage = document.getElementById("r6d3-meta-message");
+      const metaDatasetAcceptanceButton = document.getElementById("r6d3-meta-dataset-run");
+      const metaDatasetAcceptanceMessage = document.getElementById("r6d3-meta-dataset-message");
       const acceptancePanel = document.getElementById("r6d2-klaviyo-acceptance");
       const acceptanceButton = document.getElementById("r6d2-klaviyo-run");
       const acceptanceMessage = document.getElementById("r6d2-klaviyo-message");
@@ -425,6 +434,22 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             metaAcceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "META_PREFLIGHT_FAILED";
             metaAcceptanceButton.disabled = false;
           } finally { metaAcceptanceButton.loading = false; }
+        });
+        metaDatasetAcceptanceButton.addEventListener("click", async () => {
+          metaDatasetAcceptanceButton.disabled = true;
+          metaDatasetAcceptanceButton.loading = true;
+          metaDatasetAcceptanceMessage.textContent = "Running one controlled Dataset V2 acceptance…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/meta/runtime/acceptance", {
+              method: "POST",
+              body: JSON.stringify({confirmation: "RUN_R6_D3_E_META_WRITE"}),
+            });
+            metaDatasetAcceptanceMessage.textContent = result.status === "PASS_R6_D3_E_META_DATASET_WRITE"
+              ? "PASS — attempted: " + result.attempted + ", persisted: " + result.persisted + ", verified empty: " + result.empty_provider_result + "."
+              : "The Dataset V2 acceptance result could not be verified.";
+          } catch (error) {
+            metaDatasetAcceptanceMessage.textContent = (/^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "META_DATASET_ACCEPTANCE_FAILED") + ". Do not retry; review runtime evidence.";
+          } finally { metaDatasetAcceptanceButton.loading = false; }
         });
       }
       document.querySelectorAll("s-button[data-provider]").forEach((button) => button.addEventListener("click", async () => {

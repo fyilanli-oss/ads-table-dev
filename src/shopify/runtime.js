@@ -28,6 +28,7 @@ const {createKlaviyoMetricBinding} = require("../providers/klaviyo/metric-bindin
 const {createKlaviyoControlledDatasetAcceptance} = require("../providers/klaviyo/controlled-dataset-acceptance");
 const {createKlaviyoTokenLifecycle} = require("../providers/klaviyo/token-lifecycle");
 const {createMetaReadOnlyPreflight} = require("../providers/meta/read-only-preflight");
+const {createMetaControlledDatasetAcceptance} = require("../providers/meta/controlled-dataset-acceptance");
 const {WorkspaceSupabaseDatasetRepository} = require("../../funnel-core/workspace-supabase-dataset-repository");
 
 function enabled(value) {
@@ -191,6 +192,16 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         : adapters.meta
           ? {execute: async () => {throw Object.assign(new Error("META_PREFLIGHT_NOT_CONFIGURED"), {code: "META_PREFLIGHT_NOT_CONFIGURED", status: 503});}}
           : null,
+      metaDatasetAcceptance: adapters.meta && typeof resolveFxRate === "function"
+        ? createMetaControlledDatasetAcceptance({
+          connectionStore,
+          settingsStore,
+          transport: fetchImpl,
+          graphVersion: env.META_GRAPH_VERSION || "v20.0",
+          resolveFxRate,
+          repository: new WorkspaceSupabaseDatasetRepository(supabaseAdmin),
+        })
+        : null,
     });
   }
   return Object.freeze({enabled: true, providerOAuthEnabled, providerOAuthRequested, providerAvailability});

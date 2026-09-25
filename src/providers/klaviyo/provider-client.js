@@ -8,6 +8,9 @@ const REVISION = '2026-07-15';
 const STATISTICS = Object.freeze([
   'delivered', 'clicks_unique', 'opens_unique', 'conversions', 'conversion_value', 'text_message_spend'
 ]);
+const MAX_RATE_LIMIT_RETRIES = 2;
+const MAX_RATE_LIMIT_WAIT_MS = 10000;
+const RATE_LIMIT_JITTER_MS = 250;
 
 function required(value, field) {
   if (typeof value !== 'string' || value.trim() === '') throw new TypeError(`${field} is required`);
@@ -97,32 +100,55 @@ function metricCandidate(item) {
   });
 }
 
-function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId = null, now = () => new Date() } = {}) {
+function createKlaviyoProviderClient({
+  fetchImpl = fetch,
+  conversionMetricId = null,
+  now = () => new Date(),
+  sleepImpl = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
+  random = Math.random,
+} = {}) {
   const defaultMetricId = typeof conversionMetricId === 'string' && conversionMetricId.trim()
     ? conversionMetricId.trim() : null;
 
   async function request(accessToken, path, options = {}) {
-    const response = await fetchImpl(`${API_BASE}${path}`, {
-      ...options,
-      redirect: 'error', signal: AbortSignal.timeout(20000),
-      headers: {
-        Authorization: `Bearer ${required(accessToken, 'accessToken')}`,
-        accept: 'application/vnd.api+json', revision: REVISION,
-        ...(options.body ? { 'content-type': 'application/vnd.api+json' } : {}),
-        ...(options.headers || {}),
-      },
-    });
-    if (response.status === 401 || response.status === 403) throw new Error('KLAVIYO_REAUTHORIZE');
-    if (!response.ok) {
+    for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt += 1) {
+      const response = await fetchImpl(`${API_BASE}${path}`, {
+        ...options,
+        redirect: 'error', signal: AbortSignal.timeout(20000),
+        headers: {
+          Authorization: `Bearer ${required(accessToken, 'accessToken')}`,
+          accept: 'application/vnd.api+json', revision: REVISION,
+          ...(options.body ? { 'content-type': 'application/vnd.api+json' } : {}),
+          ...(options.headers || {}),
+        },
+      });
+      if (response.status === 401 || response.status === 403) throw new Error('KLAVIYO_REAUTHORIZE');
+      if (response.ok) {
+        try { return await response.json(); }
+        catch { throw new Error('KLAVIYO_PROVIDER_RESPONSE_INVALID'); }
+      }
+
       console.warn('[klaviyo] provider request failed', {
         method: options.method || 'GET',
         path: new URL(path, API_BASE).pathname,
         status: response.status,
       });
-      throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
+      if (response.status !== 429 || attempt === MAX_RATE_LIMIT_RETRIES) {
+        throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
+      }
+
+      const retryAfter = response.headers?.get?.('retry-after');
+      if (typeof retryAfter !== 'string' || !/^\d+$/.test(retryAfter.trim())) {
+        throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
+      }
+      const providerDelay = Number(retryAfter.trim()) * 1000;
+      const delay = (providerDelay * (2 ** attempt)) + Math.floor(random() * RATE_LIMIT_JITTER_MS);
+      if (!Number.isSafeInteger(delay) || delay < providerDelay || delay > MAX_RATE_LIMIT_WAIT_MS) {
+        throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
+      }
+      await sleepImpl(delay);
     }
-    try { return await response.json(); }
-    catch { throw new Error('KLAVIYO_PROVIDER_RESPONSE_INVALID'); }
+    throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
   }
 
   async function fetchAccount({ accessToken, accountId } = {}) {
@@ -173,12 +199,10 @@ function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId = n
     validateTimeZone(account?.timezone);
     const dailyWindow = { start: zonedInstant(providerDate, account.timezone), end: zonedInstant(providerDate, account.timezone, true) };
     const monthlyWindow = { start: zonedInstant(monthStart(providerDate), account.timezone), end: dailyWindow.end };
-    const [dailyCampaign, dailyFlow, monthlyCampaign, monthlyFlow] = await Promise.all([
-      report(accessToken, 'campaign', dailyWindow, conversionMetricIdInput),
-      report(accessToken, 'flow', dailyWindow, conversionMetricIdInput),
-      report(accessToken, 'campaign', monthlyWindow, conversionMetricIdInput),
-      report(accessToken, 'flow', monthlyWindow, conversionMetricIdInput),
-    ]);
+    const dailyCampaign = await report(accessToken, 'campaign', dailyWindow, conversionMetricIdInput);
+    const dailyFlow = await report(accessToken, 'flow', dailyWindow, conversionMetricIdInput);
+    const monthlyCampaign = await report(accessToken, 'campaign', monthlyWindow, conversionMetricIdInput);
+    const monthlyFlow = await report(accessToken, 'flow', monthlyWindow, conversionMetricIdInput);
     const monthly = new Map([...monthlyCampaign, ...monthlyFlow].map(row => [row.key, row]));
     const periodClosed = providerDate.slice(0, 7) < businessDateFromTimestamp(now(), account.timezone).slice(0, 7);
     const rows = [...dailyCampaign, ...dailyFlow].map(row => {

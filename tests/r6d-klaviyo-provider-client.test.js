@@ -5,8 +5,13 @@ const assert = require('node:assert/strict');
 const { SPECS } = require('../src/shopify/embedded-provider-strategies');
 const { createKlaviyoProviderClient, zonedInstant } = require('../src/providers/klaviyo/provider-client');
 
-function response(payload, status = 200) {
-  return { ok: status >= 200 && status < 300, status, json: async () => payload };
+function response(payload, status = 200, headers = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: name => headers[String(name).toLowerCase()] ?? null },
+    json: async () => payload,
+  };
 }
 
 test('Klaviyo OAuth requests the documented Flow reporting scope', () => {
@@ -108,4 +113,47 @@ test('Klaviyo metric discovery paginates and returns only exact provider-reporte
 test('Klaviyo metric discovery rejects pagination outside the provider origin', async () => {
   const client = createKlaviyoProviderClient({ fetchImpl: async () => response({ data: [], links: { next: 'https://attacker.invalid/steal' } }) });
   await assert.rejects(client.fetchPlacedOrderMetricCandidates({ accessToken: 'secret' }), /KLAVIYO_METRIC_PAGINATION_INVALID/);
+});
+test('Klaviyo reporting serializes campaign and flow requests to avoid burst rate limits', async () => {
+  let active = 0;
+  let maxActive = 0;
+  const fetchImpl = async () => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise(resolve => setImmediate(resolve));
+    active -= 1;
+    return response({ data: { attributes: { results: [] } } });
+  };
+  const client = createKlaviyoProviderClient({ fetchImpl, conversionMetricId: 'metric-1' });
+  const result = await client.fetchMessageFacts({
+    accessToken: 'secret',
+    account: { id: 'account-1', currency: 'USD', timezone: 'UTC' },
+    providerDate: '2026-09-24',
+  });
+  assert.equal(maxActive, 1);
+  assert.deepEqual(result, { rows: [], verified_empty: true });
+});
+
+test('Klaviyo provider client respects Retry-After before retrying a 429 response', async () => {
+  let calls = 0;
+  const waits = [];
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) return response({}, 429, { 'retry-after': '1' });
+    return response({ data: { attributes: { results: [] } } });
+  };
+  const client = createKlaviyoProviderClient({
+    fetchImpl,
+    conversionMetricId: 'metric-1',
+    sleepImpl: async milliseconds => { waits.push(milliseconds); },
+    random: () => 0,
+  });
+  const result = await client.fetchMessageFacts({
+    accessToken: 'secret',
+    account: { id: 'account-1', currency: 'USD', timezone: 'UTC' },
+    providerDate: '2026-09-24',
+  });
+  assert.equal(calls, 5);
+  assert.deepEqual(waits, [1000]);
+  assert.deepEqual(result, { rows: [], verified_empty: true });
 });

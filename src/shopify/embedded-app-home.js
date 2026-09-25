@@ -3,7 +3,7 @@
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 const {initializeAdAccounts} = require("./ad-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "r7a-v2";
+const EMBEDDED_HOME_RELEASE = "r6d2-read-only-preflight";
 
 function escapeAttribute(value) {
   return String(value)
@@ -230,6 +230,15 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
   <s-page heading="Data sources">
     <s-link slot="breadcrumb-actions" href="/shopify/app">Home</s-link>
     <s-banner id="status" heading="Data sources" tone="info" hidden></s-banner>
+    <div id="r6d2-klaviyo-acceptance" hidden>
+      <s-section heading="Klaviyo acceptance check">
+        <s-stack gap="base">
+          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs. It does not write Dataset V2.</s-paragraph>
+          <s-paragraph id="r6d2-klaviyo-message" aria-live="polite"></s-paragraph>
+          <s-button id="r6d2-klaviyo-run" variant="primary">Run read-only acceptance</s-button>
+        </s-stack>
+      </s-section>
+    </div>
     <div id="currency-setup" hidden>
       <s-section heading="Finish setup">
         <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
@@ -257,6 +266,10 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const currency = document.getElementById("reporting-currency");
       const saveCurrency = document.getElementById("save-reporting-currency");
       const currencyMessage = document.getElementById("platforms-currency-message");
+      const acceptancePanel = document.getElementById("r6d2-klaviyo-acceptance");
+      const acceptanceButton = document.getElementById("r6d2-klaviyo-run");
+      const acceptanceMessage = document.getElementById("r6d2-klaviyo-message");
+      const params = new URLSearchParams(location.search);
       const sessionRequest = async (path, options = {}) => {
         if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
         const token = await window.shopify.idToken();
@@ -298,6 +311,23 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           currencyMessage.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Currency is already configured. Reload Data sources." : "Please choose a supported currency and try again.";
         } finally { saveCurrency.disabled = false; saveCurrency.loading = false; }
       });
+      if (params.get("acceptance") === "r6d2-klaviyo") {
+        acceptancePanel.hidden = false;
+        acceptanceButton.addEventListener("click", async () => {
+          acceptanceButton.disabled = true;
+          acceptanceButton.loading = true;
+          acceptanceMessage.textContent = "Running the read-only checks…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"});
+            acceptanceMessage.textContent = result.status === "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT"
+              ? "PASS — Account, Campaign, Flow, Time and FX checks succeeded. Dataset V2 writes: 0."
+              : "The acceptance result could not be verified.";
+          } catch (error) {
+            acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
+            acceptanceButton.disabled = false;
+          } finally { acceptanceButton.loading = false; }
+        });
+      }
       document.querySelectorAll("s-button[data-provider]").forEach((button) => button.addEventListener("click", async () => {
         button.disabled = true;
         button.loading = true;
@@ -324,7 +354,6 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           button.loading = false;
         }
       }));
-      const params = new URLSearchParams(location.search);
       loadSettings();
       if (params.has("oauth_connected")) {
         status.setAttribute("heading", "Provider authorized");

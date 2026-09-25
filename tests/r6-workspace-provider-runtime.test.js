@@ -74,9 +74,12 @@ test('R6 preflight is read-only and fail-closed', () => {
   assert.doesNotMatch(sql, /\b(insert|update|delete|alter|drop|create|truncate)\b/i);
 });
 
-test('Execution Plan keeps R6-D2-C1 application deployment closed after the migration pass', () => {
+test('Execution Plan advances R6-D2 from the C1 deployment pass to the frozen C2-C7 acceptance sequence', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2-C1 repository corrective prepared, production closed/);
+  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2-C1 migration \+ application deployment PASS; R6-D2-C2 next/);
+  assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi/);
+  assert.match(plan, /R6-D2-C7 postcheck ve Klaviyo PASS kararı/);
+  assert.match(plan, /tamamlanmış E4\/E5\/E7 adapter, mapping ve Dataset V2 yapıları yeniden geliştirilmez/i);
   assert.match(plan, /R7-A.*R6-D/i);
   assert.match(plan, /R7-A merchant acceptance PASS; R6-D next; R7-B blocked by R6-D/i);
   assert.doesNotMatch(plan, /\| R7 \|[^\n]+`Blocked by R5–R6`/);

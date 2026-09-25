@@ -79,4 +79,6 @@ Token, authorization code, hesap ID'si, workspace ID'si, kullanıcı ID'si veya 
 
 ## Durum
 
-`Prepared locally — not deployed, not executed, production merchant acceptance pending`
+`Executed PASS — production merchant OAuth completed; one verified Meta account selected; Connected state survived reload`
+
+Salt-okunur preflight ve postcheck birlikte `PASS` vermiştir. Canonical Meta bağlantısı `connected` durumuna gelmiş; legacy Meta kayıt sayısı `1 → 1` olarak korunmuş; Dataset V2 Meta satırı, aktif legacy Meta schedule ve açık legacy Meta job sayıları `0` kalmıştır. Redacted aggregate kanıt `docs/security/evidence/R6D3C_META_ACCOUNT_SELECTION_LIVE_ACCEPTANCE_2026-09-25.json` içindedir. Bu sonuç Meta performans verisi okuma veya Dataset V2 aktivasyonu değildir.

@@ -1,8 +1,8 @@
-# R6-D3-C — Meta hesap seçimi kabul hazırlığı
+# R6-D3-C — Meta hesap seçimi canlı kabulü
 
 ## Analist özeti
 
-R6-D3-C için yeni bir hesap seçimi altyapısı kurulmayacaktır. R7-A2 kapsamında hazırlanmış canonical seçim akışı yeniden kullanılacaktır. Bu paket, mevcut parçaların Execution Plan'daki Meta kabul şartlarını birlikte karşıladığını kanıtlar ve canlı merchant kabulü için sınırı dondurur.
+R6-D3-C için yeni bir hesap seçimi altyapısı kurulmamıştır. R7-A2 kapsamında hazırlanmış canonical seçim akışı yeniden kullanılmış; gerçek Shopify merchant oturumunda OAuth, hesap seçimi, `Connected · 1 account` görünümü ve reload kalıcılığı doğrulanmıştır. Bu PASS yalnız bağlantı ve hesap seçimi içindir; Meta performans verisi veya Dataset V2 kabulü değildir.
 
 ## Neden gerekli?
 
@@ -47,7 +47,7 @@ OAuth izni, kullanıcının hangi Meta reklam hesaplarını AdsTable'a bağlamak
 8. Database bağlı Meta kaydında 1–3 `selected_accounts` zorunluluğunu korur.
 9. Bu paket provider performans verisi, Dataset V2, schedule veya backfill başlatmaz.
 
-## Canlı kabulte kanıtlanacaklar
+## Canlı kabulde kanıtlananlar
 
 1. Shopify Data sources içinden temiz Meta OAuth başlatılır.
 2. OAuth sonrası Meta hesap seçim modalı açılır.
@@ -57,9 +57,9 @@ OAuth izni, kullanıcının hangi Meta reklam hesaplarını AdsTable'a bağlamak
 6. Supabase postcheck yalnız canonical Meta bağlantısının doğrulanmış hesap kapsamıyla `connected` olduğunu gösterir.
 7. Dataset V2, schedule ve backfill sayıları değişmez.
 
-## Canlı kabul hazırlığı
+## Canlı kabul sonucu
 
-Merchant kabulünü tek geçişte ve tahmin yürütmeden yapabilmek için aşağıdaki yerel hazırlıklar tamamlanmıştır:
+Merchant kabulü aşağıdaki hazırlanmış kontrollerle tek geçişte yürütülmüştür:
 
 - Analist koşucusu: `docs/R6D3C_META_PRODUCTION_MERCHANT_ACCEPTANCE_RUNBOOK.md`
 - Salt-okunur ön kontrol: `docs/security/sql/R6D3C_META_ACCOUNT_SELECTION_PREFLIGHT.sql`
@@ -67,11 +67,12 @@ Merchant kabulünü tek geçişte ve tahmin yürütmeden yapabilmek için aşağ
 
 Ön kontrol canonical Meta kaydının temiz başlangıçta olduğunu; son kontrol ise yalnız doğrulanmış 1–3 hesabın `connected` kayda dönüştüğünü ölçer. İki sorgu da Dataset V2 Meta satırlarının, aktif Meta schedule'ın ve açık Meta job'ın `0` kaldığını kontrol eder. Legacy Meta kayıt sayısı başlangıçta kaydedilir ve son kontrolde aynı kalmak zorundadır. Token veya hesap kimliği çıktıya alınmaz; ekran görüntüsü kabul şartı değildir.
 
-Bu hazırlık production'a dağıtılmamış ve çalıştırılmamıştır. Dolayısıyla production merchant acceptance hâlâ beklemektedir.
+PR #261 merge edilmiş; production deployment ve `dev.adstable.app` alias eşleşmesi doğrulanmıştır. Salt-okunur preflight `PASS` sonrasında merchant akışı tamamlanmış, bir Meta hesabı seçilmiş ve sayfa yenilendikten sonra `Connected · 1 account` korunmuştur. Salt-okunur postcheck canonical Meta satırını `connected`, seçimi geçerli ve browser grant sayısını `0` olarak doğrulamıştır. Legacy Meta kayıt sayısı `1 → 1`; Dataset V2 Meta satırı, aktif legacy Meta schedule ve açık legacy Meta job sayıları `0` kalmıştır.
+
+Redacted aggregate kanıt: `docs/security/evidence/R6D3C_META_ACCOUNT_SELECTION_LIVE_ACCEPTANCE_2026-09-25.json`
 
 ## Kapsam dışı
 
-- Canlı Meta OAuth ve gerçek hesap seçimi bu repository preflight'ın parçası değildir.
 - Meta Insights/performance çağrısı yoktur.
 - Dataset V2 yazımı yoktur.
 - Schedule/backfill açılmaz.
@@ -80,4 +81,4 @@ Bu hazırlık production'a dağıtılmamış ve çalıştırılmamıştır. Dola
 
 ## Durum
 
-`Repository preflight PASS; production acceptance runner prepared locally — not deployed, not executed`
+`PASS — production merchant OAuth, one verified account selection and reload persistence; Meta data runtime not accepted`

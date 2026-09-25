@@ -6,9 +6,8 @@ begin
   if exists (
     select 1
     from public.performance_dataset_rows_v2
-    where workspace_id is null
   ) then
-    raise exception 'R3C1_BLOCKED_UNBOUND_DATASET_ROWS';
+    raise exception 'R3C1_BLOCKED_DATASET_NOT_EMPTY';
   end if;
 end;
 $$;

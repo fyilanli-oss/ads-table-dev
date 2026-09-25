@@ -91,7 +91,7 @@ test('R3 contract preserves exact workspace tenant and production gates', () => 
 });
 
 test('R3-C1 enforces the workspace tenant before the first Dataset V2 write', () => {
-  assert.match(enforcementMigration, /R3C1_BLOCKED_UNBOUND_DATASET_ROWS/);
+  assert.match(enforcementMigration, /R3C1_BLOCKED_DATASET_NOT_EMPTY/);
   assert.match(enforcementMigration, /alter column workspace_id set not null/i);
   assert.match(enforcementMigration, /drop policy if exists performance_dataset_rows_v2_select_own/i);
   assert.match(enforcementMigration, /revoke select on table public\.performance_dataset_rows_v2 from authenticated/i);

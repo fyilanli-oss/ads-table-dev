@@ -11,7 +11,7 @@
     "workspace_foreign_key": "public.workspaces(id)",
     "legacy_user_id_retained_until": "R10",
     "legacy_user_id_is_optional_in_contract_v2": true,
-    "legacy_user_id_nullable_requires_activation_migration": true,
+    "legacy_user_id_nullable_requires_activation_migration": false,
     "legacy_user_indexes_retained_during_r3a": true,
     "workspace_not_null_requires_later_gate": false,
     "workspace_runtime_cutover_package": "R6",
@@ -98,7 +98,7 @@
     "dependency_correction": {
       "r4_unblocked_after": "R3-A_and_R3-B",
       "r3c_runs_after": "R6_D2_C6_first_attempt_failed_before_write_and_user_moved_R3C1_before_retry",
-      "reason": "R3-C NOT NULL enforcement cannot precede the R6 writer cutover it must validate"
+      "reason": "The first controlled C6 attempt failed before persistence with zero rows; the user explicitly moved first-write tenant enforcement ahead of diagnosis and retry while rollback remains zero-row safe"
     }
   }
 }

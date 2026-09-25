@@ -90,17 +90,17 @@ test('R6 preflight is read-only and fail-closed', () => {
   assert.doesNotMatch(sql, /\b(insert|update|delete|alter|drop|create|truncate)\b/i);
 });
 
-test('Execution Plan records C5 live PASS and C6-A without claiming a production write', () => {
+test('Execution Plan records the single failed C6 write attempt without claiming Dataset persistence', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2-C1\+C2\+C3\+C4\+C5 live PASS; R6-D2-C6-A controlled write gate prepared/);
+  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2-C1\+C2\+C3\+C4\+C5 live PASS; R6-D2-C6-A gate deployed; first write FAILED \/ rows 0/);
   assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS \/ C3 next/);
   assert.match(plan, /R6-D2-C3 salt-okunur satış kaynağı keşfi — Live PASS/);
   assert.match(plan, /R6-D2-C4 canonical satış kaynağı bağı — Live PASS/);
   assert.match(plan, /R6-D2-C5 salt-okunur Klaviyo runtime preflight — Live PASS/);
-  assert.match(plan, /R6-D2-C6 kontrollü Dataset V2 canlı kabulü — C6-A gate prepared \/ production write not executed/);
-  assert.match(plan, /Production write ayrı açık onay almadan çalıştırılmaz/);
+  assert.match(plan, /R6-D2-C6 kontrollü Dataset V2 canlı kabulü — C6-A deployed \/ first live attempt FAILED \/ Dataset V2 rows `0`/);
+  assert.match(plan, /R3-C1 tenant enforcement C6-B güvenli aşama teşhisinden ve ikinci production write onayından önceye alındı/);
   assert.match(plan, /R6-D2-C7 postcheck ve Klaviyo PASS kararı/);
-  assert.match(plan, /tamamlanmış E4\/E5\/E7 yapıları yeniden geliştirilmez/i);
+  assert.match(plan, /tamamlanmış E4\/E5\/E7.*yeniden geliştirilmez/i);
   assert.match(plan, /R7-A.*R6-D/i);
   assert.match(plan, /R7-A merchant acceptance PASS; R6-D next; R7-B blocked by R6-D/i);
   assert.doesNotMatch(plan, /\| R7 \|[^\n]+`Blocked by R5–R6`/);

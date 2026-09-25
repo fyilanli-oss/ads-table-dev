@@ -304,7 +304,8 @@ test('R3 security scripts preserve a fail-closed live gate', () => {
 test('Execution Plan moves first-write tenant enforcement ahead of the C6 retry without activating providers', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
   assert.match(plan, /R3-A\+B\+C1 Done; first-write tenant enforcement live PASS/);
-  assert.match(plan, /R3-C1.*ilk Dataset V2 satırından önce/i);
+  assert.match(plan, /20260925103312_r3c1_dataset_workspace_first_write_enforcement/);
+  assert.match(plan, /postcheck `PASS` verdi: Dataset V2 `0` satır kaldı/);
   assert.match(plan, /first write FAILED \/ rows 0/);
   assert.match(plan, /C6 ilk canlı deneme HTTP `503`.*Dataset V2 upsert oluşmadı.*satır sayısı `0`/i);
   assert.match(plan, /Done \/ R4-A\+B\+C/);

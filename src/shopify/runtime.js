@@ -25,6 +25,8 @@ const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
 const {createKlaviyoProviderClient} = require("../providers/klaviyo/provider-client");
 const {createKlaviyoReadOnlyPreflight} = require("../providers/klaviyo/read-only-preflight");
 const {createKlaviyoMetricBinding} = require("../providers/klaviyo/metric-binding");
+const {createKlaviyoControlledDatasetAcceptance} = require("../providers/klaviyo/controlled-dataset-acceptance");
+const {WorkspaceSupabaseDatasetRepository} = require("../../funnel-core/workspace-supabase-dataset-repository");
 
 function enabled(value) {
   if (value === undefined || value === "") return false;
@@ -128,6 +130,15 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           resolveFxRate,
         })
         : {execute: async () => {throw Object.assign(new Error("KLAVIYO_PREFLIGHT_NOT_CONFIGURED"), {code: "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", status: 503});}};
+      const datasetAcceptance = typeof resolveFxRate === "function"
+        ? createKlaviyoControlledDatasetAcceptance({
+          connectionStore,
+          settingsStore,
+          providerClient,
+          resolveFxRate,
+          repository: new WorkspaceSupabaseDatasetRepository(supabaseAdmin),
+        })
+        : null;
       registerShopifyKlaviyoAccountRoutes(app, {
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createKlaviyoAccountSelection({
@@ -137,6 +148,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
       }),
       preflight,
+      datasetAcceptance,
       metricBinding: createKlaviyoMetricBinding({connectionStore, providerClient}),
       });
     }

@@ -107,3 +107,24 @@ test('R6-D2 metric discovery and selection routes remain Shopify-session-bound',
     ['select', authority, { metric_id: 'metric-1', workspace_id: 'attacker' }],
   ]);
 });
+
+test('R6-D2 C6 controlled Dataset acceptance route is session-bound and forwards only confirmation', async () => {
+  const routes = {};
+  const app = { get() {}, post: (path, handler) => { routes[path] = handler; } };
+  let received;
+  registerShopifyKlaviyoAccountRoutes(app, {
+    authenticateEmbedded: async ({ session_token }) => { assert.equal(session_token, 'session'); return authority; },
+    selection: {},
+    datasetAcceptance: { execute: async (input, confirmation) => {
+      received = { input, confirmation };
+      return { status: 'PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE', attempted: 0, persisted: 0 };
+    } },
+  });
+  const res = { set() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return body; } };
+  await routes['/api/shopify/providers/klaviyo/runtime/acceptance']({
+    get: () => 'Bearer session',
+    body: { confirmation: 'RUN_R6_D2_C6_KLAVIYO_WRITE', workspace_id: 'attacker', provider_date: '2099-01-01' },
+  }, res);
+  assert.deepEqual(received, { input: authority, confirmation: 'RUN_R6_D2_C6_KLAVIYO_WRITE' });
+  assert.equal(res.code, 200);
+});

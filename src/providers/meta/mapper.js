@@ -1,6 +1,7 @@
 'use strict';
 
 const { validateCanonicalRow } = require('../../../funnel-core/canonical-contract');
+const { validateWorkspaceCanonicalRow } = require('../../../funnel-core/workspace-canonical-contract');
 const { buildEntityKey, validateEntityHierarchy } = require('../../../funnel-core/entity-hierarchy');
 const { META_CAPABILITIES } = require('./capabilities');
 
@@ -27,8 +28,11 @@ function supported(value) { return value === null ? 'unknown' : 'supported'; }
 function mapMetaInsight(insight, context) {
   if (!insight || typeof insight !== 'object' || Array.isArray(insight)) throw new TypeError('Meta insight is required');
   if (!context || typeof context !== 'object' || Array.isArray(context)) throw new TypeError('Meta mapping context is required');
+  const workspaceMode = context.workspaceId !== undefined && context.workspaceId !== null;
   const identity = {
-    user_id: text(context.userId, 'context.userId'), platform: 'meta', traffic_type: 'paid', source_system: 'meta_ads', channel: null,
+    user_id: workspaceMode ? null : text(context.userId, 'context.userId'),
+    ...(workspaceMode ? { workspace_id: text(context.workspaceId, 'context.workspaceId') } : {}),
+    platform: 'meta', traffic_type: 'paid', source_system: 'meta_ads', channel: null,
     platform_account_id: text(context.accountId, 'context.accountId'), date: text(context.businessDate || insight.date_start, 'context.businessDate')
   };
   const entity = {
@@ -75,7 +79,8 @@ function mapMetaInsight(insight, context) {
     provenance: { source_system: 'meta_ads', adapter_version: ADAPTER_VERSION, source_confidence: hasUnknown ? 'partial' : hasFallback ? 'fallback' : 'real', synthetic: false,
       ga4_property_id: null, source_job_id: context.sourceJobId || null, raw_reference: { date_start: insight.date_start || null, date_stop: insight.date_stop || null, metric_sources: metricSources } }
   };
-  validateCanonicalRow(row); validateEntityHierarchy(identity, entity);
+  if (workspaceMode) validateWorkspaceCanonicalRow(row); else validateCanonicalRow(row);
+  validateEntityHierarchy(identity, entity);
   return Object.freeze({ row, entityKey: buildEntityKey(identity, entity) });
 }
 

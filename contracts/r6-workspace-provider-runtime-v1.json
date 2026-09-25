@@ -1,6 +1,6 @@
 {
   "contract_version": "r6-workspace-provider-runtime-v1",
-  "status": "R7A_MERCHANT_ACCEPTANCE_PASS_R6D_PREPARATION",
+  "status": "R6_D2_C2_PRODUCT_CONTRACT_PASS_C3_APPROVAL_GATE",
   "canonical_tenant": "workspace_id",
   "active_providers": ["meta", "google_ads", "klaviyo"],
   "parked_providers": ["tiktok", "pinterest"],
@@ -99,7 +99,7 @@
     "provider_contact": false
   },
   "r6d_work_packages": {
-    "status": "R6_D1_COMPLETE_R6_D2_C1_MIGRATION_PASS_APPLICATION_DEPLOYMENT_CLOSED",
+    "status": "R6_D1_COMPLETE_R6_D2_C1_DEPLOYED_R6_D2_C2_PRODUCT_CONTRACT_PASS",
     "sequence": [
       "R6-D1 common fail-closed acceptance runner",
       "R6-D2 Klaviyo workspace live acceptance",
@@ -148,6 +148,21 @@
         "integration_provenance_required": true,
         "zero_or_multiple_candidates_are_not_auto_selected": true
       },
+      "sales_source_product_contract": {
+        "result": "PASS_CONTRACT_ONLY",
+        "merchant_sees_technical_metric_id": false,
+        "single_verified_candidate": "read_only_summary_in_monthly_plan_cost_final_confirmation",
+        "multiple_verified_candidates": "single_choice_by_safe_integration_or_store_provenance",
+        "zero_verified_candidates": "fail_closed_not_connected",
+        "normal_setup_frequency": "once_per_connection_binding",
+        "repeat_only_on": ["reconnect", "account_change", "provider_binding_invalid", "explicit_settings_change"],
+        "monthly_plan_cost_change_resets_sales_source": false,
+        "separate_screen_for_single_candidate": false,
+        "provider_contact": false,
+        "database_write": false,
+        "dataset_v2_write": false,
+        "new_adapter_mapping_or_formula": false
+      },
       "metric_binding_migration": "supabase/migrations/20260925072801_add_workspace_provider_conversion_metric.sql",
       "metric_binding_migration_applied": true,
       "metric_binding_live_postcheck": {
@@ -177,5 +192,5 @@
       "corrective_deployment_performed": false
     }
   },
-  "next_gate": "R6-D2-C1_application_deployment_review_and_explicit_approval"
+  "next_gate": "R6-D2-C3_read_only_sales_source_discovery_review_and_explicit_approval"
 }

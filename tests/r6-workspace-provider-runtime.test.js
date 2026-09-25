@@ -18,7 +18,7 @@ test('R6 contract keeps workspace authority independent from commerce channel', 
 });
 
 test('R6 live preflight records preparation-only state without claiming activation', () => {
-  assert.equal(contract.status, 'R7A_MERCHANT_ACCEPTANCE_PASS_R6D_PREPARATION');
+  assert.equal(contract.status, 'R6_D2_C2_PRODUCT_CONTRACT_PASS_C3_APPROVAL_GATE');
   assert.equal(contract.live_preflight.result, 'PASS_PREPARATION_ONLY');
   assert.equal(contract.live_preflight.dataset_v2_rows, 0);
   assert.equal(contract.live_preflight.canonical_connection_rows, 0);
@@ -29,7 +29,7 @@ test('R6 live preflight records preparation-only state without claiming activati
 });
 
 test('R6-D is provider-by-provider and repository preparation grants no live authority', () => {
-  assert.equal(contract.r6d_work_packages.status, 'R6_D1_COMPLETE_R6_D2_C1_MIGRATION_PASS_APPLICATION_DEPLOYMENT_CLOSED');
+  assert.equal(contract.r6d_work_packages.status, 'R6_D1_COMPLETE_R6_D2_C1_DEPLOYED_R6_D2_C2_PRODUCT_CONTRACT_PASS');
   assert.deepEqual(contract.r6d_work_packages.sequence, [
     'R6-D1 common fail-closed acceptance runner',
     'R6-D2 Klaviyo workspace live acceptance',
@@ -47,7 +47,23 @@ test('R6-D is provider-by-provider and repository preparation grants no live aut
   assert.equal(contract.r6d_work_packages.r6_d2.current_connection, 'connected_merchant_confirmed');
   assert.equal(contract.r6d_work_packages.r6_d2.provider_contact, false);
   assert.equal(contract.r6d_work_packages.r6_d2.dataset_v2_write, false);
-  assert.equal(contract.next_gate, 'R6-D2-C1_application_deployment_review_and_explicit_approval');
+  assert.equal(contract.next_gate, 'R6-D2-C3_read_only_sales_source_discovery_review_and_explicit_approval');
+});
+
+test('R6-D2-C2 freezes merchant-facing Klaviyo sales-source behavior without execution', () => {
+  const ux = contract.r6d_work_packages.r6_d2.sales_source_product_contract;
+  assert.equal(ux.result, 'PASS_CONTRACT_ONLY');
+  assert.equal(ux.merchant_sees_technical_metric_id, false);
+  assert.equal(ux.single_verified_candidate, 'read_only_summary_in_monthly_plan_cost_final_confirmation');
+  assert.equal(ux.multiple_verified_candidates, 'single_choice_by_safe_integration_or_store_provenance');
+  assert.equal(ux.zero_verified_candidates, 'fail_closed_not_connected');
+  assert.equal(ux.separate_screen_for_single_candidate, false);
+  assert.equal(ux.monthly_plan_cost_change_resets_sales_source, false);
+  assert.deepEqual(ux.repeat_only_on, ['reconnect', 'account_change', 'provider_binding_invalid', 'explicit_settings_change']);
+  assert.equal(ux.provider_contact, false);
+  assert.equal(ux.database_write, false);
+  assert.equal(ux.dataset_v2_write, false);
+  assert.equal(ux.new_adapter_mapping_or_formula, false);
 });
 
 test('R6 resolves the R6-R7 dependency cycle without early provider activation', () => {
@@ -76,8 +92,8 @@ test('R6 preflight is read-only and fail-closed', () => {
 
 test('Execution Plan advances R6-D2 from the C1 deployment pass to the frozen C2-C7 acceptance sequence', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2-C1 migration \+ application deployment PASS; R6-D2-C2 next/);
-  assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi/);
+  assert.match(plan, /R6-A\+B\+C\+D1 Done; R6-D2-C1 deployment PASS; R6-D2-C2 product contract PASS; R6-D2-C3 next/);
+  assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS \/ C3 next/);
   assert.match(plan, /R6-D2-C7 postcheck ve Klaviyo PASS kararı/);
   assert.match(plan, /tamamlanmış E4\/E5\/E7 adapter, mapping ve Dataset V2 yapıları yeniden geliştirilmez/i);
   assert.match(plan, /R7-A.*R6-D/i);

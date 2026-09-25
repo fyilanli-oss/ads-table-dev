@@ -45,5 +45,5 @@ test('R6-C contract records live schema acceptance without provider activation',
   assert.equal(contract.r6c_activation_migration.postcheck_result, 'PASS');
   assert.equal(contract.r6c_activation_migration.provider_runtime_activated, false);
   assert.equal(contract.r6b_runtime_boundary.production_registered, false);
-  assert.equal(contract.next_gate, 'R6-D3-E_META_PRODUCTION_CONTROLLED_DATASET_ACCEPTANCE');
+  assert.equal(contract.next_gate, 'R6-D4_GOOGLE_ADS_ANALYST_BRIEF');
 });

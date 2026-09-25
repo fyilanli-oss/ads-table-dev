@@ -113,7 +113,14 @@ function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId = n
       },
     });
     if (response.status === 401 || response.status === 403) throw new Error('KLAVIYO_REAUTHORIZE');
-    if (!response.ok) throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
+    if (!response.ok) {
+      console.warn('[klaviyo] provider request failed', {
+        method: options.method || 'GET',
+        path: new URL(path, API_BASE).pathname,
+        status: response.status,
+      });
+      throw new Error('KLAVIYO_PROVIDER_UNAVAILABLE');
+    }
     try { return await response.json(); }
     catch { throw new Error('KLAVIYO_PROVIDER_RESPONSE_INVALID'); }
   }
@@ -131,7 +138,7 @@ function createKlaviyoProviderClient({ fetchImpl = fetch, conversionMetricId = n
   }
 
   async function fetchPlacedOrderMetricCandidates({ accessToken } = {}) {
-    let path = '/api/metrics/?fields[metric]=name,integration&page[size]=200';
+    let path = '/api/metrics/?fields[metric]=name,integration';
     const candidates = new Map();
     for (let page = 0; page < 100 && path; page += 1) {
       const payload = await request(accessToken, path);

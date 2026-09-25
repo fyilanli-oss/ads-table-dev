@@ -102,6 +102,7 @@ test('Klaviyo metric discovery paginates and returns only exact provider-reporte
     { id: 'metric-b', name: 'Placed Order', integration_name: 'WooCommerce', integration_category: 'Ecommerce' },
   ]);
   assert.equal(calls.length, 2);
+  assert.equal(calls[0], 'https://a.klaviyo.com/api/metrics/?fields[metric]=name,integration');
 });
 
 test('Klaviyo metric discovery rejects pagination outside the provider origin', async () => {

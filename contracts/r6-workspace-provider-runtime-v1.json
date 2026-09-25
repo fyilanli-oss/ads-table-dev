@@ -282,7 +282,7 @@
       "dataset_v2_write": false
     },
     "r6_d3e": {
-      "result": "PASS_REPOSITORY_ONLY_PRODUCTION_ACCEPTANCE_PENDING",
+      "result": "PASS_PRODUCTION_VERIFIED_EMPTY",
       "decision_contract": "contracts/r6d3e-meta-controlled-dataset-acceptance-v1.json",
       "analyst_record": "docs/R6D3E_META_CONTROLLED_DATASET_ACCEPTANCE.md",
       "e4_runtime_reused": true,
@@ -292,11 +292,19 @@
       "existing_row_guard": true,
       "verified_empty_allowed_without_synthetic_rows": true,
       "aggregate_response_only": true,
-      "production_deployed": false,
-      "provider_contact": false,
+      "production_deployed": true,
+      "provider_contact": true,
+      "selected_account_count": 1,
+      "attempted": 0,
+      "persisted": 0,
+      "provider_result_status": "empty",
+      "synthetic_rows_written": 0,
+      "non_empty_physical_upsert_observed": false,
+      "live_postcheck_result": "PASS",
+      "evidence": "docs/security/evidence/R6D3E_META_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-25.json",
       "dataset_v2_write": false,
       "production_activation": false
     }
   },
-  "next_gate": "R6-D3-E_META_PRODUCTION_CONTROLLED_DATASET_ACCEPTANCE"
+  "next_gate": "R6-D4_GOOGLE_ADS_ANALYST_BRIEF"
 }

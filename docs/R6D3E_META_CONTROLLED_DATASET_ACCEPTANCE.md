@@ -33,13 +33,18 @@ Provider doğrulanmış boş sonuç döndürürse `attempted=0`, `persisted=0` v
 - Normal kullanıcı yüzeyi değişmez.
 - Supabase browser grant'i açılmaz; yalnız mevcut server-side repository kullanılır.
 
-## Repository kanıtı
+## Kanıt
 
 - Kontrollü kabul: `src/providers/meta/controlled-dataset-acceptance.js`
 - Session-bound route: `src/routes/shopify-ad-account-routes.js`
 - Gizli operatör yüzeyi: `src/shopify/embedded-app-home.js`
 - Testler: `tests/r6d3e-meta-controlled-dataset-acceptance.test.js`
+- Canlı redacted aggregate kanıt: `docs/security/evidence/R6D3E_META_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-25.json`
 
 ## Durum
 
-`PASS repository only — production deployment ve açık onaylı tek kontrollü Dataset V2 kabulü bekliyor`
+`PASS production verified empty — attempted 0 / persisted 0 / synthetic 0`
+
+PR #265 merge commit `ef0d2cd240b87b626b141111ed5712404fff816d` production'a dağıtıldı. Açık kullanıcı onayıyla tek kontrollü kabul çalıştırıldı ve `PASS — attempted: 0, persisted: 0, verified empty: true` sonucu alındı. Supabase salt-okunur postcheck canonical Meta bağlantısını `connected · 1 account`; Dataset V2 toplam/Meta, aktif Meta schedule, açık Meta job ve browser grant sayılarını `0` olarak doğruladı. Legacy Meta kaydı `1` olarak değişmeden kaldı.
+
+Bu PASS gerçek provider sonucunun güvenli boş-yol kabulüdür. Sahte satır üretilmedi ve production activation açılmadı. Gerçek non-empty fiziksel UPSERT henüz gözlenmemiştir; ilk gerçek Meta satırı geldiğinde mevcut idempotent writer ve evidence sayaçlarıyla ayrıca izlenecektir.

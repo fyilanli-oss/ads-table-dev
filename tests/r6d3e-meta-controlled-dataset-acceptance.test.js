@@ -47,15 +47,20 @@ test('R6-D3-E uses a conservative three-day guard window for account timezones',
   assert.deepEqual(acceptanceDateWindow(now), { from: '2026-09-23', to: '2026-09-25' });
 });
 
-test('R6-D3-E contract reuses completed work and keeps the production gate closed', () => {
-  assert.equal(contract.status, 'PASS_REPOSITORY_ONLY_PRODUCTION_ACCEPTANCE_PENDING');
+test('R6-D3-E contract records the verified-empty production acceptance without inventing writes', () => {
+  assert.equal(contract.status, 'PASS_PRODUCTION_VERIFIED_EMPTY');
   assert.equal(contract.reuse.e4_client_mapper_time_fx, true);
   assert.equal(contract.reuse.new_metric_contract, false);
   assert.equal(contract.controls.verified_empty_writes_synthetic_rows, false);
-  assert.equal(contract.production_deployed, false);
-  assert.equal(contract.provider_contact, false);
+  assert.equal(contract.production_deployed, true);
+  assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
-  assert.equal(contract.next_gate, 'R6-D3-E_META_PRODUCTION_CONTROLLED_DATASET_ACCEPTANCE');
+  assert.equal(contract.live_acceptance.attempted, 0);
+  assert.equal(contract.live_acceptance.persisted, 0);
+  assert.equal(contract.live_acceptance.synthetic_rows_written, 0);
+  assert.equal(contract.live_acceptance.non_empty_physical_upsert_observed, false);
+  assert.equal(contract.live_acceptance.supabase_postcheck, 'PASS');
+  assert.equal(contract.next_gate, 'R6-D4_GOOGLE_ADS_ANALYST_BRIEF');
 });
 
 test('R6-D3-E requires exact action-time confirmation before provider or Dataset access', async () => {

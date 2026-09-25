@@ -1,0 +1,95 @@
+{
+  "contract_version": "r6d3a-meta-connection-lifecycle-v1",
+  "status": "PASS_CONTRACT_ONLY_R6_D3_B_IMPLEMENTATION_GATE",
+  "provider": "meta",
+  "business_outcome": "A Meta connection is owned by the AdsTable workspace, survives only for its verified token lifetime, and cannot appear connected before 1 to 3 verified ad accounts are selected.",
+  "legacy_disposition": {
+    "migrate_to_workspace": false,
+    "delete_legacy_connection": false,
+    "reuse_legacy_access_token": false,
+    "legacy_history_preserved": true,
+    "legacy_schedule_must_remain_inactive": true,
+    "automatic_legacy_job_allowed": false,
+    "reason": "The live legacy Meta row is connected by status but its encrypted access token is expired and no refresh token exists. It is historical evidence, not reusable workspace authority."
+  },
+  "oauth_entry": {
+    "channel": "shopify_embedded",
+    "workspace_authority_resolved_server_side": true,
+    "clean_authorization_required": true,
+    "callback_state_after_token_validation": "pending_account_selection",
+    "callback_may_mark_connected": false
+  },
+  "token_lifecycle": {
+    "authorization_code_exchange_required": true,
+    "server_side_long_lived_exchange_required": true,
+    "refresh_token_expected": false,
+    "invented_refresh_token_logic_forbidden": true,
+    "canonical_expiry_required": true,
+    "canonical_token_storage": "encrypted_envelope_only",
+    "validation_before_save": [
+      "token_is_valid",
+      "token_belongs_to_configured_meta_app",
+      "required_scopes_are_present",
+      "expiry_is_known_and_in_the_future"
+    ],
+    "unsupported_or_failed_renewal_result": "reauthorization_required",
+    "merchant_action_label": "Reconnect Meta"
+  },
+  "account_selection": {
+    "minimum": 1,
+    "maximum": 3,
+    "source": "provider_verified_accounts",
+    "browser_supplied_account_ids_are_authority": false,
+    "server_side_refetch_required": true,
+    "workspace_and_connection_version_match_required": true,
+    "connected_transition": "only_after_successful_verified_account_selection"
+  },
+  "state_flow": [
+    "not_connected",
+    "oauth_in_progress",
+    "token_validated",
+    "pending_account_selection",
+    "connected",
+    "reauthorization_required"
+  ],
+  "fail_closed_rules": [
+    "invalid_app_id_does_not_create_or_update_a_canonical_connection",
+    "invalid_or_expired_token_does_not_create_or_update_a_canonical_connection",
+    "missing_required_scope_does_not_create_or_update_a_canonical_connection",
+    "unknown_expiry_does_not_mark_connected",
+    "zero_or_more_than_three_selected_accounts_does_not_mark_connected",
+    "unverified_account_does_not_mark_connected",
+    "stale_connection_version_cannot_overwrite_a_newer_connection",
+    "legacy_write_schedule_backfill_and_v1_fallback_remain_forbidden"
+  ],
+  "r6_d3_b_scope": [
+    "implement_server_side_meta_long_lived_token_exchange",
+    "implement_meta_token_validation_before_canonical_save",
+    "persist_encrypted_access_token_and_canonical_expiry",
+    "return_pending_account_selection_after_callback",
+    "preserve_existing_1_to_3_provider_verified_account_selection",
+    "surface_controlled_reconnect_meta_state_when_reauthorization_is_required"
+  ],
+  "excluded_until_later_gate": [
+    "meta_performance_api_read",
+    "dataset_v2_write",
+    "schedule_or_backfill",
+    "e4_mapper_time_fx_or_writer_redevelopment",
+    "legacy_token_use_or_deletion",
+    "disconnect_or_provider_revoke",
+    "production_meta_oauth"
+  ],
+  "acceptance_questions": {
+    "legacy_disposition_decided": true,
+    "long_lived_strategy_decided": true,
+    "token_validation_decided": true,
+    "expiry_policy_decided": true,
+    "reauthorization_ui_decided": true,
+    "connected_transition_decided": true,
+    "one_to_three_account_authority_decided": true,
+    "dataset_and_schedule_gate_decided": true
+  },
+  "production_mutation": false,
+  "provider_contact": false,
+  "dataset_v2_write": false
+}

@@ -142,6 +142,14 @@ PR #259 merge commit `9039180442768a2dab9b80c09d24217d8249588f` post-merge Secur
 
 Supabase salt-okunur postcheck Dataset V2 toplam/Klaviyo satırını `0/0`; connected canonical Klaviyo, access-token expiry, encrypted refresh token ve metric binding sayılarını `1/1/1/1` doğruladı. R6-D2 Klaviyo canlı kabulü PASS ile kapanmıştır. Bu sonuç Meta veya Google Ads'i aktive etmez; sıradaki ayrı kapı R6-D3 Meta analist brief'i ve açık production onayıdır. Redacted kanıt `docs/security/evidence/R6D2C6D_KLAVIYO_LIVE_ACCEPTANCE_2026-09-25.json` içindedir.
 
+### R6-D3-A Meta bağlantı ve token yaşam döngüsü — contract PASS / R6-D3-B implementation gate
+
+Canlı salt-okunur envanter, legacy Meta bağlantısının durum olarak `connected` ve encrypted access token sahibi olmasına karşın expiry'sinin geçmiş olduğunu, refresh token taşımadığını ve active schedule/open job sayısının `0/0` kaldığını gösterdi. Canonical workspace Meta bağlantısı `0`dır. Bu nedenle legacy kayıt tarihsel kanıt olarak korunur; silinmez, canonical workspace'e taşınmaz ve access token'ı yeniden kullanılmaz.
+
+Yeni Meta bağlantısı temiz Shopify embedded OAuth ile başlar. Authorization code server-side token'a çevrildikten sonra supported long-lived access-token exchange uygulanır; token validity, configured Meta app, required scope ve gelecekteki expiry canonical save öncesinde doğrulanır. Meta'nın mevcut OAuth sözleşmesinde bulunmayan bir refresh token akışı uydurulmaz. Yenileme desteklenmiyor veya doğrulama geçmiyorsa kullanıcı kontrollü `Reconnect Meta` durumuna alınır.
+
+Callback yalnız `pending_account_selection` üretir. Bağlantı, server Meta'dan hesap listesini yeniden aldıktan ve kullanıcı en az `1`, en fazla `3` doğrulanmış reklam hesabını seçtikten sonra `Connected` olur. R6-D3-A yalnız plan ve sözleşme kararıdır; provider teması, production OAuth, Dataset V2 yazısı, schedule/backfill, Disconnect/revoke ve tamamlanmış E4 veri motorunun yeniden geliştirilmesi yoktur. Versionlı karar `contracts/r6d3a-meta-connection-lifecycle-v1.json`, analist belgesi `docs/R6D3A_META_CONNECTION_LIFECYCLE_DECISION.md` içindedir.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

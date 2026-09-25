@@ -1,6 +1,6 @@
 {
   "contract_version": "r6-workspace-provider-runtime-v1",
-  "status": "R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_APPROVAL_GATE",
+  "status": "R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_META_CONTRACT_PASS_R6_D3B_IMPLEMENTATION_GATE",
   "canonical_tenant": "workspace_id",
   "active_providers": ["meta", "google_ads", "klaviyo"],
   "parked_providers": ["tiktok", "pinterest"],
@@ -99,7 +99,7 @@
     "provider_contact": false
   },
   "r6d_work_packages": {
-    "status": "R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_APPROVAL_GATE",
+    "status": "R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_META_CONTRACT_PASS_R6_D3B_IMPLEMENTATION_GATE",
     "sequence": [
       "R6-D1 common fail-closed acceptance runner",
       "R6-D2 Klaviyo workspace live acceptance",
@@ -109,7 +109,7 @@
     ],
     "current_live_connection_state": {
       "klaviyo": "live_accepted_verified_empty",
-      "meta": "not_live_accepted",
+      "meta": "r6_d3a_contract_only_not_live_accepted",
       "google_ads": "not_live_accepted"
     },
     "rules": [
@@ -205,7 +205,26 @@
         "production_activation": false,
         "evidence": "docs/security/evidence/R6D2C6D_KLAVIYO_LIVE_ACCEPTANCE_2026-09-25.json"
       }
+    },
+    "r6_d3a": {
+      "result": "PASS_CONTRACT_ONLY",
+      "decision_contract": "contracts/r6d3a-meta-connection-lifecycle-v1.json",
+      "analyst_decision": "docs/R6D3A_META_CONNECTION_LIFECYCLE_DECISION.md",
+      "legacy_connection_migrated": false,
+      "legacy_connection_deleted": false,
+      "legacy_token_reused": false,
+      "clean_embedded_oauth_required": true,
+      "server_side_long_lived_exchange_required": true,
+      "invented_refresh_token_logic_forbidden": true,
+      "token_app_scope_expiry_validation_required": true,
+      "callback_state": "pending_account_selection",
+      "verified_account_selection_minimum": 1,
+      "verified_account_selection_maximum": 3,
+      "connected_before_account_selection": false,
+      "production_mutation": false,
+      "provider_contact": false,
+      "dataset_v2_write": false
     }
   },
-  "next_gate": "R6-D3_META_ANALYST_BRIEF_AND_EXPLICIT_PRODUCTION_APPROVAL"
+  "next_gate": "R6-D3-B_META_TOKEN_LIFECYCLE_IMPLEMENTATION_REVIEW"
 }

@@ -1,0 +1,49 @@
+{
+  "contract_version": "r6d3e-meta-controlled-dataset-acceptance-v1",
+  "status": "PASS_REPOSITORY_ONLY_PRODUCTION_ACCEPTANCE_PENDING",
+  "provider": "meta",
+  "business_outcome": "Prove the final workspace-authoritative Meta to Dataset V2 persistence boundary without schedules, backfill, V1 writes or synthetic rows.",
+  "reuse": {
+    "e4_client_mapper_time_fx": true,
+    "workspace_runner": true,
+    "workspace_canonical_write_boundary": true,
+    "workspace_supabase_repository": true,
+    "new_metric_contract": false,
+    "legacy_meta_writer_used_directly": false
+  },
+  "authority": {
+    "workspace": "verified_shopify_session",
+    "connection": "public.workspace_provider_connections",
+    "reporting_currency": "public.workspace_settings.merchant_selected",
+    "browser_tenant_date_currency_fields_are_authority": false
+  },
+  "controls": {
+    "exact_action_time_confirmation": "RUN_R6_D3_E_META_WRITE",
+    "selected_account_minimum": 1,
+    "selected_account_maximum": 3,
+    "existing_row_guard": "workspace_account_recent_business_date_window",
+    "provider_refetch": true,
+    "verified_rows_only": true,
+    "verified_empty_writes_synthetic_rows": false,
+    "attempted_must_equal_persisted": true,
+    "aggregate_response_only": true,
+    "normal_data_sources_ui_changed": false,
+    "operator_surface": "/shopify/app/platforms?acceptance=r6d3-meta"
+  },
+  "accepted_outcomes": {
+    "non_empty": "real verified rows persist with attempted equal persisted",
+    "empty": "attempted 0, persisted 0, no synthetic rows; physical non-empty upsert remains unobserved"
+  },
+  "excluded": [
+    "schedule",
+    "backfill",
+    "production_activation",
+    "v1_snapshot_write",
+    "new_metric_or_mapper",
+    "google_ads_runtime"
+  ],
+  "production_deployed": false,
+  "provider_contact": false,
+  "dataset_v2_write": false,
+  "next_gate": "R6-D3-E_META_PRODUCTION_CONTROLLED_DATASET_ACCEPTANCE"
+}

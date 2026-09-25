@@ -1,9 +1,9 @@
 "use strict";
 
 const {bearerToken} = require("./shopify-auth-routes");
-const SAFE_ERRORS = new Set(["INVALID_PLAN_COST", "INVALID_ACCOUNT", "KLAVIYO_REAUTHORIZE", "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", "KLAVIYO_UNAVAILABLE", "KLAVIYO_RESET_CONFIRMATION_REQUIRED", "KLAVIYO_DISCONNECT_CONFIRMATION_REQUIRED", "KLAVIYO_REAUTHORIZATION_REQUIRED", "KLAVIYO_REVOKE_FAILED", "CONNECTION_CHANGED"]);
+const SAFE_ERRORS = new Set(["INVALID_PLAN_COST", "INVALID_ACCOUNT", "KLAVIYO_REAUTHORIZE", "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", "KLAVIYO_UNAVAILABLE", "KLAVIYO_RESET_CONFIRMATION_REQUIRED", "KLAVIYO_DISCONNECT_CONFIRMATION_REQUIRED", "KLAVIYO_REAUTHORIZATION_REQUIRED", "KLAVIYO_REVOKE_FAILED", "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", "KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED", "KLAVIYO_PREFLIGHT_CURRENCY_REQUIRED", "KLAVIYO_PREFLIGHT_FAILED", "CONNECTION_CHANGED"]);
 
-function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selection, reset, disconnect}) {
+function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selection, reset, disconnect, preflight}) {
   const handler = action => async (req, res) => {
     res.set("Cache-Control", "no-store");
     let authority;
@@ -23,6 +23,7 @@ function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selecti
   app.get("/api/shopify/providers/klaviyo/accounts/verify", handler(authority => selection.verifyReadOnly(authority)));
   app.get("/api/shopify/providers/klaviyo/accounts", handler(authority => selection.list(authority)));
   app.post("/api/shopify/providers/klaviyo/accounts/select", handler((authority, body) => selection.complete(authority, body)));
+  if (preflight) app.post("/api/shopify/providers/klaviyo/runtime/preflight", handler(authority => preflight.execute(authority)));
   if (disconnect) app.post("/api/shopify/providers/klaviyo/accounts/disconnect", handler((authority, body) => disconnect.execute(authority, body?.confirmation)));
   if (reset) app.post("/api/shopify/providers/klaviyo/accounts/reset", handler((authority, body) => reset.execute(authority, body?.confirmation)));
 }

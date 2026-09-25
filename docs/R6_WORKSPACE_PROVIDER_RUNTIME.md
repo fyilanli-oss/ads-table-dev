@@ -156,6 +156,14 @@ Embedded Meta callback'te server-side short-lived → long-lived user token exch
 
 Validation kaynaklı güvenli hatalar Meta'ya bağlı `Reconnect Meta` durumu üretir; token, app secret ve provider response kullanıcıya veya loga çıkmaz. Başarılı callback `pending_account_selection` olarak kalır ve 1–3 provider-doğrulanmış hesap seçilmeden `Connected` olmaz. R6-D3-B production'a deploy edilmemiş, provider'a çağrı yapmamış ve Dataset V2/schedule/backfill açmamıştır. Versionlı sonuç `contracts/r6d3b-meta-token-validation-v1.json`, analist kaydı `docs/R6D3B_META_TOKEN_VALIDATION.md` içindedir.
 
+### R6-D3-C Meta hesap seçimi — repository preflight PASS / production merchant acceptance gate
+
+R7-A2'de tamamlanan canonical hesap seçimi runtime'ı yeniden incelendi ve R6-D3-C için yeniden geliştirilmesine gerek olmadığı doğrulandı. Eski `server.js + dashboard.html` akışının aksine browser tam hesap nesnesi veya tenant bilgisi sağlayamaz; yalnız seçilen ID'leri gönderir. Server save sırasında Meta `/me/adaccounts` listesini yeniden alır ve yalnız provider-doğrulanmış 1–3 hesabı optimistic connection version sınırıyla canonical kayda yazar.
+
+Shopify-native `s-choice-list` çoklu seçim ve `s-modal` programatik açma kullanımı güncel resmi Shopify App Home sözleşmesiyle doğrulandı. Supabase `selected_accounts` alanı pending durumda boş, connected Meta durumunda 1–3 hesap olacak şekilde validated constraint ile korunmaktadır. Paket-spesifik uçtan uca repository testleri session authority, provider re-fetch, browser alanlarının reddi, 1–3 sınırı, duplicate/yabancı hesap reddi ve `Connected` geçişini doğrular.
+
+Bu preflight production deployment, canlı Meta OAuth, provider teması, Dataset V2, schedule/backfill veya E4 değişikliği yapmaz. Sıradaki kapı gerçek Shopify oturumunda ayrı onaylı merchant acceptance'tır. Versionlı sonuç `contracts/r6d3c-meta-account-selection-acceptance-v1.json`, analist kaydı `docs/R6D3C_META_ACCOUNT_SELECTION_ACCEPTANCE.md` içindedir.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

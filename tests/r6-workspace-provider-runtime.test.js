@@ -18,7 +18,7 @@ test('R6 contract keeps workspace authority independent from commerce channel', 
 });
 
 test('R6 live preflight records preparation-only state without claiming activation', () => {
-  assert.equal(contract.status, 'R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_D3B_META_REPOSITORY_PASS_R6_D3C_ACCOUNT_SELECTION_GATE');
+  assert.equal(contract.status, 'R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_D3B_META_REPOSITORY_PASS_R6_D3C_REPOSITORY_PREFLIGHT_PASS_PRODUCTION_ACCEPTANCE_GATE');
   assert.equal(contract.live_preflight.result, 'PASS_PREPARATION_ONLY');
   assert.equal(contract.live_preflight.dataset_v2_rows, 0);
   assert.equal(contract.live_preflight.canonical_connection_rows, 0);
@@ -29,7 +29,7 @@ test('R6 live preflight records preparation-only state without claiming activati
 });
 
 test('R6-D is provider-by-provider and Klaviyo PASS grants no authority to other providers', () => {
-  assert.equal(contract.r6d_work_packages.status, 'R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_D3B_META_REPOSITORY_PASS_R6_D3C_ACCOUNT_SELECTION_GATE');
+  assert.equal(contract.r6d_work_packages.status, 'R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3A_D3B_META_REPOSITORY_PASS_R6_D3C_REPOSITORY_PREFLIGHT_PASS_PRODUCTION_ACCEPTANCE_GATE');
   assert.deepEqual(contract.r6d_work_packages.sequence, [
     'R6-D1 common fail-closed acceptance runner',
     'R6-D2 Klaviyo workspace live acceptance',
@@ -48,7 +48,7 @@ test('R6-D is provider-by-provider and Klaviyo PASS grants no authority to other
   assert.equal(contract.r6d_work_packages.r6_d2.provider_contact, true);
   assert.equal(contract.r6d_work_packages.r6_d2.dataset_v2_write, false);
   assert.equal(contract.r6d_work_packages.r6_d2.r6_d2_c6d_live_acceptance.production_activation, false);
-  assert.equal(contract.r6d_work_packages.current_live_connection_state.meta, 'r6_d3b_repository_only_not_live_accepted');
+  assert.equal(contract.r6d_work_packages.current_live_connection_state.meta, 'r6_d3c_repository_preflight_pass_production_acceptance_pending');
   assert.equal(contract.r6d_work_packages.r6_d3a.result, 'PASS_CONTRACT_ONLY');
   assert.equal(contract.r6d_work_packages.r6_d3a.legacy_token_reused, false);
   assert.equal(contract.r6d_work_packages.r6_d3a.server_side_long_lived_exchange_required, true);
@@ -57,7 +57,11 @@ test('R6-D is provider-by-provider and Klaviyo PASS grants no authority to other
   assert.equal(contract.r6d_work_packages.r6_d3b.result, 'PASS_REPOSITORY_ONLY');
   assert.equal(contract.r6d_work_packages.r6_d3b.short_to_long_lived_exchange, true);
   assert.equal(contract.r6d_work_packages.r6_d3b.provider_contact, false);
-  assert.equal(contract.next_gate, 'R6-D3-C_META_1_TO_3_ACCOUNT_SELECTION_ACCEPTANCE_REVIEW');
+  assert.equal(contract.r6d_work_packages.r6_d3c.result, 'PASS_REPOSITORY_PREFLIGHT_PRODUCTION_ACCEPTANCE_PENDING');
+  assert.equal(contract.r6d_work_packages.r6_d3c.existing_r7a2_runtime_reused, true);
+  assert.equal(contract.r6d_work_packages.r6_d3c.new_account_selection_runtime_created, false);
+  assert.equal(contract.r6d_work_packages.r6_d3c.provider_contact, false);
+  assert.equal(contract.next_gate, 'R6-D3-C_META_PRODUCTION_MERCHANT_ACCEPTANCE');
 });
 
 test('R6-D2-C2 freezes merchant-facing Klaviyo sales-source behavior without execution', () => {
@@ -102,7 +106,7 @@ test('R6 preflight is read-only and fail-closed', () => {
 
 test('Execution Plan records the failed C6 attempts and the verified-empty live corrective', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3-A\+B Meta contract\/token repository Done; R6-D3-C account-selection acceptance gate/);
+  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3-A\+B Meta contract\/token repository Done; R6-D3-C repository preflight PASS, production merchant acceptance pending/);
   assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS \/ C3 next/);
   assert.match(plan, /R6-D2-C3 salt-okunur satış kaynağı keşfi — Live PASS/);
   assert.match(plan, /R6-D2-C4 canonical satış kaynağı bağı — Live PASS/);
@@ -113,6 +117,7 @@ test('Execution Plan records the failed C6 attempts and the verified-empty live 
   assert.match(plan, /R6-D2-C7 postcheck ve Klaviyo PASS kararı — PASS \/ R6-D2 Done \/ R6-D3 approval gate/);
   assert.match(plan, /R6-D3-A Meta bağlantı ve token yaşam döngüsü — Done \/ contract only \/ R6-D3-B implementation gate/);
   assert.match(plan, /R6-D3-B Meta token doğrulama uygulaması — Done \/ repository only \/ R6-D3-C account-selection acceptance gate/);
+  assert.match(plan, /R6-D3-C Meta 1–3 hesap seçimi — Repository preflight PASS \/ production merchant acceptance pending/);
   assert.match(plan, /tamamlanmış E4\/E5\/E7.*yeniden geliştirilmedi/i);
   assert.match(plan, /R7-A.*R6-D/i);
   assert.match(plan, /R7-A merchant acceptance PASS; R6-D next; R7-B blocked by R6-D/i);

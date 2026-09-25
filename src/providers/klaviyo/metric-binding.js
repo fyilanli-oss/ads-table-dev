@@ -4,7 +4,7 @@ function codedError(code, status = 409) {
   return Object.assign(new Error(code), { code, status });
 }
 
-function createKlaviyoMetricBinding({ connectionStore, providerClient } = {}) {
+function createKlaviyoMetricBinding({ connectionStore, providerClient, tokenLifecycle = null } = {}) {
   if (!connectionStore || typeof connectionStore.resolveConnected !== 'function' ||
     typeof connectionStore.bindKlaviyoConversionMetric !== 'function') {
     throw new TypeError('canonical connection store with metric binding is required');
@@ -18,7 +18,10 @@ function createKlaviyoMetricBinding({ connectionStore, providerClient } = {}) {
     if (!connection) throw codedError('KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED');
     let candidates;
     try {
-      candidates = await providerClient.fetchPlacedOrderMetricCandidates({ accessToken: connection.accessToken });
+      const operation = active => providerClient.fetchPlacedOrderMetricCandidates({ accessToken: active.accessToken });
+      candidates = tokenLifecycle
+        ? (await tokenLifecycle.run({ authority, connection, operation })).value
+        : await operation(connection);
     } catch (error) {
       if (error?.message === 'KLAVIYO_REAUTHORIZE') throw codedError('KLAVIYO_REAUTHORIZE');
       throw codedError('KLAVIYO_METRIC_DISCOVERY_FAILED', 503);
@@ -36,11 +39,16 @@ function createKlaviyoMetricBinding({ connectionStore, providerClient } = {}) {
   async function select(authority, body = {}) {
     const requestedId = typeof body.metric_id === 'string' ? body.metric_id.trim() : '';
     if (!requestedId) throw codedError('KLAVIYO_CONVERSION_METRIC_SELECTION_INVALID');
-    const connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
+    let connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
     if (!connection) throw codedError('KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED');
     let candidates;
     try {
-      candidates = await providerClient.fetchPlacedOrderMetricCandidates({ accessToken: connection.accessToken });
+      const operation = active => providerClient.fetchPlacedOrderMetricCandidates({ accessToken: active.accessToken });
+      if (tokenLifecycle) {
+        const execution = await tokenLifecycle.run({ authority, connection, operation });
+        candidates = execution.value;
+        connection = execution.connection;
+      } else candidates = await operation(connection);
     } catch (error) {
       if (error?.message === 'KLAVIYO_REAUTHORIZE') throw codedError('KLAVIYO_REAUTHORIZE');
       throw codedError('KLAVIYO_METRIC_DISCOVERY_FAILED', 503);

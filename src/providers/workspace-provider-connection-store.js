@@ -139,7 +139,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at')
+      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at')
       .eq('workspace_id', workspace.workspace_id)
       .eq('provider', provider)
       .eq('status', 'connected')
@@ -164,6 +164,9 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       refreshToken: data.refresh_token_envelope
         ? vault.decrypt(data.refresh_token_envelope, tokenContext(workspace.workspace_id, provider, 'refresh'))
         : null,
+      accessTokenExpiresAt: data.access_token_expires_at,
+      refreshTokenExpiresAt: data.refresh_token_expires_at,
+      grantedScopes: Array.isArray(data.granted_scopes) ? Object.freeze([...data.granted_scopes]) : Object.freeze([]),
       version: data.connection_version
     });
   }
@@ -252,6 +255,26 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       .select('connection_version').maybeSingle();
     if (error) throw new Error('CONNECTION_WRITE_FAILED');
     if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+  }
+
+  async function refreshConnectedKlaviyo({ authority: authorityInput, version, accessToken, refreshToken, expiresAt, refreshExpiresAt = null, scopes = [] } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
+    const timestamp = now().toISOString();
+    const { data, error } = await client.from(TABLE).update({
+      access_token_envelope: vault.encrypt(required(accessToken, 'accessToken'), tokenContext(authority.workspace_id, 'klaviyo', 'access')),
+      refresh_token_envelope: vault.encrypt(required(refreshToken, 'refreshToken'), tokenContext(authority.workspace_id, 'klaviyo', 'refresh')),
+      access_token_expires_at: required(expiresAt, 'expiresAt'),
+      refresh_token_expires_at: refreshExpiresAt,
+      granted_scopes: Array.isArray(scopes) ? [...scopes] : [],
+      connection_version: version + 1,
+      updated_at: timestamp,
+    }).eq('workspace_id', authority.workspace_id).eq('provider', 'klaviyo')
+      .eq('connection_version', version).eq('status', 'connected')
+      .select('connection_version').maybeSingle();
+    if (error) throw new Error('CONNECTION_WRITE_FAILED');
+    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+    return data;
   }
 
   async function completeKlaviyo({ authority: authorityInput, version, account, cost }) {
@@ -347,6 +370,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     readKlaviyo,
     readKlaviyoStatus,
     refreshKlaviyo,
+    refreshConnectedKlaviyo,
     completeKlaviyo,
     disconnectKlaviyo,
     bindKlaviyoConversionMetric,

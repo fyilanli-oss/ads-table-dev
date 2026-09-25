@@ -6,9 +6,11 @@ function normalize(payload) {
   if (typeof accessToken !== "string" || !accessToken) throw new Error("INVALID_PROVIDER_TOKEN_RESPONSE");
   const rawScopes = Array.isArray(data.scope) ? data.scope : (typeof data.scope === "string" ? data.scope.split(/[\s,]+/) : []);
   const scopes = [...new Set(rawScopes.map(scope => typeof scope === "string" ? scope.trim() : "").filter(Boolean))];
+  const expiresIn = Number(data.expires_in);
   return Object.freeze({
     accessToken,
     refreshToken: typeof data.refresh_token === "string" && data.refresh_token ? data.refresh_token : null,
+    expiresIn: Number.isSafeInteger(expiresIn) && expiresIn > 0 ? expiresIn : null,
     scopes: Object.freeze(scopes),
   });
 }

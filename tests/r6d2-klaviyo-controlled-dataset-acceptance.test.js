@@ -31,7 +31,7 @@ const fact = Object.freeze({
   spend_allocation: { dailySentCount: 100, monthlySentCount: 1000, periodClosed: true },
 });
 
-function acceptance({ result = { rows: [fact], verified_empty: false }, existingRows = [], failAt = null } = {}) {
+function acceptance({ result = { rows: [fact], verified_empty: false }, existingRows = [], failAt = null, tokenLifecycle = null } = {}) {
   const calls = [];
   const fail = stage => { if (failAt === stage) throw new Error(`secret--must-not-leak`); };
   const service = createKlaviyoControlledDatasetAcceptance({
@@ -41,6 +41,7 @@ function acceptance({ result = { rows: [fact], verified_empty: false }, existing
       fetchAccount: async input => { calls.push(['account', input]); fail('provider_account'); return { id: 'account-1', currency: 'USD', timezone: 'UTC' }; },
       fetchMessageFacts: async input => { calls.push(['facts', input]); fail('provider_facts'); return result; },
     },
+    tokenLifecycle,
     resolveFxRate: async () => { fail('fx'); return { fx_rate: 40, fx_rate_date: '2026-09-23', fx_provider: 'test_fx' }; },
     repository: {
       readCanonicalRawFacts: async input => { calls.push(['read', input]); fail('guard'); return existingRows; },
@@ -111,4 +112,19 @@ test('C6-B returns only allowlisted failure stages and never the underlying erro
       return true;
     });
   }
+});
+
+test('C6-D requires reauthorization without contacting the provider or writing Dataset V2', async () => {
+  const tokenLifecycle = {
+    run: async () => {
+      const error = Object.assign(new Error('provider detail must not leak'), { code: 'KLAVIYO_REAUTHORIZE' });
+      throw error;
+    },
+  };
+  const { calls, service } = acceptance({ tokenLifecycle });
+  await assert.rejects(service.execute(authority, CONFIRMATION), error =>
+    error.code === 'KLAVIYO_DATASET_ACCEPTANCE_REAUTHORIZE' && error.status === 409);
+  assert.equal(calls.some(([name]) => name === 'account'), false);
+  assert.equal(calls.some(([name]) => name === 'facts'), false);
+  assert.equal(calls.some(([name]) => name === 'write'), false);
 });

@@ -122,17 +122,52 @@ test('connected resolver is workspace-scoped and returns decrypted token only se
   const { calls, store } = fixture({
     data: {
       status: 'connected', active_account_id: 'account', source_currency: 'USD',
-      access_token_envelope: encrypted('access'), refresh_token_envelope: encrypted('refresh'), connection_version: 4
+      access_token_envelope: encrypted('access'), refresh_token_envelope: encrypted('refresh'),
+      access_token_expires_at: '2026-09-23T10:00:00.000Z', refresh_token_expires_at: null,
+      granted_scopes: ['accounts:read'], connection_version: 4
     },
     error: null
   });
   const resolved = await store.resolveConnected({ authority, provider: 'meta' });
   assert.equal(resolved.accessToken, 'access');
   assert.equal(resolved.version, 4);
+  assert.equal(resolved.accessTokenExpiresAt, '2026-09-23T10:00:00.000Z');
+  assert.deepEqual(resolved.grantedScopes, ['accounts:read']);
   assert.deepEqual(calls.filter((call) => call[0] === 'eq'), [
     ['eq', 'workspace_id', authority.workspace_id],
     ['eq', 'provider', 'meta'],
     ['eq', 'status', 'connected']
+  ]);
+});
+
+test('connected Klaviyo refresh rotates encrypted tokens with optimistic version protection', async () => {
+  const calls = [];
+  const query = {
+    update(row) { calls.push(['update', row]); return query; },
+    eq(field, value) { calls.push(['eq', field, value]); return query; },
+    select(columns) { calls.push(['select', columns]); return query; },
+    async maybeSingle() { return { data: { connection_version: 5 }, error: null }; },
+  };
+  const client = { from(table) { calls.push(['from', table]); return query; } };
+  const vault = {
+    encrypt(value, context) { return { ciphertext: `enc:${value}`, context }; },
+    decrypt(envelope) { return envelope.ciphertext.replace(/^enc:/, ''); },
+  };
+  const store = createCanonicalWorkspaceProviderConnectionStore({ client, vault, now: () => new Date('2026-09-23T09:00:00.000Z') });
+  await store.refreshConnectedKlaviyo({
+    authority, version: 4, accessToken: 'new-access', refreshToken: 'new-refresh',
+    expiresAt: '2026-09-23T10:00:00.000Z', scopes: ['accounts:read', 'campaigns:read'],
+  });
+  const update = calls.find(([name]) => name === 'update')[1];
+  assert.equal(update.access_token_envelope.ciphertext, 'enc:new-access');
+  assert.equal(update.refresh_token_envelope.ciphertext, 'enc:new-refresh');
+  assert.equal(update.access_token_expires_at, '2026-09-23T10:00:00.000Z');
+  assert.deepEqual(update.granted_scopes, ['accounts:read', 'campaigns:read']);
+  assert.deepEqual(calls.filter(([name]) => name === 'eq'), [
+    ['eq', 'workspace_id', authority.workspace_id],
+    ['eq', 'provider', 'klaviyo'],
+    ['eq', 'connection_version', 4],
+    ['eq', 'status', 'connected'],
   ]);
 });
 

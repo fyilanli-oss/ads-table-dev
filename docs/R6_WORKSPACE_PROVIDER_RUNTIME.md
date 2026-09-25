@@ -130,6 +130,14 @@ Sıradaki kapı **R6-D2-C3 salt-okunur satış kaynağı keşfi** için analist 
 
 Resmî sözleşme referansları: Klaviyo [Get Accounts](https://developers.klaviyo.com/en/reference/get_accounts), [Reporting API overview](https://developers.klaviyo.com/en/reference/reporting_api_overview), [Get Campaigns](https://developers.klaviyo.com/en/reference/get_campaigns) ve [Get Flows](https://developers.klaviyo.com/en/reference/get_flows).
 
+### R6-D2-C6-D connected token lifecycle corrective — repository PASS / deployment pending
+
+C6-C ikinci kontrollü deneme `KLAVIYO_DATASET_ACCEPTANCE_FAILED_PROVIDER_ACCOUNT` ile Account API aşamasında durdu; Dataset V2 satırı `0` kaldı. Production canonical Klaviyo kaydı encrypted refresh token ve `accounts:read` scope taşırken access-token expiry alanı boştu. Connected runtime kısa ömürlü access token için refresh uygulamıyordu.
+
+C6-D, OAuth grant'ini kalıcı ürün bağlantısı olarak yönetir: `expires_in` canonical expiry alanına yazılır; expiry bilinmiyor/yaklaşıyorsa token provider'da yenilenir; dönen en güncel access/refresh token encrypted envelope olarak aynı workspace connection'a optimistic version ile kaydedilir. Beklenmeyen `401` yalnız bir refresh ve bir tekrar üretir. `invalid_grant` veya ikinci auth hatası yeniden yetkilendirme ister. Paralel istekler aynı process'te tek refresh paylaşır. Metric seçimi, mapping, Dataset writer ve E4/E5/E7 kapsamı değişmez.
+
+Repository ilgili kapsam regresyonu `120/120 PASS` verdi. Production deployment, gerçek token yenilemesi, provider teması veya Dataset V2 yeniden denemesi yapılmadı; bunlar ayrı kabul kapılarıdır.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

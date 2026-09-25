@@ -32,6 +32,7 @@ function createKlaviyoReadOnlyPreflight({
   connectionStore,
   settingsStore,
   providerClient,
+  tokenLifecycle = null,
   resolveFxRate,
   now = () => new Date(),
 } = {}) {
@@ -45,17 +46,22 @@ function createKlaviyoReadOnlyPreflight({
 
   async function execute(authority) {
     try {
-      const connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
+      let connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       const currency = await settingsStore.resolveReportingCurrency(authority);
       const providerDate = closedProviderDate(now());
-      const result = await runner(Object.freeze({
-        authority,
-        connection,
-        reportingCurrency: currency.reportingCurrency,
-        currencyVersion: currency.currencyVersion,
-        request: Object.freeze({ provider_date: providerDate }),
-      }));
+      const operation = activeConnection => runner(Object.freeze({
+          authority,
+          connection: activeConnection,
+          reportingCurrency: currency.reportingCurrency,
+          currencyVersion: currency.currencyVersion,
+          request: Object.freeze({ provider_date: providerDate }),
+        }));
+      const execution = tokenLifecycle
+        ? await tokenLifecycle.run({ authority, connection, operation })
+        : { value: await operation(connection), connection };
+      connection = execution.connection;
+      const result = execution.value;
       const verified = verifyProviderResult({
         provider: 'klaviyo',
         connection,

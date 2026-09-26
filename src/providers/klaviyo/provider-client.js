@@ -11,6 +11,32 @@ const STATISTICS = Object.freeze([
 const MAX_RATE_LIMIT_RETRIES = 2;
 const MAX_RATE_LIMIT_WAIT_MS = 10000;
 const RATE_LIMIT_JITTER_MS = 250;
+const MAX_DIAGNOSTIC_EVENT_PAGES = 20;
+const EVENT_CATEGORY_BY_NAME = Object.freeze({
+  'Received Email': 'received_email',
+  'Opened Email': 'opened_email',
+  'Clicked Email': 'clicked_email',
+  'Bounced Email': 'bounced_email',
+  'Dropped Email': 'dropped_email',
+  'Marked Email as Spam': 'marked_email_as_spam',
+  'Unsubscribed': 'unsubscribed',
+  'Consented to Receive SMS': 'consented_to_receive_sms',
+  'Received SMS': 'received_sms',
+  'Sent SMS': 'sent_sms',
+  'Clicked SMS': 'clicked_sms',
+  'Failed to Deliver SMS': 'failed_to_deliver_sms',
+  'Received Automated Response SMS': 'received_automated_response_sms',
+  'Failed to Deliver Automated Response SMS': 'failed_to_deliver_automated_response_sms',
+  'Active on Site': 'active_on_site',
+  'Viewed Product': 'viewed_product',
+  'Added to Cart': 'added_to_cart',
+  'Started Checkout': 'started_checkout',
+  'Placed Order': 'placed_order',
+  'Ordered Product': 'ordered_product',
+  'Fulfilled Order': 'fulfilled_order',
+  'Cancelled Order': 'cancelled_order',
+  'Refunded Order': 'refunded_order',
+});
 
 function required(value, field) {
   if (typeof value !== 'string' || value.trim() === '') throw new TypeError(`${field} is required`);
@@ -93,6 +119,28 @@ function campaignPagePath(value) {
     throw new Error('KLAVIYO_CAMPAIGN_PAGINATION_INVALID');
   }
   return `${url.pathname}${url.search}`;
+}
+
+function flowPagePath(value) {
+  const url = new URL(value, API_BASE);
+  if (url.origin !== API_BASE || !['/api/flows', '/api/flows/'].includes(url.pathname)) {
+    throw new Error('KLAVIYO_FLOW_PAGINATION_INVALID');
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+function eventPagePath(value) {
+  const url = new URL(value, API_BASE);
+  if (url.origin !== API_BASE || !['/api/events', '/api/events/'].includes(url.pathname)) {
+    throw new Error('KLAVIYO_EVENT_PAGINATION_INVALID');
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+function eventBusinessDate(value, timeZone) {
+  const instant = new Date(required(value, 'event.datetime'));
+  if (Number.isNaN(instant.getTime())) throw new Error('KLAVIYO_EVENT_DATETIME_INVALID');
+  return businessDateFromTimestamp(instant, validateTimeZone(timeZone));
 }
 
 function campaignBusinessDate(item, timeZone) {
@@ -268,6 +316,71 @@ function createKlaviyoProviderClient({
     return Object.freeze([...dates].sort((left, right) => right.localeCompare(left)));
   }
 
+  async function fetchFlowEventInventory({ accessToken, timeZone } = {}) {
+    validateTimeZone(timeZone);
+    const flowStatusCounts = { live: 0, manual: 0, draft: 0, other: 0 };
+    let flowCount = 0;
+    let flowPath = '/api/flows/?fields[flow]=status&page[size]=50';
+    for (let page = 0; page < 100 && flowPath; page += 1) {
+      const payload = await request(accessToken, flowPath);
+      if (!Array.isArray(payload?.data)) throw new Error('KLAVIYO_FLOW_RESPONSE_INVALID');
+      for (const item of payload.data) {
+        flowCount += 1;
+        const status = required(item?.attributes?.status, 'flow.status').toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(flowStatusCounts, status) && status !== 'other') {
+          flowStatusCounts[status] += 1;
+        } else {
+          flowStatusCounts.other += 1;
+        }
+      }
+      const next = payload?.links?.next;
+      flowPath = next ? flowPagePath(next) : null;
+      if (page === 99 && flowPath) throw new Error('KLAVIYO_FLOW_PAGINATION_LIMIT');
+    }
+
+    const eventCounts = Object.fromEntries(Object.values(EVENT_CATEGORY_BY_NAME).map(key => [key, 0]));
+    eventCounts.other = 0;
+    let eventCount = 0;
+    let attributedEventCount = 0;
+    let earliestEventDate = null;
+    let latestEventDate = null;
+    let eventScanTruncated = false;
+    let eventPath = '/api/events/?fields[event]=datetime&fields[metric]=name,integration&fields[attribution]=id&include=metric,attributions&page[size]=200&sort=datetime';
+    for (let page = 0; page < MAX_DIAGNOSTIC_EVENT_PAGES && eventPath; page += 1) {
+      const payload = await request(accessToken, eventPath);
+      if (!Array.isArray(payload?.data) || (payload?.included !== undefined && !Array.isArray(payload.included))) {
+        throw new Error('KLAVIYO_EVENT_RESPONSE_INVALID');
+      }
+      const metrics = new Map((payload.included || [])
+        .filter(item => item?.type === 'metric')
+        .map(item => [required(item?.id, 'metric.id'), required(item?.attributes?.name, 'metric.name')]));
+      for (const item of payload.data) {
+        eventCount += 1;
+        const date = eventBusinessDate(item?.attributes?.datetime, timeZone);
+        earliestEventDate = !earliestEventDate || date < earliestEventDate ? date : earliestEventDate;
+        latestEventDate = !latestEventDate || date > latestEventDate ? date : latestEventDate;
+        const metricId = required(item?.relationships?.metric?.data?.id, 'event.metric.id');
+        const category = EVENT_CATEGORY_BY_NAME[metrics.get(metricId)] || 'other';
+        eventCounts[category] += 1;
+        const attributions = item?.relationships?.attributions?.data;
+        if (Array.isArray(attributions) && attributions.length > 0) attributedEventCount += 1;
+      }
+      const next = payload?.links?.next;
+      eventPath = next ? eventPagePath(next) : null;
+      if (page === MAX_DIAGNOSTIC_EVENT_PAGES - 1 && eventPath) eventScanTruncated = true;
+    }
+    return Object.freeze({
+      flow_count: flowCount,
+      flow_status_counts: Object.freeze({ ...flowStatusCounts }),
+      scanned_event_count: eventCount,
+      event_counts: Object.freeze({ ...eventCounts }),
+      attributed_event_count: attributedEventCount,
+      earliest_event_date: earliestEventDate,
+      latest_event_date: latestEventDate,
+      event_scan_truncated: eventScanTruncated,
+    });
+  }
+
   async function report(accessToken, branch, timeframe, conversionMetricIdInput) {
     const metricId = required(conversionMetricIdInput || defaultMetricId, 'Klaviyo conversion metric id');
     const type = `${branch}-values-report`;
@@ -316,11 +429,11 @@ function createKlaviyoProviderClient({
     return Object.freeze({ rows, verified_empty: rows.length === 0 });
   }
 
-  return Object.freeze({ fetchAccount, fetchPlacedOrderMetricCandidates, fetchCampaignInventory, fetchSentCampaignDates, fetchMessageFacts });
+  return Object.freeze({ fetchAccount, fetchPlacedOrderMetricCandidates, fetchCampaignInventory, fetchSentCampaignDates, fetchFlowEventInventory, fetchMessageFacts });
 }
 
 function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
 }
 
-module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, zonedInstant, reportRows, metricPagePath, campaignPagePath, campaignBusinessDate, metricCandidate, createKlaviyoProviderClient });
+module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, EVENT_CATEGORY_BY_NAME, zonedInstant, reportRows, metricPagePath, campaignPagePath, flowPagePath, eventPagePath, campaignBusinessDate, eventBusinessDate, metricCandidate, createKlaviyoProviderClient });

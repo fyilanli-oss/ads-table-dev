@@ -252,3 +252,84 @@ test('Klaviyo campaign diagnostics distinguish total, Sent and missing scheduled
   assert.ok(calls.every(url => decodeURIComponent(url).includes("fields[campaign]=status,scheduled_at")));
   assert.ok(calls.every(url => !decodeURIComponent(url).includes("equals(status,'Sent')")));
 });
+
+
+test('Klaviyo Flow/Event diagnostics return only aggregate statuses, dates and allowlisted categories', async () => {
+  const fetchImpl = async url => {
+    const decoded = decodeURIComponent(url);
+    if (decoded.includes('/api/flows/')) return response({
+      data: [
+        { id: 'flow-secret-1', attributes: { status: 'live' } },
+        { id: 'flow-secret-2', attributes: { status: 'draft' } },
+        { id: 'flow-secret-3', attributes: { status: 'manual' } },
+      ],
+      links: { next: null },
+    });
+    if (decoded.includes('/api/events/')) return response({
+      data: [
+        {
+          id: 'event-secret-1',
+          attributes: { datetime: '2024-01-01T10:00:00Z' },
+          relationships: { metric: { data: { id: 'metric-1' } }, attributions: { data: [{ type: 'attribution', id: 'attribute-secret' }] } },
+        },
+        {
+          id: 'event-secret-2',
+          attributes: { datetime: '2024-01-03T12:00:00Z' },
+          relationships: { metric: { data: { id: 'metric-2' } }, attributions: { data: [] } },
+        },
+        {
+          id: 'event-secret-3',
+          attributes: { datetime: '2024-01-02T12:00:00Z' },
+          relationships: { metric: { data: { id: 'metric-3' } }, attributions: { data: [] } },
+        },
+      ],
+      included: [
+        { type: 'metric', id: 'metric-1', attributes: { name: 'Received Email', integration: { name: 'Klaviyo' } } },
+        { type: 'metric', id: 'metric-2', attributes: { name: 'Placed Order', integration: { name: 'API' } } },
+        { type: 'metric', id: 'metric-3', attributes: { name: 'Unlisted Private Metric', integration: { name: 'API' } } },
+      ],
+      links: { next: null },
+    });
+    throw new Error('unexpected URL');
+  };
+  const client = createKlaviyoProviderClient({ fetchImpl });
+  const result = await client.fetchFlowEventInventory({ accessToken: 'secret', timeZone: 'UTC' });
+  assert.equal(result.flow_count, 3);
+  assert.deepEqual(result.flow_status_counts, { live: 1, manual: 1, draft: 1, other: 0 });
+  assert.equal(result.scanned_event_count, 3);
+  assert.equal(result.event_counts.received_email, 1);
+  assert.equal(result.event_counts.placed_order, 1);
+  assert.equal(result.event_counts.other, 1);
+  assert.equal(result.attributed_event_count, 1);
+  assert.equal(result.earliest_event_date, '2024-01-01');
+  assert.equal(result.latest_event_date, '2024-01-03');
+  assert.equal(result.event_scan_truncated, false);
+  assert.doesNotMatch(JSON.stringify(result), /secret|Unlisted Private Metric|Klaviyo|API/);
+});
+
+test('Klaviyo Flow/Event diagnostics reject pagination outside the provider origin', async () => {
+  const client = createKlaviyoProviderClient({
+    fetchImpl: async url => url.includes('/api/flows/')
+      ? response({ data: [], links: { next: 'https://attacker.invalid/api/flows/?page[cursor]=steal' } })
+      : response({ data: [], included: [], links: { next: null } }),
+  });
+  await assert.rejects(
+    client.fetchFlowEventInventory({ accessToken: 'secret', timeZone: 'UTC' }),
+    /KLAVIYO_FLOW_PAGINATION_INVALID/,
+  );
+});
+
+
+test('Klaviyo Flow/Event diagnostics accept an empty event page without an included collection', async () => {
+  const client = createKlaviyoProviderClient({
+    fetchImpl: async url => url.includes('/api/flows/')
+      ? response({ data: [], links: { next: null } })
+      : response({ data: [], links: { next: null } }),
+  });
+  const result = await client.fetchFlowEventInventory({ accessToken: 'secret', timeZone: 'UTC' });
+  assert.equal(result.flow_count, 0);
+  assert.equal(result.scanned_event_count, 0);
+  assert.equal(result.earliest_event_date, null);
+  assert.equal(result.latest_event_date, null);
+  assert.equal(result.event_scan_truncated, false);
+});

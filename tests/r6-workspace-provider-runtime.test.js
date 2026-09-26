@@ -77,11 +77,12 @@ test('R6-D is provider-by-provider and Klaviyo PASS grants no authority to other
   assert.equal(contract.r6d_work_packages.r6_d3e.non_empty_physical_upsert_observed, false);
   assert.equal(contract.r6d_work_packages.r6_d3e.live_postcheck_result, 'PASS');
   assert.equal(contract.r6d_work_packages.r6_d3e.dataset_v2_write, false);
-  assert.equal(contract.r6d_work_packages.r6_d3f.result, 'PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING');
+  assert.equal(contract.r6d_work_packages.r6_d3f.result, 'PASS_PRODUCTION_DISCONNECT_AND_CLEAN_RECONNECT');
   assert.equal(contract.r6d_work_packages.r6_d3f.schema_migration_required, false);
-  assert.equal(contract.r6d_work_packages.r6_d3f.production_provider_contact, false);
-  assert.equal(contract.r6d_work_packages.r6_d3f.live_disconnect_verified, false);
-  assert.equal(contract.next_gate, 'R6-D3-F_PRODUCTION_DEPLOYMENT_AND_MERCHANT_ACCEPTANCE');
+  assert.equal(contract.r6d_work_packages.r6_d3f.production_provider_contact, true);
+  assert.equal(contract.r6d_work_packages.r6_d3f.live_disconnect_verified, true);
+  assert.equal(contract.r6d_work_packages.r6_d3f.clean_reconnect_verified, true);
+  assert.equal(contract.next_gate, 'R6-D4_GOOGLE_ADS_ANALYST_BRIEF');
 });
 
 test('R6-D2-C2 freezes merchant-facing Klaviyo sales-source behavior without execution', () => {
@@ -126,7 +127,7 @@ test('R6 preflight is read-only and fail-closed', () => {
 
 test('Execution Plan records the failed C6 attempts and the verified-empty live corrective', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3-E Meta data live PASS; R6-D3-F repository implementation PASS, production acceptance next/);
+  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4 Google Ads analyst brief next/);
   assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS \/ C3 next/);
   assert.match(plan, /R6-D2-C3 salt-okunur satış kaynağı keşfi — Live PASS/);
   assert.match(plan, /R6-D2-C4 canonical satış kaynağı bağı — Live PASS/);
@@ -140,7 +141,7 @@ test('Execution Plan records the failed C6 attempts and the verified-empty live 
   assert.match(plan, /R6-D3-C Meta 1–3 hesap seçimi — Production merchant acceptance PASS \/ 1 verified account \/ data runtime gate/);
   assert.match(plan, /R6-D3-D Meta workspace salt-okunur preflight — Production read-only acceptance PASS \/ verified empty \/ Dataset V2 gate/);
   assert.match(plan, /R6-D3-E Meta kontrollü Dataset V2 kabulü — Production verified-empty PASS \/ data gate closed \/ lifecycle gate open/);
-  assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Repository implementation PASS \/ production acceptance pending/);
+  assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Production Disconnect and clean Reconnect PASS \/ R6-D3 complete/);
   assert.match(plan, /tamamlanmış E4\/E5\/E7.*yeniden geliştirilmedi/i);
   assert.match(plan, /R7-A.*R6-D/i);
   assert.match(plan, /R7-A merchant acceptance PASS; provider-specific Disconnect acceptance moved into each R6-D provider gate; R7-B final consistency after R6-D/i);

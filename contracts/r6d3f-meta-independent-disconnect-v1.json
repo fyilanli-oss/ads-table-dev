@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d3f-meta-independent-disconnect-v1",
-  "status": "PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING",
+  "status": "PASS_PRODUCTION_DISCONNECT_AND_CLEAN_RECONNECT",
   "provider": "meta",
   "business_rule": "Every provider connection belongs to the same workspace but owns an independent Connect, Disconnect and clean Reconnect lifecycle.",
   "decision_baseline_gap": {
@@ -17,9 +17,25 @@
     "revoke_first_service": "src/shopify/meta-disconnect.js",
     "canonical_cleanup_operation": "disconnectMeta",
     "focused_tests_passed": 55,
-    "production_deployment_verified": false,
-    "live_disconnect_verified": false,
-    "clean_reconnect_verified": false
+    "production_deployment_verified": true,
+    "live_disconnect_verified": true,
+    "clean_reconnect_verified": true
+  },
+  "live_acceptance": {
+    "result": "PASS",
+    "pull_request": 268,
+    "merge_commit": "2f7014a6ed89eccc85e2c38d76ef518734493597",
+    "initial_connected_account_count": 1,
+    "cancel_preserved_connection": true,
+    "disconnect_postcheck": "PASS",
+    "clean_reconnect_account_count": 1,
+    "reconnect_postcheck": "PASS",
+    "klaviyo_preserved": true,
+    "reporting_currency_preserved": true,
+    "historical_analytics_preserved": true,
+    "dataset_v2_rows_after": 0,
+    "schedule_or_backfill_started": false,
+    "evidence": "docs/security/evidence/R6D3F_META_DISCONNECT_RECONNECT_LIVE_ACCEPTANCE_2026-09-26.json"
   },
   "user_flow": [
     "connected_meta_card_shows_disconnect",
@@ -93,7 +109,7 @@
     "verify_oauth_account_selection_and_connected_state"
   ],
   "schema_migration_required": false,
-  "production_provider_contact": false,
-  "supabase_mutation": false,
-  "next_gate": "R6-D3-F_PRODUCTION_DEPLOYMENT_AND_MERCHANT_ACCEPTANCE"
+  "production_provider_contact": true,
+  "supabase_mutation": true,
+  "next_gate": "R6-D4_GOOGLE_ADS_ANALYST_BRIEF"
 }

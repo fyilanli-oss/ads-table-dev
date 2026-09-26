@@ -70,14 +70,15 @@ Workspace/provider kimliği, oluşturulma tarihi, önceki bağlantı zamanı ve 
 - 55 odaklı repository testi PASS verdi; Klaviyo, Google hazırlığı, Dataset/FX ve geçmiş veri sınırları regresyon testleriyle korundu.
 - Şema zaten yeterli olduğu için Supabase migration eklenmedi.
 
-## Bu uygulama paketinde henüz yapılmayanlar
+## Production kabul sonucu
 
-- Production deployment doğrulanmadı.
-- Canlı Meta revoke/Disconnect çalıştırılmadı.
-- Supabase production satırı değiştirilmedi.
-- Temiz Meta reconnect merchant tarafından doğrulanmadı.
-- Google Ads paketi başlatılmadı.
+- PR #268 merge commit `2f7014a6ed89eccc85e2c38d76ef518734493597` production'da READY oldu ve `dev.adstable.app` alias'ı aynı deployment'a bağlandı.
+- Merchant başlangıçta `Connected · 1 account` durumunu doğruladı; modal Cancel bağlantıyı korudu.
+- Açık Disconnect onayı Meta'yı `Not connected` durumuna getirdi. Salt-okunur postcheck token/scope/expiry ve account selection temizliğini doğruladı.
+- Temiz OAuth ve tek verified hesap seçimiyle reconnect tamamlandı. İkinci salt-okunur postcheck canonical Meta `connected · 1 account` durumunu doğruladı.
+- Klaviyo connected, reporting currency `TRY`, Dataset V2 toplam/Meta `0`, aktif Meta schedule/job `0`, legacy Meta geçmişi `1` ve browser grant `0` olarak korundu.
+- Redacted kanıt `docs/security/evidence/R6D3F_META_DISCONNECT_RECONNECT_LIVE_ACCEPTANCE_2026-09-26.json` içindedir.
 
 ## Durum
 
-`PASS repository implementation — production deployment and merchant acceptance pending`
+`PASS production Disconnect and clean Reconnect — R6-D3 complete; R6-D4 Google Ads analyst brief next`

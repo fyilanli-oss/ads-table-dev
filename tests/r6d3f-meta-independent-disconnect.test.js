@@ -9,20 +9,24 @@ const root = path.resolve(__dirname, '..');
 const contract = JSON.parse(fs.readFileSync(path.join(root, 'contracts/r6d3f-meta-independent-disconnect-v1.json'), 'utf8'));
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('R6-D3-F preserves the decision baseline and records repository implementation separately', () => {
-  assert.equal(contract.status, 'PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING');
+test('R6-D3-F preserves the decision baseline and records live Disconnect and reconnect acceptance', () => {
+  assert.equal(contract.status, 'PASS_PRODUCTION_DISCONNECT_AND_CLEAN_RECONNECT');
   assert.equal(contract.provider, 'meta');
   assert.equal(contract.decision_baseline_gap.legacy_reference_has_meta_disconnect, true);
   assert.equal(contract.decision_baseline_gap.embedded_meta_disconnect_route_exists, false);
   assert.equal(contract.decision_baseline_gap.canonical_meta_disconnect_store_operation_exists, false);
   assert.equal(contract.repository_implementation.status, 'PASS');
-  assert.equal(contract.repository_implementation.production_deployment_verified, false);
-  assert.equal(contract.repository_implementation.live_disconnect_verified, false);
-  assert.equal(contract.repository_implementation.clean_reconnect_verified, false);
+  assert.equal(contract.repository_implementation.production_deployment_verified, true);
+  assert.equal(contract.repository_implementation.live_disconnect_verified, true);
+  assert.equal(contract.repository_implementation.clean_reconnect_verified, true);
+  assert.equal(contract.live_acceptance.result, 'PASS');
+  assert.equal(contract.live_acceptance.clean_reconnect_account_count, 1);
+  assert.equal(contract.live_acceptance.dataset_v2_rows_after, 0);
+  assert.equal(fs.existsSync(path.join(root, contract.live_acceptance.evidence)), true);
   assert.equal(contract.schema_migration_required, false);
-  assert.equal(contract.production_provider_contact, false);
-  assert.equal(contract.supabase_mutation, false);
-  assert.equal(contract.next_gate, 'R6-D3-F_PRODUCTION_DEPLOYMENT_AND_MERCHANT_ACCEPTANCE');
+  assert.equal(contract.production_provider_contact, true);
+  assert.equal(contract.supabase_mutation, true);
+  assert.equal(contract.next_gate, 'R6-D4_GOOGLE_ADS_ANALYST_BRIEF');
 });
 
 test('R6-D3-F is revoke-first, optimistic and isolated from other providers and analytics', () => {
@@ -38,9 +42,9 @@ test('R6-D3-F is revoke-first, optimistic and isolated from other providers and 
 
 test('Execution Plan keeps Meta open until Disconnect and clean Reconnect acceptance', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Repository implementation PASS \/ production acceptance pending/);
-  assert.match(plan, /Her provider Connect → Connected → Disconnect → temiz Reconnect zincirini bağımsız tamamlamadan kendi kabulü kapanmaz/);
-  assert.match(plan, /Sıradaki kapı production deployment ve merchant acceptance'tır; Google Ads henüz başlamaz/);
+  assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Production Disconnect and clean Reconnect PASS \/ R6-D3 complete/);
+  assert.match(plan, /Meta Connect → OAuth → verified account selection → data acceptance → Disconnect → temiz Reconnect zinciri canlıda tamamlanmıştır/);
+  assert.match(plan, /R6-D3 tamamlandı; sıradaki kapı R6-D4 Google Ads analist brief'idir/);
 });
 
 test('The documented reference and pre-implementation gap remain auditable', () => {

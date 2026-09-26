@@ -306,7 +306,7 @@
       "production_activation": false
     },
     "r6_d3f": {
-      "result": "PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING",
+      "result": "PASS_PRODUCTION_DISCONNECT_AND_CLEAN_RECONNECT",
       "decision_contract": "contracts/r6d3f-meta-independent-disconnect-v1.json",
       "analyst_record": "docs/R6D3F_META_INDEPENDENT_DISCONNECT.md",
       "provider": "meta",
@@ -318,12 +318,15 @@
       "revoke_first_cleanup": true,
       "focused_tests_passed": 55,
       "schema_migration_required": false,
-      "production_provider_contact": false,
-      "supabase_mutation": false,
-      "production_deployment_verified": false,
-      "live_disconnect_verified": false,
-      "clean_reconnect_verified": false
+      "production_provider_contact": true,
+      "supabase_mutation": true,
+      "production_deployment_verified": true,
+      "live_disconnect_verified": true,
+      "clean_reconnect_verified": true,
+      "selected_account_count_after_reconnect": 1,
+      "live_postcheck_result": "PASS",
+      "evidence": "docs/security/evidence/R6D3F_META_DISCONNECT_RECONNECT_LIVE_ACCEPTANCE_2026-09-26.json"
     }
   },
-  "next_gate": "R6-D3-F_PRODUCTION_DEPLOYMENT_AND_MERCHANT_ACCEPTANCE"
+  "next_gate": "R6-D4_GOOGLE_ADS_ANALYST_BRIEF"
 }

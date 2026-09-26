@@ -48,38 +48,55 @@ function createGoogleAdsAccountDiscovery({fetchImpl = fetch, developerToken, api
     const accessible = await fetchImpl(`https://googleads.googleapis.com/${apiVersion}/customers:listAccessibleCustomers`, {
       headers: headers(accessToken), signal: AbortSignal.timeout(15000), redirect: 'error',
     });
-    const body = await accessible.json().catch(() => null);
+    const body = await accessible.json().catch(() => { throw googleFailure('list_accessible_customers_response', accessible, null); });
     if (accessible.status === 401 || accessible.status === 403) throw failure('PROVIDER_REAUTHORIZE', 409);
     if (!accessible.ok) throw googleFailure('list_accessible_customers', accessible, body);
     const resourceNames = Array.isArray(body?.resourceNames) ? body.resourceNames : [];
-    const discovered = await discoverGoogleCustomers({resourceNames, search: async ({customerId, query}) => {
+    let discovered;
+    try { discovered = await discoverGoogleCustomers({resourceNames, search: async ({customerId, query}) => {
       const response = await fetchImpl(`https://googleads.googleapis.com/${apiVersion}/customers/${customerId}/googleAds:searchStream`, {
         method: 'POST', headers: headers(accessToken), body: JSON.stringify({query}), signal: AbortSignal.timeout(15000), redirect: 'error',
       });
-      const payload = await response.json().catch(() => null);
+      const payload = await response.json().catch(() => { throw googleFailure('customer_client_response', response, null); });
       if (response.status === 401 || response.status === 403) throw failure('PROVIDER_REAUTHORIZE', 409);
       if (!response.ok) throw googleFailure('customer_client_search', response, payload);
       return {results: (Array.isArray(payload) ? payload : []).flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : [])};
-    }});
-    return discovered.customers.map(item => validGoogleAccount({
-      id: item.customerId,
-      name: item.account_name,
-      currency: item.currency,
-      loginCustomerId: item.loginCustomerId,
-    }));
+    }}); } catch (error) {
+      if (!error.providerStage) error.providerStage = 'customer_client_transform';
+      throw error;
+    }
+    try {
+      return discovered.customers.map(item => validGoogleAccount({
+        id: item.customerId,
+        name: item.account_name,
+        currency: item.currency,
+        loginCustomerId: item.loginCustomerId,
+      }));
+    } catch (error) {
+      if (!error.providerStage) error.providerStage = 'verified_account_shape';
+      throw error;
+    }
   };
 }
 
 function createAdAccountSelection({store, discoverByProvider, tokenLifecycleByProvider = {}} = {}) {
   async function discover(authority, provider, connection) {
     const lifecycle = tokenLifecycleByProvider[provider];
-    if (!lifecycle) return {accounts: await discoverByProvider[provider](connection.accessToken), connection};
-    const result = await lifecycle.run({
-      authority,
-      connection,
-      operation: current => discoverByProvider[provider](current.accessToken),
-    });
-    return {accounts: result.value, connection: result.connection};
+    try {
+      if (!lifecycle) return {accounts: await discoverByProvider[provider](connection.accessToken), connection};
+      const result = await lifecycle.run({
+        authority,
+        connection,
+        operation: current => discoverByProvider[provider](current.accessToken),
+      });
+      return {accounts: result.value, connection: result.connection};
+    } catch (error) {
+      if (provider === 'google_ads' && !error.providerStage) {
+        const code = String(error?.code || error?.message || '');
+        error.providerStage = /^GOOGLE_(?:TOKEN|REAUTHORIZE|ACCESS_TOKEN)/.test(code) ? 'token_lifecycle' : 'account_discovery_internal';
+      }
+      throw error;
+    }
   }
   return Object.freeze({
     async status(authority, provider) {

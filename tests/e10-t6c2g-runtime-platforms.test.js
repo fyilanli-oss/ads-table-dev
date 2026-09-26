@@ -57,6 +57,7 @@ test("provider token exchange clients keep credentials server-side and use exact
     calls.push({url, options});
     if (url.includes("/debug_token")) return {ok: true, json: async () => ({data: {app_id: "client", is_valid: true, expires_at: 1790341200, scopes: ["ads_read"]}})};
     const metaLongLived = url.includes("graph.facebook.com") && String(options.body || "").includes("fb_exchange_token");
+    if (url.includes("oauth2.googleapis.com")) return {ok: true, json: async () => ({access_token: "access", refresh_token: "refresh", expires_in: 3600, scope: "https://www.googleapis.com/auth/adwords"})};
     return {ok: true, json: async () => ({access_token: metaLongLived ? "meta-long" : "access", refresh_token: "refresh"})};
   }});
   for (const exchange of Object.values(exchanges)) {
@@ -158,3 +159,4 @@ test("incomplete provider activation stays isolated without crashing Shopify App
   assert.equal(typeof routes["GET /shopify/app/platforms"], "function");
   assert.equal(routes["POST /api/shopify/providers/meta/oauth/start"], undefined);
 });
+

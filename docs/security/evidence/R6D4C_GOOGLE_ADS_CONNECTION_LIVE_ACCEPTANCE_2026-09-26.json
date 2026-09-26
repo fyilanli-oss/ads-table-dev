@@ -1,0 +1,46 @@
+{
+  "evidence_version": "r6d4c-google-ads-connection-live-acceptance-v1",
+  "captured_at_utc": "2026-09-26T12:20:00Z",
+  "project": "adstable-dev",
+  "production_release": {
+    "pull_request": 276,
+    "merge_commit": "4b34eb4bfe33ca3ac67091b57e5ccd38c6ac25ce",
+    "deployment_status": "READY",
+    "canonical_alias": "https://dev.adstable.app",
+    "alias_match": true
+  },
+  "merchant_acceptance": {
+    "pending_grant_preserved": true,
+    "repeated_oauth_required": false,
+    "account_selection_modal": "PASS",
+    "selected_account_count": 3,
+    "connected_ui": "PASS",
+    "reload_persistence": "PASS",
+    "screenshots_required": false
+  },
+  "runtime_evidence": {
+    "accounts_request_status": 200,
+    "selection_request_status": 200
+  },
+  "supabase_read_only_postcheck": {
+    "result": "PASS",
+    "canonical_connection_rows": 1,
+    "connected_rows": 1,
+    "selected_account_count": 3,
+    "selected_accounts_shape_valid": true,
+    "credential_envelopes_present": true,
+    "account_verification_present": true,
+    "connected_timestamp_present": true,
+    "authorization_adapter": "shopify_verified_session",
+    "dataset_v2_google_ads_rows": 0
+  },
+  "scope": {
+    "connection_and_account_selection_only": true,
+    "dataset_v2_write": false,
+    "schedule_or_backfill": false,
+    "disconnect_acceptance": false,
+    "existing_e5_runtime_redeveloped": false
+  },
+  "decision": "PASS_GOOGLE_ADS_CONNECTION_AND_THREE_ACCOUNT_SELECTION_ONLY",
+  "next_gate": "R6-D4-D_GOOGLE_ADS_READ_ONLY_PREFLIGHT_ANALYST_BRIEF"
+}

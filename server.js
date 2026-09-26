@@ -1234,7 +1234,7 @@ registerOAuthProviderRoutes({app,provider:"google-sheets",startHandler:handleGoo
 app.get("/api/google-sheets/status",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
-    res.json({ok:true,connected:false,platform:GOOGLE_SHEETS_PLATFORM,status:"parked",parked:true,reason:GOOGLE_SHEETS_PARK_REASON});
+    res.json({ok:true,connected:false,platform:GOOGLE_SHEETS_PLATFORM,status:"retired",retired:true,reason:"legacy_google_services_retired"});
   }catch(e){res.status(e.status||500).json({ok:false,error:e.message})}
 });
 app.post("/api/google-sheets/disconnect",async(req,res)=>{
@@ -1455,8 +1455,8 @@ async function bindOrganicGa4Property(userId,body={}){requireOrganicGa4Ingest();
 }
 app.post("/api/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
 app.post("/api/platform/organic/bind",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json(await bindOrganicGa4Property(user.id,req.body||{}))}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_ga4_property_binding"})}});
-app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,parked:true,setupStage:"parked",reason:ORGANIC_GA4_PARK_REASON,ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
-app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,parked:true,setupStage:"parked",reason:ORGANIC_GA4_PARK_REASON,ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,retired:true,setupStage:"retired",reason:"legacy_google_services_retired",ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
+app.get("/api/platform/organic/binding",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;res.json({ok:true,platform:"organic",configured:false,retired:true,setupStage:"retired",reason:"legacy_google_services_retired",ga4_property:null})}catch(e){res.status(e.status||500).json({ok:false,error:e.message,stage:"organic_binding_status"})}});
 
 
 // ===== ORGANIC SNAPSHOT v1 =====
@@ -3644,7 +3644,7 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:false,google_sheets:false,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:"parked",google_sheets:"parked"},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:null},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"parked",label:"Organic",message:"GA4 Organic ingestion is parked; Paid/Organic Blend capability remains available for a future backend source."},google_sheets:{platform:"google_sheets",status:"parked",label:"Google Sheets",message:"Google Sheets export is parked until a Dataset V2 workspace export is designed."}}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:false,google_sheets:false,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:"retired",google_sheets:"retired"},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:null},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"retired",label:"Organic",message:"GA4 Organic is retired; historical records remain available for audit."},google_sheets:{platform:"google_sheets",status:"retired",label:"Google Sheets",message:"Google Sheets export is retired; historical spreadsheet metadata is preserved."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
 app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic","google_sheets"].includes(platform))return res.status(400).json({error:"Unsupported platform"});if(platform==="google_sheets")requireGoogleSheetsExport();const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({code:e.code||null,parked:e.code==="GOOGLE_SHEETS_EXPORT_PARKED",error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
@@ -4361,25 +4361,9 @@ app.post("/api/platform/google/disconnect",async(req,res)=>{
 // ===== D.2A.3 ORGANIC CONNECT / DISCONNECT SKELETON =====
 app.get("/api/platform/organic/status",async(req,res)=>{
   try{
-    const user=await requireUser(req,res);
-    if(!user)return;
-
-    const conn=await getConnection(user.id,"organic");
-    const ownershipCount=await countActiveOwnerships(user.id,"organic");
-    res.json({
-      platform:"organic",
-      label:"Organic",
-      state: conn ? "CONNECTED" : "NOT_CONNECTED",
-      connected:Boolean(conn),
-      account_limit:PHASE1_PLATFORM_LIMITS.organic,
-      active_ownership_count:ownershipCount,
-      setup_stage:conn?.metadata?.setupStage||"skeleton",
-      ga4_connected:Boolean(conn),
-      message:conn?"Organic enhancement is connected through Google Analytics.":"Connect Google Analytics to enable the Organic enhancement."
-    });
-  }catch(e){
-    res.status(500).json({error:e.message});
-  }
+    const user=await requireUser(req,res);if(!user)return;
+    res.json({platform:"organic",label:"Organic",state:"RETIRED",connected:false,retired:true,account_limit:PHASE1_PLATFORM_LIMITS.organic,active_ownership_count:0,setup_stage:"retired",ga4_connected:false,message:"GA4 Organic is retired. Historical records are preserved."});
+  }catch(e){res.status(500).json({error:e.message})}
 });
 
 app.post("/api/platform/organic/disconnect",async(req,res)=>{

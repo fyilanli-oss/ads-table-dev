@@ -174,7 +174,7 @@ function renderProviderSection({id, label, description, parked = false}, provide
       </s-modal>`}
       ${["meta", "google_ads", "klaviyo"].includes(id) && !parked ? `<s-modal id="${id}-disconnect-modal" heading="Disconnect ${label}?" size="small-100">
         <s-stack gap="base">
-          <s-paragraph>AdsTable will stop new provider access and refresh activity for this connection.</s-paragraph>
+          <s-paragraph>${id === "google_ads" ? "AdsTable will revoke this Google authorization, including the retired Google Sheets and GA4 permissions, then remove the Google Ads connection." : "AdsTable will stop new provider access and refresh activity for this connection."}</s-paragraph>
           <s-paragraph>Historical analytics will be preserved.</s-paragraph>
           <s-paragraph id="${id}-disconnect-message" aria-live="polite"></s-paragraph>
         </s-stack>

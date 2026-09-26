@@ -87,7 +87,9 @@ function initializeAdAccounts() {
             ? 'Meta access could not be revoked. The connection remains active.'
             : provider === 'meta' && error.message === 'META_REAUTHORIZE'
               ? 'Meta authorization must be renewed before this connection can be revoked.'
-              : (provider === 'meta' ? 'Meta' : 'Google Ads') + ' could not be disconnected. The connection remains active.';
+              : provider === 'google_ads' && error.message === 'GOOGLE_REVOKE_FAILED'
+                ? 'Google access could not be revoked. The connection remains active.'
+                : (provider === 'meta' ? 'Meta' : 'Google Ads') + ' could not be disconnected. The connection remains active.';
         } finally {
           busy = false;
           disconnectConfirm.disabled = false;

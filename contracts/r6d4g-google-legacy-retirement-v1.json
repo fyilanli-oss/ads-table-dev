@@ -1,0 +1,41 @@
+{
+  "contract_version": "r6d4g-google-legacy-retirement-v1",
+  "status": "APPROVED_REPOSITORY_IMPLEMENTATION",
+  "retired_services": [
+    "google_sheets",
+    "ga4_organic"
+  ],
+  "runtime": {
+    "oauth": false,
+    "refresh": false,
+    "manual_or_automatic_work": false,
+    "dataset_write": false,
+    "compatibility_tombstones": true
+  },
+  "google_ads_disconnect": {
+    "exact_confirmation": "DISCONNECT_GOOGLE_ADS",
+    "provider_grant_revoke_required": true,
+    "refresh_token_preferred": true,
+    "local_cleanup_after_revoke_only": true,
+    "failed_revoke_preserves_local_connection": true
+  },
+  "supabase": {
+    "migration_required": false,
+    "live_credential_cleanup_requires_separate_action_time_confirmation": true
+  },
+  "history": {
+    "preserve_legacy_google_jobs": true,
+    "preserve_spreadsheet_metadata": true,
+    "preserve_dataset_v2_rows": true,
+    "preserve_other_providers": true,
+    "preserve_reporting_currency": true
+  },
+  "out_of_scope": [
+    "new_google_project",
+    "dataset_v2_work",
+    "new_metrics",
+    "adapter_rebuild",
+    "history_deletion"
+  ],
+  "production_acceptance_required": true
+}

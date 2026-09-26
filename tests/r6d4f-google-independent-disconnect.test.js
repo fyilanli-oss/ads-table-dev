@@ -26,26 +26,29 @@ test('Google Ads disconnect requires exact action-time confirmation before readi
   assert.equal(reads, 0);
 });
 
-test('Google Ads disconnect is local-only and does not require provider transport', async () => {
-  const calls = [];
-  const service = createGoogleDisconnect({store: {
-    resolveConnected: async input => {
-      calls.push(['resolve', input]);
-      return {status: 'connected', version: 11, accessToken: 'must-not-be-used'};
+test('Google Ads disconnect revokes provider grant before local cleanup', async () => {
+  const calls = [], transport = [];
+  const service = createGoogleDisconnect({
+    store: {
+      resolveConnected: async input => { calls.push(['resolve', input]); return {version: 11, accessToken: 'access-secret', refreshToken: 'refresh-secret'}; },
+      disconnectGoogle: async input => calls.push(['disconnect', input]),
     },
-    disconnectGoogle: async input => calls.push(['disconnect', input]),
-  }});
-
-  assert.deepEqual(await service.execute(authority, CONFIRMATION), {
-    status: 'not_connected',
-    historical_data_preserved: true,
-    provider_grant_revoked: false,
-    local_credentials_removed: true,
+    fetchImpl: async (url, options) => { transport.push([url, options]); return {ok: true, status: 200, text: async () => ''}; },
   });
-  assert.deepEqual(calls, [
-    ['resolve', {authority, provider: 'google_ads'}],
-    ['disconnect', {authority, version: 11}],
-  ]);
+  const outcome = await service.execute(authority, CONFIRMATION);
+  assert.equal(outcome.provider_grant_revoked, true);
+  assert.equal(new URLSearchParams(transport[0][1].body).get('token'), 'refresh-secret');
+  assert.deepEqual(calls, [['resolve', {authority, provider: 'google_ads'}], ['disconnect', {authority, version: 11}]]);
+});
+
+test('failed Google revoke preserves local connection', async () => {
+  let writes = 0;
+  const service = createGoogleDisconnect({
+    store: {resolveConnected: async () => ({version: 11, refreshToken: 'secret'}), disconnectGoogle: async () => { writes += 1; }},
+    fetchImpl: async () => ({ok: false, status: 500, text: async () => ''}),
+  });
+  await assert.rejects(service.execute(authority, CONFIRMATION), error => error.code === 'GOOGLE_REVOKE_FAILED');
+  assert.equal(writes, 0);
 });
 
 test('already disconnected Google Ads is idempotent', async () => {
@@ -123,7 +126,7 @@ test('session-bound Google Ads disconnect route delegates exact confirmation', a
   ]);
 });
 
-test('embedded UI exposes Google Ads warning modal, Cancel and local disconnect action', () => {
+test('embedded UI exposes Google Ads warning modal, Cancel and provider revoke action', () => {
   const html = renderEmbeddedPlatforms({clientId: 'client', providerOAuthEnabled: true});
   const ui = fs.readFileSync(path.join(__dirname, '../src/shopify/ad-account-ui.js'), 'utf8');
   const runtime = fs.readFileSync(path.join(__dirname, '../src/shopify/runtime.js'), 'utf8');
@@ -131,7 +134,7 @@ test('embedded UI exposes Google Ads warning modal, Cancel and local disconnect 
   assert.match(html, /id="google_ads-disconnect-confirm"/);
   assert.match(html, /commandFor="google_ads-disconnect-modal" command="--hide">Cancel/);
   assert.match(ui, /DISCONNECT_GOOGLE_ADS/);
-  assert.match(runtime, /createGoogleDisconnect/);
+  assert.match(runtime, /createGoogleDisconnect\(\{store: connectionStore, fetchImpl\}\)/);
 });
 
 test('contract forbids global Google revoke and preserves unrelated state', () => {

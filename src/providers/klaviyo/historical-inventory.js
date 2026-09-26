@@ -46,7 +46,7 @@ function createKlaviyoHistoricalInventory({
     throw new TypeError('workspace settings store is required');
   }
   if (!providerClient || typeof providerClient.fetchAccount !== 'function' ||
-    typeof providerClient.fetchSentCampaignDates !== 'function') {
+    typeof providerClient.fetchCampaignInventory !== 'function') {
     throw new TypeError('Klaviyo historical inventory provider client is required');
   }
   const runner = createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate });
@@ -64,13 +64,13 @@ function createKlaviyoHistoricalInventory({
           accessToken: activeConnection.accessToken,
           accountId,
         });
-        const discovered = await providerClient.fetchSentCampaignDates({
+        const campaignInventory = await providerClient.fetchCampaignInventory({
           accessToken: activeConnection.accessToken,
           timeZone: account.timezone,
         });
-        const eligibleDates = discovered.filter(date => date <= latestClosedDate);
+        const eligibleDates = campaignInventory.sent_dates.filter(date => date <= latestClosedDate);
         if (eligibleDates.length === 0) {
-          return Object.freeze({ providerDate: null, eligibleDates, result: null });
+          return Object.freeze({ providerDate: null, eligibleDates, campaignInventory, result: null });
         }
         const providerDate = eligibleDates[0];
         const result = await runner(Object.freeze({
@@ -80,7 +80,7 @@ function createKlaviyoHistoricalInventory({
           currencyVersion: currency.currencyVersion,
           request: Object.freeze({ provider_date: providerDate }),
         }));
-        return Object.freeze({ providerDate, eligibleDates, result });
+        return Object.freeze({ providerDate, eligibleDates, campaignInventory, result });
       };
 
       const execution = tokenLifecycle
@@ -94,6 +94,10 @@ function createKlaviyoHistoricalInventory({
           status: 'PASS_R6_D5_A_KLAVIYO_HISTORICAL_INVENTORY',
           provider_result_status: 'empty',
           selected_account_count: 1,
+          total_campaign_count: inventory.campaignInventory.total_campaign_count,
+          sent_campaign_count: inventory.campaignInventory.sent_campaign_count,
+          sent_with_scheduled_at_count: inventory.campaignInventory.sent_with_scheduled_at_count,
+          sent_without_scheduled_at_count: inventory.campaignInventory.sent_without_scheduled_at_count,
           closed_sent_date_count: 0,
           checked_date_count: 0,
           row_count: 0,
@@ -120,6 +124,10 @@ function createKlaviyoHistoricalInventory({
         status: 'PASS_R6_D5_A_KLAVIYO_HISTORICAL_INVENTORY',
         provider_result_status: verified.providerResultStatus,
         selected_account_count: verified.selectedAccountCount,
+        total_campaign_count: inventory.campaignInventory.total_campaign_count,
+        sent_campaign_count: inventory.campaignInventory.sent_campaign_count,
+        sent_with_scheduled_at_count: inventory.campaignInventory.sent_with_scheduled_at_count,
+        sent_without_scheduled_at_count: inventory.campaignInventory.sent_without_scheduled_at_count,
         closed_sent_date_count: inventory.eligibleDates.length,
         checked_date_count: 1,
         row_count: verified.rows.length,

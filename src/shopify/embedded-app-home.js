@@ -393,9 +393,13 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           try {
             const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/historical-inventory", {method: "POST"});
             if (result.status !== "PASS_R6_D5_A_KLAVIYO_HISTORICAL_INVENTORY") throw new Error("KLAVIYO_HISTORICAL_INVENTORY_FAILED");
+            const campaignSummary = result.total_campaign_count + " campaign(s), " + result.sent_campaign_count + " Sent; " +
+              result.sent_with_scheduled_at_count + " with scheduled_at, " +
+              result.sent_without_scheduled_at_count + " without scheduled_at. ";
             historicalInventoryMessage.textContent = result.checked_date_count === 0
-              ? "PASS — No closed sent-campaign date was found. Dataset V2 writes: 0."
-              : "PASS — " + result.closed_sent_date_count + " closed sent date(s) found; " + result.row_count + " verified row(s) mapped on " + result.provider_date + ". Dataset V2 writes: 0.";
+              ? "PASS — " + campaignSummary + "No closed sent date. Dataset V2 writes: 0."
+              : "PASS — " + campaignSummary + result.closed_sent_date_count + " closed sent date(s) found; " +
+                result.row_count + " verified row(s) mapped on " + result.provider_date + ". Dataset V2 writes: 0.";
           } catch (error) {
             historicalInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_HISTORICAL_INVENTORY_FAILED";
             historicalInventoryButton.disabled = false;

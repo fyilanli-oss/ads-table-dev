@@ -198,6 +198,50 @@ function createKlaviyoProviderClient({
     return Object.freeze([...candidates.values()].sort((left, right) => left.id.localeCompare(right.id)));
   }
 
+  async function fetchCampaignInventory({ accessToken, timeZone } = {}) {
+    validateTimeZone(timeZone);
+    const dates = new Set();
+    let totalCampaignCount = 0;
+    let sentCampaignCount = 0;
+    let sentWithScheduledAtCount = 0;
+    let sentWithoutScheduledAtCount = 0;
+    for (const channel of ['email', 'sms']) {
+      const params = new URLSearchParams({
+        filter: `equals(messages.channel,'${channel}')`,
+        'fields[campaign]': 'status,scheduled_at',
+        'page[size]': '100',
+      });
+      let path = `/api/campaigns/?${params.toString()}`;
+      for (let page = 0; page < 100 && path; page += 1) {
+        const payload = await request(accessToken, path);
+        if (!Array.isArray(payload?.data)) throw new Error('KLAVIYO_CAMPAIGN_RESPONSE_INVALID');
+        for (const item of payload.data) {
+          totalCampaignCount += 1;
+          const status = required(item?.attributes?.status, 'campaign.status');
+          if (status !== 'Sent') continue;
+          sentCampaignCount += 1;
+          const date = campaignBusinessDate(item, timeZone);
+          if (date) {
+            sentWithScheduledAtCount += 1;
+            dates.add(date);
+          } else {
+            sentWithoutScheduledAtCount += 1;
+          }
+        }
+        const next = payload?.links?.next;
+        path = next ? campaignPagePath(next) : null;
+        if (page === 99 && path) throw new Error('KLAVIYO_CAMPAIGN_PAGINATION_LIMIT');
+      }
+    }
+    return Object.freeze({
+      total_campaign_count: totalCampaignCount,
+      sent_campaign_count: sentCampaignCount,
+      sent_with_scheduled_at_count: sentWithScheduledAtCount,
+      sent_without_scheduled_at_count: sentWithoutScheduledAtCount,
+      sent_dates: Object.freeze([...dates].sort((left, right) => right.localeCompare(left))),
+    });
+  }
+
   async function fetchSentCampaignDates({ accessToken, timeZone } = {}) {
     validateTimeZone(timeZone);
     const dates = new Set();
@@ -272,7 +316,7 @@ function createKlaviyoProviderClient({
     return Object.freeze({ rows, verified_empty: rows.length === 0 });
   }
 
-  return Object.freeze({ fetchAccount, fetchPlacedOrderMetricCandidates, fetchSentCampaignDates, fetchMessageFacts });
+  return Object.freeze({ fetchAccount, fetchPlacedOrderMetricCandidates, fetchCampaignInventory, fetchSentCampaignDates, fetchMessageFacts });
 }
 
 function codedError(code, status) {

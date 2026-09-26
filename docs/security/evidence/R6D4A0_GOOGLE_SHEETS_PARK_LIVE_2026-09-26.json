@@ -1,0 +1,37 @@
+{
+  "version": "r6d4a0-google-sheets-park-live-v1",
+  "result": "PASS",
+  "merge_commit": "1a9fa1d69d8a9552108e693cd4366d8852108a2a",
+  "security_full_regression": "PASS",
+  "deployment": {
+    "target": "production",
+    "state": "READY",
+    "canonical_alias": "dev.adstable.app",
+    "alias_error": null,
+    "runtime_error_scan_1h": 0
+  },
+  "read_only_postcheck": {
+    "legacy_rows": 1,
+    "connected_rows": 1,
+    "spreadsheet_bound_rows": 1,
+    "auto_sync_enabled_historical_rows": 1,
+    "last_sync_success_historical_rows": 1,
+    "plaintext_token_rows": 0,
+    "encrypted_token_rows": 1,
+    "encrypted_access_rows": 1,
+    "encrypted_refresh_rows": 1,
+    "dataset_v2_total_rows": 0,
+    "dataset_v2_google_sheets_rows": 0
+  },
+  "mutations": {
+    "supabase": false,
+    "provider_contact": false,
+    "provider_revoke": false,
+    "spreadsheet_write": false
+  },
+  "redaction": {
+    "user_identity": "omitted",
+    "token_material": "omitted",
+    "spreadsheet_identity": "omitted"
+  }
+}

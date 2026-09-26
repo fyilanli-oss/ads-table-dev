@@ -26,6 +26,7 @@ const {createAdAccountSelection, createMetaAccountDiscovery, createGoogleAdsAcco
 const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
 const {createKlaviyoProviderClient} = require("../providers/klaviyo/provider-client");
 const {createKlaviyoReadOnlyPreflight} = require("../providers/klaviyo/read-only-preflight");
+const {createKlaviyoHistoricalInventory} = require("../providers/klaviyo/historical-inventory");
 const {createKlaviyoMetricBinding} = require("../providers/klaviyo/metric-binding");
 const {createKlaviyoControlledDatasetAcceptance} = require("../providers/klaviyo/controlled-dataset-acceptance");
 const {createKlaviyoTokenLifecycle} = require("../providers/klaviyo/token-lifecycle");
@@ -152,6 +153,15 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           resolveFxRate,
         })
         : {execute: async () => {throw Object.assign(new Error("KLAVIYO_PREFLIGHT_NOT_CONFIGURED"), {code: "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", status: 503});}};
+      const historicalInventory = typeof resolveFxRate === "function"
+        ? createKlaviyoHistoricalInventory({
+          connectionStore,
+          settingsStore,
+          providerClient,
+          tokenLifecycle,
+          resolveFxRate,
+        })
+        : null;
       const datasetAcceptance = typeof resolveFxRate === "function"
         ? createKlaviyoControlledDatasetAcceptance({
           connectionStore,
@@ -171,6 +181,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
       }),
       preflight,
+      historicalInventory,
       datasetAcceptance,
       metricBinding: createKlaviyoMetricBinding({connectionStore, providerClient, tokenLifecycle}),
       });

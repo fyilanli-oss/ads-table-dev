@@ -79,5 +79,11 @@ Bu paket yalnız plan, karar, contract ve test değiştirir. Rollback ilgili com
 
 ## Durum
 
-`Done — contract only / R6-D4-B implementation gate`
+`R6-D4-C production merchant acceptance PASS / R6-D4-D read-only preflight gate`
+
+## R6-D4-C canlı kabul sonucu
+
+Merchant akışı production'da üç provider-doğrulanmış hesapla tamamlandı. Korunmuş pending OAuth grant'i hesap seçim modalını yeniden OAuth istemeden açtı; seçim kaydı sonrasında arayüz `Connected · 3 accounts` gösterdi ve reload kalıcılığı kullanıcı tarafından doğrulandı. Runtime accounts GET ve selection POST istekleri `200` verdi.
+
+Salt-okunur Supabase postcheck; tek canonical Google Ads bağlantısının `connected` olduğunu, üç seçilmiş hesabın zorunlu alanlarının geçerli olduğunu, credential envelope'larının şifreli biçimde bulunduğunu, account verification ve connected zamanlarının mevcut olduğunu ve işlemin `shopify_verified_session` üzerinden yetkilendirildiğini doğruladı. Dataset V2 Google Ads satırı `0` kaldı. Bu kabul veri okuma/yazma, schedule/backfill veya Disconnect kabulü değildir. Redacted kanıt `docs/security/evidence/R6D4C_GOOGLE_ADS_CONNECTION_LIVE_ACCEPTANCE_2026-09-26.json` içindedir.
 

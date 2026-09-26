@@ -291,6 +291,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-paragraph>This read-only check finds closed dates for sent Klaviyo campaigns and evaluates only the most recent date through the existing Campaign and Flow mapping. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d5-klaviyo-historical-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d5-klaviyo-historical-run" variant="primary">Run historical read-only inventory</s-button>
+          <s-paragraph>This separate read-only check inventories Flow status and known synthetic Event categories. Events remain diagnostic evidence and are not written as Campaign or Flow performance rows.</s-paragraph>
+          <s-paragraph id="r6d5-klaviyo-flow-event-message" aria-live="polite"></s-paragraph>
+          <s-button id="r6d5-klaviyo-flow-event-run" variant="primary">Run Flow/Event read-only inventory</s-button>
         </s-stack>
       </s-section>
     </div>
@@ -342,6 +345,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const historicalInventoryPanel = document.getElementById("r6d5-klaviyo-historical-inventory");
       const historicalInventoryButton = document.getElementById("r6d5-klaviyo-historical-run");
       const historicalInventoryMessage = document.getElementById("r6d5-klaviyo-historical-message");
+      const flowEventInventoryButton = document.getElementById("r6d5-klaviyo-flow-event-run");
+      const flowEventInventoryMessage = document.getElementById("r6d5-klaviyo-flow-event-message");
       const params = new URLSearchParams(location.search);
       const sessionRequest = async (path, options = {}) => {
         if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
@@ -404,6 +409,31 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             historicalInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_HISTORICAL_INVENTORY_FAILED";
             historicalInventoryButton.disabled = false;
           } finally { historicalInventoryButton.loading = false; }
+        });
+        flowEventInventoryButton.addEventListener("click", async () => {
+          flowEventInventoryButton.disabled = true;
+          flowEventInventoryButton.loading = true;
+          flowEventInventoryMessage.textContent = "Inspecting Flow status and Event dates without writing Dataset V2…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/flow-event-inventory", {method: "POST"});
+            if (result.status !== "PASS_R6_D5_A2_KLAVIYO_FLOW_EVENT_INVENTORY") throw new Error("KLAVIYO_FLOW_EVENT_INVENTORY_FAILED");
+            const counts = result.event_counts;
+            const range = result.earliest_event_date
+              ? result.earliest_event_date + " to " + result.latest_event_date
+              : "no event date";
+            flowEventInventoryMessage.textContent =
+              "PASS — " + result.flow_count + " flow(s): " + result.flow_status_counts.live + " live, " +
+              result.flow_status_counts.manual + " manual, " + result.flow_status_counts.draft + " draft, " +
+              result.flow_status_counts.other + " other. " + result.scanned_event_count + " event(s) scanned (" + range + "), " +
+              result.attributed_event_count + " attributed; Received Email " + counts.received_email +
+              ", Opened Email " + counts.opened_email + ", Clicked Email " + counts.clicked_email +
+              ", Added to Cart " + counts.added_to_cart + ", Started Checkout " + counts.started_checkout +
+              ", Placed Order " + counts.placed_order + ". Scan truncated: " + (result.event_scan_truncated ? "yes" : "no") +
+              ". Dataset V2 writes: 0.";
+          } catch (error) {
+            flowEventInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_FLOW_EVENT_INVENTORY_FAILED";
+            flowEventInventoryButton.disabled = false;
+          } finally { flowEventInventoryButton.loading = false; }
         });
       }
       if (params.get("acceptance") === "r6d2-klaviyo") {

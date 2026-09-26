@@ -236,6 +236,13 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-paragraph>This one-time check reads the selected Google Ads accounts, Standard Ads and Performance Max Asset Groups through the completed E5 contract. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d4-google-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d4-google-run" variant="primary">Run read-only acceptance</s-button>
+          <div id="r6d4-google-dataset-step">
+            <s-stack gap="base">
+              <s-paragraph>This controlled acceptance may write only real provider-verified Google Ads rows to Dataset V2. A verified empty result writes no synthetic rows and does not enable schedules or backfill.</s-paragraph>
+              <s-paragraph id="r6d4-google-dataset-message" aria-live="polite"></s-paragraph>
+              <s-button id="r6d4-google-dataset-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
+            </s-stack>
+          </div>
         </s-stack>
       </s-section>
     </div>
@@ -308,6 +315,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const googleAcceptancePanel = document.getElementById("r6d4-google-acceptance");
       const googleAcceptanceButton = document.getElementById("r6d4-google-run");
       const googleAcceptanceMessage = document.getElementById("r6d4-google-message");
+      const googleDatasetAcceptanceButton = document.getElementById("r6d4-google-dataset-run");
+      const googleDatasetAcceptanceMessage = document.getElementById("r6d4-google-dataset-message");
       const metaAcceptancePanel = document.getElementById("r6d3-meta-acceptance");
       const metaAcceptanceButton = document.getElementById("r6d3-meta-run");
       const metaAcceptanceMessage = document.getElementById("r6d3-meta-message");
@@ -479,6 +488,22 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             googleAcceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "GOOGLE_PREFLIGHT_FAILED";
             googleAcceptanceButton.disabled = false;
           } finally { googleAcceptanceButton.loading = false; }
+        });
+        googleDatasetAcceptanceButton.addEventListener("click", async () => {
+          googleDatasetAcceptanceButton.disabled = true;
+          googleDatasetAcceptanceButton.loading = true;
+          googleDatasetAcceptanceMessage.textContent = "Running one controlled Dataset V2 acceptance…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/google_ads/runtime/acceptance", {
+              method: "POST",
+              body: JSON.stringify({confirmation: "RUN_R6_D4_E_GOOGLE_WRITE"}),
+            });
+            googleDatasetAcceptanceMessage.textContent = result.status === "PASS_R6_D4_E_GOOGLE_DATASET_WRITE"
+              ? "PASS — attempted: " + result.attempted + ", persisted: " + result.persisted + ", verified empty: " + result.empty_provider_result + "."
+              : "The Dataset V2 acceptance result could not be verified.";
+          } catch (error) {
+            googleDatasetAcceptanceMessage.textContent = (/^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "GOOGLE_DATASET_ACCEPTANCE_FAILED") + ". Do not retry; review runtime evidence.";
+          } finally { googleDatasetAcceptanceButton.loading = false; }
         });
       }
       document.querySelectorAll("s-button[data-provider]").forEach((button) => button.addEventListener("click", async () => {

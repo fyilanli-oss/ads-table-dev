@@ -14,10 +14,11 @@ Merchant Google Ads OAuth iznini tamamladı; callback canonical workspace bağla
 ## Corrective kapsamı
 
 1. `list_accessible_customers` ve `customer_client_search` aşamaları ayrılır.
-2. Yalnız HTTP status, Google hata sınıfı ve request ID server loguna yazılır.
-3. OAuth token, developer token, hesap/customer ID, provider mesajı ve response body loglanmaz.
-4. Yeni canonical `GOOGLE_ADS_DEVELOPER_TOKEN` adı tercih edilir; eski production `GOOGLE_DEVELOPER_TOKEN` yalnız server-side fallback olarak desteklenir.
-5. Mevcut pending bağlantı korunur. Yeniden OAuth, Supabase mutation, Dataset V2 write, schedule/backfill veya Disconnect yapılmaz.
+2. Provider HTTP hatası yoksa token lifecycle, JSON response, customer transform ve verified-account shape aşamaları ayrıca ayrılır.
+3. Yalnız HTTP status, Google hata sınıfı ve request ID server loguna yazılır.
+4. OAuth token, developer token, hesap/customer ID, provider mesajı ve response body loglanmaz.
+5. Yeni canonical `GOOGLE_ADS_DEVELOPER_TOKEN` adı tercih edilir; eski production `GOOGLE_DEVELOPER_TOKEN` yalnız server-side fallback olarak desteklenir.
+6. Mevcut pending bağlantı korunur. Yeniden OAuth, Supabase mutation, Dataset V2 write, schedule/backfill veya Disconnect yapılmaz.
 
 ## Kabul sonucu
 

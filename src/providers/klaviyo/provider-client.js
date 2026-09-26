@@ -348,10 +348,10 @@ function createKlaviyoProviderClient({
     let eventPath = '/api/events/?fields[event]=datetime&fields[metric]=name,integration&fields[attribution]=id&include=metric,attributions&page[size]=200&sort=datetime';
     for (let page = 0; page < MAX_DIAGNOSTIC_EVENT_PAGES && eventPath; page += 1) {
       const payload = await request(accessToken, eventPath);
-      if (!Array.isArray(payload?.data) || !Array.isArray(payload?.included)) {
+      if (!Array.isArray(payload?.data) || (payload?.included !== undefined && !Array.isArray(payload.included))) {
         throw new Error('KLAVIYO_EVENT_RESPONSE_INVALID');
       }
-      const metrics = new Map(payload.included
+      const metrics = new Map((payload.included || [])
         .filter(item => item?.type === 'metric')
         .map(item => [required(item?.id, 'metric.id'), required(item?.attributes?.name, 'metric.name')]));
       for (const item of payload.data) {

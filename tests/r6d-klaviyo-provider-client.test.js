@@ -179,3 +179,42 @@ test('Klaviyo provider client returns a safe rate-limit error after the bounded 
   });
   assert.equal(calls, 3);
 });
+
+
+test('Klaviyo sent campaign inventory returns unique provider dates without campaign identifiers', async () => {
+  const calls = [];
+  const fetchImpl = async url => {
+    calls.push(url);
+    const decoded = decodeURIComponent(url);
+    if (decoded.includes("'email'")) return response({
+      data: [
+        { id: 'campaign-secret-1', attributes: { scheduled_at: '2026-09-20T23:30:00Z' } },
+        { id: 'campaign-secret-2', attributes: { scheduled_at: '2026-09-20T08:00:00Z' } },
+      ],
+      links: { next: null },
+    });
+    return response({
+      data: [{ id: 'campaign-secret-3', attributes: { scheduled_at: '2026-09-19T10:00:00Z' } }],
+      links: { next: null },
+    });
+  };
+  const client = createKlaviyoProviderClient({ fetchImpl });
+  const dates = await client.fetchSentCampaignDates({ accessToken: 'secret', timeZone: 'America/New_York' });
+  assert.deepEqual(dates, ['2026-09-20', '2026-09-19']);
+  assert.equal(JSON.stringify(dates).includes('campaign-secret'), false);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every(url => decodeURIComponent(url).includes("equals(status,'Sent')")));
+});
+
+test('Klaviyo sent campaign inventory rejects pagination outside the provider origin', async () => {
+  const client = createKlaviyoProviderClient({
+    fetchImpl: async () => response({
+      data: [],
+      links: { next: 'https://attacker.invalid/api/campaigns/?page[cursor]=steal' },
+    }),
+  });
+  await assert.rejects(
+    client.fetchSentCampaignDates({ accessToken: 'secret', timeZone: 'UTC' }),
+    /KLAVIYO_CAMPAIGN_PAGINATION_INVALID/,
+  );
+});

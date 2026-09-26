@@ -285,6 +285,15 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         </s-stack>
       </s-section>
     </div>
+    <div id="r6d5-klaviyo-historical-inventory" hidden>
+      <s-section heading="Klaviyo historical test-data inventory">
+        <s-stack gap="base">
+          <s-paragraph>This read-only check finds closed dates for sent Klaviyo campaigns and evaluates only the most recent date through the existing Campaign and Flow mapping. It does not write Dataset V2.</s-paragraph>
+          <s-paragraph id="r6d5-klaviyo-historical-message" aria-live="polite"></s-paragraph>
+          <s-button id="r6d5-klaviyo-historical-run" variant="primary">Run historical read-only inventory</s-button>
+        </s-stack>
+      </s-section>
+    </div>
     <div id="currency-setup" hidden>
       <s-section heading="Finish setup">
         <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
@@ -330,6 +339,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const metricConfirm = document.getElementById("r6d2-klaviyo-metric-confirm");
       const datasetAcceptanceButton = document.getElementById("r6d2-klaviyo-c6-run");
       const datasetAcceptanceMessage = document.getElementById("r6d2-klaviyo-c6-message");
+      const historicalInventoryPanel = document.getElementById("r6d5-klaviyo-historical-inventory");
+      const historicalInventoryButton = document.getElementById("r6d5-klaviyo-historical-run");
+      const historicalInventoryMessage = document.getElementById("r6d5-klaviyo-historical-message");
       const params = new URLSearchParams(location.search);
       const sessionRequest = async (path, options = {}) => {
         if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
@@ -372,6 +384,24 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           currencyMessage.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Currency is already configured. Reload Data sources." : "Please choose a supported currency and try again.";
         } finally { saveCurrency.disabled = false; saveCurrency.loading = false; }
       });
+      if (params.get("acceptance") === "r6d5-klaviyo") {
+        historicalInventoryPanel.hidden = false;
+        historicalInventoryButton.addEventListener("click", async () => {
+          historicalInventoryButton.disabled = true;
+          historicalInventoryButton.loading = true;
+          historicalInventoryMessage.textContent = "Inspecting closed sent-campaign dates without writing Dataset V2…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/historical-inventory", {method: "POST"});
+            if (result.status !== "PASS_R6_D5_A_KLAVIYO_HISTORICAL_INVENTORY") throw new Error("KLAVIYO_HISTORICAL_INVENTORY_FAILED");
+            historicalInventoryMessage.textContent = result.checked_date_count === 0
+              ? "PASS — No closed sent-campaign date was found. Dataset V2 writes: 0."
+              : "PASS — " + result.closed_sent_date_count + " closed sent date(s) found; " + result.row_count + " verified row(s) mapped on " + result.provider_date + ". Dataset V2 writes: 0.";
+          } catch (error) {
+            historicalInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_HISTORICAL_INVENTORY_FAILED";
+            historicalInventoryButton.disabled = false;
+          } finally { historicalInventoryButton.loading = false; }
+        });
+      }
       if (params.get("acceptance") === "r6d2-klaviyo") {
         acceptancePanel.hidden = false;
         const showAcceptanceResult = result => {

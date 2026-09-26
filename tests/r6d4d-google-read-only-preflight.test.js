@@ -17,6 +17,7 @@ const authority = {authority: 'server_resolved_workspace', workspace_id: WORKSPA
 const standardFixture = JSON.parse(fs.readFileSync(path.join(__dirname, '../artifacts/e5-google/e5-t3-standard-ad-fixture.json'), 'utf8'));
 const pmaxFixture = JSON.parse(fs.readFileSync(path.join(__dirname, '../artifacts/e5-google/e5-t4-pmax-asset-group-fixture.json'), 'utf8'));
 const contract = JSON.parse(fs.readFileSync(path.join(__dirname, '../contracts/r6d4d-google-read-only-preflight-v1.json'), 'utf8'));
+const liveEvidence = JSON.parse(fs.readFileSync(path.join(__dirname, '../docs/security/evidence/R6D4D_GOOGLE_READ_ONLY_LIVE_ACCEPTANCE_2026-09-26.json'), 'utf8'));
 const accounts = [
   {id: '1111111111', name: 'One', currency: 'USD', login_customer_id: '9999999999'},
   {id: '2222222222', name: 'Two', currency: 'USD', login_customer_id: '9999999999'},
@@ -44,7 +45,7 @@ function providerSearch(calls, {withRows = true} = {}) {
 }
 
 test('R6-D4-D contract reuses E5 and keeps Dataset V2 closed', () => {
-  assert.equal(contract.status, 'PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING');
+  assert.equal(contract.status, 'PASS_PRODUCTION_READ_ONLY_ACCEPTANCE');
   assert.equal(contract.reuse.e5_standard_query_and_mapper, true);
   assert.equal(contract.reuse.e5_performance_max_query_and_mapper, true);
   assert.equal(contract.reuse.e5_time_fx, true);
@@ -52,7 +53,19 @@ test('R6-D4-D contract reuses E5 and keeps Dataset V2 closed', () => {
   assert.equal(contract.acceptance.normal_data_sources_ui_changed, false);
   assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
-  assert.equal(contract.live_acceptance.status, 'PENDING');
+  assert.equal(contract.live_acceptance.status, 'PASS');
+  assert.equal(contract.live_acceptance.selected_account_count, 3);
+  assert.equal(contract.live_acceptance.verified_row_count, 0);
+  assert.equal(contract.live_acceptance.provider_result_status, 'empty');
+  assert.equal(contract.live_acceptance.standard_and_performance_max_verified, true);
+  assert.equal(contract.live_acceptance.time_fx_verified, true);
+  assert.equal(contract.live_acceptance.supabase_postcheck, 'PASS');
+  assert.equal(liveEvidence.result, 'PASS_PRODUCTION_READ_ONLY_ACCEPTANCE');
+  assert.equal(liveEvidence.merchant_acceptance.dataset_v2_writes, 0);
+  assert.equal(liveEvidence.supabase_postcheck.google_dataset_rows, 0);
+  assert.equal(liveEvidence.supabase_postcheck.google_synthetic_rows, 0);
+  assert.equal(liveEvidence.supabase_postcheck.browser_grant_count, 0);
+  assert.equal(liveEvidence.safeguards.production_activation, false);
 });
 
 test('completed E5 Standard and PMax mappers support workspace authority without legacy user ownership', () => {

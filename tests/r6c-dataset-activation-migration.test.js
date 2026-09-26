@@ -37,7 +37,7 @@ test('R6-C rollback fails closed after workspace-only rows exist', () => {
 });
 
 test('R6-C contract records live schema acceptance without provider activation', () => {
-  assert.equal(contract.status, 'R6_D2_KLAVIYO_LIVE_PASS_R6_D3C_META_CONNECTION_ACCOUNT_SELECTION_LIVE_PASS_DATA_RUNTIME_GATE');
+  assert.equal(contract.status, 'R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_FULL_LIFECYCLE_LIVE_PASS_R6_D4D_GOOGLE_READ_ONLY_LIVE_PASS_DATASET_ACCEPTANCE_GATE');
   assert.equal(contract.r6c_activation_migration.prepared, true);
   assert.equal(contract.r6c_activation_migration.applied_live, true);
   assert.equal(contract.r6c_activation_migration.live_migration_version, '20260923154503');
@@ -45,5 +45,5 @@ test('R6-C contract records live schema acceptance without provider activation',
   assert.equal(contract.r6c_activation_migration.postcheck_result, 'PASS');
   assert.equal(contract.r6c_activation_migration.provider_runtime_activated, false);
   assert.equal(contract.r6b_runtime_boundary.production_registered, false);
-  assert.equal(contract.next_gate, 'R6-D4-D_GOOGLE_READ_ONLY_PRODUCTION_ACCEPTANCE');
+  assert.equal(contract.next_gate, 'R6-D4-E_GOOGLE_CONTROLLED_DATASET_V2_ACCEPTANCE_BRIEF');
 });

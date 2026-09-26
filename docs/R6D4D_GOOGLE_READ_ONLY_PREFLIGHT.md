@@ -45,5 +45,5 @@ Başarılı sonuç şu anlama gelir:
 
 ## Durum
 
-Repository uygulaması hazırlanmıştır; production kabulü henüz yapılmamıştır. Canlı kontrol ve salt-okunur Supabase son kontrolü kanıtlanmadan R6-D4-D tamamlanmış sayılmaz. Canlı PASS sonrasında sıradaki çalışma ayrı analist brief'i ve onayla R6-D4-E kontrollü Dataset V2 kabulüdür.
+Production salt-okunur kabulü PASS olmuştur. Üç canonical Google Ads hesabında Standard ve Performance Max dalları çalışmış, provider sonucu doğrulanmış boş (`0` satır) dönmüş, Time/FX kontrolleri geçmiş ve Dataset V2 yazımı `0` kalmıştır. Supabase son kontrolü tek connected canonical bağlantıyı, üç seçilmiş hesabı, encrypted access/refresh token zarflarını, reporting currency kaydını, workspace ve Google Dataset V2 satırlarının `0` olduğunu, sentetik Google satırının `0` ve tarayıcı rol grant'inin `0` olduğunu doğrulamıştır. Redacted kanıt `docs/security/evidence/R6D4D_GOOGLE_READ_ONLY_LIVE_ACCEPTANCE_2026-09-26.json` içindedir. Sıradaki çalışma ayrı analist brief'i ve onayla R6-D4-E kontrollü Dataset V2 kabulüdür.
 

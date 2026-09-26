@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d4d-google-read-only-preflight-v1",
-  "status": "PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING",
+  "status": "PASS_PRODUCTION_READ_ONLY_ACCEPTANCE",
   "provider": "google_ads",
   "business_outcome": "Verify that every selected canonical Google Ads customer can supply provider metadata plus the completed E5 Standard and Performance Max branches for one closed business day without writing Dataset V2.",
   "reuse": {
@@ -23,8 +23,15 @@
     "selected_account_minimum": 1,
     "selected_account_maximum": 3,
     "manager_context": "canonical_selected_accounts.login_customer_id",
-    "customer_metadata": ["id", "currency_code", "time_zone"],
-    "branches": ["standard", "performance_max"],
+    "customer_metadata": [
+      "id",
+      "currency_code",
+      "time_zone"
+    ],
+    "branches": [
+      "standard",
+      "performance_max"
+    ],
     "date_strategy": "previous_closed_business_date_per_customer_timezone",
     "metrics": "E5_FIXED_CONTRACT"
   },
@@ -61,16 +68,15 @@
   "provider_contact": true,
   "dataset_v2_write": false,
   "live_acceptance": {
-    "status": "PENDING",
-    "selected_account_count": null,
-    "verified_row_count": null,
-    "provider_result_status": null,
-    "customer_metadata_verified": null,
-    "standard_and_performance_max_verified": null,
-    "time_fx_verified": null,
-    "supabase_postcheck": null,
-    "evidence": null
+    "status": "PASS",
+    "selected_account_count": 3,
+    "verified_row_count": 0,
+    "provider_result_status": "empty",
+    "customer_metadata_verified": true,
+    "standard_and_performance_max_verified": true,
+    "time_fx_verified": true,
+    "supabase_postcheck": "PASS",
+    "evidence": "docs/security/evidence/R6D4D_GOOGLE_READ_ONLY_LIVE_ACCEPTANCE_2026-09-26.json"
   },
-  "next_gate": "R6-D4-E_CONTROLLED_DATASET_V2_ACCEPTANCE_BRIEF_AFTER_LIVE_PASS"
+  "next_gate": "R6-D4-E_GOOGLE_CONTROLLED_DATASET_V2_ACCEPTANCE_BRIEF"
 }
-

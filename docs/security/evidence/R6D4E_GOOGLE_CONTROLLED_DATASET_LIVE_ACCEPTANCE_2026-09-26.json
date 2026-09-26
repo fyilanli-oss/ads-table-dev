@@ -1,0 +1,46 @@
+{
+  "evidence_version": "r6d4e-google-controlled-dataset-live-acceptance-v1",
+  "recorded_date": "2026-09-26",
+  "result": "PASS_PRODUCTION_VERIFIED_EMPTY",
+  "deployment": {
+    "pull_request": 280,
+    "merge_commit": "6b4d4c1abb7a9a3fe83959c176a0213abd3ffa90",
+    "security_suite": "PASS",
+    "full_regression_suite": "PASS",
+    "vercel": "SUCCESS"
+  },
+  "merchant_acceptance": {
+    "selected_account_count": 3,
+    "attempted": 0,
+    "persisted": 0,
+    "verified_empty": true
+  },
+  "supabase_postcheck": {
+    "result": "PASS_R6_D4_E_VERIFIED_EMPTY_POSTCHECK",
+    "canonical_google_rows": 1,
+    "connected_google_rows": 1,
+    "selected_account_count": 3,
+    "valid_connected_google_rows": 1,
+    "connected_with_access_envelope": 1,
+    "connected_with_refresh_envelope": 1,
+    "connected_with_access_expiry": 1,
+    "merchant_reporting_currency_rows": 1,
+    "dataset_v2_total_rows": 0,
+    "connected_workspace_dataset_rows": 0,
+    "google_dataset_rows": 0,
+    "google_synthetic_rows": 0,
+    "connected_workspace_google_rows": 0,
+    "browser_grant_count": 0
+  },
+  "safeguards": {
+    "account_workspace_and_token_values_recorded": false,
+    "synthetic_rows_written": 0,
+    "non_empty_physical_upsert_observed": false,
+    "schedule_enabled": false,
+    "backfill_enabled": false,
+    "dataset_v1_write": false,
+    "google_sheets_or_ga4_activated": false,
+    "production_activation": false
+  },
+  "next_gate": "R6-D4-F_GOOGLE_INDEPENDENT_DISCONNECT_ANALYST_BRIEF"
+}

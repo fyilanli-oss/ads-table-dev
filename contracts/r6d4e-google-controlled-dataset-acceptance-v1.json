@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d4e-google-controlled-dataset-acceptance-v1",
-  "status": "PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING",
+  "status": "PASS_PRODUCTION_VERIFIED_EMPTY",
   "provider": "google_ads",
   "canonical_dataset_platform": "google",
   "business_outcome": "Prove the final workspace-authoritative Google Ads to Dataset V2 persistence boundary for all selected accounts without schedules, backfill, V1 writes or synthetic rows.",
@@ -48,20 +48,19 @@
     "google_sheets_or_ga4_reactivation",
     "disconnect_or_provider_revoke"
   ],
-  "production_deployed": false,
-  "provider_contact": false,
+  "production_deployed": true,
+  "provider_contact": true,
   "dataset_v2_write": false,
   "live_acceptance": {
-    "status": "PENDING",
-    "selected_account_count": null,
-    "attempted": null,
-    "persisted": null,
-    "provider_result_status": null,
-    "synthetic_rows_written": null,
-    "non_empty_physical_upsert_observed": null,
-    "supabase_postcheck": null,
-    "evidence": null
+    "status": "PASS",
+    "selected_account_count": 3,
+    "attempted": 0,
+    "persisted": 0,
+    "provider_result_status": "empty",
+    "synthetic_rows_written": 0,
+    "non_empty_physical_upsert_observed": false,
+    "supabase_postcheck": "PASS",
+    "evidence": "docs/security/evidence/R6D4E_GOOGLE_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-26.json"
   },
   "next_gate": "R6-D4-F_GOOGLE_INDEPENDENT_DISCONNECT_DECISION_AFTER_LIVE_PASS"
 }
-

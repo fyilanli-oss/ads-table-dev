@@ -60,16 +60,21 @@ test('R6-D4-E uses a conservative three-day guard window for account timezones',
 });
 
 test('R6-D4-E contract reuses completed Google runtime and keeps production activation closed', () => {
-  assert.equal(contract.status, 'PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING');
+  assert.equal(contract.status, 'PASS_PRODUCTION_VERIFIED_EMPTY');
   assert.equal(contract.canonical_dataset_platform, 'google');
   assert.equal(contract.reuse.e5_standard_performance_max_conversion_time_fx, true);
   assert.equal(contract.reuse.r6d4d_workspace_runner, true);
   assert.equal(contract.reuse.legacy_server_refresh_reactivated, false);
   assert.equal(contract.controls.verified_empty_writes_synthetic_rows, false);
-  assert.equal(contract.production_deployed, false);
-  assert.equal(contract.provider_contact, false);
+  assert.equal(contract.production_deployed, true);
+  assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
-  assert.equal(contract.live_acceptance.status, 'PENDING');
+  assert.equal(contract.live_acceptance.status, 'PASS');
+  assert.equal(contract.live_acceptance.selected_account_count, 3);
+  assert.equal(contract.live_acceptance.attempted, 0);
+  assert.equal(contract.live_acceptance.persisted, 0);
+  assert.equal(contract.live_acceptance.synthetic_rows_written, 0);
+  assert.equal(contract.live_acceptance.supabase_postcheck, 'PASS');
 });
 
 test('R6-D4-E requires exact action-time confirmation before provider or Dataset access', async () => {

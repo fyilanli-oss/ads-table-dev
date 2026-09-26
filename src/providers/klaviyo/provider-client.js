@@ -242,9 +242,30 @@ function createKlaviyoProviderClient({
     });
   }
 
-  async function fetchSentCampaignDates(options = {}) {
-    const inventory = await fetchCampaignInventory(options);
-    return inventory.sent_dates;
+  async function fetchSentCampaignDates({ accessToken, timeZone } = {}) {
+    validateTimeZone(timeZone);
+    const dates = new Set();
+    for (const channel of ['email', 'sms']) {
+      const params = new URLSearchParams({
+        filter: `and(equals(messages.channel,'${channel}'),equals(status,'Sent'))`,
+        'fields[campaign]': 'scheduled_at',
+        'page[size]': '100',
+        sort: '-scheduled_at',
+      });
+      let path = `/api/campaigns/?${params.toString()}`;
+      for (let page = 0; page < 100 && path; page += 1) {
+        const payload = await request(accessToken, path);
+        if (!Array.isArray(payload?.data)) throw new Error('KLAVIYO_CAMPAIGN_RESPONSE_INVALID');
+        for (const item of payload.data) {
+          const date = campaignBusinessDate(item, timeZone);
+          if (date) dates.add(date);
+        }
+        const next = payload?.links?.next;
+        path = next ? campaignPagePath(next) : null;
+        if (page === 99 && path) throw new Error('KLAVIYO_CAMPAIGN_PAGINATION_LIMIT');
+      }
+    }
+    return Object.freeze([...dates].sort((left, right) => right.localeCompare(left)));
   }
 
   async function report(accessToken, branch, timeframe, conversionMetricIdInput) {

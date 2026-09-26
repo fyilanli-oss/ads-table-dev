@@ -1,0 +1,53 @@
+{
+  "contract_version": "r6d4f-google-independent-disconnect-v1",
+  "status": "PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING",
+  "provider": "google_ads",
+  "business_outcome": "The merchant can independently disconnect and cleanly reconnect Google Ads without affecting Meta, Klaviyo, parked Google services, reporting currency, or historical analytics.",
+  "entry_state": "connected_with_1_to_3_verified_accounts",
+  "merchant_flow": [
+    "open_google_ads_disconnect_warning",
+    "cancel_preserves_connected_state",
+    "confirm_disconnect_google_ads",
+    "google_ads_becomes_not_connected",
+    "clean_google_ads_oauth",
+    "select_1_to_3_provider_verified_accounts",
+    "google_ads_becomes_connected"
+  ],
+  "disconnect_policy": {
+    "exact_confirmation": "DISCONNECT_GOOGLE_ADS",
+    "shopify_session_required": true,
+    "provider_global_revoke_allowed": false,
+    "provider_api_contact_allowed": false,
+    "reason": "Google Ads, parked Google Sheets, and parked GA4 historically used the same Google OAuth client; provider-level revoke could invalidate another Google grant.",
+    "canonical_scope": "workspace_id plus provider google_ads plus connected status plus connection_version",
+    "local_credentials_removed": true,
+    "selected_accounts_removed": true,
+    "account_metadata_removed": true,
+    "historical_analytics_preserved": true,
+    "clean_reconnect_required": true
+  },
+  "must_preserve": [
+    "workspace_reporting_currency",
+    "meta_connection",
+    "klaviyo_connection",
+    "historical_dataset_v2_rows",
+    "legacy_google_history",
+    "parked_google_sheets_state",
+    "parked_ga4_state"
+  ],
+  "supabase": {
+    "table": "workspace_provider_connections",
+    "migration_required": false,
+    "optimistic_connection_version_required": true,
+    "browser_write_allowed": false
+  },
+  "out_of_scope": [
+    "dataset_v2_write",
+    "schedule_or_backfill_activation",
+    "new_metrics",
+    "google_sheets_activation",
+    "ga4_activation",
+    "global_google_grant_revoke"
+  ],
+  "production_acceptance_required": true
+}

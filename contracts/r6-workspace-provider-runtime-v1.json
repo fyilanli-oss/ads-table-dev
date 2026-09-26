@@ -1,6 +1,6 @@
 {
   "contract_version": "r6-workspace-provider-runtime-v1",
-  "status": "R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_FULL_LIFECYCLE_LIVE_PASS_R6_D4E_GOOGLE_VERIFIED_EMPTY_LIVE_PASS_DISCONNECT_GATE",
+  "status": "R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_FULL_LIFECYCLE_LIVE_PASS_R6_D4E_GOOGLE_VERIFIED_EMPTY_LIVE_PASS_R6_D4F_REPOSITORY_PASS_PRODUCTION_PENDING",
   "canonical_tenant": "workspace_id",
   "active_providers": [
     "meta",
@@ -129,7 +129,7 @@
     "provider_contact": false
   },
   "r6d_work_packages": {
-    "status": "R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_FULL_LIFECYCLE_LIVE_PASS_R6_D4E_GOOGLE_VERIFIED_EMPTY_LIVE_PASS_R6_D4F_DISCONNECT_GATE",
+    "status": "R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_FULL_LIFECYCLE_LIVE_PASS_R6_D4E_GOOGLE_VERIFIED_EMPTY_LIVE_PASS_R6_D4F_REPOSITORY_PASS_PRODUCTION_PENDING",
     "sequence": [
       "R6-D1 common fail-closed acceptance runner",
       "R6-D2 Klaviyo workspace live acceptance",
@@ -140,7 +140,7 @@
     "current_live_connection_state": {
       "klaviyo": "live_accepted_verified_empty",
       "meta": "full_lifecycle_live_accepted",
-      "google_ads": "controlled_dataset_live_accepted_verified_empty_disconnect_pending"
+      "google_ads": "controlled_dataset_live_accepted_verified_empty_disconnect_repository_ready"
     },
     "rules": [
       "repository preparation does not authorize provider contact",
@@ -421,7 +421,24 @@
       "non_empty_physical_upsert_observed": false,
       "live_postcheck_result": "PASS",
       "evidence": "docs/security/evidence/R6D4E_GOOGLE_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-26.json"
+    },
+    "r6_d4f": {
+      "result": "PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING",
+      "decision_contract": "contracts/r6d4f-google-independent-disconnect-v1.json",
+      "analyst_record": "docs/R6D4F_GOOGLE_INDEPENDENT_DISCONNECT.md",
+      "provider": "google_ads",
+      "provider_global_revoke_allowed": false,
+      "local_disconnect_only": true,
+      "shopify_native_disconnect_modal": true,
+      "session_bound_disconnect_route": true,
+      "optimistic_cleanup": true,
+      "schema_migration_required": false,
+      "production_provider_contact": false,
+      "supabase_mutation": false,
+      "live_disconnect_verified": false,
+      "clean_reconnect_verified": false,
+      "live_postcheck_result": "PENDING"
     }
   },
-  "next_gate": "R6-D4-F_GOOGLE_INDEPENDENT_DISCONNECT_ANALYST_BRIEF"
+  "next_gate": "R6-D4-F_GOOGLE_DISCONNECT_CLEAN_RECONNECT_PRODUCTION_ACCEPTANCE"
 }

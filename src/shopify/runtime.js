@@ -18,6 +18,7 @@ const {createWorkspaceSettingsStore} = require("../providers/workspace-settings-
 const {createKlaviyoAccountSelection} = require("./klaviyo-account-selection");
 const {createKlaviyoDisconnect} = require("./klaviyo-disconnect");
 const {createMetaDisconnect} = require("./meta-disconnect");
+const {createGoogleDisconnect} = require("./google-disconnect");
 const {registerShopifyKlaviyoAccountRoutes} = require("../routes/shopify-klaviyo-account-routes");
 const {registerShopifyWorkspaceSettingsRoutes} = require("../routes/shopify-workspace-settings-routes");
 const {registerShopifyAdAccountRoutes} = require("../routes/shopify-ad-account-routes");
@@ -251,6 +252,9 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           resolveFxRate,
           repository: new WorkspaceSupabaseDatasetRepository(supabaseAdmin),
         })
+        : null,
+      googleDisconnect: adapters.google_ads
+        ? createGoogleDisconnect({store: connectionStore})
         : null,
       });
     }

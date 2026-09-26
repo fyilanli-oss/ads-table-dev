@@ -140,14 +140,14 @@ test('session-bound Meta disconnect route delegates only the exact confirmation'
   ]);
 });
 
-test('embedded UI exposes Meta warning modal without enabling Google disconnect', () => {
+test('embedded UI keeps the Meta warning modal when Google gets its independent disconnect', () => {
   const html = renderEmbeddedPlatforms({clientId: 'client', providerOAuthEnabled: true});
   const ui = fs.readFileSync(path.join(__dirname, '../src/shopify/ad-account-ui.js'), 'utf8');
   const runtime = fs.readFileSync(path.join(__dirname, '../src/shopify/runtime.js'), 'utf8');
   assert.match(html, /id="meta-disconnect-modal" heading="Disconnect Meta\?"/);
   assert.match(html, /id="meta-disconnect-confirm"/);
-  assert.doesNotMatch(html, /id="google_ads-disconnect-modal"/);
-  assert.match(ui, /confirmation: 'DISCONNECT_META'/);
+  assert.match(html, /id="google_ads-disconnect-modal"/);
+  assert.match(ui, /'DISCONNECT_META'/);
   assert.match(ui, /connection remains active/);
   assert.match(runtime, /createMetaDisconnect/);
 });

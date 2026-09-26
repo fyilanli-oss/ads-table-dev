@@ -141,7 +141,7 @@ test('canonical store allows 1-3 ad accounts and exactly one Klaviyo account', (
   assert.throws(() => selectedAccounts('google_ads', accounts.slice(0, 1)), /account.login_customer_id is required/);
 });
 
-test('Meta and Google account selection are Shopify-native while only approved providers expose disconnect', () => {
+test('Meta and Google account selection and approved disconnect actions are Shopify-native', () => {
   const html = renderEmbeddedPlatforms({clientId: 'client', providerOAuthEnabled: true});
   assert.match(html, /id="meta-account-modal" heading="Select Meta account"/);
   assert.match(html, /id="google_ads-account-modal" heading="Select Google Ads account"/);
@@ -149,7 +149,7 @@ test('Meta and Google account selection are Shopify-native while only approved p
   assert.match(html, /id="meta-choice"[^>]+multiple/);
   assert.doesNotMatch(html, /Open setup|Close setup/);
   assert.match(html, /id="meta-disconnect-modal"/);
-  assert.doesNotMatch(html, /id="google_ads-disconnect-modal"/);
+  assert.match(html, /id="google_ads-disconnect-modal"/);
   assert.match(html, /id="klaviyo-disconnect-modal"/);
   assert.doesNotMatch(html, /data-provider="tiktok"|data-provider="pinterest"/);
 });

@@ -3,6 +3,7 @@
 const {bearerToken} = require('./shopify-auth-routes');
 const {PROVIDERS} = require('../shopify/ad-account-selection');
 const SAFE = new Set(['INVALID_ACCOUNT','ACCOUNT_SELECTION_LIMIT','PROVIDER_REAUTHORIZE','PROVIDER_ACCOUNTS_UNAVAILABLE','CONNECTION_CHANGED','META_PREFLIGHT_NOT_CONFIGURED','META_PREFLIGHT_CONNECTION_REQUIRED','META_PREFLIGHT_CURRENCY_REQUIRED','META_PREFLIGHT_REAUTHORIZE','META_PREFLIGHT_FAILED','META_DATASET_ACCEPTANCE_CONFIRMATION_REQUIRED','META_DATASET_ACCEPTANCE_ALREADY_EXECUTED','META_DATASET_ACCEPTANCE_REAUTHORIZE','META_DISCONNECT_CONFIRMATION_REQUIRED','META_REAUTHORIZE','META_REVOKE_FAILED']);
+const SAFE_GOOGLE_DIAGNOSTIC = /^(?:GOOGLE_[A-Z0-9_]+|PROVIDER_(?:REAUTHORIZE|ACCOUNTS_UNAVAILABLE)|CONNECTION_(?:CHANGED|READ_FAILED|WRITE_FAILED))$/;
 
 function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection, metaPreflight = null, metaDatasetAcceptance = null, metaDisconnect = null} = {}) {
   const handler = (provider, operation, action) => async (req, res) => {
@@ -17,6 +18,7 @@ function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection, m
         event: 'shopify_google_ads_account_operation_failed',
         operation,
         code: known ? error.code : 'PROVIDER_ACCOUNTS_UNAVAILABLE',
+        diagnosticCode: SAFE_GOOGLE_DIAGNOSTIC.test(String(error?.code || error?.message || '')) ? String(error.code || error.message) : null,
         stage: error.providerStage || null,
         upstreamStatus: error.upstreamStatus ?? null,
         upstreamCode: error.upstreamCode || null,

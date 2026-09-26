@@ -61,14 +61,23 @@ Workspace/provider kimliği, oluşturulma tarihi, önceki bağlantı zamanı ve 
 6. Dataset sayıları, reporting currency, legacy Meta geçmişi ve Klaviyo bağlantısı değişmez.
 7. Temiz Meta reconnect tamamlanır ve `Connected · 1 account` yeniden doğrulanır.
 
-## Bu karar paketinde yapılmayanlar
+## Repository uygulama sonucu
 
-- Uygulama kodu yazılmaz.
-- Provider revoke çağrısı yapılmaz.
-- Supabase mutation veya migration yapılmaz.
-- Canlı Meta bağlantısı kesilmez.
-- Google Ads paketi başlatılmaz.
+- Meta kartına Shopify-native Disconnect düğmesi ve uyarı modalı eklendi.
+- Endpoint doğrulanmış Shopify session'dan workspace authority çözüyor ve exact işlem-anı onayı istiyor.
+- Eski çalışan referansla aynı şekilde bağlı user access token kullanılarak Meta revoke önce çalışıyor; hata halinde canonical kayıt değişmiyor.
+- Başarılı revoke sonrasında yalnız Meta credential, scope, expiry, account selection ve verification alanları optimistic connection version ile temizleniyor.
+- 55 odaklı repository testi PASS verdi; Klaviyo, Google hazırlığı, Dataset/FX ve geçmiş veri sınırları regresyon testleriyle korundu.
+- Şema zaten yeterli olduğu için Supabase migration eklenmedi.
+
+## Bu uygulama paketinde henüz yapılmayanlar
+
+- Production deployment doğrulanmadı.
+- Canlı Meta revoke/Disconnect çalıştırılmadı.
+- Supabase production satırı değiştirilmedi.
+- Temiz Meta reconnect merchant tarafından doğrulanmadı.
+- Google Ads paketi başlatılmadı.
 
 ## Durum
 
-`PASS contract only — implementation gate`
+`PASS repository implementation — production deployment and merchant acceptance pending`

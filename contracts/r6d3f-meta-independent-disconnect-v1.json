@@ -1,14 +1,25 @@
 {
   "contract_version": "r6d3f-meta-independent-disconnect-v1",
-  "status": "PASS_CONTRACT_ONLY_IMPLEMENTATION_GATE",
+  "status": "PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING",
   "provider": "meta",
   "business_rule": "Every provider connection belongs to the same workspace but owns an independent Connect, Disconnect and clean Reconnect lifecycle.",
-  "current_gap": {
+  "decision_baseline_gap": {
     "legacy_reference_has_meta_disconnect": true,
     "embedded_meta_connected_surface": "connected_badge_only",
     "embedded_meta_disconnect_route_exists": false,
     "canonical_meta_disconnect_store_operation_exists": false,
     "schema_supports_disconnected_state": true
+  },
+  "repository_implementation": {
+    "status": "PASS",
+    "shopify_native_disconnect_modal": true,
+    "session_bound_disconnect_route": true,
+    "revoke_first_service": "src/shopify/meta-disconnect.js",
+    "canonical_cleanup_operation": "disconnectMeta",
+    "focused_tests_passed": 55,
+    "production_deployment_verified": false,
+    "live_disconnect_verified": false,
+    "clean_reconnect_verified": false
   },
   "user_flow": [
     "connected_meta_card_shows_disconnect",
@@ -84,5 +95,5 @@
   "schema_migration_required": false,
   "production_provider_contact": false,
   "supabase_mutation": false,
-  "next_gate": "R6-D3-F_META_DISCONNECT_IMPLEMENTATION"
+  "next_gate": "R6-D3-F_PRODUCTION_DEPLOYMENT_AND_MERCHANT_ACCEPTANCE"
 }

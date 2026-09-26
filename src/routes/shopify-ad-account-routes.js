@@ -2,9 +2,9 @@
 
 const {bearerToken} = require('./shopify-auth-routes');
 const {PROVIDERS} = require('../shopify/ad-account-selection');
-const SAFE = new Set(['INVALID_ACCOUNT','ACCOUNT_SELECTION_LIMIT','PROVIDER_REAUTHORIZE','PROVIDER_ACCOUNTS_UNAVAILABLE','CONNECTION_CHANGED','META_PREFLIGHT_NOT_CONFIGURED','META_PREFLIGHT_CONNECTION_REQUIRED','META_PREFLIGHT_CURRENCY_REQUIRED','META_PREFLIGHT_REAUTHORIZE','META_PREFLIGHT_FAILED','META_DATASET_ACCEPTANCE_CONFIRMATION_REQUIRED','META_DATASET_ACCEPTANCE_ALREADY_EXECUTED','META_DATASET_ACCEPTANCE_REAUTHORIZE']);
+const SAFE = new Set(['INVALID_ACCOUNT','ACCOUNT_SELECTION_LIMIT','PROVIDER_REAUTHORIZE','PROVIDER_ACCOUNTS_UNAVAILABLE','CONNECTION_CHANGED','META_PREFLIGHT_NOT_CONFIGURED','META_PREFLIGHT_CONNECTION_REQUIRED','META_PREFLIGHT_CURRENCY_REQUIRED','META_PREFLIGHT_REAUTHORIZE','META_PREFLIGHT_FAILED','META_DATASET_ACCEPTANCE_CONFIRMATION_REQUIRED','META_DATASET_ACCEPTANCE_ALREADY_EXECUTED','META_DATASET_ACCEPTANCE_REAUTHORIZE','META_DISCONNECT_CONFIRMATION_REQUIRED','META_REAUTHORIZE','META_REVOKE_FAILED']);
 
-function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection, metaPreflight = null, metaDatasetAcceptance = null} = {}) {
+function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection, metaPreflight = null, metaDatasetAcceptance = null, metaDisconnect = null} = {}) {
   const handler = (provider, action) => async (req, res) => {
     res.set('Cache-Control', 'no-store');
     let authority;
@@ -23,6 +23,7 @@ function registerShopifyAdAccountRoutes(app, {authenticateEmbedded, selection, m
   }
   if (metaPreflight) app.post('/api/shopify/providers/meta/runtime/preflight', handler('meta', authority => metaPreflight.execute(authority)));
   if (metaDatasetAcceptance) app.post('/api/shopify/providers/meta/runtime/acceptance', handler('meta', (authority, _provider, body) => metaDatasetAcceptance.execute(authority, body?.confirmation)));
+  if (metaDisconnect) app.post('/api/shopify/providers/meta/accounts/disconnect', handler('meta', (authority, _provider, body) => metaDisconnect.execute(authority, body?.confirmation)));
 }
 
 module.exports = Object.freeze({registerShopifyAdAccountRoutes});

@@ -9,6 +9,9 @@ function initializeAdAccounts() {
     const connect = document.getElementById(provider + '-connect');
     const connectAction = document.getElementById(provider + '-connect-action');
     const connected = document.getElementById(provider + '-connected');
+    const disconnectModal = document.getElementById(provider + '-disconnect-modal');
+    const disconnectConfirm = document.getElementById(provider + '-disconnect-confirm');
+    const disconnectMessage = document.getElementById(provider + '-disconnect-message');
     const query = new URLSearchParams(location.search);
     const reauthorizationRequired = provider === 'meta' && query.get('oauth_error') === 'reauthorization_required' && query.get('provider') === 'meta';
     if (!message || !choices || !save || !modal) continue;
@@ -65,6 +68,33 @@ function initializeAdAccounts() {
       } catch (error) { showError(error); }
       finally { busy = false; save.disabled = false; save.loading = false; }
     });
+    if (provider === 'meta' && disconnectConfirm && disconnectModal && disconnectMessage) {
+      disconnectConfirm.addEventListener('click', async () => {
+        if (busy) return;
+        busy = true;
+        disconnectConfirm.disabled = true;
+        disconnectConfirm.loading = true;
+        disconnectMessage.textContent = 'Disconnecting…';
+        try {
+          await request('/disconnect', {confirmation: 'DISCONNECT_META'});
+          message.textContent = 'Not connected';
+          connect.hidden = false;
+          connected.hidden = true;
+          disconnectMessage.textContent = '';
+          if (typeof disconnectModal.hideOverlay === 'function') disconnectModal.hideOverlay();
+        } catch (error) {
+          disconnectMessage.textContent = error.message === 'META_REVOKE_FAILED'
+            ? 'Meta access could not be revoked. The connection remains active.'
+            : error.message === 'META_REAUTHORIZE'
+              ? 'Meta authorization must be renewed before this connection can be revoked.'
+              : 'Meta could not be disconnected. The connection remains active.';
+        } finally {
+          busy = false;
+          disconnectConfirm.disabled = false;
+          disconnectConfirm.loading = false;
+        }
+      });
+    }
     request('/status').then(result => {
       if (result.status === 'pending_account_selection') return loadAccounts();
       if (result.status === 'connected') {

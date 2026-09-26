@@ -33,6 +33,7 @@ const {createMetaControlledDatasetAcceptance} = require("../providers/meta/contr
 const {createGoogleAdsTokenLifecycle} = require("../providers/google/token-lifecycle");
 const {createGoogleAdsSearchClient} = require("../providers/google/search-client");
 const {createGoogleReadOnlyPreflight} = require("../providers/google/read-only-preflight");
+const {createGoogleControlledDatasetAcceptance} = require("../providers/google/controlled-dataset-acceptance");
 const {WorkspaceSupabaseDatasetRepository} = require("../../funnel-core/workspace-supabase-dataset-repository");
 
 function enabled(value) {
@@ -237,6 +238,20 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         : adapters.google_ads
           ? {execute: async () => {throw Object.assign(new Error("GOOGLE_PREFLIGHT_NOT_CONFIGURED"), {code: "GOOGLE_PREFLIGHT_NOT_CONFIGURED", status: 503});}}
           : null,
+      googleDatasetAcceptance: adapters.google_ads && providerAvailability.google_ads && typeof resolveFxRate === "function"
+        ? createGoogleControlledDatasetAcceptance({
+          connectionStore,
+          settingsStore,
+          tokenLifecycle: googleTokenLifecycle,
+          search: createGoogleAdsSearchClient({
+            fetchImpl,
+            developerToken: googleDeveloperToken,
+            apiVersion: env.GOOGLE_ADS_API_VERSION || "v25",
+          }),
+          resolveFxRate,
+          repository: new WorkspaceSupabaseDatasetRepository(supabaseAdmin),
+        })
+        : null,
       });
     }
   }

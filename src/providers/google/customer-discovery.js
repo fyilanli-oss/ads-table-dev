@@ -55,7 +55,8 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
     try {
       response = await search({ customerId: loginCustomerId, query: CUSTOMER_CLIENT_QUERY });
       queriedRootCount += 1;
-    } catch {
+    } catch (error) {
+      if (String(error?.code || error?.message || '') === 'PROVIDER_REAUTHORIZE') throw error;
       failedRootCount += 1;
       continue;
     }
@@ -75,3 +76,4 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
 }
 
 module.exports = Object.freeze({ CUSTOMER_CLIENT_QUERY, discoverGoogleCustomers });
+

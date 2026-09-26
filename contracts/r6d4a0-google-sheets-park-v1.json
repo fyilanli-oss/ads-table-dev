@@ -1,0 +1,32 @@
+{
+  "version": "r6d4a0-google-sheets-park-v1",
+  "decision": {
+    "status": "parked",
+    "embedded_connect_surface": false,
+    "future_role": "workspace_dataset_v2_export"
+  },
+  "runtime": {
+    "new_oauth": false,
+    "oauth_callback_exchange": false,
+    "token_refresh": false,
+    "manual_sync": false,
+    "auto_sync": false,
+    "disconnect_mutation": false
+  },
+  "data": {
+    "dataset_v1_export": false,
+    "dataset_v2_export": false,
+    "synthetic_rows": false
+  },
+  "preservation": {
+    "existing_spreadsheet_unchanged": true,
+    "historical_connection_unchanged": true,
+    "encrypted_tokens_unchanged": true,
+    "google_grant_revoked": false
+  },
+  "release_gate": {
+    "repository_tests_required": true,
+    "production_deployment_separate": true,
+    "post_deploy_read_only_verification_required": true
+  }
+}

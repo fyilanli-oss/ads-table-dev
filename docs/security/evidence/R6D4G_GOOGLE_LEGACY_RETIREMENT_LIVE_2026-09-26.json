@@ -1,0 +1,53 @@
+{
+  "evidence_version": "r6d4g-live-2026-09-26",
+  "redacted": true,
+  "repository": {
+    "pull_request": 283,
+    "merge_commit": "0998f41124b2dade4238c9a2637f347da8568955",
+    "security_and_regression": "PASS",
+    "deployment": "SUCCESS"
+  },
+  "merchant_observation": {
+    "disconnect_result": "Not connected",
+    "clean_oauth_first_consent_warning": true,
+    "requested_scope": "https://www.googleapis.com/auth/adwords",
+    "reconnect_result": "Connected",
+    "selected_account_count": 3
+  },
+  "postcheck": {
+    "google_ads": {
+      "status": "connected",
+      "connection_version": 13,
+      "access_token_envelope": true,
+      "refresh_token_envelope": true,
+      "access_expiry": true,
+      "selected_accounts": 3
+    },
+    "google_sheets": {
+      "credential_rows": 0,
+      "connected_rows": 0
+    },
+    "ga4_organic": {
+      "historical_jobs": 340,
+      "live_jobs": 0,
+      "schedules": 2,
+      "active_schedules": 0
+    },
+    "preserved": {
+      "meta_connected": true,
+      "klaviyo_connected": true,
+      "reporting_currency": "TRY",
+      "dataset_v2_rows": 0
+    }
+  },
+  "excluded_sensitive_values": [
+    "workspace_id",
+    "user_id",
+    "provider_account_ids",
+    "token_values",
+    "spreadsheet_id"
+  ],
+  "follow_up": {
+    "google_cloud_unused_sheets_analytics_api_disable": "non_blocking_admin_hygiene_pending"
+  }
+}

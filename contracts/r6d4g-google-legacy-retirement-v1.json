@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d4g-google-legacy-retirement-v1",
-  "status": "APPROVED_REPOSITORY_IMPLEMENTATION",
+  "status": "PRODUCTION_RUNTIME_DATA_ACCEPTANCE_PASS",
   "retired_services": [
     "google_sheets",
     "ga4_organic"
@@ -37,5 +37,19 @@
     "adapter_rebuild",
     "history_deletion"
   ],
-  "production_acceptance_required": true
+  "production_acceptance_required": false,
+  "production_acceptance": {
+    "result": "PASS",
+    "merge_commit": "0998f41124b2dade4238c9a2637f347da8568955",
+    "google_ads_reconnected_accounts": 3,
+    "google_sheets_credential_rows": 0,
+    "google_sheets_connected_rows": 0,
+    "organic_historical_jobs": 340,
+    "organic_schedules": 2,
+    "organic_active_jobs": 0,
+    "organic_active_schedules": 0,
+    "dataset_v2_rows": 0,
+    "reporting_currency": "TRY",
+    "cloud_api_disable": "NON_BLOCKING_ADMIN_HYGIENE_PENDING"
+  }
 }

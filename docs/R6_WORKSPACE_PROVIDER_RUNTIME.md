@@ -192,11 +192,17 @@ Her provider'ın Connect → Connected → Disconnect → temiz Reconnect zincir
 
 Merchant production akışında üç provider-doğrulanmış Google Ads hesabını seçip kaydetti; reload sonrasında `Connected · 3 accounts` durumu korundu. Accounts GET ve selection POST runtime'da `200` verdi. Salt-okunur Supabase postcheck tek canonical bağlantıyı `connected`, hesap sayısını `3`, hesap şekli ve credential envelope'larını geçerli, authority adapter'ını `shopify_verified_session` olarak doğruladı. Dataset V2 Google Ads satırı `0` kaldı. Bu sonuç yalnız bağlantı/hesap seçimi kapısını kapatır; sıradaki ayrı kapı R6-D4-D salt-okunur Google Ads preflight'tır. Redacted kanıt `docs/security/evidence/R6D4C_GOOGLE_ADS_CONNECTION_LIVE_ACCEPTANCE_2026-09-26.json` içindedir.
 
-### R6-D4-D Google Ads salt-okunur runtime preflight — repository PASS
+### R6-D4-D Google Ads salt-okunur runtime preflight — production PASS
 
 Bu paket yeni Google Ads analitiği geliştirmez. R6-D4-C'de seçilen üç canonical hesabın `login_customer_id` manager bağlamını, tamamlanmış E5 müşteri metadata, Standard Ads, Performance Max, conversion mapping ve Time/FX motoruna taşır. Her hesabın provider kimliği, source currency'si ve timezone'u yeniden doğrulanır; önceki kapanmış business date için iki E5 dalı da çalışır. Normal Data Sources ekranı değişmez; yalnız `?acceptance=r6d4-google` operatör yüzeyi toplu ve redacted sonuç gösterir.
 
-Dataset V2/V1 write, schedule, backfill, yeni metrik sözleşmesi, Google Sheets/GA4 aktivasyonu ve Disconnect bu kapsamda yoktur. Mevcut R6-D4-B token yaşam döngüsü yalnız access token süresi dolmuşsa veya bir kez yetkisiz yanıt alınırsa credential envelope'u yenileyebilir. Repository testleri PASS'tir; production provider sonucu ve salt-okunur Supabase postcheck henüz yapılmadığı için R6-D4-D canlı PASS değildir. Contract `contracts/r6d4d-google-read-only-preflight-v1.json`, ayrıntılı analist kaydı `docs/R6D4D_GOOGLE_READ_ONLY_PREFLIGHT.md` içindedir.
+Dataset V2/V1 write, schedule, backfill, yeni metrik sözleşmesi, Google Sheets/GA4 aktivasyonu ve Disconnect bu kapsamda yoktur. Mevcut R6-D4-B token yaşam döngüsü yalnız access token süresi dolmuşsa veya bir kez yetkisiz yanıt alınırsa credential envelope'u yenileyebilir. Production salt-okunur kabul üç seçili hesapta `PASS` vermiştir: Standard/PMax sonucu doğrulanmış boş, Time/FX başarılı ve Dataset V2 yazısı `0` kalmıştır. Supabase son kontrolü canonical connection, üç seçili hesap, token envelope'ları ve reporting currency'yi doğrulamıştır. Contract `contracts/r6d4d-google-read-only-preflight-v1.json`, ayrıntılı analist kaydı `docs/R6D4D_GOOGLE_READ_ONLY_PREFLIGHT.md` içindedir.
+
+### R6-D4-E Google Ads kontrollü Dataset V2 kabulü — repository PASS / production pending
+
+Bu paket yeni Google metriği veya adapter geliştirmez. Tamamlanmış E5 Standard/PMax/conversion/Time/FX ve R6-D4-D workspace runner yeniden kullanılır. Exact action-time confirmation olmadan provider veya Dataset erişimi başlamaz. Yakın tarihli mevcut canonical `google` satırı yeniden çalışmayı durdurur. Yalnız provider-doğrulanmış satırlar workspace canonical write boundary üzerinden yazılabilir; doğrulanmış boş sonuç `attempted: 0 / persisted: 0` olur ve sentetik satır üretilmez.
+
+Normal Data Sources ekranı değişmez; kontrol yalnız `?acceptance=r6d4-google` operatör yüzeyindedir. Schedule, backfill, Dataset V1, Google Sheets, GA4, yeni metrik, Disconnect ve production aktivasyonu kapsam dışıdır. Repository testleri PASS'tir. Production deployment, canlı provider çağrısı, Supabase yazısı ve son kontrol henüz yapılmadığı için R6-D4-E canlı PASS değildir. Contract `contracts/r6d4e-google-controlled-dataset-acceptance-v1.json`, ayrıntılı analist kaydı `docs/R6D4E_GOOGLE_CONTROLLED_DATASET_ACCEPTANCE.md` içindedir.
 
 ## Fail-closed kurallar
 

@@ -94,6 +94,31 @@ test('Google lifecycle performs one refresh and one retry after an unexpected au
   assert.equal(operations, 2);
 });
 
+test('Google lifecycle preserves safe provider context when refreshed authorization still fails', async () => {
+  let current = {
+    status: 'connected', version: 7, accessToken: 'current', refreshToken: 'refresh',
+    accessTokenExpiresAt: '2026-09-26T14:00:00.000Z', grantedScopes: [GOOGLE_ADS_SCOPE],
+  };
+  const store = {
+    readPendingProvider: async () => null,
+    resolveConnected: async () => current,
+    refreshGoogle: async input => { current = {...current, version: 8, accessToken: input.accessToken, accessTokenExpiresAt: input.expiresAt}; },
+  };
+  const lifecycle = createGoogleAdsTokenLifecycle({
+    connectionStore: store, clientId: 'client', clientSecret: 'secret', now: () => new Date('2026-09-26T12:00:00.000Z'),
+    fetchImpl: async () => response(200, {access_token: 'renewed', expires_in: 3600, scope: GOOGLE_ADS_SCOPE}),
+  });
+  const failure = () => Object.assign(new Error('PROVIDER_REAUTHORIZE'), {
+    code: 'PROVIDER_REAUTHORIZE', providerStage: 'list_accessible_customers', upstreamStatus: 401,
+    upstreamCode: 'UNAUTHENTICATED', upstreamRequestId: 'safe-request-id',
+  });
+  await assert.rejects(
+    lifecycle.run({authority, connection: current, operation: async () => { throw failure(); }}),
+    error => error.code === 'GOOGLE_REAUTHORIZE' && error.providerStage === 'list_accessible_customers' &&
+      error.upstreamStatus === 401 && error.upstreamCode === 'UNAUTHENTICATED' && error.upstreamRequestId === 'safe-request-id'
+  );
+});
+
 test('Google invalid_grant requires reauthorization and does not invoke the operation', async () => {
   let operations = 0;
   const current = {

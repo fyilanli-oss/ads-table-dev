@@ -308,7 +308,7 @@ test('Execution Plan preserves first-write tenant enforcement across the control
   assert.match(plan, /postcheck `PASS` verdi: Dataset V2 `0` satır kaldı/);
   assert.match(plan, /C6-A ilk canlı write denemesi fail-closed `503` verdi ve Dataset V2 `0` kaldı/);
   assert.match(plan, /C6-C ikinci deneme `KLAVIYO_DATASET_ACCEPTANCE_FAILED_PROVIDER_ACCOUNT` ile fail-closed kaldı; Dataset V2 hâlâ `0` satırdır/);
-  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4-C Google Ads connection\/account selection live PASS; R6-D4-D next/);
+  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4-C Google Ads connection\/account selection live PASS; R6-D4-D repository PASS \/ production acceptance pending/);
   assert.match(plan, /Done \/ R4-A\+B\+C/);
   assert.doesNotMatch(plan, /\| R4 \|[^\n]+`Blocked by R3`/);
 });

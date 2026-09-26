@@ -29,7 +29,7 @@ test('R6 live preflight records preparation-only state without claiming activati
 });
 
 test('R6-D is provider-by-provider and Klaviyo PASS grants no authority to other providers', () => {
-  assert.equal(contract.r6d_work_packages.status, 'R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3C_META_CONNECTION_ACCOUNT_SELECTION_LIVE_PASS_DATA_RUNTIME_GATE');
+  assert.equal(contract.r6d_work_packages.status, 'R6_D1_COMPLETE_R6_D2_KLAVIYO_LIVE_PASS_R6_D3_META_FULL_LIFECYCLE_LIVE_PASS_R6_D4C_GOOGLE_THREE_ACCOUNT_LIVE_PASS_R6_D4D_REPOSITORY_PASS_PRODUCTION_PENDING');
   assert.deepEqual(contract.r6d_work_packages.sequence, [
     'R6-D1 common fail-closed acceptance runner',
     'R6-D2 Klaviyo workspace live acceptance',
@@ -48,7 +48,7 @@ test('R6-D is provider-by-provider and Klaviyo PASS grants no authority to other
   assert.equal(contract.r6d_work_packages.r6_d2.provider_contact, true);
   assert.equal(contract.r6d_work_packages.r6_d2.dataset_v2_write, false);
   assert.equal(contract.r6d_work_packages.r6_d2.r6_d2_c6d_live_acceptance.production_activation, false);
-  assert.equal(contract.r6d_work_packages.current_live_connection_state.meta, 'r6_d3c_live_connected_one_verified_account');
+  assert.equal(contract.r6d_work_packages.current_live_connection_state.meta, 'full_lifecycle_live_accepted');
   assert.equal(contract.r6d_work_packages.r6_d3a.result, 'PASS_CONTRACT_ONLY');
   assert.equal(contract.r6d_work_packages.r6_d3a.legacy_token_reused, false);
   assert.equal(contract.r6d_work_packages.r6_d3a.server_side_long_lived_exchange_required, true);
@@ -82,7 +82,7 @@ test('R6-D is provider-by-provider and Klaviyo PASS grants no authority to other
   assert.equal(contract.r6d_work_packages.r6_d3f.production_provider_contact, true);
   assert.equal(contract.r6d_work_packages.r6_d3f.live_disconnect_verified, true);
   assert.equal(contract.r6d_work_packages.r6_d3f.clean_reconnect_verified, true);
-  assert.equal(contract.next_gate, 'R6-D4_GOOGLE_ADS_ANALYST_BRIEF');
+  assert.equal(contract.next_gate, 'R6-D4-D_GOOGLE_READ_ONLY_PRODUCTION_ACCEPTANCE');
 });
 
 test('R6-D2-C2 freezes merchant-facing Klaviyo sales-source behavior without execution', () => {
@@ -127,7 +127,7 @@ test('R6 preflight is read-only and fail-closed', () => {
 
 test('Execution Plan records the failed C6 attempts and the verified-empty live corrective', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4-C Google Ads connection\/account selection live PASS; R6-D4-D next/);
+  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4-C Google Ads connection\/account selection live PASS; R6-D4-D repository PASS \/ production acceptance pending/);
   assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS \/ C3 next/);
   assert.match(plan, /R6-D2-C3 salt-okunur satış kaynağı keşfi — Live PASS/);
   assert.match(plan, /R6-D2-C4 canonical satış kaynağı bağı — Live PASS/);

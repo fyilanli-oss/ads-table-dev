@@ -218,3 +218,37 @@ test('Klaviyo sent campaign inventory rejects pagination outside the provider or
     /KLAVIYO_CAMPAIGN_PAGINATION_INVALID/,
   );
 });
+
+
+test('Klaviyo campaign diagnostics distinguish total, Sent and missing scheduled_at without identifiers', async () => {
+  const calls = [];
+  const fetchImpl = async url => {
+    calls.push(url);
+    const decoded = decodeURIComponent(url);
+    if (decoded.includes("'email'")) return response({
+      data: [
+        { id: 'draft-secret', attributes: { status: 'Draft', scheduled_at: null } },
+        { id: 'sent-dated-secret', attributes: { status: 'Sent', scheduled_at: '2026-09-20T23:30:00Z' } },
+        { id: 'sent-undated-secret', attributes: { status: 'Sent', scheduled_at: null } },
+      ],
+      links: { next: null },
+    });
+    return response({
+      data: [{ id: 'sent-sms-secret', attributes: { status: 'Sent', scheduled_at: '2026-09-19T10:00:00Z' } }],
+      links: { next: null },
+    });
+  };
+  const client = createKlaviyoProviderClient({ fetchImpl });
+  const result = await client.fetchCampaignInventory({ accessToken: 'secret', timeZone: 'America/New_York' });
+  assert.deepEqual(result, {
+    total_campaign_count: 4,
+    sent_campaign_count: 3,
+    sent_with_scheduled_at_count: 2,
+    sent_without_scheduled_at_count: 1,
+    sent_dates: ['2026-09-20', '2026-09-19'],
+  });
+  assert.equal(JSON.stringify(result).includes('secret'), false);
+  assert.equal(calls.length, 2);
+  assert.ok(calls.every(url => decodeURIComponent(url).includes("fields[campaign]=status,scheduled_at")));
+  assert.ok(calls.every(url => !decodeURIComponent(url).includes("equals(status,'Sent')")));
+});

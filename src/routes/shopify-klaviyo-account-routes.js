@@ -1,9 +1,9 @@
 "use strict";
 
 const {bearerToken} = require("./shopify-auth-routes");
-const SAFE_ERRORS = new Set(["INVALID_PLAN_COST", "INVALID_ACCOUNT", "KLAVIYO_REAUTHORIZE", "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", "KLAVIYO_UNAVAILABLE", "KLAVIYO_RESET_CONFIRMATION_REQUIRED", "KLAVIYO_DISCONNECT_CONFIRMATION_REQUIRED", "KLAVIYO_REAUTHORIZATION_REQUIRED", "KLAVIYO_REVOKE_FAILED", "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", "KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED", "KLAVIYO_PREFLIGHT_CURRENCY_REQUIRED", "KLAVIYO_PREFLIGHT_METRIC_REQUIRED", "KLAVIYO_PREFLIGHT_FAILED", "KLAVIYO_HISTORICAL_INVENTORY_CONNECTION_REQUIRED", "KLAVIYO_HISTORICAL_INVENTORY_CURRENCY_REQUIRED", "KLAVIYO_HISTORICAL_INVENTORY_METRIC_REQUIRED", "KLAVIYO_HISTORICAL_INVENTORY_FAILED", "KLAVIYO_METRIC_DISCOVERY_FAILED", "KLAVIYO_CONVERSION_METRIC_NOT_FOUND", "KLAVIYO_CONVERSION_METRIC_SELECTION_INVALID", "KLAVIYO_DATASET_ACCEPTANCE_CONFIRMATION_REQUIRED", "KLAVIYO_DATASET_ACCEPTANCE_ALREADY_EXECUTED", "CONNECTION_CHANGED"]);
+const SAFE_ERRORS = new Set(["INVALID_PLAN_COST", "INVALID_ACCOUNT", "KLAVIYO_REAUTHORIZE", "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", "KLAVIYO_UNAVAILABLE", "KLAVIYO_RESET_CONFIRMATION_REQUIRED", "KLAVIYO_DISCONNECT_CONFIRMATION_REQUIRED", "KLAVIYO_REAUTHORIZATION_REQUIRED", "KLAVIYO_REVOKE_FAILED", "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", "KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED", "KLAVIYO_PREFLIGHT_CURRENCY_REQUIRED", "KLAVIYO_PREFLIGHT_METRIC_REQUIRED", "KLAVIYO_PREFLIGHT_FAILED", "KLAVIYO_HISTORICAL_INVENTORY_CONNECTION_REQUIRED", "KLAVIYO_HISTORICAL_INVENTORY_CURRENCY_REQUIRED", "KLAVIYO_HISTORICAL_INVENTORY_METRIC_REQUIRED", "KLAVIYO_HISTORICAL_INVENTORY_FAILED", "KLAVIYO_FLOW_EVENT_INVENTORY_CONNECTION_REQUIRED", "KLAVIYO_FLOW_EVENT_INVENTORY_FAILED", "KLAVIYO_METRIC_DISCOVERY_FAILED", "KLAVIYO_CONVERSION_METRIC_NOT_FOUND", "KLAVIYO_CONVERSION_METRIC_SELECTION_INVALID", "KLAVIYO_DATASET_ACCEPTANCE_CONFIRMATION_REQUIRED", "KLAVIYO_DATASET_ACCEPTANCE_ALREADY_EXECUTED", "CONNECTION_CHANGED"]);
 
-function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selection, reset, disconnect, preflight, historicalInventory, datasetAcceptance, metricBinding}) {
+function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selection, reset, disconnect, preflight, historicalInventory, flowEventInventory, datasetAcceptance, metricBinding}) {
   const handler = action => async (req, res) => {
     res.set("Cache-Control", "no-store");
     let authority;
@@ -25,6 +25,7 @@ function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selecti
   app.post("/api/shopify/providers/klaviyo/accounts/select", handler((authority, body) => selection.complete(authority, body)));
   if (preflight) app.post("/api/shopify/providers/klaviyo/runtime/preflight", handler(authority => preflight.execute(authority)));
   if (historicalInventory) app.post("/api/shopify/providers/klaviyo/runtime/historical-inventory", handler(authority => historicalInventory.execute(authority)));
+  if (flowEventInventory) app.post("/api/shopify/providers/klaviyo/runtime/flow-event-inventory", handler(authority => flowEventInventory.execute(authority)));
   if (datasetAcceptance) app.post("/api/shopify/providers/klaviyo/runtime/acceptance", handler((authority, body) => datasetAcceptance.execute(authority, body?.confirmation)));
   if (metricBinding) {
     app.get("/api/shopify/providers/klaviyo/runtime/metrics", handler(authority => metricBinding.discover(authority)));

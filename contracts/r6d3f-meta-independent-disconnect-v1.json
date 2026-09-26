@@ -1,0 +1,88 @@
+{
+  "contract_version": "r6d3f-meta-independent-disconnect-v1",
+  "status": "PASS_CONTRACT_ONLY_IMPLEMENTATION_GATE",
+  "provider": "meta",
+  "business_rule": "Every provider connection belongs to the same workspace but owns an independent Connect, Disconnect and clean Reconnect lifecycle.",
+  "current_gap": {
+    "legacy_reference_has_meta_disconnect": true,
+    "embedded_meta_connected_surface": "connected_badge_only",
+    "embedded_meta_disconnect_route_exists": false,
+    "canonical_meta_disconnect_store_operation_exists": false,
+    "schema_supports_disconnected_state": true
+  },
+  "user_flow": [
+    "connected_meta_card_shows_disconnect",
+    "disconnect_opens_shopify_native_warning_modal",
+    "cancel_is_non_destructive",
+    "explicit_disconnect_is_session_bound",
+    "provider_revoke_succeeds_before_local_cleanup",
+    "only_meta_canonical_credentials_and_selection_are_cleared",
+    "historical_analytics_and_other_provider_connections_are_preserved",
+    "card_returns_to_not_connected_connect_state",
+    "clean_meta_reconnect_can_complete_again"
+  ],
+  "provider_revoke": {
+    "reference_behavior": "DELETE Meta Graph /me/permissions with the connected user access token",
+    "app_access_token_allowed": false,
+    "revoke_failure_changes_local_connection": false,
+    "missing_connected_access_token_result": "fail_closed",
+    "provider_response_exposed_to_browser": false
+  },
+  "canonical_disconnect": {
+    "table": "workspace_provider_connections",
+    "authority": "shopify_verified_session_to_server_resolved_workspace",
+    "provider_scope": "meta_only",
+    "required_current_status": "connected",
+    "optimistic_connection_version_required": true,
+    "set_status": "disconnected",
+    "set_disconnected_at": true,
+    "increment_connection_version": true,
+    "clear": [
+      "access_token_envelope",
+      "refresh_token_envelope",
+      "access_token_expires_at",
+      "refresh_token_expires_at",
+      "granted_scopes",
+      "active_account_id",
+      "active_account_name",
+      "selected_accounts",
+      "source_currency",
+      "account_verified_at"
+    ],
+    "preserve": [
+      "workspace_id",
+      "provider",
+      "created_at",
+      "connected_at_as_audit_history",
+      "last_authorized_via_as_audit_history",
+      "historical_dataset_v1_rows",
+      "historical_dataset_v2_rows",
+      "legacy_meta_history",
+      "workspace_reporting_currency",
+      "other_provider_connections"
+    ]
+  },
+  "independence_invariants": {
+    "klaviyo_connection_changed": false,
+    "google_ads_connection_changed": false,
+    "workspace_reporting_currency_changed": false,
+    "historical_analytics_deleted": false,
+    "schedule_or_backfill_started": false,
+    "dataset_write_triggered": false
+  },
+  "acceptance_sequence": [
+    "verify_connected_one_account",
+    "open_disconnect_modal",
+    "cancel_and_verify_no_change",
+    "reopen_and_confirm_disconnect",
+    "verify_not_connected_connect_ui",
+    "run_read_only_supabase_postcheck",
+    "verify_other_provider_and_dataset_counts_unchanged",
+    "perform_clean_reconnect",
+    "verify_oauth_account_selection_and_connected_state"
+  ],
+  "schema_migration_required": false,
+  "production_provider_contact": false,
+  "supabase_mutation": false,
+  "next_gate": "R6-D3-F_META_DISCONNECT_IMPLEMENTATION"
+}

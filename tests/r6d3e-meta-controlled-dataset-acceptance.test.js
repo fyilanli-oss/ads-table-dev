@@ -60,7 +60,7 @@ test('R6-D3-E contract records the verified-empty production acceptance without 
   assert.equal(contract.live_acceptance.synthetic_rows_written, 0);
   assert.equal(contract.live_acceptance.non_empty_physical_upsert_observed, false);
   assert.equal(contract.live_acceptance.supabase_postcheck, 'PASS');
-  assert.equal(contract.next_gate, 'R6-D4_GOOGLE_ADS_ANALYST_BRIEF');
+  assert.equal(contract.next_gate, 'R6-D3-F_META_INDEPENDENT_DISCONNECT_DECISION');
 });
 
 test('R6-D3-E requires exact action-time confirmation before provider or Dataset access', async () => {

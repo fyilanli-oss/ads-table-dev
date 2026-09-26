@@ -55,5 +55,5 @@
     "supabase_postcheck": "PASS",
     "evidence": "docs/security/evidence/R6D3E_META_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-25.json"
   },
-  "next_gate": "R6-D4_GOOGLE_ADS_ANALYST_BRIEF"
+  "next_gate": "R6-D3-F_META_INDEPENDENT_DISCONNECT_DECISION"
 }

@@ -304,7 +304,19 @@
       "evidence": "docs/security/evidence/R6D3E_META_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-25.json",
       "dataset_v2_write": false,
       "production_activation": false
+    },
+    "r6_d3f": {
+      "result": "PASS_CONTRACT_ONLY_IMPLEMENTATION_GATE",
+      "decision_contract": "contracts/r6d3f-meta-independent-disconnect-v1.json",
+      "analyst_record": "docs/R6D3F_META_INDEPENDENT_DISCONNECT.md",
+      "provider": "meta",
+      "provider_lifecycle_independent": true,
+      "legacy_reference_reviewed": true,
+      "embedded_disconnect_gap_confirmed": true,
+      "schema_migration_required": false,
+      "production_provider_contact": false,
+      "supabase_mutation": false
     }
   },
-  "next_gate": "R6-D4_GOOGLE_ADS_ANALYST_BRIEF"
+  "next_gate": "R6-D3-F_META_DISCONNECT_IMPLEMENTATION"
 }

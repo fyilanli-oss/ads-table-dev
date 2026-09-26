@@ -29,11 +29,17 @@ function selectedAccounts(provider, accounts) {
     const id = required(account?.id, 'account.id');
     if (seen.has(id)) throw new Error('INVALID_ACCOUNT_SELECTION_COUNT');
     seen.add(id);
-    unique.push(Object.freeze({
+    const verified = {
       id,
       name: required(account?.name, 'account.name'),
       currency: required(account?.currency, 'account.currency'),
-    }));
+    };
+    if (provider === 'google_ads') {
+      const loginCustomerId = required(account?.login_customer_id || account?.loginCustomerId, 'account.login_customer_id');
+      if (!/^\d+$/.test(loginCustomerId)) throw new Error('INVALID_GOOGLE_LOGIN_CUSTOMER_ID');
+      verified.login_customer_id = loginCustomerId;
+    }
+    unique.push(Object.freeze(verified));
   }
   if (unique.length < 1 || unique.length > limit) throw new Error('INVALID_ACCOUNT_SELECTION_COUNT');
   return Object.freeze(unique);
@@ -192,7 +198,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const authority = requireServerWorkspaceAuthority(authorityInput);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,active_account_name,source_currency,selected_accounts,connection_version,access_token_envelope,refresh_token_envelope')
+      .select('status,active_account_id,active_account_name,source_currency,selected_accounts,connection_version,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes')
       .eq('workspace_id', authority.workspace_id).eq('provider', provider).maybeSingle();
     if (error) throw new Error('CONNECTION_READ_FAILED');
     if (!data) return null;
@@ -202,7 +208,30 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
         ? vault.decrypt(data.access_token_envelope, tokenContext(authority.workspace_id, provider, 'access')) : null,
       refreshToken: data.status === 'pending_account_selection' && data.refresh_token_envelope
         ? vault.decrypt(data.refresh_token_envelope, tokenContext(authority.workspace_id, provider, 'refresh')) : null,
+      accessTokenExpiresAt: data.access_token_expires_at,
+      refreshTokenExpiresAt: data.refresh_token_expires_at,
+      grantedScopes: Array.isArray(data.granted_scopes) ? Object.freeze([...data.granted_scopes]) : Object.freeze([]),
     });
+  }
+
+  async function refreshGoogle({ authority: authorityInput, version, status, accessToken, refreshToken, expiresAt, scopes = [] } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
+    if (!['pending_account_selection', 'connected'].includes(status)) throw new Error('GOOGLE_CONNECTION_STATE_INVALID');
+    const timestamp = now().toISOString();
+    const { data, error } = await client.from(TABLE).update({
+      access_token_envelope: vault.encrypt(required(accessToken, 'accessToken'), tokenContext(authority.workspace_id, 'google_ads', 'access')),
+      refresh_token_envelope: vault.encrypt(required(refreshToken, 'refreshToken'), tokenContext(authority.workspace_id, 'google_ads', 'refresh')),
+      access_token_expires_at: required(expiresAt, 'expiresAt'),
+      granted_scopes: Array.isArray(scopes) ? [...scopes] : [],
+      connection_version: version + 1,
+      updated_at: timestamp,
+    }).eq('workspace_id', authority.workspace_id).eq('provider', 'google_ads')
+      .eq('connection_version', version).eq('status', status)
+      .select('connection_version').maybeSingle();
+    if (error) throw new Error('CONNECTION_WRITE_FAILED');
+    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+    return data;
   }
 
   async function completeAccountSelection({ authority: authorityInput, provider: providerInput, version, accounts } = {}) {
@@ -399,6 +428,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     readStatus,
     resolveConnected,
     readPendingProvider,
+    refreshGoogle,
     completeAccountSelection,
     readKlaviyo,
     readKlaviyoStatus,
@@ -419,3 +449,4 @@ module.exports = Object.freeze({
   authorityFromEmbeddedTransaction,
   createCanonicalWorkspaceProviderConnectionStore
 });
+

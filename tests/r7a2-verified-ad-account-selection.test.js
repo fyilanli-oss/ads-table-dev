@@ -49,7 +49,7 @@ test('Google Ads discovery uses accessible customers and verified customer_clien
     if (url.endsWith('customers:listAccessibleCustomers')) return response(200, {resourceNames: ['customers/123']});
     return response(200, [{results: [{customerClient: {id: '456', descriptiveName: 'Verified Google', currencyCode: 'EUR', timeZone: 'Europe/Berlin', manager: false, level: 1}}]}]);
   }});
-  assert.deepEqual(await discover('access'), [{id: '456', name: 'Verified Google', currency: 'EUR'}]);
+  assert.deepEqual(await discover('access'), [{id: '456', name: 'Verified Google', currency: 'EUR', loginCustomerId: '123'}]);
   assert.equal(calls.every(call => call.options.headers['developer-token'] === 'developer'), true);
   assert.equal(calls[1].options.method, 'POST');
 });
@@ -90,10 +90,15 @@ test('Meta and Google require between one and three distinct verified ad account
 test('canonical store allows 1-3 ad accounts and exactly one Klaviyo account', () => {
   const accounts = [1,2,3].map(number => ({id: `account-${number}`, name: `Account ${number}`, currency: number === 2 ? 'EUR' : 'USD'}));
   assert.equal(selectedAccounts('meta', accounts).length, 3);
-  assert.equal(selectedAccounts('google_ads', accounts.slice(0, 2)).length, 2);
+  const google = accounts.slice(0, 2).map((account, index) => ({...account, loginCustomerId: String(100 + index)}));
+  assert.deepEqual(selectedAccounts('google_ads', google), [
+    {...accounts[0], login_customer_id: '100'},
+    {...accounts[1], login_customer_id: '101'},
+  ]);
   assert.equal(selectedAccounts('klaviyo', accounts.slice(0, 1)).length, 1);
   assert.throws(() => selectedAccounts('klaviyo', accounts.slice(0, 2)), /INVALID_ACCOUNT_SELECTION_COUNT/);
   assert.throws(() => selectedAccounts('meta', [accounts[0], accounts[0]]), /INVALID_ACCOUNT_SELECTION_COUNT/);
+  assert.throws(() => selectedAccounts('google_ads', accounts.slice(0, 1)), /account.login_customer_id is required/);
 });
 
 test('Meta and Google account selection are Shopify-native while only approved providers expose disconnect', () => {
@@ -108,3 +113,4 @@ test('Meta and Google account selection are Shopify-native while only approved p
   assert.match(html, /id="klaviyo-disconnect-modal"/);
   assert.doesNotMatch(html, /data-provider="tiktok"|data-provider="pinterest"/);
 });
+

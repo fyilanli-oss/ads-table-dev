@@ -13,6 +13,13 @@ function validAccount(item) {
   return Object.freeze({id: item.id.slice(0, 256), name: item.name.slice(0, 256), currency: item.currency});
 }
 
+function validGoogleAccount(item) {
+  const account = validAccount(item);
+  const loginCustomerId = String(item?.loginCustomerId || item?.login_customer_id || '');
+  if (!/^\d+$/.test(loginCustomerId)) throw failure('PROVIDER_ACCOUNTS_UNAVAILABLE');
+  return Object.freeze({...account, loginCustomerId});
+}
+
 function createMetaAccountDiscovery({fetchImpl = fetch, graphVersion = 'v20.0'} = {}) {
   return async accessToken => {
     const response = await fetchImpl(`https://graph.facebook.com/${graphVersion}/me/adaccounts?fields=id,name,currency,account_status&limit=100`, {
@@ -40,15 +47,31 @@ function createGoogleAdsAccountDiscovery({fetchImpl = fetch, developerToken, api
       const response = await fetchImpl(`https://googleads.googleapis.com/${apiVersion}/customers/${customerId}/googleAds:searchStream`, {
         method: 'POST', headers: headers(accessToken), body: JSON.stringify({query}), signal: AbortSignal.timeout(15000), redirect: 'error',
       });
+      if (response.status === 401 || response.status === 403) throw failure('PROVIDER_REAUTHORIZE', 409);
       if (!response.ok) throw new Error('GOOGLE_CUSTOMER_DISCOVERY_FAILED');
       const chunks = await response.json();
       return {results: (Array.isArray(chunks) ? chunks : []).flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : [])};
     }});
-    return discovered.customers.map(item => validAccount({id: item.customerId, name: item.account_name, currency: item.currency}));
+    return discovered.customers.map(item => validGoogleAccount({
+      id: item.customerId,
+      name: item.account_name,
+      currency: item.currency,
+      loginCustomerId: item.loginCustomerId,
+    }));
   };
 }
 
-function createAdAccountSelection({store, discoverByProvider} = {}) {
+function createAdAccountSelection({store, discoverByProvider, tokenLifecycleByProvider = {}} = {}) {
+  async function discover(authority, provider, connection) {
+    const lifecycle = tokenLifecycleByProvider[provider];
+    if (!lifecycle) return {accounts: await discoverByProvider[provider](connection.accessToken), connection};
+    const result = await lifecycle.run({
+      authority,
+      connection,
+      operation: current => discoverByProvider[provider](current.accessToken),
+    });
+    return {accounts: result.value, connection: result.connection};
+  }
   return Object.freeze({
     async status(authority, provider) {
       const row = await store.readStatus({authority, provider});
@@ -59,7 +82,7 @@ function createAdAccountSelection({store, discoverByProvider} = {}) {
       const connection = await store.readPendingProvider({authority, provider});
       if (!connection) return {status: 'not_connected', accounts: []};
       if (connection.status !== 'pending_account_selection' || !connection.accessToken) return {status: connection.status, accounts: []};
-      const accounts = await discoverByProvider[provider](connection.accessToken);
+      const {accounts} = await discover(authority, provider, connection);
       return {status: connection.status, accounts};
     },
     async complete(authority, provider, input) {
@@ -70,13 +93,16 @@ function createAdAccountSelection({store, discoverByProvider} = {}) {
       if (accountIds.length !== input.account_ids.length) throw failure('INVALID_ACCOUNT', 400);
       const connection = await store.readPendingProvider({authority, provider});
       if (!connection || connection.status !== 'pending_account_selection' || !connection.accessToken) throw failure('INVALID_ACCOUNT', 400);
-      const accounts = await discoverByProvider[provider](connection.accessToken);
+      const discovered = await discover(authority, provider, connection);
+      const accounts = discovered.accounts;
       const verified = accountIds.map(id => accounts.find(item => item.id === id));
       if (verified.some(account => !account)) throw failure('INVALID_ACCOUNT', 400);
-      await store.completeAccountSelection({authority, provider, version: connection.connection_version, accounts: verified});
+      const version = discovered.connection.version ?? discovered.connection.connection_version;
+      await store.completeAccountSelection({authority, provider, version, accounts: verified});
       return {status: 'connected', accounts: verified};
     },
   });
 }
 
-module.exports = Object.freeze({PROVIDERS, ACCOUNT_LIMIT, createMetaAccountDiscovery, createGoogleAdsAccountDiscovery, createAdAccountSelection});
+module.exports = Object.freeze({PROVIDERS, ACCOUNT_LIMIT, createMetaAccountDiscovery, createGoogleAdsAccountDiscovery, createAdAccountSelection, validGoogleAccount});
+

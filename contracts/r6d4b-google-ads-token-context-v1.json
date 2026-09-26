@@ -1,0 +1,53 @@
+{
+  "contract_version": "r6d4b-google-ads-token-context-v1",
+  "status": "REPOSITORY_PASS_R6_D4_C_MERCHANT_ACCEPTANCE_GATE",
+  "provider": "google_ads",
+  "implemented": {
+    "oauth_requires_refresh_token": true,
+    "oauth_requires_future_access_expiry": true,
+    "oauth_requires_adwords_scope": true,
+    "encrypted_access_and_refresh_storage": true,
+    "server_side_expiry_refresh": true,
+    "refresh_token_rotation": true,
+    "single_refresh_and_single_retry_on_auth_failure": true,
+    "invalid_grant_requires_reauthorization": true,
+    "selected_account_login_customer_id_persisted": true,
+    "manager_accounts_remain_non_selectable": true,
+    "optimistic_connection_version_protection": true
+  },
+  "canonical_selected_account_shape": [
+    "id",
+    "name",
+    "currency",
+    "login_customer_id"
+  ],
+  "state_support": [
+    "pending_account_selection",
+    "connected"
+  ],
+  "reauthorization_code": "GOOGLE_REAUTHORIZE",
+  "database_migration_required": false,
+  "reason_no_migration": "selected_accounts is an existing server-only JSONB envelope and accepts the verified login_customer_id field without changing table cardinality or browser access",
+  "preserved_boundaries": {
+    "workspace_authority_server_resolved": true,
+    "browser_metadata_is_authority": false,
+    "google_sheets_parked": true,
+    "ga4_organic_parked": true,
+    "legacy_token_fallback": false,
+    "E5_redevelopment": false
+  },
+  "excluded": [
+    "production_google_oauth",
+    "merchant_account_selection_acceptance",
+    "google_ads_performance_read",
+    "dataset_v2_write",
+    "schedule_or_backfill",
+    "disconnect_or_provider_revoke",
+    "google_sheets_reactivation",
+    "ga4_organic_reactivation"
+  ],
+  "production_mutation": false,
+  "provider_contact": false,
+  "dataset_v2_write": false
+}
+

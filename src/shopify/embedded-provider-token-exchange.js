@@ -1,5 +1,7 @@
 "use strict";
 
+const GOOGLE_ADS_SCOPE = "https://www.googleapis.com/auth/adwords";
+
 function normalize(payload) {
   const data = payload?.data && typeof payload.data === "object" ? payload.data : payload;
   const accessToken = data?.access_token;
@@ -78,6 +80,21 @@ async function exchangeAndValidateMetaToken({fetchImpl, graphVersion, now, formH
   });
 }
 
+async function exchangeAndValidateGoogleToken({fetchImpl, formHeaders, form, code, redirectUri, clientId, clientSecret}) {
+  const response = await fetchImpl("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: formHeaders,
+    body: form({grant_type: "authorization_code", client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, code}),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload || typeof payload !== "object") throw failure("GOOGLE_TOKEN_CODE_EXCHANGE_FAILED");
+  const tokens = normalize(payload);
+  if (!tokens.refreshToken) throw failure("GOOGLE_REFRESH_TOKEN_REQUIRED");
+  if (!tokens.expiresIn) throw failure("GOOGLE_TOKEN_EXPIRY_REQUIRED");
+  if (!tokens.scopes.includes(GOOGLE_ADS_SCOPE)) throw failure("GOOGLE_ADS_SCOPE_MISSING");
+  return tokens;
+}
+
 function createEmbeddedProviderTokenExchanges({fetchImpl = fetch, metaGraphVersion = "v20.0", now = () => new Date()} = {}) {
   if (typeof fetchImpl !== "function") throw new TypeError("fetchImpl is required");
   if (!/^v\d+\.\d+$/.test(metaGraphVersion)) throw new TypeError("metaGraphVersion is invalid");
@@ -86,11 +103,12 @@ function createEmbeddedProviderTokenExchanges({fetchImpl = fetch, metaGraphVersi
   const formHeaders = {"Content-Type": "application/x-www-form-urlencoded", Accept: "application/json"};
   return Object.freeze({
     meta: input => exchangeAndValidateMetaToken({fetchImpl, graphVersion: metaGraphVersion, now, formHeaders, form, ...input}),
-    google_ads: ({code, redirectUri, clientId, clientSecret}) => requestToken(fetchImpl, "https://oauth2.googleapis.com/token", {method: "POST", headers: formHeaders, body: form({grant_type: "authorization_code", client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, code})}),
+    google_ads: input => exchangeAndValidateGoogleToken({fetchImpl, formHeaders, form, ...input}),
     klaviyo: ({code, redirectUri, pkceVerifier, clientId, clientSecret}) => requestToken(fetchImpl, "https://a.klaviyo.com/oauth/token", {method: "POST", headers: {...formHeaders, Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`}, body: form({grant_type: "authorization_code", redirect_uri: redirectUri, code, code_verifier: pkceVerifier})}),
     tiktok: ({code, clientId, clientSecret}) => requestToken(fetchImpl, "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/", {method: "POST", headers: {"Content-Type": "application/json", Accept: "application/json"}, body: JSON.stringify({app_id: clientId, secret: clientSecret, auth_code: code})}),
     pinterest: ({code, redirectUri, clientId, clientSecret}) => requestToken(fetchImpl, "https://api.pinterest.com/v5/oauth/token", {method: "POST", headers: {...formHeaders, Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`}, body: form({grant_type: "authorization_code", redirect_uri: redirectUri, code})}),
   });
 }
 
-module.exports = Object.freeze({createEmbeddedProviderTokenExchanges, normalize, exchangeAndValidateMetaToken});
+module.exports = Object.freeze({createEmbeddedProviderTokenExchanges, normalize, exchangeAndValidateMetaToken, exchangeAndValidateGoogleToken, GOOGLE_ADS_SCOPE});
+

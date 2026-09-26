@@ -140,7 +140,601 @@ Bu bölüm, Shopify Embedded kararından önceki standalone kullanıcı/OAuth mo
 - **R5-A human binding + R5-B repository hazırlığı:** Kullanıcı, embedded account ID ile eşleşen eski AdsTable Klaviyo hesabının bu workspace'e ait olduğunu açıkça beyan etti. Yalnız bu legacy aday için `1` aktif `human_attested` binding yazıldı; seçilmiş hesabı olmayan ikinci legacy satır unbound kaldı. Mevcut accounts endpoint'inin `401` halinde token refresh yazısı yapabildiği görülerek salt-okunur onay kapsamında çalıştırılması reddedildi. Bunun yerine Shopify session-bound `GET /api/shopify/providers/klaviyo/accounts/verify` ve R5 operatör parametresi hazırlandı: tek Account API GET çağrısı, refresh/write yok, `401` halinde fail-closed, account/token ifşası yok. Testler `16/16` Klaviyo ve `3/3` R5 PASS. Kod henüz deploy edilmediği için provider teması ve R5-C taşıması yapılmadı.
 - **R5-B canlı sonuç + R5-C kontrollü temiz reset kararı:** PR #231 merge commit `bab09110eb532e318d893c24535ce33953df63c2` production'a alındı ve `dev.adstable.app` alias'ı bu READY deployment'a bağlandı. Kullanıcının açık provider-temas onayıyla session-bound no-refresh doğrulama tam bir kez çalıştırıldı; `/api/shopify/providers/klaviyo/accounts/verify` `409` döndürdü. Supabase salt-okunur kontrolü embedded kaydın `connected`, aktif hesaplı, `USD` currency'li ve şifreli access/refresh token zarflı olduğunu doğruladı; refresh, retry, revoke, canonical insert veya token silme yapılmadı. Eski grant doğrulanamadığı için R5 v1 kanonik taşıma yolu kapatıldı ve sonuç `reauthorization_required` kabul edildi. Kullanıcı temiz başlangıç kararı verdi: R5-C, yalnız işlem anındaki ayrı açık onayla refresh token'ı bir kez revoke edecek; provider başarısından önce yerel durumu değiştirmeyecek; embedded satırı `revoked` yaparken hesap/maliyet/currency/token zarfları ve tarihsel verileri koruyacak; aynı işlemde OAuth başlatmayacaktır. Hazırlık sözleşmesi `contracts/r5-klaviyo-consolidation-v2.json` ve `docs/R5C_KLAVIYO_CONTROLLED_CLEAN_RESET.md` içindedir. Canlı revoke ve Supabase mutation henüz yapılmamıştır.
 - **R5-C — Tamamlandı / R6 approval gate:** PR #232 merge commit `cb51f91f257622c9e6715fd2ae960cf9a0b596d4` ile hazırlık, PR #233 merge commit `8f183720fe1e64975ce8adabbeb8318f55257259` ile Shopify-native execution gate production'a alındı. Son deployment `READY`, target `production`, alias `dev.adstable.app` ve alias hatası `null` olarak doğrulandı. Merchant resmi `s-modal` içindeki **Remove connection** eylemiyle işlem-anı onayı verdi; session-bound `POST /api/shopify/providers/klaviyo/accounts/reset` production logunda bir kez `200` döndü. Salt-okunur Supabase postcheck `PASS`: tek embedded Klaviyo satırı `revoked`, `connected` satır `0`, canonical Klaviyo `0`; aktif hesap, aylık maliyet, source currency ve encrypted access/refresh zarfları tarihçe olarak korundu. Aktif human-attested binding `1`, Klaviyo schedule/job `0`, legacy freeze trigger `6`, plaintext legacy token `0` kaldı. Reset yeni OAuth, refresh, canonical insert, Dataset V2 yazımı veya token silme başlatmadı; Connect R6/R7 kabulüne kadar kapalıdır. R5 tamamlandı; sonraki çalışma ayrı kapsam ve onay kapısıyla R6'dır.
-- **R6-A — Tamamlandı / R6-B workspace runtime gate:** 23 Eylül 2026 salt-okunur canlı preflight `PASS_PREPARATION_ONLY` verdi: `1` workspace, `0` workspace settings/reporting currency, `0` canonical connection, `0` Dataset V2 satırı, `0` aktif legacy schedule/job, `6` legacy freeze trigger ve `1` revoked embedded Klaviyo. Workspace foreign key ve unique index yerinde; Dataset V2 `user_id` hâlâ `NOT NULL`. Provider teması, migration veya database write yapılmadı. Versionlı contract `contracts/r6-workspace-provider-runtime-v1.json`, analist kararı `docs/R6_WORKSPACE_PROVIDER_RUNTIME.md` ve salt-okunur kapı `docs/security/sql/R6_WORKSPACE_RUNTIME_PREFLIGHT.sql` içindedir. R6 canlı kabulü reporting currency ve canonical connection istediği, bunları fication, ayrı capture/restore insan onayları, environment-only credential ve managed primitives doğrulanmış disposable Supabase target.
+- **R6-A — Tamamlandı / R6-B workspace runtime gate:** 23 Eylül 2026 salt-okunur canlı preflight `PASS_PREPARATION_ONLY` verdi: `1` workspace, `0` workspace settings/reporting currency, `0` canonical connection, `0` Dataset V2 satırı, `0` aktif legacy schedule/job, `6` legacy freeze trigger ve `1` revoked embedded Klaviyo. Workspace foreign key ve unique index yerinde; Dataset V2 `user_id` hâlâ `NOT NULL`. Provider teması, migration veya database write yapılmadı. Versionlı contract `contracts/r6-workspace-provider-runtime-v1.json`, analist kararı `docs/R6_WORKSPACE_PROVIDER_RUNTIME.md` ve salt-okunur kapı `docs/security/sql/R6_WORKSPACE_RUNTIME_PREFLIGHT.sql` içindedir. R6 canlı kabulü reporting currency ve canonical connection istediği, bunları R7 oluşturduğu için eski R6↔R7 döngüsü alt kapılara ayrıldı: R6-B ortak workspace runtime, R6-C aktivasyon migration hazırlığı, R7-A currency/Connect foundation, R6-D gerçek provider kabulü, R3-C tenant sıkılaştırması, R7-B final Connected/Disconnect deneyimi. İlk aktif dilim yalnız Meta, Google Ads ve Klaviyo'dur; TikTok/Pinterest production path'e kaydedilmez.
+- **R6-B — Tamamlandı / R6-C activation migration gate:** Ortak runtime boundary server-resolved workspace, aynı workspace için canonical `connected` provider kaydı ve yalnız `merchant_selected` reporting currency bulunmadan provider runner veya Dataset V2 yazısına geçmez. Request içindeki tenant alanları reddedilir; yalnız Meta/Google Ads/Klaviyo allowlist'tedir; access/refresh token sonuçta ifşa edilmez. Provider runner'lar production composition root'a kaydedilmediği için canlı çalışma kapalıdır. Repository testleri authority→connection→currency→runner→workspace write sırasını, eksik currency/connection fail-closed davranışını ve TikTok/Pinterest reddini doğrular. Provider teması, migration ve database write yapılmadı.
+- **R6-C — Tamamlandı / R7-A Ready:** Açık production onayıyla preflight `PASS_PREPARATION_ONLY` verdi; `r6_dataset_v2_workspace_activation` canlı ledger'a `20260923154503` sürümüyle uygulandı ve postcheck `PASS` oldu. Dataset V2 `user_id` nullable; `workspace_id` R3-C'ye kadar staged nullable; legacy unique index/SELECT policy ve dört workspace indexi yerinde; Dataset V2 `0` satır. Advisor kontrolünde R6-C kaynaklı yeni WARN/ERROR yoktur; boş tablodaki üç workspace indexinin unused kaydı beklenen INFO'dur. Provider runtime aktive edilmedi; OAuth/provider teması/veri yazımı yapılmadı. Kanıt `docs/security/evidence/R6C_DATASET_ACTIVATION_LIVE.json` içindedir. Sıradaki iş R7-A reporting currency ve canonical Connect foundation'dır.
+- **R7:** Connect kartı önce açıklama modalı açar; modal dışı close/Cancel provider teması yapmaz. OAuth top-level'dır. Account selection ve Klaviyo plan cost/currency Shopify-native modal/form ile tamamlanır. Connected kartında Disconnect bulunur; Cancel non-destructive, tarihsel analytics korunur. Resmi Shopify componentleri, session token ve mobil acceptance zorunludur.
+- **R7-A1 — Repository complete / R7-A2 next:** Shopify session ile çözülen workspace için reporting currency ilk kez merchant tarafından seçilir; Shopify currency okunmaz/default yapılmaz. Currency kaydı olmadan Data Sources ve OAuth start fail-closed durur. Meta/Google Ads/Klaviyo aktif, TikTok/Pinterest Parked'tır. Connect kartı provider teması yapmadan açıklama modalı açar; yalnız modal içindeki açık eylem top-level OAuth başlatır. Callback artık eski Shopify connection tablosuna değil `workspace_provider_connections` tablosuna `pending_account_selection` yazar. Klaviyo seçim ve maliyet kaydı canonical store'a yönlendirilmiştir. Production deployment/provider teması yapılmadı. Meta ve Google Ads verified account discovery/seçimi R7-A2'de tamamlanacaktır; R6-D ve R7-B kapıları kapalıdır.
+- **R7-A2 — Corrected account-cardinality contract / production acceptance gate:** Meta `me/adaccounts` ve Google Ads `ListAccessibleCustomers + customer_client` üzerinden provider-supplied hesap kimliği/adı/source currency kaydetme anında yeniden doğrulanır; kullanıcı aynı OAuth grant'i altında en az 1, en fazla 3 reklam hesabı seçer. Klaviyo Accounts API üzerinden tek doğrulanmış hesap seçilir ve plan cost bu hesabın verified source currency'siyle ayrı adımda kaydedilir. Browser workspace, account adı veya currency authority değildir. `active_account_id` geriye uyumluluk alanıdır; tam bağlantı kapsamı `selected_accounts`, Funnel için tek aktif hesap tercihi ise ayrı Settings kararıdır. TikTok/Pinterest parked kalır. Additive cardinality migration'ı, production deployment, merchant reporting currency seçimi, canlı provider teması ve canonical connection ayrı kabul kapısındadır; ardından R6-D gelir.
+- **R7-A production corrective — OAuth route/UI readiness:** İlk merchant kabulünde Klaviyo status ve OAuth start rotalarının `404` verdiği production runtime loguyla doğrulandı. Kök neden, R7-A2'de Google Ads account discovery için eklenen developer-token şartının yanlışlıkla bütün provider route composition'ını kapatması; presentation function'ın ise yalnız genel feature flag'e bakarak Connect göstermesiydi. Provider readiness artık provider bazında izole edilir: eksik Google Ads hazırlığı Klaviyo veya Meta rotalarını kapatamaz; bilinen fakat hazır olmayan provider `503 SHOPIFY_PROVIDER_NOT_CONFIGURED` döndürür. İlk currency seçimi ve kısa Connect açıklaması `small-100` Shopify-native modallara taşınır; generic hata yerine güvenli hata kodu gösterilir. Corrective deployment ve merchant retest tamamlanmadan R7-A production acceptance verilmez; R6-D/R7-B kapıları kapalı kalır.
+- **R7-A account-cardinality activation — migration ve application deployment PASS / merchant acceptance next:** Açık production onayıyla salt-okunur database preflight `PASS` verdi: canonical connection tablosu `0` satır, connected/invalid kayıt `0`, RLS ve FORCE RLS açık. Yalnız additive `20260924120453_add_workspace_provider_selected_accounts` migration'ı uygulandı. Postcheck `PASS`: kolon `NOT NULL DEFAULT []`, üç cardinality constraint validated, browser grant `0`, canonical satır `0`. PR #242 merge commit `a94201bf74c76cc57b5a357782c06a3b48bb3f67` Vercel production'da `READY`; `dev.adstable.app` alias'ı aynı deployment'a bağlı ve deploy sonrası runtime error taraması temizdir. Meta/Google için 1–3, Klaviyo için tek hesap veritabanı sınırında korunur. Canlı provider teması, OAuth veya connection yazısı yapılmadı; sıradaki kapı merchant acceptance'tır. Redacted database kanıtı `docs/security/evidence/R7A_ACCOUNT_CARDINALITY_LIVE.json` içindedir.
+- **R7-A merchant acceptance — PASS / R6-D next:** İlk canlı Klaviyo OAuth callback'i provider token değişiminden sonra `CANONICAL_CONNECTION_WRITE_FAILED` ile durdu. Supabase PostgreSQL logu kesin kök nedeni `workspace_provider_timestamp_order` ihlali olarak gösterdi: application `updated_at` değeri, ağ gecikmesi sonrasında database tarafından üretilen `created_at` değerinden eski kaldı. İlk insert artık `updated_at` göndermez; database iki varsayılan timestamp'i aynı transaction anında üretir. Focused regression 34/34 PASS; production rollback-only insert `timestamp_constraint_pass=true`, `database_defaults_same_timestamp=true`; zorunlu rollback sonrası canonical/Klaviyo/pending satırları `0/0/0`. PR #244 merge commit `3206563365219cfe1b9c8483a52294752f186fc7` production'da READY olduktan sonra merchant akışı canlıda PASS verdi: Connect→OAuth→tek verified account→source-currency plan cost→Save→Connected→warning-modal Disconnect. Disconnect endpoint'i `200`; canonical Klaviyo satırı `disconnected`, access/refresh token, selected account ve plan cost temiz, `disconnected_at` doludur. R7-A kabulü tamamlandı; sıradaki kapı R6-D, R7-B/R3-C kapalıdır.
+- **R6-D iş aynası — In progress / R6-D1 Done; R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4-C Google Ads connection/account selection live PASS; R6-D4-D repository PASS / production acceptance pending:** R6-D tek bir belirsiz production açılışı değildir. Sabit sıra: **R6-D1** ortak fail-closed kabul koşucusu; **R6-D2** Klaviyo workspace tam yaşam döngüsü; **R6-D3** Meta workspace tam yaşam döngüsü; **R6-D4-A0** eski Google Sheets Dataset V1 export utility'sinin güvenli parkı; **R6-D4** Google Ads workspace tam yaşam döngüsü; **R6-D5** provider bazlı kontrollü aktivasyon kararı. Meta tam yaşam döngüsü tamamlanmıştır. Google Ads bağlantı ve üç doğrulanmış hesap seçimi reload kalıcılığıyla canlıda kanıtlanmıştır. E5 motorunu workspace authority ile çağıran salt-okunur preflight repository'de hazırlanmıştır; canlı provider sonucu ve Supabase son kontrolü olmadan R6-D4-D kapanmaz. Google Sheets/GA4 ile TikTok/Pinterest parked kalır. R6-D bütün provider kapıları tamamlanmadan `Done` olmaz; R7-B yalnız son ortak tutarlılık kapısıdır.
+- **R6-D1 — Done / R6-D2 in progress:** Ortak runtime seçilmiş hesap kapsamı, provider/platform, source/target currency, timezone/business date, sentetik satır yasağı ve doğrulanmış empty/non-empty sonucunu Dataset V2 yazısından önce fail-closed doğrular; dış sonuç token/account ID/metrik taşımaz ve `production_activation=false` kalır. Klaviyo workspace mapper/runner ile `2026-07-15` API revision kullanan Accounts + Campaign/Flow Reporting client hazırdır. `flows:read` OAuth scope'a eklenmiştir; explicit conversion metric ID zorunludur. Klaviyo `text_message_spend` yalnız USD hesapta gerçek spend olarak kabul edilir; başka account currency altında yanlış etiketlenmez. Email monthly plan cost yalnız canonical connection kaydından kullanım payıyla uygulanır. Tamamlanmış adapter, mapping, formula ve Dataset V2 writer yeniden geliştirilmez; R6-D2 yalnız canlı kabul kapılarıyla ilerler.
+- **R6-D2 production preflight attempt — FAIL-CLOSED / PASS verilmedi:** Canonical Klaviyo reconnect merchant tarafından doğrulandı. PR #250 merge commit `3b8ce7f06e6cfcdf254d459f7e16ed54542c95e4` production'da Shopify-session-bound salt-okunur kabul rotasını açtı. İlk canlı çalıştırma `KLAVIYO_PREFLIGHT_NOT_CONFIGURED` döndürdü; route/session authority çalıştı fakat global `KLAVIYO_PLACED_ORDER_METRIC_ID` eksik olduğu için provider çağrısı başlamadı. Dataset V2 ve connection metadata yazısı yapılmadı.
+- **R6-D2-C1 workspace/account metric binding corrective — migration + application deployment PASS / C2 next:** Tek global Klaviyo metric ID çok-workspace ve gelecekteki WooCommerce adapter'ı için reddedildi. Metrics API bütün sayfaları provider origin sınırında tarar; yalnız tam `Placed Order` adayları integration name/category provenance ile kabul yüzeyine gelir. Sıfır veya birden fazla aday otomatik seçilmez. Seçim provider'da tekrar doğrulanarak aynı workspace, canonical Klaviyo account ve optimistic connection version ile `workspace_provider_connections` kaydına bağlanır; disconnect/reconnect/account değişimi bağı temizler. Additive migration production'da PASS olmuş, PR #251 merge commit `b482ed7bd6506225ec9b95ca0cd9c5eef243ee50` production deployment'ında `READY` olmuş ve `dev.adstable.app` alias'ı doğrulanmıştır; deploy sonrası runtime error taraması temizdir. Provider discovery, canonical metric yazısı ve Dataset V2 yazısı yapılmamıştır. Dataset V2 write bundan sonra da ayrı onaydır.
+- **R6-D2-C1 production migration preflight — PASS / mutation yapılmadı:** 2026-09-25 salt-okunur sorgusu canonical tablo, RLS/FORCE RLS ve browser grant sınırını doğruladı; hedef metric kolon/constraint sayısı `0/0`, canonical connection `1`, connected Klaviyo `1`, sonuç `PASS`. Provider çağrısı, database mutation veya Dataset V2 yazısı yapılmadı. Redacted kanıt `docs/security/evidence/R6D2C1_KLAVIYO_METRIC_BINDING_PREFLIGHT_LIVE.json`. Bu PASS yalnız migration önkoşuludur; migration uygulaması ayrı açık onay bekler.
+- **R6-D2-C1 production migration — PASS / application deployment PASS:** Açık onayla additive migration production ledger'a `20260925072801_add_workspace_provider_conversion_metric` olarak uygulandı. Postcheck: kolon `5`, validated constraint `1`, RLS/FORCE RLS açık, browser grant `0`, bound metric `0`, invalid binding `0`, sonuç `PASS`. Mevcut connection satırına metric değeri yazılmadı; provider teması ve Dataset V2 yazısı yapılmadı. Security/performance advisors çalıştı; C1'e bağlı yeni bulgu yok, mevcut proje-geneli uyarılar bu taskta değiştirilmedi. Redacted kanıt `docs/security/evidence/R6D2C1_KLAVIYO_METRIC_BINDING_MIGRATION_LIVE.json`. Sonraki kapı R6-D2-C2 ürün sözleşmesi ve ardından ayrı onaylı salt-okunur discovery'dir.
+- **R6-D2-C1 application deployment — PASS / C2 next:** PR #251 merge commit `b482ed7bd6506225ec9b95ca0cd9c5eef243ee50` GitHub `main` ile eşleşir. Vercel deployment `READY`, target `production`, `dev.adstable.app` alias'ı bağlı ve `aliasError=null`dır; son bir saatlik runtime error taramasında hata bulunmamıştır. Bu PASS yalnız C1 uygulama deployment'ını kapatır; provider discovery, canonical metric yazısı, Klaviyo rapor okuması veya Dataset V2 yazısı değildir.
+- **R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS / C3 next:** Kullanıcı teknik metric ID seçmez. Tek doğrulanmış `Placed Order` adayı varsa ayrı seçim ekranı açılmaz; satış kaynağı özeti Email Monthly Plan Cost adımındaki final onayda gösterilir. Birden fazla doğrulanmış aday varsa yalnız integration/store provenance taşıyan Shopify-native tek seçim kontrolü açılır; sıfır adayda bağlantı fail-closed kalır. Seçim yalnız ilk bağlantı, reconnect/account değişimi, bağın provider'da geçersizleşmesi veya Settings'teki açık değişiklikte yeniden istenir. Plan cost değişikliği tek başına satış kaynağı seçimini tekrar açmaz. C2 yalnız analist/UI sözleşmesidir; provider çağrısı, database write, Dataset V2 write veya yeni adapter/mapping geliştirmesi yapılmadı.
+- **R6-D2-C3 salt-okunur satış kaynağı keşfi — Live PASS:** Mevcut canonical Klaviyo grant'i ile exact `Placed Order` adayları provider Metrics API'den okundu; tek aday kullanıcıya gösterildi. Supabase connection metadata ve Dataset V2 değiştirilmedi; teknik metric ID UI'a taşınmadı.
+- **R6-D2-C4 canonical satış kaynağı bağı — Live PASS:** Kullanıcının onayladığı provider-doğrulanmış `Placed Order` adayı mevcut workspace + Klaviyo account kapsamlı connection satırına optimistic version sınırıyla yazıldı. Dataset V2 yazısı yapılmadı; reconnect/account değişimi korumaları korunuyor.
+- **R6-D2-C5 salt-okunur Klaviyo runtime preflight — Live PASS:** Account, Campaign, Flow, Time ve FX doğrulandı. Campaign endpoint'inin ilk HTTP `429` yanıtı provider `Retry-After` süresi sonrasında kontrollü retry ile toparlandı; outer endpoint HTTP `200` verdi. Canonical connection `1`, connected `1`, metric binding `1`, Klaviyo Dataset V2 satırı `0` kaldı; C5 provider/DB write üretmedi.
+- **R6-D2-C6 kontrollü Dataset V2 canlı kabulü — C6-A+C6-C failed closed / C6-B diagnostics PASS / Dataset V2 rows `0`:** C6-A ilk açık onaylı production isteği genel HTTP `503` ile durdu; C6-B güvenli aşama teşhisi production'a alındı. R3-C1 tenant enforcement PASS sonrasında ayrı açık onayla yapılan C6-C ikinci deneme `KLAVIYO_DATASET_ACCEPTANCE_FAILED_PROVIDER_ACCOUNT` döndürdü. Shopify authority, canonical connection, reporting currency ve Dataset zero-row guard başarılıydı; hata Account API aşamasında, campaign/flow, FX, normalization ve persistence öncesinde oluştu. Supabase upsert oluşmadı; bağlantı ve mevcut metric binding korundu. Dataset V2 satırı `0` kaldı ve otomatik retry yapılmadı.
+- **R6-D2-C6-D connected Klaviyo token lifecycle corrective — Live PASS / verified empty / rows `0`:** PR #259 merge commit `9039180442768a2dab9b80c09d24217d8249588f` post-merge Security/Full Regression PASS ve otomatik Vercel Production deployment SUCCESS ile production'a alındı. Açık production onayıyla salt-okunur preflight tek kez çalıştı ve Account, Campaign, Flow, Time ve FX kapılarında PASS verdi. Ardından tek kontrollü C6 isteği `PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE`, `attempted 0`, `persisted 0`, `empty_provider_result true` döndürdü. Provider gerçek boş sonuç verdiği için sentetik satır oluşturulmadı. Supabase salt-okunur postcheck Dataset V2 toplam/Klaviyo satırını `0/0`; connected Klaviyo, access expiry, encrypted refresh ve metric binding sayılarını `1/1/1/1` doğruladı. Beklenmeyen provider `401` yalnız bir refresh + bir retry üretir; ikinci auth hatası yeniden yetkilendirme ister. Bu sonuç token yaşam döngüsünün merchant'ı yeniden OAuth'a zorlamadan çalıştığını ve controlled acceptance'ın fail-safe boş sonuç sözleşmesini karşıladığını kanıtlar. Metric seçimi, mapping ve Dataset writer değiştirilmedi; tamamlanmış E4/E5/E7 yeniden geliştirilmedi. Redacted kanıt `docs/security/evidence/R6D2C6D_KLAVIYO_LIVE_ACCEPTANCE_2026-09-25.json` içindedir.
+- **R6-D2-C7 postcheck ve Klaviyo PASS kararı — PASS / R6-D2 Done / R6-D3 approval gate:** Workspace/account kapsamı, provider provenance, source/reporting currency, Time/FX, sentetik veri yasağı ve provider-doğrulanmış boş sonuç canlı preflight ile doğrulandı. Supabase postcheck canonical bağlantı ve token metadata'sını korurken Dataset V2'nin `0` kaldığını doğruladı. Klaviyo canlı kabulü tamamlandı; sıradaki ayrı paket Meta için 1–3 verified hesap brief'i ve production onayıdır. Klaviyo PASS sonucu Meta/Google aktivasyonu değildir.
+- **R6-D3-A Meta bağlantı ve token yaşam döngüsü — Done / contract only / R6-D3-B implementation gate:** Canlı salt-okunur envanterdeki legacy Meta kaydı durum olarak connected olsa da access expiry geçmiş ve refresh token yoktur; kayıt/history silinmez fakat canonical workspace'e taşınmaz, token yeniden kullanılmaz ve schedule pasif kalır. Yeni bağlantı temiz Shopify embedded OAuth ile başlar. Authorization code sonrası supported long-lived access-token modeli server-side uygulanır; token validity, configured Meta app, required scope ve gelecekteki expiry doğrulanmadan canonical save yapılmaz. Meta için uydurma refresh-token akışı kurulmaz; desteklenmeyen yenileme veya geçersiz token kontrollü `Reconnect Meta` ister. Callback `pending_account_selection` durumunda durur; server'ın provider'dan yeniden doğruladığı en az 1, en fazla 3 reklam hesabı seçilmeden `Connected` olmaz. Bu paket provider teması, production OAuth, Dataset V2 yazısı, schedule/backfill, Disconnect/revoke veya E4 yeniden geliştirmesi içermez. Sözleşme `contracts/r6d3a-meta-connection-lifecycle-v1.json`, analist kararı `docs/R6D3A_META_CONNECTION_LIFECYCLE_DECISION.md` içindedir.
+- **R6-D3-B Meta token doğrulama uygulaması — Done / repository only / R6-D3-C account-selection acceptance gate:** Embedded Meta callback artık authorization code'u server-side kısa token'a, ardından supported long-lived user token'a çevirir. Long-lived token debugger ile `is_valid`, configured app ID, `ads_read` scope ve gelecekteki expiry doğrulanmadan canonical store çağrılmaz. Yalnız doğrulanmış long-lived access token encrypted envelope'a gider; Meta refresh token beklenmez veya üretilmez. Güvenli validation hataları Meta'ya bağlı `Reconnect Meta` sunumuna döner. Graph version authorize, exchange ve account discovery hattında aynı environment kaynağını kullanır. Başarılı callback yine yalnız `pending_account_selection` olur. Production deployment/provider teması, Dataset V2, schedule/backfill, Disconnect/revoke ve E4 değişikliği yapılmadı. Sözleşme `contracts/r6d3b-meta-token-validation-v1.json`, analist kaydı `docs/R6D3B_META_TOKEN_VALIDATION.md` içindedir.
+- **R6-D3-C Meta 1–3 hesap seçimi — Production merchant acceptance PASS / 1 verified account / data runtime gate:** R7-A2'de kurulmuş canonical seçim hattı eski `server.js + dashboard.html` referansıyla yeniden karşılaştırılmış ve yeni runtime yazılmamıştır. Shopify session-bound liste/seçim rotaları Meta `/me/adaccounts` listesini server-side yeniden doğrular; browser yalnız ID gönderir. Sıfır, üçten fazla, duplicate veya listede olmayan seçim reddedilir. PR #261, merge commit `d7dfaa4baf8ba89af65873d1f00718ae3de5258d` ile production'a alınmış; security ve Vercel kontrolleri geçmiş, immutable deployment ile `dev.adstable.app` içerik eşleşmesi doğrulanmıştır. Salt-okunur preflight `PASS` sonrasında gerçek merchant Connect→OAuth→modal→1 hesap→Save→reload zinciri tamamlanmış ve kullanıcı `Connected · 1 account` görünümünü doğrulamıştır. Salt-okunur postcheck canonical Meta `1`, connected `1`, pending/invalid `0`, browser grant `0`; legacy Meta `1 → 1`; Dataset V2 Meta/schedule/job `0` sonucuyla `PASS` vermiştir. Bu PASS yalnız bağlantı ve hesap seçimidir: Meta Insights/performance, Time/FX, Dataset V2, schedule/backfill, Disconnect/revoke veya tamamlanmış E4/E5/E7 yeniden geliştirmesi yapılmamıştır. Sözleşme `contracts/r6d3c-meta-account-selection-acceptance-v1.json`, analist kaydı `docs/R6D3C_META_ACCOUNT_SELECTION_ACCEPTANCE.md`, redacted aggregate kanıt `docs/security/evidence/R6D3C_META_ACCOUNT_SELECTION_LIVE_ACCEPTANCE_2026-09-25.json` içindedir. Sıradaki kapı kodlama değil, R6-D3 Meta data runtime analist brief'idir.
+- **R6-D3-D Meta workspace salt-okunur preflight — Production read-only acceptance PASS / verified empty / Dataset V2 gate:** Tamamlanmış E4 Meta Client, Campaign→AdSet→Ad mapper, sabit metrik sözleşmesi ve Time/FX katmanı yeniden geliştirilmeden workspace authority'ye bağlandı. PR #263 merge commit `e558ec69d25b6f5aeee314d592cd5cac231662a8` production'a dağıtıldı. Gerçek merchant kabulü `1` hesabın Account API ile doğrulandığını, önceki kapanmış gün Insights isteğinin başarıyla çalıştığını, sonucun provider-doğrulanmış boş (`0` satır) ve Time/FX kontrollerinin başarılı olduğunu gösterdi; Dataset V2 yazısı `0` kaldı. Supabase postcheck canonical Meta `1`, connected/selected account `1`, pending/invalid `0`; Dataset V2 Meta/schedule/job, browser grant `0`; legacy Meta `1` sonucuyla PASS verdi. Bu PASS kalıcı Dataset V2 yazısı, schedule, backfill veya aktivasyon değildir. Sözleşme `contracts/r6d3d-meta-read-only-preflight-v1.json`, analist kaydı `docs/R6D3D_META_READ_ONLY_PREFLIGHT.md`, kanıt `docs/security/evidence/R6D3D_META_READ_ONLY_LIVE_ACCEPTANCE_2026-09-25.json` içindedir. Sıradaki kapı ayrı analist brief'i ve açık onay gerektiren kontrollü Dataset V2 kabul kararıdır.
+- **R6-D3-E Meta kontrollü Dataset V2 kabulü — Production verified-empty PASS / data gate closed / lifecycle gate open:** Onaylanan analist brief'i doğrultusunda yeni metrik, mapper veya legacy runtime geliştirilmemiştir. Mevcut Meta workspace runner, ortak provider-result doğrulaması, workspace canonical write boundary ve Workspace Supabase repository tek exact-confirmation işleminde birleştirilmiştir. Shopify session dışındaki workspace/tarih/currency alanları authority değildir. Seçilmiş 1–3 hesap için yakın business-date penceresinde mevcut Meta satırı varsa provider temasından önce fail-closed durur. PR #265 merge commit `ef0d2cd240b87b626b141111ed5712404fff816d` production'a dağıtıldıktan sonra açık onaylı tek kontrollü kabul `attempted 0`, `persisted 0`, `verified empty true`, `synthetic 0` sonucu verdi. Supabase salt-okunur postcheck canonical Meta `connected · 1 account` durumunu korurken Dataset V2 toplam/Meta, aktif Meta schedule, açık Meta job ve browser grant sayılarını `0` doğruladı; legacy Meta kaydı `1` kaldı. Bu sonuç provider-doğrulanmış güvenli boş-yol kabulüdür; non-empty fiziksel UPSERT henüz gözlenmemiştir. Schedule, backfill, V1 write ve aktivasyon açılmamıştır. Sözleşme `contracts/r6d3e-meta-controlled-dataset-acceptance-v1.json`, analist kaydı `docs/R6D3E_META_CONTROLLED_DATASET_ACCEPTANCE.md`, redacted kanıt `docs/security/evidence/R6D3E_META_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-25.json` içindedir. R6-D3-E veri kapısı kapanmıştır; tam Meta yaşam döngüsü R6-D3-F olmadan kapanmaz.
+- **R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Production Disconnect and clean Reconnect PASS / R6-D3 complete:** Eski `server.js + dashboard.html` referansındaki revoke-first davranış embedded yapıya taşındı. PR #268 merge commit `2f7014a6ed89eccc85e2c38d76ef518734493597` production'da READY oldu ve `dev.adstable.app` alias'ı doğrulandı. Merchant `Connected · 1 account` durumunda modal Cancel'ın non-destructive olduğunu, açık Disconnect sonrası `Not connected` durumunu ve temiz OAuth/tek verified hesap ile yeniden `Connected · 1 account` durumunu doğruladı. Salt-okunur Supabase postcheck Meta token/account cleanup ve reconnect'i PASS verirken Klaviyo connected, reporting currency `TRY`, legacy Meta geçmişi `1`, Dataset V2 toplam/Meta `0`, aktif Meta schedule/job `0` ve browser grant `0` kaldı. Migration yapılmadı. Sözleşme `contracts/r6d3f-meta-independent-disconnect-v1.json`, analist kaydı `docs/R6D3F_META_INDEPENDENT_DISCONNECT.md`, redacted kanıt `docs/security/evidence/R6D3F_META_DISCONNECT_RECONNECT_LIVE_ACCEPTANCE_2026-09-26.json` içindedir. R6-D3 tamamlandı; sıradaki kapı R6-D4 Google Ads analist brief'idir.
+- **R6-D4-A0 Google Sheets park kararı — Production PASS / R6-D4 Google Ads gate:** Google Sheets mevcut yapıda provider data source değil, eski `performance_dataset_rows` Dataset V1 içeriğini spreadsheet'e taşıyan standalone export utility'sidir. PR #270 merge commit `1a9fa1d69d8a9552108e693cd4366d8852108a2a` Security/Full Regression PASS sonrasında Vercel production'da `READY` olmuş ve `dev.adstable.app` alias'ı aynı deployment'a bağlanmıştır; bir saatlik runtime error taraması temizdir. Production'da yeni OAuth ve callback exchange, token refresh, manuel/otomatik sync, Dataset V1/V2 export ve disconnect mutation fail-closed kapalıdır; status yüzeyi `Parked` olur. Salt-okunur postcheck tarihsel connected kayıt, encrypted access/refresh credential ve spreadsheet bağının korunduğunu; plaintext token ile Dataset V2 toplam/Google Sheets satırının `0/0/0` kaldığını doğrulamıştır. Google grant revoke, Supabase mutation, provider çağrısı veya spreadsheet değişikliği yapılmamıştır. Contract `contracts/r6d4a0-google-sheets-park-v1.json`, analist kaydı `docs/R6D4A0_GOOGLE_SHEETS_PARK.md`, redacted kanıt `docs/security/evidence/R6D4A0_GOOGLE_SHEETS_PARK_LIVE_2026-09-26.json` içindedir. R6-D4 Google Ads ayrı analist brief'i ve onayıyla başlayabilir.
+- **R6-D4-A Google Ads bağlantı ve token yaşam döngüsü — Done / contract only / R6-D4-B implementation gate:** Execution Plan, eski `server.js + dashboard.html` referansı ve embedded canonical yapı birlikte karşılaştırıldı. Mevcut embedded akış top-level offline OAuth, `pending_account_selection`, `ListAccessibleCustomers + customer_client` keşfi ve provider tarafından yeniden doğrulanmış 1–3 hesap seçimini sağlar; ancak hesap başına manager `login_customer_id` canonical kayıtta kaybolur, canonical refresh-token yenilemesi ve Google Ads'e özel Disconnect yoktur. R6-D4-B; geçerli refresh token + access expiry olmadan canonical save yapmayacak, server-side refresh/rotation ve tek kontrollü auth retry uygulayacak, her seçilmiş non-manager hesaba doğrulanmış `login_customer_id` yazacak ve invalid grant'te `Reconnect Google Ads` isteyecektir. Disconnect provider global revoke yapmadan yalnız Google Ads canonical credential/hesap bağını temizleyecek, tarihsel analytics'i koruyacaktır; bunun nedeni aynı Google OAuth client'ın geçmişte Ads, parked Sheets ve parked GA4 tarafından kullanılmış olmasıdır. E5 Standard/PMax, mapping, Time/FX ve Dataset V2 writer yeniden geliştirilmez; Google Sheets ve GA4 parked kalır. Bu paket provider teması, production OAuth, Supabase mutation veya Dataset V2 yazısı yapmadı. Contract `contracts/r6d4a-google-ads-connection-lifecycle-v1.json`, analist kararı `docs/R6D4A_GOOGLE_ADS_CONNECTION_LIFECYCLE_DECISION.md` içindedir.
+- **R6-D4-B Google Ads token ve manager-context uygulaması — Repository PASS / R6-D4-C merchant acceptance gate:** Embedded Google token exchange artık refresh token, pozitif access expiry ve exact `adwords` scope olmadan canonical save'e geçmez. Pending veya connected canonical connection için server-side expiry refresh, refresh-token rotation, optimistic version koruması ve beklenmeyen auth hatasında yalnız bir refresh + bir retry uygulanır; `invalid_grant` veya ikinci auth hatası `GOOGLE_REAUTHORIZE` üretir ve legacy token'a düşmez. `ListAccessibleCustomers + customer_client` keşfinde manager hesaplar seçilemez kalırken her seçilmiş reklam hesabının doğrulanmış `login_customer_id` değeri `selected_accounts` JSONB envelope'unda korunur; refresh selection sırasında gerçekleşirse Save yeni connection version'ı kullanır. Mevcut JSONB alanı yeterli olduğu için migration yapılmadı; RLS/browser grant değişmedi. E5 yeniden geliştirilmedi; Google Sheets/GA4 parked kaldı. Bu paket production deployment, provider teması, Supabase mutation, Dataset V2 write, schedule/backfill veya Disconnect/revoke yapmadı. Contract `contracts/r6d4b-google-ads-token-context-v1.json`, analist kaydı `docs/R6D4B_GOOGLE_ADS_TOKEN_CONTEXT.md` içindedir.
+- **R6-D4-C1 Google Ads hesap keşfi corrective — Repository PASS / production diagnostic gate:** Merchant OAuth callback ve canonical pending status production loglarında başarılı, `/api/shopify/providers/google_ads/accounts` ise `503` olarak kanıtlandı. Eski `server.js + dashboard.html` test hard-route'u ile embedded gerçek `ListAccessibleCustomers + customer_client` seçimi karşılaştırıldı. Embedded discovery; provider HTTP adımları yanında token lifecycle, JSON response, customer transform ve verified-account shape aşamalarını güvenli biçimde ayırır. Yalnız HTTP `401` reauthorization sayılır; `403` developer-token/Google Ads authorization kanıtını korur ve boşuna refresh çalıştırmaz. Yalnız upstream HTTP status, Google hata sınıfı ve request ID server loguna taşınır; token/developer-token/customer ID/provider mesajı/body loglanmaz. Canonical `GOOGLE_ADS_DEVELOPER_TOKEN` tercih edilir; eski `GOOGLE_DEVELOPER_TOKEN` yalnız server-side fallback'tir. Pending connection korunur; yeniden OAuth, Supabase mutation, Dataset V2 write, schedule/backfill veya Disconnect yapılmadı. Analist kaydı `docs/R6D4C1_GOOGLE_ACCOUNT_DISCOVERY_CORRECTIVE.md` içindedir.
+- **R6-D4-C Google Ads bağlantı ve hesap seçimi — Production merchant acceptance PASS / 3 verified accounts / R6-D4-D next:** PR #276 merge commit `4b34eb4bfe33ca3ac67091b57e5ccd38c6ac25ce` production'da `READY` olmuş ve `dev.adstable.app` alias'ı doğrulanmıştır. Merchant'ın korunmuş pending grant'i yeniden OAuth istemeden hesap seçim modalını açmış; kullanıcı test erişimi altında görünen üç hesabı seçip kaydetmiş ve reload sonrasında `Connected · 3 accounts` durumunu doğrulamıştır. Production runtime kanıtında accounts GET ve selection POST `200` dönmüştür. Supabase salt-okunur postcheck tek canonical Google Ads satırını `connected`, üç seçilmiş hesabı doğrulanmış şekil, encrypted credential envelope'larını mevcut, hesap doğrulama/connected zamanlarını dolu ve yetkilendirme adapter'ını `shopify_verified_session` olarak doğrulamıştır. Dataset V2 Google Ads satırı `0` kalmıştır. Hesap, workspace veya token değeri kanıta alınmamıştır. Bu PASS yalnız bağlantı ve hesap seçimidir; E5 yeniden geliştirilmemiş, veri preflight/write, schedule/backfill veya Disconnect yapılmamıştır. Redacted kanıt `docs/security/evidence/R6D4C_GOOGLE_ADS_CONNECTION_LIVE_ACCEPTANCE_2026-09-26.json` içindedir. Sıradaki kapı kodlama değil, R6-D4-D salt-okunur Google Ads preflight analist brief'idir.
+- **R6-D4-D Google Ads salt-okunur runtime preflight — Repository PASS / production acceptance pending:** Üç seçilmiş canonical hesap için `workspace_id + selected_accounts + login_customer_id` bağlamını tamamlanmış E5 müşteri metadata, Standard Ads, Performance Max, conversion mapping ve Time/FX motoruna taşıyan ince bir katman hazırlanmıştır. Her hesabın kimliği, source currency'si ve timezone'u provider'dan yeniden okunur; önceki kapanmış business date için Standard ve PMax ayrı sorgulanır. Sonuç yalnız redacted aggregate olarak döner. Normal Data Sources yüzeyi değişmez; kontrol `?acceptance=r6d4-google` operatör parametresinde görünür. Dataset V2/V1 write, schedule, backfill, yeni metrik, Google Sheets/GA4 aktivasyonu ve Disconnect yoktur. Süresi dolmuş access token için yalnız mevcut R6-D4-B refresh/rotation sözleşmesi çalışabilir; bu analytics write değildir. Repository kapsamındaki 8 yeni test ve 55 ilgili regresyon testi PASS'tir. Contract `contracts/r6d4d-google-read-only-preflight-v1.json`, analist kaydı `docs/R6D4D_GOOGLE_READ_ONLY_PREFLIGHT.md` içindedir. Production provider sonucu ve salt-okunur Supabase postcheck kanıtlanmadan bu kapı tamamlanmış sayılmaz ve R6-D4-E başlamaz.
+- **R8:** V1 satırları doğrudan SQL copy ile V2'ye taşınmaz. Provider re-fetch tercih edilir; mümkün değilse yalnız canonical validation/provenance geçen legacy fact yazılır. Direct/Others, sentetik fallback ve belirsiz Organic otomatik taşınmaz. Backfill resumable/idempotent ve provider bazlı coverage ölçümlüdür.
+- **R9:** Read cutover provider/workspace canary ile ilerler. Error, lag, partial, FX rejection, currency consistency ve duplicate identity gözlenir. V2 read rollback'i V1 verisini değiştirmez.
+- **R10:** Standalone OAuth route, refresh/automation, V1 read/write ve compatibility alanları ancak consumer-zero ve stabilization sonrasında ayrı release/migration ile emekli edilir. Snapshot retention/audit ve token deletion kararları belgelenir; destructive işlem restore kanıtından önce yapılamaz.
+- **R11:** Ortak tablolarda zorunlu Shopify identity bulunmaz. Gelecekte `woocommerce_installations → workspace_id` adapter'ı eklenebilir; email/domain/provider account benzerliği workspace'leri otomatik birleştiremez. Aynı workspace'te birden fazla commerce installation ayrıca versionlı ürün kararı gerektirir.
+
+#### Revizyonun geçiş ve kanıt kuralı
+
+Her R paketi başlamadan zorunlu task aynasıyla ayrıntılandırılır; planlanan/gerçekleşen/sapma ayrımı korunur. Supabase DDL önce repository migration ve rollback olarak hazırlanır; canlı uygulama ayrı açık production onayı ister. Migration sonrası schema/constraint/RLS/grant sorguları, Supabase security/performance advisor, ilgili unit/integration/security testleri ve redacted acceptance evidence zorunludur. Bir R paketinin `PASS` olması sonraki provider teması, production mutation veya destructive retirement için örtük onay değildir.
+
+## 2. V3 gerçekleşme haritası
+
+| V3 fazı | Planlanan | Doğrulanmış gerçekleşen | V4 kararı |
+|---|---|---|---|
+| Phase 1 | Funnel Core iskeleti | Canonical contract, hierarchy, analysis scope, Formula/Time/FX servisleri, repository arayüzü ve Query Service uygulanmış; yerel senaryolar mevcut | **Tamamlandı — koruma/regresyon kapsamı** |
+| Phase 2 | Dataset V2 migration | Migration, corrective migration ve Supabase repository uygulanmış; canlı tablo mevcut | **Kod artefaktı tamam; canlı kabul E2'de açık** |
+| Phase 3 | Meta adapter | Provider→canonical→V2 production vertical slice | **Açık — E4** |
+| Phase 4 | Google adapter | Standard mapping; PMax contract hazırlığı | **Done — E5 canlı V2-primary kabulü tamamlandı** |
+| Phase 5 | TikTok adapter | Gerçek metrics ve synthetic ayrımı | **Parked — tamamlanmış artefaktlar korunur; OAuth/refresh/activation kapalı** |
+| Phase 6 | Klaviyo adapter | Campaign/Flow/Message ve Email/SMS | **Açık — E7** |
+| Phase 7 | GA4 Organic | Property/domain/timezone/currency/provenance | **Parked — capability korunur; ingest/connect yüzeyi kapalı** |
+| Phase 8 | Shopify Public Embedded Foundation | Install/auth, shop-workspace, minimum scope, billing ve review readiness | **Açık — E10** |
+| Phase 9 | Funnel API | Shopify-aware, authenticated ve scope-aware backend output | **Açık — E11** |
+| Phase 10 | Embedded dashboard binding | App Bridge shell ve presentation-only Funnel UI | **Açık — E12** |
+| Phase 11 | Parity/geçiş | Uçtan uca zincir doğrulaması | **E4–E13 boyunca zorunlu kapı** |
+
+> Phase 1 ve Phase 2'nin `Done` işareti yalnız kendi önceki faz sınırları içindir. Canlı DB kabulü, runtime ingest ve production binding'in tamamlandığı anlamına gelmez.
+
+### 2.1 Canonical provider envelope ve capability-aware hierarchy — V4 freeze
+
+V3 §10.2'nin ana kararı yalnız entity seviyelerinin farklılığı değildir. **Meta, Google, TikTok, Klaviyo ve GA4 kaynaklı Organic dahil bütün adapter'ların aynı canonical envelope'a normalize edilmesidir.** Bu standart provider'ların farklı API şekillerini Dataset V2, Formula Engine, Funnel API ve UI için tek dile çeviren mimari omurgadır. Bir adapter'ın bu envelope dışına çıkması provider-specific şemaları yeniden bütün katmanlara sızdırır ve sistemi başlangıç noktasına döndürür.
+
+Bu nedenle aşağıdaki envelope V4'te E0–E14 boyunca **değiştirilemez cross-cutting contract ve acceptance gate** olarak freeze edilmiştir. Adapter'lar yalnız alanların değerini ve provider capability'sine göre support durumunu belirler; blokları kaldırmaz, yeniden adlandırmaz veya provider'a özel paralel payload üretmez.
+
+Canonical model provider'da bulunmayan bir seviyeyi uydurmaz. Her leaf satır provider'ın gerçekten desteklediği en düşük analytical entity'yi temsil eder; root ve parent lineage açıkça taşınır.
+
+| Capability branch | Zorunlu canonical hierarchy | Yasaklanan sentetik davranış |
+|---|---|---|
+| Meta Paid | `Campaign → AdSet → Ad` | AdSet'i AdGroup olarak yeniden adlandırmak veya lineage'ı düşürmek |
+| Google Standard | `Campaign → AdGroup → Ad` | Campaign/AdGroup lineage'ı olmayan leaf üretmek |
+| Google PMax | `Campaign(type=performance_max) → Asset Group` | Sahte AdGroup veya Ad üretmek |
+| TikTok Paid | `Campaign → AdGroup → Ad` | Aynı fact'i birden fazla seviyede toplayarak double-count üretmek |
+| Klaviyo Campaign | `Campaign → Campaign Message` | Sahte AdGroup/Ad seviyesi üretmek |
+| Klaviyo Flow | `Flow → Flow Message` | Flow'u Campaign altına yerleştirmek veya sentetik `Email Flow` parent üretmek |
+| GA4 Organic | `Platform-level Organic identity` | Organic satırı Campaign/AdGroup/Ad altına zorlamak |
+
+#### Tek standart canonical envelope
+
+```json
+{
+  "identity": {
+    "user_id": "uuid",
+    "platform": "meta|google|tiktok|klaviyo",
+    "traffic_type": "paid|organic",
+    "source_system": "meta_ads|google_ads|tiktok_ads|klaviyo|ga4",
+    "channel": "email|sms|null",
+    "platform_account_id": "string",
+    "date": "YYYY-MM-DD"
+  },
+  "entity": {
+    "campaign_type": "standard|performance_max|null",
+    "root_entity_type": "campaign|flow|organic|null",
+    "root_entity_id": "string|null",
+    "root_entity_name": "string|null",
+    "parent_entity_type": "adset|adgroup|campaign|flow|null",
+    "parent_entity_id": "string|null",
+    "parent_entity_name": "string|null",
+    "entity_type": "ad|asset_group|campaign_message|flow_message|organic",
+    "entity_id": "string",
+    "entity_name": "string"
+  },
+  "raw_metrics": {
+    "impression": "number|null",
+    "ad_click": "number|null",
+    "session": "number|null",
+    "spend_value": "number|null",
+    "add_to_cart": "number|null",
+    "add_to_cart_value": "number|null",
+    "checkout": "number|null",
+    "checkout_value": "number|null",
+    "purchase": "number|null",
+    "purchase_value": "number|null"
+  },
+  "metric_support": {
+    "impression": "supported|unsupported|unknown",
+    "ad_click": "supported|unsupported|unknown",
+    "session": "supported|unsupported|unknown",
+    "spend_value": "supported|unsupported|unknown",
+    "add_to_cart": "supported|unsupported|unknown",
+    "add_to_cart_value": "supported|unsupported|unknown",
+    "checkout": "supported|unsupported|unknown",
+    "checkout_value": "supported|unsupported|unknown",
+    "purchase": "supported|unsupported|unknown",
+    "purchase_value": "supported|unsupported|unknown"
+  },
+  "currency": {
+    "source_currency": "USD",
+    "target_currency": "TRY",
+    "fx_rate": 1,
+    "fx_rate_date": "YYYY-MM-DD",
+    "fx_provider": "provider",
+    "fx_engine_version": "vN"
+  },
+  "time": {
+    "source_timezone": "IANA timezone",
+    "business_date": "YYYY-MM-DD",
+    "time_engine_version": "vN"
+  },
+  "provenance": {
+    "source_system": "meta_ads|google_ads|tiktok_ads|klaviyo|ga4",
+    "adapter_version": "vN",
+    "source_confidence": "real|fallback|partial",
+    "synthetic": false,
+    "ga4_property_id": "string|null",
+    "raw_reference": {}
+  }
+}
+```
+
+Envelope her adapter için aynı yedi bloğu taşır: `identity`, `entity`, `raw_metrics`, `metric_support`, `currency`, `time`, `provenance`. `identity.date` ile `time.business_date` aynı canonical business date'i ifade eder. `identity.source_system` ile `provenance.source_system` aynı olmalıdır. Her raw metric anahtarı karşılık gelen bir `metric_support` anahtarıyla birlikte bulunur.
+
+Provider'da bir metrik veya entity seviyesi bulunmuyorsa contract değiştirilmez: değer `null`, support durumu `unsupported|unknown` olur ve provenance sebebi açıklar. Gerçek ölçülen `0` ise `supported` olarak korunur. Provider'a özgü ek ham detay gerekiyorsa canonical alanları değiştirmek yerine redacted `provenance.raw_reference` veya versionlı adapter evidence içinde tutulur; Formula Engine bu provider-specific ayrıntıya bağımlı olamaz.
+
+Entity alanlarının geçerli kombinasyonu capability branch tarafından belirlenir. Alanın provider'da bulunmaması durumunda değer `null` kalır; görünen ad, placeholder ID veya sentetik entity ile doldurulmaz. Stable `entity_key`, identity ve hierarchy branch'inden deterministik üretilir; frontend görünen isimlerden identity üretmez.
+
+#### Canonical envelope invariants
+
+- Bütün provider ve GA4 Organic adapter'ları aynı yedi top-level bloğu eksiksiz üretir.
+- Platforma özel alternatif raw fact DTO'su Dataset V2 repository sınırını geçemez.
+- `source_system`, `traffic_type`, `channel` ve platform kombinasyonu canonical validation'dan geçer.
+- On raw metric anahtarının tamamı ve birebir support anahtarları bulunur.
+- `supported` metrik finite number taşır; gerçek `0` geçerlidir. `unsupported|unknown` metrik yalnız `null` taşır.
+- Time normalization tamamlanmadan `identity.date/time.business_date`; FX tamamlanmadan monetary facts production-ready sayılmaz.
+- Organic satır `source_system=ga4` ve `ga4_property_id` provenance taşır; GA4 bir paid platform olarak modellenmez.
+- `synthetic=true` production canonical performance olarak Dataset V2'ye yazılamaz.
+- Contract, adapter, time ve FX version provenance'ı yeniden üretim ve parity için izlenebilir olur.
+- Derived KPI'lar bu envelope'un raw fact kaynağına yazılmaz; aggregate sonrası Formula Engine tarafından hesaplanır.
+
+#### Hierarchy kabul kriterleri
+
+- Adapter output'u ilgili capability branch'in root/parent/leaf kombinasyonunu taşır.
+- Aynı provider ID ve branch aynı deterministik `entity_key`i üretir.
+- Klaviyo Campaign Message ve Flow Message aynı leaf ID'ye sahip olsa bile branch identity nedeniyle çakışmaz.
+- PMax, Klaviyo ve Organic için olmayan canonical seviyeler `null` kalır.
+- Dataset V2 round-trip hierarchy ve lineage alanlarını kayıpsız korur.
+- Funnel API stable identity ile capability-aware child ilişkisi döndürür.
+- Funnel UI yalnız API hierarchy'sini render eder; klasik Ad hierarchy'sine zorlamaz.
+- Aggregate yalnız seçilen analytical grain'deki canonical leaf fact'leri toplar; parent/leaf double-count oluşmaz.
+
+#### Hierarchy test kapısı
+
+- Her branch için accepted golden fixture.
+- Her yasak sentetik şekil için canonical ve DB rejection fixture'ı.
+- Deterministic key ve same-ID/different-branch collision testi.
+- Provider raw→canonical→V2 round-trip lineage testi.
+- Parent/leaf double-count negatif testi.
+- API drilldown ve UI capability render contract/E2E testi.
+
+#### Canonical envelope test kapısı
+
+- Meta, Google Standard, Google PMax, TikTok, Klaviyo Email/SMS ve GA4 Organic için aynı schema validator'a giren golden fixture.
+- Eksik top-level blok, eksik metric/support anahtarı ve provider-specific paralel şekil rejection testleri.
+- Identity/source/channel, date/business-date ve provenance/source-system cross-field invariant testleri.
+- Gerçek `0`, unsupported `null`, unknown `null`, partial provenance ve synthetic rejection testleri.
+- Time/FX öncesi ve sonrası envelope testi; dört monetary fact'in birlikte normalize edildiğinin kanıtı.
+- Canonical envelope→Dataset V2→canonical envelope kayıpsız round-trip testi.
+- Adapter/contract/time/FX version provenance ve replay testleri.
+
+#### Contract rollback ve değişiklik yönetimi
+
+- Hierarchy contract değişikliği adapter içinde sessizce yapılamaz; contract/adapter version artışı ve decision log gerektirir.
+- Yeni branch provider/account feature flag ile açılır; eski branch verisiyle aynı aggregate'e version kontrolü olmadan karıştırılmaz.
+- Hatalı hierarchy yazımında ilgili adapter version durdurulur, run ID ile etkilenen V2 satırları belirlenir ve doğrulanmış adapter ile yeniden üretilir.
+- Rollback hiçbir zaman sahte entity üretmeye veya unsupported seviyeyi `0`/placeholder ile doldurmaya dönemez.
+- Canonical blok/alan değişikliği yalnız versionlı contract migration, bütün adapter fixture'ları, Dataset V2 mapper, API contract ve rollback planı birlikte kabul edilirse yapılabilir.
+- Tek bir provider ihtiyacı ortak envelope'u sessizce çatallayamaz; yeni capability önce ortak contract decision log'unda değerlendirilir.
+
+### 2.2 Normalization pipeline — V4 freeze
+
+V3 §11–12'deki Time ve FX kararları canonical envelope'un opsiyonel yardımcıları değildir. Bütün provider'lar için production fact oluşma sırası aşağıdaki tek pipeline'dır:
+
+```text
+Provider raw response
+→ provider adapter mapping
+→ canonical identity/entity/support validation
+→ provider business-date normalization
+→ monetary raw facts için tek-rate FX normalization
+→ production canonical validation
+→ Dataset V2 upsert
+→ scope-aware aggregate
+→ Formula/Compare/Intent
+→ Funnel API
+→ presentation-only UI/export
+```
+
+#### Time contract
+
+- Paid satırın `source_timezone` değeri provider account metadata'sından gelir.
+- Organic satırın `source_timezone` değeri GA4 Property metadata'sından gelir.
+- Server UTC tarihi hiçbir provider'ın business date'i olarak kullanılamaz.
+- `identity.date = time.business_date` olmalıdır ve canonical unique identity bu business date'i kullanır.
+- Timezone bulunamıyorsa UTC fallback ile production fact üretilmez; satır rejection/evidence akışına gider.
+
+#### FX contract
+
+- FX aggregation ve Formula Engine'den önce uygulanır.
+- `spend_value`, `add_to_cart_value`, `checkout_value` ve `purchase_value` aynı satırda aynı rate/date/provider ile normalize edilir.
+- Aynı canonical satırın monetary alanları farklı currency veya rate halinde bırakılamaz.
+- Cross-currency rate yoksa sentetik `1` kullanılmaz; satır retry/rejection akışına gider.
+- Aynı currency durumunda rate `1` gerçek, izlenebilir normalization sonucu olarak taşınır.
+
+#### Pipeline kabul/test/rollback kapısı
+
+- Hiçbir adapter Dataset V2'ye Time/FX ve production canonical validation'ı atlayarak yazamaz.
+- Her provider için timezone boundary/DST ve currency fixture'ları bulunur.
+- Dört monetary metric'in aynı rate ile dönüştüğü ve source provenance'ın korunduğu test edilir.
+- Missing timezone/rate, mixed currency ve invalid rate negatif testleri zorunludur.
+- Time/FX engine version değişikliği decision log, version bump, parity ve hedefli replay planı gerektirir.
+- Hatalı engine version feature flag ile durdurulur; run/version ile etkilenen facts yeniden üretilir. UTC fallback veya sentetik FX rollback değildir.
+
+### 2.3 Analysis Scope, aggregation ve Formula Engine — V4 freeze
+
+V3 §13–14'teki business math tek backend standardıdır. Dataset V2 yalnız normalized raw fact source-of-truth'tur; UI, export, adapter veya repository ayrı formül motoru olamaz.
+
+#### Analysis Scope contract
+
+```text
+PAID:
+  funnel_click = paid.ad_click
+
+ORGANIC:
+  funnel_click = organic.session
+
+PAID_ORGANIC_BLEND:
+  additive paid raw facts + additive organic raw facts
+  → derived metrics toplam raw facts üzerinden yeniden hesaplanır
+
+INTENT:
+  Paid-only
+```
+
+Blend, Paid ve Organic satır KPI'larının ortalaması değildir. Organic yalnız seçili AdsTable platform hesabına deterministic olarak eşleşmiş GA4 facts'ten gelir. En az bir analysis scope aktif kalır.
+
+#### Aggregate-first Formula contract
+
+Önce aynı scope ve grain içindeki on canonical raw metric toplanır; sonra derived değerler hesaplanır:
+
+```text
+sales           = purchase_value
+abandoned       = max(checkout - purchase, 0)
+abandoned_value = max(checkout_value - purchase_value, 0)
+ctr             = funnel_click / impressions * 100
+cpc             = spend / funnel_click
+roas            = sales / spend
+cps             = spend / purchase
+profit          = sales - spend
+margin          = profit / sales * 100
+```
+
+Intent Paid-only oranları:
+
+```text
+add_to_cart_rate = paid_add_to_cart / paid_ad_click * 100
+checkout_rate    = paid_checkout / paid_add_to_cart * 100
+abandoned_rate   = paid_abandoned / paid_checkout * 100
+purchase_rate    = paid_purchase / paid_checkout * 100
+```
+
+#### Formula invariants
+
+- Oranlar toplanmaz veya satır oranlarının ortalaması alınmaz: `SUM(raw numerator) / SUM(raw denominator)` kullanılır.
+- Denominator `0`, unsupported veya hesaplanamazsa derived sonuç `null` olur.
+- Unsupported/unknown additive input kısmi toplamı sessizce gerçek toplam gibi sunulmaz; support sonucu propagate edilir.
+- `sales - spend` canonical adı `profit`tir; `revenue` olarak kalıcılaştırılmaz.
+- Campaign ve child facts aynı total içinde double-count edilmez.
+- Compare iki period için aynı Formula Engine'i kullanır: `(current - previous) / abs(previous) * 100`; previous `0` ise change `null`dır.
+- Different-length period normalization gerekiyorsa tek versionlı backend policy olur.
+- Funnel Table, Compare, Intent ve Export aynı Dataset V2/engine output'unu tüketir.
+
+#### Formula kabul/test/rollback kapısı
+
+- Aynı aggregate fixture Formula, API, Compare, Intent, Export ve UI'da aynı sonucu verir.
+- Blend aggregate-first sonucu ile yanlış KPI-average sonucu arasındaki negatif test bulunur.
+- Zero denominator, unsupported propagation, abandoned floor, profit naming ve hierarchy double-count testleri zorunludur.
+- Formula değişikliği `formula_engine_version`, golden parity, decision log ve önceki versiona read rollback gerektirir.
+- Frontend veya adapter'da duplicate formula tespit edilirse production acceptance verilmez.
+
+### 2.4 Dataset V2 grain, identity ve transition — V4 freeze
+
+Dataset V2, snapshot geçmişi veya derived sonuç deposu değil, Funnel'ın daily canonical raw fact source-of-truth katmanıdır.
+
+#### Tek canonical grain
+
+```text
+1 user
++ 1 platform
++ 1 platform account
++ 1 provider business date
++ 1 traffic type
++ 1 gerçek capability-aware leaf entity
+```
+
+Mantıksal unique key:
+
+```text
+user_id
++ platform
++ platform_account_id
++ business_date
++ traffic_type
++ entity_key
+```
+
+- Aynı key ile refresh yeni satır üretmez; idempotent UPSERT yapar.
+- `snapshot_id` canonical identity'ye girmez.
+- CTR, CPC, ROAS, CPS, abandoned, profit, margin ve rate'ler raw Dataset V2 facts değildir.
+- Derived cache gerekirse Dataset V2'den ayrı olur ve `formula_engine_version` taşır.
+- Direct/Others final analytical Dataset grain'ine girmez.
+
+#### Organic account mapping contract
+
+GA4 Organic satırın analytical `platform_account_id` değeri GA4 Property ID değildir; deterministic olarak eşleşmiş AdsTable Meta/Google/TikTok/Klaviyo platform hesabıdır. Gerçek GA4 Property ID `provenance.ga4_property_id` olarak ayrı kalır. Deterministic match yoksa canonical Organic row yazılmaz; unmapped evidence olarak tutulur.
+
+#### V1/V2 transition contract
+
+- Migration boyunca refresh, Legacy Snapshot ve Canonical Dataset V2'ye kontrollü dual-write yapabilir.
+- Snapshot capture evidence, job/debug history ve legacy compatibility rolünü korur.
+- Dataset V2 Funnel, Paid/Organic/Blend, Compare, Intent ve Export'un yeni source-of-truth'udur.
+- Operational Dashboard/Auth/Connect/Account/Refresh/Job lifecycle cutover'dan etkilenmez.
+- V1 read ve legacy analysis yalnız parity, consumer-zero ve rollback süresi tamamlanınca E14'te emekli edilir.
+
+#### Dataset kabul/test/rollback kapısı
+
+- Same-key upsert, different date/entity isolation ve concurrent retry testleri zorunludur.
+- Organic platform-account/property ayrımı ve unmatched rejection test edilir.
+- Raw tabloda derived KPI veya snapshot-version duplication bulunamaz.
+- Dual-write run'ında V1 no-change ve V1/V2 raw parity evidence üretilir.
+- V2 read flag kapatılabilir; legacy yol stabilizasyon boyunca korunur. Destructive retirement yalnız E14 kapsamındadır.
+
+### 2.5 Backend analysis boundary ve deferred capability — V4 freeze
+
+- Funnel browser'dan Supabase'e doğrudan bağlanamaz; authenticated Funnel API tek analysis boundary'dir.
+- API user/account ownership, query bounds, Dataset V2 read, scope-aware aggregate, Formula, Compare ve Intent orchestration'ın sahibidir.
+- UI ve Export hazır backend contract'ını tüketir; business anlamını değiştiremez.
+- Intent yalnız Paid scope'tur; Organic/Blend facts Intent oranlarına karıştırılmaz.
+- Top Selling/Ranking core acceptance değildir. Ürün kararıyla açılırsa ayrı backend Ranking Engine Dataset V2'yi capability-aware tüketir; farklı entity tiplerini sahte Ad üreterek aynı leaderboard'a zorlamaz.
+- Klaviyo automatic Email Spend ayrı ürün/araştırma kararıdır; mevcut manual/estimated değer yalnız provenance'ı açık fallback olabilir ve provider gerçek spend ile karıştırılamaz.
+
+Bu boundary'lerden sapma yeni provider ihtiyacı gerekçesiyle epic içinde yapılamaz; versionlı contract/decision log ve bütün consumer parity'si gerekir.
+
+### 2.6 V3 contract → V4 enforcement matrisi
+
+| V3 teknik standardı | V4 freeze/gate | Uygulama epic'leri |
+|---|---|---|
+| §10.1 Platform/source/channel | Canonical envelope invariants | E0, E4–E8 |
+| §10.2 Capability-aware hierarchy | Hierarchy matrix, deterministic identity ve sentetik seviye yasağı | E0, E2, E4–E12 |
+| §10.3 Metric Support/NULL | Envelope invariant, support propagation ve UI state | E2, E4–E12 |
+| §10.4 Organic account mapping | Deterministic AdsTable account + ayrı GA4 provenance | E2, E8, E9 |
+| §10.5–10.7 Klaviyo channel/spend | Ortak envelope, channel ve provenance/fallback ayrımı | E7 |
+| §11 Time Engine | Provider/Property timezone ve UTC fallback yasağı | E4–E9 |
+| §12 FX Engine | Formula öncesi dört monetary fact için tek rate | E4–E9 |
+| §13 Analysis/Formula | Backend-only Paid/Organic/Blend ve versionlı formulas | E11–E12 |
+| §14 Aggregation | Aggregate-first, ratio-average ve double-count yasağı | E4–E12 |
+| §15 Dataset V2 | Raw source-of-truth, canonical grain ve unique upsert | E2, E4–E11 |
+| §16 V1/V2 transition | Dual-write, parity, operational compatibility | E4–E9, E13–E14 |
+| §17 Funnel API | Authenticated backend analysis boundary | E11–E12 |
+| §18 Compare | Aynı engine, previous-zero `null`, versionlı period policy | E11–E12 |
+| §19 Intent/Ranking | Paid-only Intent; Ranking deferred ve capability-aware | E11–E12 |
+
+Bu matris V3 standardının yalnız “referans” olarak kalıp execution task'larında unutulmasını engeller. Bir V3 standardı uygulanırken ilgili V4 gate'in kabul, test, rollback ve evidence maddeleri task aynasına kopyalanır.
+
+## 3. Revize epic mimarisi
+
+| Epic | İçerik | Başlangıç şartı | Bitiş şartı |
+|---|---|---|---|
+| **E0** | Plan freeze, baseline ve mimari sınırlar | Mutabakat | V4 plan ve modül sınırları onaylı |
+| **E1** | OAuth ve session güvenliği | E0 | Güvenlik testleri geçiyor |
+| **E2** | Dataset V2 canlı kabulü | E1 | DB/RLS evidence paketi tamam |
+| **E3** | Backend modularization foundation | E1 | Yeni işler `server.js` dışında geliştirilebiliyor |
+| **E4** | Meta vertical slice | E2 + E3 | Dual-write ve parity kabulü |
+| **E5** | Google Standard/PMax adapter | E4 | Google parity kabulü |
+| **E6** | TikTok adapter | E4 | TikTok parity kabulü |
+| **E7** | Klaviyo adapter | E4 | Campaign/Flow/channel kabulü |
+| **E8** | GA4 Organic adapter | E4 | Organic provenance kabulü |
+| **E9** | Backfill ve data readiness | İlgili adapter | Coverage/parity eşikleri sağlanmış |
+| **E10** | Shopify Public Embedded Foundation | E9 implementation + ürün GO kararı | Review-ready install/auth/tenant/billing/embedded foundation |
+| **E11** | Funnel API | E10 + E2 + E3 + gerçek V2 veri | Shopify-aware API security/contract kabulü |
+| **E12** | Shopify Embedded dashboard ve Funnel UI binding | E10 + E11 + parity | Embedded UI canary kabulü |
+| **E13** | Production cutover | E4–E12 | Full production GO |
+| **E14** | Legacy retirement ve monolit kapanışı | Stabilizasyon dönemi | V1 consumer sıfır; legacy yüzey kaldırılmış |
+
+### 3.1 Bağımlılık grafiği
+
+```text
+E0 → E1 ─┬→ E2 ───────────────┬→ E4 → E5/E6/E7/E8 → E9 ─┐
+         └→ E3 ───────────────┤                           │
+                              └─────────────────────────────┴→ E10 Shopify Foundation
+                                                                  ↓
+                                                         E11 Funnel API → E12 Embedded UI
+                                                                  ↓
+                                                              E13 → E14
+```
+
+E5–E8, Meta referans vertical slice kabul edildikten sonra kapasiteye göre paralel yürütülebilir. E9 her provider için ayrı cursor ve readiness durumu taşır.
+
+## 4. E0 — Plan freeze, baseline ve mimari sınırlar
+
+**Durum:** `Done` — V4 mutabakatıyla baseline oluşturuldu; repository kabulü commit/PR ile kanıtlanacaktır.
+
+### Planlanan işler
+
+- **E0-T1:** V3, Final Rapor ve V4 belge hiyerarşisini freeze et.
+- **E0-T2:** Epic/task durum sözlüğünü ve zorunlu task şablonunu kabul et.
+- **E0-T3:** `server.js` ve `dashboard.html` sorumluluk envanterini çıkar.
+- **E0-T4:** Hedef backend/frontend modül sınırlarını karar kaydına bağla.
+- **E0-T5:** Feature flag, evidence ve decision-log isimlendirmesini belirle.
+- **E0-T6:** V3 §10.2 yedi bloklu canonical provider envelope ve capability-aware hierarchy matrixini V4 cross-cutting contract olarak freeze et.
+- **E0-T7:** Time/FX pipeline, Analysis Scope/Formula/Aggregation, Dataset grain/transition ve backend analysis boundary contract'larını V4 enforcement matrisine bağla.
+
+### Kabul kriterleri
+
+- Tek execution takip belgesi V4'tür.
+- V3 teknik referans, Final Rapor baseline olarak korunur.
+- Epic bağımlılıkları ve GO/NO-GO sahipleri bellidir.
+- Monolit büyütmeme ve dokunurken çıkarma kuralları onaylıdır.
+- Her iş zorunlu task aynasını kullanır.
+- Her adapter için aynı `identity/entity/raw_metrics/metric_support/currency/time/provenance` envelope'u zorunludur.
+- Her provider branch için root/parent/leaf, deterministic key ve yasak sentetik şekiller bellidir.
+- V3 §10.1–§19 arasındaki her cross-cutting standardın sahibi, uygulama epic'i ve acceptance gate'i bellidir.
+
+### Test / kontrol
+
+- Markdown link ve başlık kontrolü.
+- V3 fazlarının V4 epic'lerinde karşılığı olduğunun izlenebilirlik kontrolü.
+- V3 §10.1–§19 contract→V4 enforcement matrisi completeness kontrolü.
+- Epic'lerde kabul, test, rollback ve bağımlılık alanlarının varlık kontrolü.
+
+### Rollback
+
+Belge geri alınabilir; V3 ve Final Rapor değişmediği için teknik baseline kaybolmaz. V4 değişikliği yeni sürüm ve decision log ile yapılır, geçmiş sessizce yeniden yazılmaz.
+
+### Bağımlılıklar
+
+Mutabakat dışında bağımlılık yoktur.
+
+### Evidence
+
+- V4 dosyasının repository commit'i.
+- PR incelemesi ve mutabakat kaydı.
+
+## 5. E1 — OAuth ve session güvenliği
+
+**Durum:** `Done` — E1-T1–E1-T7 tamamlandı; production OAuth/session güvenliği, fail-closed config, encrypted-only token runtime, plaintext retirement ve CI security regression kapıları kabul edildi.
+
+### Planlanan işler
+
+- **E1-T1 — `Done` — OAuth route envanteri ve threat model:** Tüm start/callback yolları, identity kaynakları, state, replay ve token yazma noktaları çıkarıldı; executable current-state baseline eklendi.
+- **E1-T2 — `Done` — Bearer-bound identity:** Aktif OAuth başlangıçları doğrulanmış bearer kullanıcıya bağlandı; legacy query `user_id` reddedildi ve dashboard bearer-authenticated JSON handshake'e geçirildi.
+- **E1-T3 — `Done` — Transaction store:** Kısa ömürlü, tek kullanımlık, atomik tüketilen OAuth transaction store; SHA-256 state özeti, 10 dakika TTL, provider/redirect/user bağları ve Klaviyo PKCE taşımasıyla kuruldu.
+- **E1-T4 — `Done` — Session elimination:** E1-T3 sonrasında runtime session consumer kalmadığı doğrulandığı için kullanılmayan shared store eklemek yerine Express session katmanı tamamen kaldırıldı. Böylece MemoryStore, known fallback secret, session cookie ve multi-instance affinity riski ortadan kaldırıldı.
+- **E1-T5 — `Done` — Unsafe default guard:** Review/test hard-route ve sandbox varsayılanları kapatıldı. Production'daki `UNSAFE_PRODUCTION_CONFIG`, Production scope'undaki `TIKTOK_SANDBOX_ACCESS_TOKEN` değişkeninden kaynaklandı; PR #15'in secret-free structured diagnostic'i yalnız değişken adını gösterdi. Değişken kaldırılıp yeni deployment alındıktan sonra site ve login normale döndü; hiçbir secret değeri loglanmadı ve guard beklendiği gibi fail-closed çalıştı.
+- **E1-T6 — `Done` — Token protection:** E1-T6A vault, E1-T6B canlı schema/RLS/grant acceptance, E1-T6C Production activation, E1-T6D backfill ve orphan cleanup ve E1-T6E plaintext nulling tamamlandı. Final Production değerleri encryption enabled = `true`, legacy read enabled = `false`; final DB acceptance 7 connected, 7 encrypted, 0 auth-orphan, 0 missing encrypted, 0 plaintext access ve 0 plaintext refresh sonucunu verdi. Site ve login çalışıyor; legacy read kapalıyken Refresh Completed ve encrypted-only provider runtime acceptance tamamlandı. Plaintext kolonların fiziksel drop işlemi E14 Legacy Retirement kapsamına taşındı.
+- **E1-T7 — `Done` — Security regression suite:** Auth, IDOR, tamper, replay ve expiry regression suite hazırlandı; dedicated `test:security` komutu eklendi. Security CI pull request ve `main` push üzerinde production secret veya environment kullanmadan security ve full regression testlerini çalıştırır.
+
+### Kabul kriterleri
+
+- OAuth user kimliği yalnız doğrulanmış bearer context'ten gelir.
+- State ve transaction user/provider/redirect bağlamına bağlıdır; bir kez tüketilir ve sürelidir.
+- Callback replay, state mismatch, expired transaction ve cross-user tamper reddedilir.
+- Uygulama session secret'a ihtiyaç duymaz; unsafe review/sandbox production config fail-fast olarak reddedilir.
+- OAuth callback'leri shared transaction store ile multi-instance çalışır ve session affinity gerektirmez.
+- Token değerleri response, log ve test artefaktlarında görünmez.
+
+### Test planı
+
+- OAuth start için unauthenticated `401`.
+- Query/body user ID tamper negatif testi.
+- State mismatch, replay, expiry ve provider mismatch testleri.
+- User A transaction'ının User B tarafından tüketilememe testi.
+- Session middleware, cookie, secret fallback ve dependency elimination testi.
+- OAuth transaction store TTL ve atomic consume integration testi.
+- Log redaction testi.
+
+### Rollback planı
+
+- Provider bazlı OAuth feature flag kullanılır.
+- Yeni transaction store sorununda yeni bağlantı başlatma kontrollü kapatılır; güvenli olmayan eski identity yoluna dönülmez.
+- Mevcut geçerli connection kayıtları korunur.
+- Bilinmeyen kritik bir session consumer bulunursa merge durdurulur; merge sonrası yeniden ekleme yalnız açık evidence ve yeni security review ile değerlendirilir. Known fallback secret hiçbir rollback senaryosunda geri getirilmez.
+
+### Bağımlılıklar
+
+- E0.
+- Provider callback URL envanteri.
+
+### Evidence
+
+- Threat model.
+- Route matrisi.
+- Security test çıktıları.
+- Redacted production-like OAuth trace.
+- Config startup testleri.
+- E1-T1 gerçekleşen evidence: `security/oauth-route-inventory.js`, `tests/oauth-security-baseline.test.js` ve `docs/security/E1_T1_OAUTH_SECURITY_BASELINE.md`.
+- E1-T2 gerçekleşen evidence: `security/oauth-access.js`, bearer/tamper/unauthenticated acceptance testleri ve `public/dashboard.html` authenticated OAuth handshake'i.
+- E1-T5 corrective evidence: `UNSAFE_PRODUCTION_CONFIG` nedeninin Production scope'undaki `TIKTOK_SANDBOX_ACCESS_TOKEN` olduğu PR #15'in secret-free structured diagnostic'iyle, secret değeri loglanmadan belirlendi. Değişken Production'dan kaldırıldı; yeni deployment sonrasında site ve login normale döndü. E1-T5 guard doğru şekilde fail-closed çalıştı.
+- E1-T3 gerçekleşen evidence: `security/oauth-transaction-store.js`, atomik transaction migration'ı ve replay/expiry/provider/redirect/PKCE testleri.
+- E1-T4 gerçekleşen evidence: session-elimination runtime/package guard'ları, pasif Pinterest redirect regresyonu ve güncellenmiş security baseline.
+
+### E1-T4 task aynası
+
+**Planlanan:**
+- Production secret fail-fast ve shared TTL session store.
+
+**Gerçekleşen:**
+- Aktif runtime session consumer kalmadığı doğrulandı.
+- Express session dependency/middleware/cookie bütünüyle kaldırıldı.
+
+**Sapma gerekçesi:**
+- Kullanılmayan bir shared store eklemek gereksiz altyapı ve saldırı yüzeyi oluşturacaktı.
+- Session elimination aynı güvenlik hedefini daha güçlü ve daha basit biçimde sağlıyor.
+
+**Rollback:**
+- OAuth transaction store geri alınmaz; query-controlled identity veya session-bound OAuth state geri getirilmez.
+- Kritik bir legacy consumer tespit edilirse değişiklik merge edilmez.
+- Merge sonrasında bilinmeyen session consumer bulunursa yalnız açık evidence ve yeni security review ile session altyapısı yeniden değerlendirilir.
+- Known development secret fallback hiçbir rollback senaryosunda geri getirilmez.
+
+## 6. E2 — Dataset V2 canlı kabulü
+
+**Durum:** `Done` — E2-T1–E2-T7 canlı veri, constraint, upsert, RLS, service-role ve cleanup kabul kapıları tamamlandı. E2-T8 açık insan iş kararıyla `Deferred` edildi ve E2 kapanış kapısından çıkarıldı. E1, E2 ve E3 bu tek closeout merge'iyle kapalıdır.
+
+### Planlanan işler
+
+- **E2-T1 — `Done`:** Canlı column/type/nullability introspection.
+- **E2-T2 — `Done`:** Constraint, index, policy ve grant drift karşılaştırması.
+- **E2-T3 — `Done`:** Canlı canonical round-trip acceptance yönetim sonucu tamamlandı.
+- **E2-T4 — `Done`:** Same-key gerçek PostgreSQL upsert ve duplicate kontrolü tamamlandı.
+- **E2-T5 — `Done`:** V2 preflight 18/18 PASS; 35 vakalı rollback-only canlı rejection acceptance PASS; mandatory postcheck 15/15 PASS; transaction ve postcheck retry edilmedi, production no-change korundu.
+- **E2-T6 — `Done`:** V4 preflight 21/21 PASS; corrected canonical 16-case rollback-only RLS transaction evidence PASS; mandatory postcheck zero-baseline SQL shape nedeniyle fail-closed oldu; root cause redacted diagnostic ile doğrulandı; zero-safe corrective diagnostic 19/19 PASS. Transaction/postcheck retry edilmedi, production no-change korundu ve açık insan iş kabulü PR #81 sonrasında verildi.
+- **E2-T7 — `Done`:** Baseline, tek final request, corrective named-baseline 19/19 PASS evidence, PR/CI ve açık insan iş kabulü tamamlandı.
+- **E2-T8 — `Deferred`:** Schema-only restore'un müşteri/reklam verisini geri getirmediği ve Dataset V2 canlı kabulüne iş değeri katmadığı açık insan kararıyla kabul edildi; yeni inventory/capture/restore operationu yapılmayacaktır.
+
+#### E2-T8 task aynası — fresh-project restore readiness
+
+**Amaç:** Eksik historical SQL’i uydurmadan application-owned current-state baseline capture, disposable Supabase restore ve normalized acceptance için fail-closed repository hazırlığı sağlamak.
+
+**Mevcut durum:** E2-T1–T7 `Done`; bilinen/açık Dataset V2 database acceptance açığı yoktur. E2-T8 iş değeri olmadığı yönündeki açık insan kararıyla `Deferred` edilmiştir.
+
+**E2-T8 iş değeri ve kapanış kararı:** E2-T8 tek pakettir; alt paketlere bölünmez. Schema-only fresh-project restore müşteri/reklam verisini geri getirmediği için Dataset V2 canlı kabulüne anlamlı iş değeri sağlamaz. Bu çalışma durdurulmuş, `Deferred` edilmiş ve E2 kapanış kapısından çıkarılmıştır.
+
+**İş çıktısı:** Dataset V2'nin production şeması, veri kuralları, idempotent upsert'i, RLS/ownership sınırları, service-role erişimi ve test kalıntısı temizliği kabul edilmiştir. E2'nin işi budur ve tamamlanmıştır.
+
+**Kapanış:** E1 `Done`, E2 `Done`, E3 `Done`. Ownership diagnostic ilerletilmez; E2-T8 için yeni production operation veya yeni takip programı açılmaz.
+
+**Planlanan durum:** Ayrı insan onaylı capture ve disposable Supabase restore sonrasında normalized parity evidence’ının review edilmesi; o zamana kadar `Verification`.
+
+**Kapsam:** Scope contract, altı migration classification manifest’i, schema-only capture planı, artifact validator, source inventory, target preflight/acceptance, redacted evidence converter ve executable contract testleri.
+
+**Kapsam dışı:** Supabase/Management API bağlantısı; production schema veya row capture; baseline SQL; target provisioning; restore operatorü/çalıştırması; migration replay; `db push`; deployment ve secret/environment değişikliği.
+
+**Bağımlılıklar:** Onaylı main/checksum, DB ledger baseline manifest, object-by-object capture classification, ayrı capture/restore insan onayları, environment-only credential ve managed primitives doğrulanmış disposable Supabase target.
 
 **Uygulama adımları:** Contract’ı doğrula; fixed schema-only capture planını review et; gelecekte sanitize capture al; validator ve insan review’dan geçir; cutoff ve migration classification’ı kesinleştir; target preflight yap; ayrı restore operatorünü ancak accepted baseline sonrasında hazırla; restore ve read-only acceptance evidence’ını review et.
 
@@ -1230,7 +1824,1185 @@ Canlı kayıt denetimi ayrıca son manual job'ın `completed` olduğunu fakat sn
 
 Account identity/timezone/provider date doğrulaması, ortak FX normalization, tek Dataset V2 write boundary, Campaign/Flow + Email/SMS duplicate koruması, zero-row no-fake-write, exact branch/channel/fact/support parity ve legacy-authoritative shadow failure isolation `src/providers/klaviyo/runtime.js` içinde tamamlandı. Production primary activation yapılmaz. E7 için yeni alt paket açılmaz; gerçek provider message/report DTO'su ile live evidence alınana kadar mevcut legacy Klaviyo snapshot otoritesi korunur.
 
-**Evidence:** `src/providers/klaviyo/runtime.js`, `tests/e7-t8-klaviyo-runtime.test.js`, `docs/E7_KLAVIAuth/provider-token güvenlik contract'ları.
+**Evidence:** `src/providers/klaviyo/runtime.js`, `tests/e7-t8-klaviyo-runtime.test.js`, `docs/E7_KLAVIYO_ADAPTER.md`.
+
+## 12. E8 — GA4 Organic adapter
+
+**Durum:** `Parked — GA4 Organic ingestion is not an active delivery dependency; Blend capability is retained`
+
+### Planlanan işler
+
+- **E8-T1:** Account/property selection compatibility.
+- **E8-T2:** Property metadata ve Web Stream discovery.
+- **E8-T3:** Domain/site URL match.
+- **E8-T4:** Property timezone/currency; UTC fallback yasağı.
+- **E8-T5:** Organic source/medium/channel classification.
+- **E8-T6:** Session/ATC/Checkout/Purchase/Revenue facts ve support.
+- **E8-T7:** Deterministic platform account + ayrı GA4 property provenance.
+- **E8-T7A:** Platform-level Organic entity identity; paid root/parent seviyelerinin `null` kalması.
+- **E8-T7B:** GA4 verisini paid adapter'larla aynı yedi bloklu envelope'a `traffic_type=organic, source_system=ga4` olarak normalize et.
+- **E8-T8:** ORGANIC ve PAID_ORGANIC_BLEND entegrasyonu, dual-write/parity.
+
+### Kabul kriterleri
+
+- Her satır property/domain/source/medium/channel provenance taşır.
+- Direct/Others paid platforma zorla yazılmaz.
+- Organic satır Campaign/AdGroup/Ad hierarchy'sine zorlanmaz ve sentetik parent taşımaz.
+- GA4 ayrı bir analytics schema veya platform oluşturmaz; ortak envelope içinde source system/provenance olarak kalır.
+- Yanlış currency veya UTC fallback kabul edilmez.
+- Bulunmayan value metriği uydurulmaz.
+- Paid+Organic blend aggregate-first Formula Engine ile üretilir.
+
+### Test planı
+
+Property/domain match, platform-level Organic identity, sentetik parent rejection, classification fixtures, timezone/DST, currency/FX, support/null, provenance, Organic/Blend aggregate ve parity.
+
+### Rollback planı
+
+GA4 Organic V2 ve Blend ayrı flag'lerle kapatılabilir; mevcut selection/binding ve V1 yolu korunur.
+
+### Bağımlılıklar
+
+E4; domain match ve classification policy; property metadata erişimi.
+
+### Pinterest üç paketlik kabul yolu — Paket 1/3
+
+**Durum:** `Verification — OAuth/account access implemented; live provider acceptance pending`
+
+Pinterest Passive/Legacy kilidi kaldırılarak ortak authenticated OAuth handshake ve tek kullanımlık transaction state sınırına alınmıştır. Callback kimliği caller girdisinden değil tüketilen transaction'dan gelir. OAuth sonrasında explicit advertiser seçimi zorunludur; account discovery yalnız gerçek ID, ad, currency ve timezone dörtlüsünü seçime sunar. Token exchange/refresh server tarafındadır; ham provider veya HTML hata cevabı kullanıcıya taşınmaz. Paket 1 Dataset V2 write, analytics metric kabulü veya production primary activation yapmaz.
+
+**Kalan sabit paketler:** Paket 2 canonical adapter + Time/FX + Dataset V2 shadow; Paket 3 live parity + activation/rollback. Yeni alt paket açılmaz.
+
+**Evidence:** `src/oauth/pinterest-handlers.js`, `src/providers/pinterest/account-discovery.js`, `tests/pinterest-package-1.test.js`, `docs/PINTEREST_PACKAGE_1_ACCOUNT_ACCESS.md`.
+
+2026-09-08 ilk production Connect denemesi OAuth transaction oluşmadan `OAuth could not be started` mesajıyla durdu. Bu, provider çağrısından önce production OAuth config kapısında durulduğunu doğrular. Corrective olarak start/readiness cevabı artık secret değerleri göstermeden eksik environment adlarını açıkça bildirir; yeni tahminî provider değişikliği yapılmaz. Production ayarı okunup tamamlanmadan Paket 1 kabulü verilmez.
+
+## 13. E9 — Backfill ve data readiness
+
+**Durum:** `Implementation complete — E9-T1/T2/T3/T4/T5/T6/T7 Done; production activation requires separate approval`
+
+### Planlanan işler
+
+- **E9-T1 — Done; provider scope revised:** İlk hazırlama yesterday/finalized ardından today/provisional; Meta ve Google Ads için aynı OAuth grant'i altında provider tarafından doğrulanmış 1–3 reklam hesabı, Klaviyo için tek doğrulanmış hesap; TikTok, Pinterest ve diğer parked provider'lar dışarıda; eski tarihçe otomatik değil; 14. günde günlük birikim devam eder.
+- **E9-T2 — Done:** User/platform/account/business-date/date-key unique checkpoint; opaque cursor; terminal replay engeli; service-role-only persistence.
+- **E9-T3 — Done:** Atomic expiring worker lease; provider-isolated single-flight budgets; Retry-After + bounded backoff; three-attempt ceiling; parked providers excluded.
+- **E9-T4 — Done:** Checkpoint kapsam doğrulaması, batch içi duplicate engeli ve mevcut canonical conflict anahtarıyla idempotent upsert.
+- **E9-T5 — Done:** Fail-closed completeness, duplicate, metric support, timezone, FX ve freshness ölçümü.
+- **E9-T6 — Done:** Provider bazlı, hesap kimliklerini ve metrik değerlerini taşımayan parity/readiness sunum modeli.
+- **E9-T7 — Done:** Service-role-only pause/resume/cancel kontrolü, claim kapısı ve production runbook.
+
+### E9-T1 karar kanıtı
+
+`src/backfill/onboarding-scope.js`, `tests/e9-t1-onboarding-scope.test.js` ve `docs/E9_T1_ONBOARDING_BACKFILL_SCOPE.md`. Bu görev production backfill çalıştırmaz.
+
+**E9-T2 kanıtı:** `src/backfill/checkpoint.js`, `supabase/migrations/20260908074500_create_backfill_checkpoints.sql`, `tests/e9-t2-checkpoint.test.js`, `docs/E9_T2_RESUMABLE_CHECKPOINT.md`. Production migration/backfill çalıştırılmadı.
+
+**E9-T3 kanıtı:** `src/backfill/retry-policy.js`, `supabase/migrations/20260908080000_add_backfill_checkpoint_leases.sql`, `tests/e9-t3-lease-retry.test.js`, `docs/E9_T3_LEASE_QUOTA_RETRY.md`. Production migration/provider call/backfill çalıştırılmadı.
+
+**E9-T4 kanıtı:** `src/backfill/idempotent-batch.js`, `tests/e9-t4-idempotent-batch.test.js`, `docs/E9_T4_IDEMPOTENT_CANONICAL_BATCH.md`. Production migration/provider call/backfill çalıştırılmadı.
+
+**E9-T5 kanıtı:** `src/backfill/data-readiness.js`, `tests/e9-t5-data-readiness.test.js`, `docs/E9_T5_DATA_READINESS_MEASUREMENT.md`. Production sorgusu/provider call/backfill çalıştırılmadı.
+
+**E9-T6 kanıtı:** `src/backfill/readiness-dashboard.js`, `tests/e9-t6-provider-dashboard.test.js`, `docs/E9_T6_PROVIDER_READINESS_DASHBOARD.md`. Public UI/production sorgusu/provider call/backfill çalıştırılmadı.
+
+**E9-T7 kanıtı:** `src/backfill/control-policy.js`, `supabase/migrations/20260908090000_add_backfill_checkpoint_controls.sql`, `tests/e9-t7-controls-runbook.test.js`, `docs/E9_T7_BACKFILL_CONTROL_RUNBOOK.md`. Production migration/backfill çalıştırılmadı.
+
+### Kabul kriterleri
+
+- Job restart sonrası kaldığı yerden duplicate üretmeden devam eder.
+- Her provider/account/date için status ve failure nedeni görülebilir.
+- Belgelenmiş coverage/parity/freshness eşikleri sağlanır.
+- Rate limit aşımı veri kaybına dönüşmez.
+- UI cutover readiness kapısı otomatik raporlanır.
+
+### Test planı
+
+Interrupted resume, same-batch replay, partial failure, quota/rate limit, missing FX, stale data, duplicate ve reconciliation testleri.
+
+### Rollback planı
+
+Backfill pause/cancel edilir; live ingest ayrıdır; run ID/adapter version ile hatalı satırlar hedeflenir; V1 etkilenmez.
+
+### Bağımlılıklar
+
+İlgili provider adapter acceptance; tarih kapsamı; quota ve parity eşikleri.
+
+## 14. E10 — Shopify Public Embedded App Foundation
+
+**Durum:** `In progress — E10-T5 product freeze Done (C1–C7; C5-B Deferred); E10-T6-A Done/PASS; E10-T6-B managed-installation runtime ve remote Supabase migration PASS; external keyring daha önce production kabulünde doğrulandı, bu Codex process'inde Shopify env 4/4 ve keyring girdileri 1/2 görünür; every production contact gated`
+
+### Ürün ve mimari kararı
+
+AdsTable, bağımsız backend ve canonical analytics omurgasını koruyarak Shopify Public Embedded App yönüne ilerler. Shopify kurulum, doğrulanmış shop identity, embedded dağıtım ve Shopify-origin merchant için mümkünse billing kanalıdır; AdsTable provider adapter'ları, Dataset V2, Formula Engine ve Funnel API business logic'in sahibidir. İlk sürümde bir Shopify shop bir AdsTable workspace'e bağlanır; multi-store/agency üst katmanı ertelenir. Shopify'dan alınacak ilk veri yalnız overlap incelemesi için platform bazlı Purchase Count ve Sales Value'dur; provider-reported conversion ile aynı fact olarak birleştirilmez. Shopify'a sunulacak AdsTable çıktıları ayrı ürün kararında belirlenecek, intake bu kararı peşinen yönlendirmeyecektir. AdsTable ürün sözlüğünde Revenue kaynak fact değil `Sales - Spend` sonucudur.
+
+### Shopify Embedded Uygulama Anayasası — authoritative ve zorunlu okuma
+
+Bu dokuz madde E10, E11 ve E12 için ürün anayasasıdır. Alt task, teknik doküman, mockup veya kod bu maddelerle çatışırsa ilerleme durur; Execution Plan ve gerekli iş kararı düzeltilmeden implementation yapılmaz.
+
+#### 1. Ürün amacı ve sınırı
+
+AdsTable, Shopify Admin içinde doğal çalışan bir embedded analytics uygulamasıdır; Shopify Admin'in kopyası veya bağımsız AdsTable sitesinin iframe'e yerleştirilmiş hali değildir. Shopify dağıtım ve merchant bağlamını; AdsTable provider verisi, hierarchy, formül, compare ve Funnel business logic'ini sağlar.
+
+#### 2. Authority, güvenlik ve production sınırı
+
+Shop, workspace, user ve entitlement authority server-side doğrulanır; browser claim'i yetki üretmez. Token/secret/PII browser veya loga çıkmaz. Partner Dashboard, credential, scope, billing, migration, webhook registration, App Store submission ve production veri işlemleri ayrı açık insan onayı gerektirir.
+
+##### 2.1 Provider OAuth'ları Shopify içine nasıl monte edilir?
+
+Shopify App install/session OAuth'u ile aktif ilk dilimdeki Meta, Google Ads ve Klaviyo provider OAuth'ları iki ayrı protokol zinciridir; fakat hepsi doğrulanmış Shopify session'dan türetilen aynı AdsTable `workspace_id` tenant authority'sinde birleşir ve tek canonical workspace connection store'a yazar. TikTok ve Pinterest parked olduğu sürece OAuth başlatmaz.
+
+1. Merchant provider bağlantısını Shopify embedded uygulamasındaki `Data Sources / Platforms` sayfasından, resmi Shopify Button/Card/Banner/Modal bileşenleriyle başlatır. Ayrı AdsTable login sayfasına veya bağımsız dashboard'a gönderilmez.
+2. Connect tıklaması önce embedded session token ile AdsTable backend'e gider. Backend doğrulanmış Shopify session'ından `shop → workspace`, entitlement, provider ve dönüş yüzeyini çözer. Shopify kullanıcısı yalnızca doğrulanmış actor/audit bağlamıdır; browser'dan gelen user/workspace/shop query değeri authority olamaz.
+3. Backend tek kullanımlık OAuth transaction oluşturur. Transaction `shop_id`, `workspace_id`, gerektiğinde doğrulanmış actor kimliği, `provider`, exact callback URI, embedded return target, nonce/state, PKCE gereken provider için verifier, oluşturulma/sona erme zamanı ve `surface=shopify_embedded` bağlarını taşır. Actor kimliği hiçbir aşamada workspace tenant authority'sinin yerine geçemez.
+4. Aktif Meta/Google Ads/Klaviyo consent ekranları üçüncü taraf sayfalarıdır ve embedded iframe içinde açılmaz. Backend'in ürettiği authorization URL'ye, implementation anındaki güncel resmi App Bridge dış navigasyon yöntemiyle **top-level çıkış** yapılır. Özel nested iframe yasaktır; popup ancak güncel resmi Shopify yönlendirmesi ve browser davranışı ayrıca doğrulanırsa kullanılabilir. TikTok/Pinterest yeniden açılırsa aynı kural güncel resmî dokümanla yeniden doğrulanır.
+5. Provider callback AdsTable'ın provider'a kayıtlı server-side HTTPS callback endpoint'ine döner. Backend state'i atomik ve tek kullanımlık tüketir; provider, callback URI, shop/workspace/user ve embedded surface bağlarını doğrulamadan code exchange veya token persistence yapmaz.
+6. Token exchange ve encrypted persistence yalnız backend'de yapılır. Provider token'ı, OAuth code'u, secret veya ham provider error'u Shopify browser'ına, URL'ye ya da loga taşınmaz.
+7. Başarılı/başarısız callback sabit allowlist outcome ile Shopify Admin'deki canonical embedded app dönüş URL'sine **top-level** döner. Mevcut bağımsız `/dashboard?...` dönüşleri Shopify embedded akışında kullanılamaz. Uygulama yeniden embedded bağlama girdiğinde App Bridge/session token yenilenir ve connection status backend'den tekrar okunur.
+8. Provider account seçimi, reconnect ve disconnect aynı `Data Sources / Platforms` yüzeyinde resmi Shopify componentleriyle yapılır. Account ownership server-side doğrulanır; görünen account adı veya browser seçimi tek başına yetki üretmez.
+9. Standalone AdsTable OAuth kanalı korunacaksa `surface=standalone` ile ayrı dönüş kontratı kullanır. Standalone ve Shopify embedded transaction/callback dönüşleri birbirine düşemez; callback host allowlist ve redirect target server-side sabittir.
+
+**Mevcut kod için karar:** Repository'deki provider OAuth transaction/HMAC-state, callback exchange, encrypted token store ve account-selection çekirdeği yeniden kullanılır; ancak mevcut handler'ların `/dashboard?...` dönüşleri ve yalnız user/provider/redirect URI bağları Shopify embedded için yeterli değildir. T5-C onayından sonra ayrı bir embedded OAuth surface adapter contract'ı hazırlanacaktır. Bu anayasa değişikliği henüz OAuth route/runtime implementasyonu veya production redirect URI kaydı yapmaz.
+
+#### 3. Shopify Embedded Uygulama Görsel Yaklaşımı
+
+- Resmi Shopify embedded shell ve App Bridge **zorunludur**.
+- Genel UI kontrollerinde güncel resmi Shopify UI componentleri **zorunludur**.
+- Özel AdsTable CSS component framework ve Shopify Admin'i taklit eden statik shell **yasaktır**.
+- AdsTable özel visualization yalnız Funnel/Table data presentation alanında kullanılabilir ve Shopify design token, responsive ve accessibility sınırlarına uyar.
+- Duplicate global navigation, desktop sayfanın mobil iframe'e sıkışması veya yabancı-site/iframe hissi **acceptance failure**dır.
+
+#### 4. Üst menü, tarih ve comparison
+
+Toolbar sırası `Time Range → Comparison → Filters`; yardımcı eylemler `Export → Data freshness/auto refresh → Data Sources → Funnel/Table`dır. Summary ve Custom Range aynı anda üst üste bindirilmez. Compare ve zero-denominator sonucu backend'de hesaplanır; unsupported/unknown hiçbir zaman sahte `0` olmaz.
+
+#### 5. Filters
+
+Shopify Analytics'e ait ilgisiz filtreler kopyalanmaz. AdsTable filtre taxonomy'si Platform, Connected Account ve gerçek provider hierarchy kimliklerinden oluşur; kontrol davranışı resmi Shopify componentleriyle kurulur. Paid/Organic/Blend veya UTM-derived Organic frontend filtresi açılmaz.
+
+#### 6. Funnel/Table veri akışı ve switch
+
+Funnel ve Table aynı backend query/compare sonucunun iki presentation renderer'ıdır. Switch sırasında tarih, comparison, currency, filter ve data-source state korunur. Frontend aggregation, formula veya sahte hierarchy üretmez. Funnel aşağı doğru stage, sağa doğru dönem/compare; Table aşağı doğru gerçek entity hierarchy, sağa doğru metric akışı kullanır.
+
+#### 7. Provider hierarchy
+
+Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad`; Google PMax `Campaign → Asset Group`; TikTok `Campaign → Ad Group → Ad`; Klaviyo Campaign ve Flow sibling root'lar altında kendi Message leaf'lerini kullanır. Provider'da olmayan parent/leaf seviyesi uydurulmaz ve aynı fact farklı seviyelerde double-count edilmez.
+
+#### 8. Metrik sözlüğü ve provenance
+
+`Sales = satış değeri`, `Spend = reklam harcaması`, `Revenue = Sales - Spend`dır. Gerçek cost contract olmadan Profit/Margin gösterilmez. Shopify-reported attribution, provider-reported attribution, AdsTable-calculated ve Unattributed birbirine karıştırılmaz; eksik/unsupported/unknown `null/—` kalır.
+
+#### 9. E10-T5 İçin Revize Edilmiş Ürün Sözleşmesi
+
+- **E10-T5-A — Shopify Kuralları — `Done`:** Bu anayasanın UI, embedded davranış, hierarchy, metrik ve provenance kurallarıdır.
+- **E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek? — `Done`:** Yalnız `platform`, `platform_purchase_count` ve `platform_sales_value`; yalnız Shopify-native Attribution comparison / overlap diagnostic alanında ve provider verisinden ayrı provenance ile gösterilir. Total commerce, Refund, PII, Funnel totalı, Revenue etkisi veya otomatik deduction yoktur.
+- **E10-T5-C — Shopify'a ne verilecek, nasıl gösterilecek? — `Done`:** C1 Funnel, C2 Ad Analysis, C3 Dashboard, C4 Platforms, C5-A Attribution Differences, C6 Settings ve C7 integrated acceptance onaylandı; C5-B Deferred.
+- **Provider OAuth montaj kararı:** Connect/account selection/reconnect/disconnect Shopify-native `Data Sources / Platforms` yüzeyindedir; üçüncü taraf consent top-level resmi App Bridge navigasyonuyla açılır ve callback canonical embedded app URL'sine döner. Ayrı AdsTable login/dashboard veya iframe içinde provider consent yoktur.
+- **Mutlak sıra kapısı:** T5-C output/display matrisi C7 ile onaylanmış, Shopify'a gerçek temas kurmayan E10-T6-A offline readiness PASS olmuştur. Ayrı açık development onayı olmadan E10-T6-B ve sonraki Shopify temaslı işler; gerekli plan kapıları olmadan E10-T7–T10, E11 veya E12 implementation branch/PR'ı açılamaz.
+
+### Planlanan işler
+
+- **E10-T1 — Done — Official requirements freeze:** Güncel resmi Shopify dokümantasyonundan Public App dağıtımı, embedded auth/token exchange, App Bridge, billing, privacy/protected-data ve App Store review gereksinimlerini linkli decision log ile dondur; doğrulanmamış varsayımı implementation contract yapma.
+- **E10-T2 — Done — Shop/workspace tenant modeli:** Bir shop = bir workspace başlangıç modelini, immutable shop identity'yi, doğrulanmış domain değişimini, reinstall ve ilerideki multi-store genişleme sınırını executable contract ile dondur. Browser query/body içindeki shop veya workspace kimliğini authoritative kabul etme.
+- **E10-T3 — Done — Install ve embedded authentication:** Install/callback doğrulaması, state/nonce, server-side shop ownership, embedded session token doğrulaması, token exchange/yenileme ve reauthorization lifecycle'ını kur. Mevcut AdsTable auth ile Shopify identity arasında tek ve testli authority zinciri oluştur.
+- **E10-T4 — Done — Token, uninstall ve privacy lifecycle:** Shopify token'larını encrypted store sınırına bağla; browser/log erişimini yasakla; doğrulanmış uninstall, shop erişim kaybı ve privacy/compliance olaylarında erişimi fail-closed durdur ve retention/deletion kararlarını executable contract ile kanıtla.
+- **E10-T5 — Done — Revize edilmiş ürün sözleşmesi:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim ürün kararları tamamlandı; C5-B verified reconciliation `Deferred`. E10-T6-A offline readiness ve E10-T6-B Development Store kabulü PASS olmuştur; sıradaki kapı E10-T6-C embedded provider OAuth smoke'tur.
+- **E10-T6 — In progress; A ve B Done — Capability/readiness, development bootstrap ve gerekçeli sync:** E10-T6-A resmi offline readiness PASS; E10-T6-B gerçek Development Store embedded App Home üzerinde ID token, expiring offline token exchange, Admin Shop identity, atomic binding, encrypted persistence ve reopen/idempotency kapılarıyla PASS oldu. Production teması veya scope genişletme yapılmadı; sıradaki kapı E10-T6-C embedded provider OAuth smoke'tur.
+- **E10-T7 — Shopify Billing ve entitlement:** Shopify-origin merchant için Shopify billing'i öncelikli değerlendir; trial, approve/decline, active/frozen/cancelled subscription ve reinstall entitlement durumlarını server-side doğrula. Bağımsız/agency billing kanalını ayrı capability olarak tut.
+- **E10-T8 — Embedded shell:** Shopify Admin içindeki App Bridge shell, navigation, CSP/frame güvenliği, loading/empty/partial/error/re-auth/billing durumları ve mobil davranışı mockup'larla contract-test et. Business math frontend'e taşınmaz.
+- **E10-T9 — App Store review-first workstream:** Listing, minimum-scope gerekçesi, test store, reviewer erişimi ve talimatları, privacy/support/data-deletion yüzeyleri, install-to-value videosu ve provider bağlı değilken incelenebilir demo/empty-state paketini geliştirmeyle paralel yürüt. Review hazırlığını sona bırakma.
+- **E10-T10 — Acceptance package:** Install/reinstall/uninstall, session/IDOR, webhook HMAC/replay, token redaction, scope, billing, CSP, mobile embedded UX ve review checklist için otomatik test ve redacted evidence paketi üret.
+
+### Shopify ile ilk temas kapısı — ilk kazma zamanı ve E10-T6 sırası
+
+**“Shopify ile ilk temas” tanımı:** Partner Dashboard'da app oluşturma/bağlama veya ayar değiştirme; Development Store'a install; App URL, embedded ayarı, redirect URI, scope ya da webhook kaydı; Shopify credential/token üretimi veya Development Store'a gerçek API query çalıştırılmasıdır. Yalnız resmi doküman/schema incelemek ve repository contract/test hazırlamak gerçek Shopify teması sayılmaz.
+
+**Kesin karar:** Shopify'daki ilk gerçek işlem **E10-T6-B — Development App Bootstrap** paketinde yapılır. Bu paket E10-T5-C `Done` ve E10-T6-A `PASS` olmadan başlayamaz; başlaması ayrıca açık development-environment insan onayı gerektirir. Production onayı yerine geçmez.
+
+#### E10-T6-A — Official capability ve development-readiness — Shopify teması yok
+
+**Durum:** `Done / PASS` — resmi docs, Dev MCP component validation, ShopifyQL/scope/protected-data ve development checklist satırları doğrulandı; Shopify/Development Store/production teması yapılmadı.
+
+- Başlangıç koşulu: E10-T5-C output/display matrisi kullanıcı tarafından Execution Plan içinde okunmuş, açıkça onaylanmış, `Done` yapılmış ve merge edilmiş olmalıdır.
+- Güncel Admin API/App Bridge/UI component sürümü; embedded dış navigasyon; ShopifyQL attribution dimension/metric; gerekli minimum scope/protected-data; callback URL; CSP/frame; install/session; webhook gerekliliği ve Development Store kabul adımları resmi kaynaklarla doğrulanır.
+- Çıktı yalnız redacted readiness matrisi ve `PASS/BLOCKED` evidence'tır. Partner Dashboard, store, credential, scope, redirect, webhook veya API query değişikliği yapılmaz.
+
+#### E10-T6-B — Development App Bootstrap — Shopify'da ilk kazma
+
+**Durum:** `Done / PASS — gerçek Development Store embedded install/session kabulü tamamlandı`.
+
+- Başlangıç koşulu: E10-T6-A `PASS` ve açık insan development onayı.
+- İlk kez Shopify Partner Dashboard'da development app oluşturulur veya mevcut app bağlanır; development App URL/embedded ayarı ve yalnız doğrulanmış callback/redirect değerleri kaydedilir; yalnız onaylı minimum development scope hazırlanır; app Development Store'a kurulur.
+- İlk kabul yalnız Shopify-managed install sonrasında session token, token exchange ve `shop → workspace` binding smoke sonucudur. Uygulamaya ait legacy install OAuth callback'i acceptance parçası değildir. Production store/credential, billing activation, App Store submission ve production veri işlemi kesinlikle yapılmaz.
+- **Managed-installation düzeltmesi:** Güncel managed modelde uygulama install OAuth callback'i üretmez; Shopify install/scope onayını yönetir. Embedded App Home session token'ı `POST /api/shopify/bootstrap` üzerinden doğrulanır, offline token exchange ve Admin API shop identity kontrolünden sonra binding + encrypted token persistence atomic tamamlanır. Server-only Supabase schema/RPC/service ve composition-root kaydı repository'de hazırdır; açık onayla remote Supabase migration ve redacted postcheck `PASS_MIGRATION_ONLY` tamamlandı. Preview runtime yapılandırması ve encrypted persistence kapıları gerçek Development Store smoke içinde PASS verdi. Redacted contract ve kalan smoke adımları `docs/E10_T6B_MANAGED_INSTALLATION_BOOTSTRAP.md` içindedir.
+- **2026-09-10 final smoke sonucu:** Gerçek Shopify Admin embedded App Home kabulü tamamlandı. ID/session token doğrulaması, `expiring=1` offline token exchange, verified Admin Shop identity, atomic shop/workspace binding, encrypted token persistence ve idempotent reopen birlikte PASS verdi. Nihai redacted UI sonucu `Development store connected securely.` oldu. Secret, token veya tenant kimliği evidence’a yazılmadı; production teması ve scope genişletme yapılmadı. E10-T6-B `Done / PASS`, sıradaki kapı E10-T6-C’dir. Redacted evidence `artifacts/e10-shopify/e10-t6b-development-store-smoke.json` içindedir.
+
+#### E10-T6-C — Embedded provider OAuth smoke — T6-B kabulünden sonra
+
+**Durum:** `Verification — C1/C2A development migration PASS; C2B-C2H repository hazırlığı Done; PR #202 startup corrective PASS; OAuth development smoke insan yürütmesini ve ayrı aktivasyon onayını bekliyor`.
+
+#### E10-T6-C2I — Aktivasyon geri dönüşü ve development smoke kapısı
+
+PR #199 token vault yapılandırmasını tek başına embedded provider OAuth aktivasyonu için yeterli saydı. Bu davranış eksik provider credential'ları bulunan deployment'ta composition sırasında fail-closed startup hatasına yol açtığı için Shopify App Home'u da erişilemez hale getirdi. PR #202 / merge `b5b8c79` ile bu yanlış eşleme kaldırıldı: embedded provider OAuth yalnız `SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED=true` açık aktivasyon kararıyla compose edilir; token vault varlığı aktivasyon yerine geçmez. Focused regression, full suite, Security Regression ve Vercel kapıları PASS oldu. Bu corrective, Shopify-native App Home/Platforms sözleşmesini, resmi component yönünü veya canonical OAuth akışını gevşetmez.
+
+**Sıradaki uygulanabilir kapı:** Açık development aktivasyon kararı alınmıştır; ancak mevcut Vercel operatorü Production environment feature flag değişikliği ve `deploy --prod` içerir. Development onayı production deployment onayı değildir. Operator ayrı exact production deployment confirmation olmadan Vercel'e temas etmeden durmalıdır. Bu ikinci onaydan önce feature flag değiştirilmez, deploy veya provider consent başlatılmaz. Onaylı deployment sonrasında insan Shopify Admin içinden tek kontrollü Connect smoke'u yürütür. Smoke başarısız olursa düzeltme aynı task branch/PR üzerinde tamamlanır; başarılı kanıt olmadan E10-T6-C veya parent E10 `Done` sayılmaz.
+
+**C2I corrective:** İlk manuel aktivasyon, repository preflight'i çalıştırmadan feature flag'i açtığı için eksik provider yapılandırması serverless composition'ı durdurdu. Production flag tekrar kapatılarak App Home geri alındı. Bundan sonra eksik OAuth transaction store, keyring veya provider credential çifti yalnız embedded provider OAuth capability'sini fail-closed kapatır; Shopify App Home/install-session runtime'ını çökertmez. Connect route'ları readiness tamamlanmadan kaydedilmez ve smoke yeniden başlatılmaz.
+
+**C2I workflow hazırlığı — Done (repository preparation):** Production aktivasyon operatörü yalnız `workflow_dispatch`, yalnız `refs/heads/main`, iki bağımsız ve defaultsuz exact onay, GitHub `Production` environment, sabit concurrency ve `contents: read` sınırlarıyla hazırlandı. `VERCEL_TOKEN` yalnız mevcut operatörü çağıran son adıma verilir. Workflow hazırlığı, PR, CI veya main merge Production aktivasyon izni değildir; task sonrasında kullanıcıdan yeni ve ayrıca açık dispatch onayı alınmadan workflow çalıştırılmaz. Bu kayıt aktivasyon, flag değişikliği, deploy veya provider consent yapıldığı anlamına gelmez.
+
+**C2I-V3 sensitive preflight corrective — repository preparation:** Vercel CLI Production `env pull`, sensitive değerleri indirmeyip `[SENSITIVE]` placeholder yazdığı için runner-local preflight gerçek konfigürasyonu doğrulayamaz. Preflight gerçek Vercel runtime'a taşınır; yalnız exact repository/workflow/main/workflow_dispatch/Production/audience/time/signature claim'leri doğrulanmış kısa ömürlü GitHub Actions OIDC çağrısı kabul edilir. Endpoint yalnız mevcut redacted boolean/count contract'ını döndürür, provider'a temas etmez ve secret/değer/uzunluk taşımaz. Workflow için eklenen `id-token: write` yalnız OIDC token istemek içindir; `VERCEL_TOKEN` yine yalnız son mutation operatöründedir. Bu hazırlık yeni aktivasyon, flag değişikliği, deploy veya provider consent onayı değildir.
+
+**C2I-V7 controlled readiness refresh — repository preparation:** Production configuration scope corrective sonrasında activation'dan bağımsız bir readiness yolu kullanılır. Yeni manuel workflow yalnız `refs/heads/main`, GitHub `Production` environment, exact defaultsuz redeploy onayı, sabit concurrency ve `contents: read` + OIDC için `id-token: write` sınırlarıyla çalışır. Operatör yalnız mevcut kodu Production'a yeniden deploy eder; feature flag veya başka environment variable yazmaz ve provider'a temas etmez. Redeploy sonrasında aynı redacted OIDC preflight'i çalışır. Bu hazırlık veya workflow merge'i redeploy/dispatch/aktivasyon izni değildir; feature flag kapalı kalır ve activation workflow'u çalıştırılmaz.
+
+**C2I-V9 real-device Shopify-native acceptance — FAIL / product UI corrective:** 19 Eylül 2026 gerçek cihaz insan gözleminde App Home ve Data Sources/Platforms Shopify Admin içinde açıldı ve insan hiçbir Connect eylemine basmadı. Ancak App Home'daki durumdan habersiz ikinci Klaviyo kartı, iki yüzey arasındaki `Connect`/`Connected` çelişkisi, tekrarlanan provider metinleri, `Parked` olması gereken Pinterest'in aktif gösterimi ve Data Sources render'ında otomatik Klaviyo Account API/token-refresh olasılığı nedeniyle V9 `FAIL` oldu. Corrective; App Home'u store + Data Sources girişine indirir, provider metinlerini ayrıştırır, Pinterest'i `Parked` yapar ve normal sayfa açılışını yalnız yerel status okumasıyla sınırlar. Connect modalı, OAuth, account discovery, mutation ve Disconnect V10 kapılarında kalır. Corrective sonrası acceptance, iki görüntü mağaza/hesap/kişi/browser kimlikleri repository'ye girmeden redacted edilip hash ve insan privacy attestation ile doğrulanana kadar `PASS` değildir. Pending contract gereksinimleri gözlenmiş boolean PASS gibi göstermez. Evidence validator yalnız allowlisted iki farklı PNG'yi, exact route/file sırasını, SHA-256 bağını, güvenli boyutları, PNG yapısını, metadata yokluğunu ve exact attestation/interaction şeklini kabul eder; insan görsel/privacy incelemesinin yerine geçmez. Non-accepting intake template `REVIEW_REQUIRED`, placeholder hash/timestamp ve false attestation değerleriyle başlar; template doğrudan PASS sayılamaz. Capture yalnız iç uygulama navigasyonunu kullanır; hiçbir Provider Connect düğmesine basılmaz ve OAuth, consent, callback, account discovery, token exchange, provider API, deployment veya Production mutation yapılmaz. Ayrıntılı sözleşme `contracts/shopify/e10-t6-c2i-v9-real-device-acceptance.json` ve `docs/E10_T6_C2I_V9_REAL_DEVICE_ACCEPTANCE.md` içindedir.
+
+**C2I-V10 Provider Connect kararı — decision frozen / execution blocked:** Kullanıcı tercihiyle ilk kontrollü provider adayı Klaviyo, fallback Google Ads olarak sabitlendi. Klaviyo akışı `Connect → açıklama modalı → explicit Connect → top-level OAuth → server-verified Klaviyo account seçimi → account-selection close → Email Monthly Plan Cost → Save → Connected` adımlarını ayrı ayrı geçer; OAuth tek başına bağlantı değildir. Disconnect ayrı warning modalı ve açık onay gerektirir, refresh'i durdurur ve tarihsel analytics'i silmez. V9 gerçek cihaz App Home + Data Sources/Platforms Shopify-native kanıtı repository'ye ulaşmadığı için V10 execution kapalıdır; provider consent, API smoke, deployment veya Production mutation yapılmaz. Ayrıntılı sözleşme `contracts/shopify/e10-t6-c2i-v10-provider-connect-decision.json` ve `docs/E10_T6_C2I_V10_PROVIDER_CONNECT_DECISION.md` içindedir.
+
+**C2J görünürlük corrective:** Production App Home ekranının önceki HTML'i göstermeye devam ettiği gerçek cihaz kanıtıyla doğrulandı. Data Sources / Platforms girişi büyük, birincil ve sürüm işaretli eylem olarak App Home'a sabitlendi; App Home ile Platforms yanıtlarına browser, CDN, surrogate ve Vercel CDN katmanlarında açık `no-store` başlıkları eklendi. İnsan smoke'u ekranda `e10-t6c2j` sürüm işaretini ve `Open Data Sources / Platforms` eylemini birlikte görmeden PASS sayılamaz; provider OAuth aktivasyon flag'i bu görünürlük doğrulamasından önce kapalı kalır.
+
+**C2K Shopify-native corrective:** C2J'de görünürlüğü kurtarmak için eklenen özel CSS kartı/butonu ve kullanıcıya gösterilen teknik release işareti Embedded Uygulama Anayasası madde 3 ile çeliştiği için geri alınmıştır. App Home ve Data Sources yüzeyleri doğrulama anındaki resmi Shopify App Home sözleşmesine göre App Bridge (`app-bridge.js`), stable Polaris Web Components (`polaris-1.js`), `s-app-nav`, `s-page`, `s-section`, `s-stack`, `s-banner` ve `s-button` ile kurulur. Embedded yüzeylerde özel component CSS'i ve nested provider iframe'i yoktur. Provider Connect yalnız doğrulanmış session token ile backend transaction başlatır; dönen allowlisted consent URL resmi Navigation API'nin top-level `open(url, "_top")` davranışıyla Shopify iframe'inden çıkar. Bu kurallar source/test kapısıdır; gerçek cihaz Shopify-native render görülmeden C2K PASS veya OAuth smoke başlangıcı ilan edilmez.
+
+**C2L deployment/version kök neden kapısı:** Resmi Shopify deployment sözleşmesine göre app version, app configuration ve extension snapshot'ıdır; yeni Shopify app version yayınlamak hosted web app kodunu yayınlamaz. C2K yalnız Vercel web kodu değiştirdiği, `shopify.app.toml` veya extension değiştirmediği için Shopify app version ilerletmesi çözüm değildir. Vercel'in deployment status'u da canonical App Home'un yeni artifact'i sunduğunu tek başına kanıtlamaz. Ayrı read-only production surface probe; canonical `https://dev.adstable.app/` yanıtında exact release header, App Bridge, stable Polaris, Shopify-native page/action, özel style yokluğu ve nested iframe yokluğunu birlikte doğrulamadan gerçek cihaz smoke'u tekrarlanmaz. İlk GitHub-hosted probe canonical origin için HTTP 500, eksik release header ve beklenen Shopify markup'ının yokluğunu doğruladı. Bu nedenle mevcut ekran problemi cihaz/cache varsayımı değildir; production web surface başarısızdır. Bu probe normal unit/security CI içine saklanmaz: `npm run e10:production:surface:probe` ayrı ve bilinçli bir release kapısıdır. 200 + exact release sağlanmadan kullanıcıdan tekrar smoke istenmez. Sürüm kararı: yalnız hosted Node/HTML/JS değişiklikleri **Shopify app version gerektirmez**; `shopify.app.toml`, app configuration veya extension değişirse `shopify app deploy` ve yeni app version gerekir; Vercel/environment/domain düzeltmesi ise web deployment gerektirir.
+
+**C2M production runtime izolasyonu:** Canonical App Home HTTP 500 verdiği halde aynı commit lokal runtime üzerinde 200 ve exact `e10-t6c2k` üretti. Shopify presentation rotaları bu nedenle büyük legacy `server.js` boot graph'ından ayrılmış minimal Vercel function'a taşındı; `/`, `/shopify/app` ve `/shopify/app/platforms` yalnız resmi App Bridge/Polaris HTML'ini üretir. API ve OAuth rotaları mevcut application function'da kalır. Public Shopify API key yoksa eski/farklı ekran sunmak yerine açık 503 döner. Bu web routing değişikliği Shopify app version gerektirmez.
+
+- Preflight, mevcut OAuth transaction ve provider persistence sınırlarının yalnız standalone `user_id` authority'si taşıdığını; callback'lerin `/dashboard` yüzeyine döndüğünü doğruladı. Shopify `workspace_id` auth user kimliği gibi kullanılamaz ve query/body tenant authority kabul edilemez.
+- Önce doğrulanmış Shopify session → shop/workspace/user/provider/surface/return target transaction bağı, workspace-scoped encrypted connection persistence ve canonical embedded callback dönüşü uygulanıp isolation/replay testleri geçmelidir.
+- **E10-T6-C1 — Done:** Standalone user authority ile Shopify embedded authority ayrık CHECK contract ile modellenmiştir; embedded transaction doğrulanmış shop/workspace/Shopify user, provider, surface ve sabit return target taşır. Atomic consume ve server-only grant testlidir. Development migration ve redacted postcheck PASS.
+- **E10-T6-C2A — Done:** Consumed embedded transaction authority ile workspace-scoped, encrypted-only provider connection persistence hazırlandı; standalone bağlantı tablosuyla tenant kimliği birleştirilmedi. Development migration ve forced-RLS/role postcheck PASS.
+- **E10-T6-C2B — Done (repository preparation):** Embedded start doğrulanmış Shopify session authority ile transaction üretir; callback state’i atomik tüketmeden provider exchange yapmaz ve yalnız canonical Platforms dönüşü üretir. Provider çağrısı yapılmadı.
+- **E10-T6-C2C — Done (repository preparation):** Tenant-isolation/replay route kabulü ve default-off feature-gated runtime registration hazır.
+- **E10-T6-C2D — Done (repository preparation):** Beş allowlisted provider için ortak embedded authority/transaction/store bağımlılıklarını provider-specific authorization/token stratejileriyle birleştiren fail-closed adapter composition hazır. OAuth development smoke'undan önce provider strategy wiring ve development activation preflight/evidence paketleri kalır.
+- **E10-T6-C2E — Done (repository preparation):** Provider authorization stratejileri canonical embedded callback, minimum scope ve server-only secret/exchange sınırlarıyla hazır. OAuth development smoke'undan önce yalnız development activation preflight/evidence paketi kalır.
+- **E10-T6-C2F — Done (repository preparation):** Redacted activation preflight Shopify, keyring, database ve beş provider config görünürlüğünü doğrular; feature flag'in preflight sırasında kapalı olmasını şart koşar. Repository paketi kalmadı; gerçek OAuth smoke ayrı insan onayı ve environment preflight PASS bekler.
+- **E10-T6-C2G — Done (PR #196, merge `76a63ce`):** Provider strategy, token exchange, embedded transaction ve workspace encrypted connection parçaları gerçek composition root'a bağlandı. Feature flag kapalıyken davranış değişmez; açıkken eksik bağımlılıkta fail-closed durur.
+- **E10-T6-C2H — Done (PR #196, merge `76a63ce`):** Shopify App Home altında canonical `/shopify/app/platforms` yüzeyi ve beş provider Connect eylemi oluşturuldu. Connect yalnız App Bridge ID token ile embedded start endpoint'ini çağırır; consent top-level açılır ve callback aynı Platforms yüzeyine döner. Kullanıcı consent eylemi otomatikleştirilmez.
+- **Merge kanıtı (2026-09-11):** PR #196 merge edildi; merge sonrası GitHub Security Regression ve Vercel deployment PASS. Feature flag aktivasyonu, provider consent ve production işlemi yapılmadı.
+- **Düzeltme kaydı (2026-09-11):** Önceki “repository paketi kalmadı” değerlendirmesi kaynak kodla uyuşmuyordu. `server.js` adapter composition vermiyor, feature flag açıldığında runtime fail-closed başlıyor ve embedded App Home üzerinde Connect yüzeyi bulunmuyordu. OAuth smoke öncesi C2G ve C2H zorunlu repository kapıları olarak eklendi; secret'ların bir process çıktısında görünmemesi credential yokluğu kanıtı sayılmaz.
+- Bu repository kapısı PASS olmadan provider consent başlatılmaz. Provider veya production teması yapılmadı. Karar `docs/E10_T6C_EMBEDDED_PROVIDER_OAUTH_PREFLIGHT.md` ve `contracts/shopify/e10-t6c-provider-oauth-preflight.json` içindedir.
+
+#### E10-T6-D — Shopify attribution feasibility smoke — T6-C kabulünden sonra
+
+- Development Store'da yalnız T5-B'nin iki metriği için platform attribution dimension, Purchase Count, Sales Value, tarih, currency ve `read_reports`/exact scope uygunluğu read-only ve PII'siz doğrulanır.
+- Sonuç desteklenmiyorsa Order/Customer ingestion'a veya yeni scope'a otomatik geçilmez; `BLOCKED` evidence üretilir ve iş kararı istenir.
+
+#### E10-T6-E — Webhook/initial sync kararı — yalnız kanıtlanmış ihtiyaçtan sonra
+
+- Webhook veya initial sync, T5-C çıktısı ve T6-D feasibility sonucu gerçekten gerektiriyorsa ayrıca planlanır. T5-B overlap diagnostic'i tek başına order webhook, commerce storage veya Dataset V2 yazımını meşrulaştırmaz.
+- Development dışı her scope, credential, webhook, billing ve production aktivasyonu ayrı açık production onayı gerektirir.
+
+**Sıra özeti:** `E10-T5-C ürün onayı+merge → E10-T6-A offline readiness PASS → insan development onayı → E10-T6-B ilk Shopify teması → E10-T6-C embedded OAuth smoke → E10-T6-D attribution feasibility → gerekirse E10-T6-E`. Bu sırayı atlayan uygulama veya production işlemi acceptance failure'dır.
+
+### Kabul kriterleri
+
+- Shopify tarafından doğrulanmamış shop/user/workspace kimliği hiçbir backend yetkisi vermez.
+- Bir shop yalnız kendi workspace, bağlantı, billing entitlement ve analytics verisine ulaşabilir; cross-shop erişim reddedilir.
+- Token, webhook secret, session material, provider payload ve müşteri PII'si browser'a veya loglara sızmaz.
+- Uninstall ve privacy lifecycle'ı yeni provider çağrılarını durdurur ve belgelenmiş retention/deletion politikasını uygular.
+- Minimum scope matrisi her izni görünür ürün çıktısına bağlar; gereksiz protected customer data talep edilmez.
+- Shopify-reported platform Purchase Count/Sales Value, provider-reported conversion facts ve ilerideki AdsTable overlap/attribution sonucu provenance ile ayrıdır; Shopify total commerce ilk intake'te yoktur.
+- Billing entitlement server-side doğrulanır; ödeme ekranı embedded güven avantajını bozacak bağımsız yönlendirmeye zorlanmaz.
+- App Store review paketi implementation boyunca güncel tutulur ve submission öncesi ayrı insan onayı gerektirir.
+- Mevcut canonical envelope, Dataset V2 ve backend-only Formula/Funnel sınırları korunur.
+
+### Rollback ve production sınırı
+
+E10 geliştirmesi feature-gated ilerler. Shopify Partner Dashboard ayarı, production credential, scope talebi, billing aktivasyonu, migration, webhook registration ve App Store submission ayrı açık production onayı olmadan yapılmaz. Embedded yüzey kapatıldığında mevcut bağımsız AdsTable backend ve legacy rollback yolu zarar görmez.
+
+### E10-T1 karar kanıtı
+
+Resmi gereksinim matrisi, fail-closed implementation hükümleri ve yeniden doğrulama tetikleyicileri `docs/E10_T1_SHOPIFY_OFFICIAL_REQUIREMENTS_FREEZE.md` içinde donduruldu; executable sözleşme `tests/e10-t1-shopify-requirements-freeze.test.js` ile korunur. Exact API/App Bridge sürümü, token modeli, commerce scope'ları, protected-data erişimi, billing modeli ve submission checklist'i ilgili uygulama taskı öncesinde güncel resmi belge ve uygulamaya özgü Partner Dashboard sonucu üzerinden yeniden doğrulanacaktır.
+
+**Durum:** E10-T1 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T2 shop/workspace tenant modelidir. Bu taskta Partner Dashboard, credential, scope, billing, migration, webhook, provider, production veya App Store submission işlemi yapılmadı.
+
+### E10-T2 karar kanıtı
+
+One-shop/one-workspace başlangıç modeli, immutable shop kimliği, verified domain değişimi, reinstall generation, uniqueness ve browser claim rejection sözleşmeleri `src/shopify/tenant-model.js` içinde executable hale getirildi. Model kararı `docs/E10_T2_SHOP_WORKSPACE_TENANT_MODEL.md`, regresyon kanıtı `tests/e10-t2-shop-workspace-tenant.test.js` içindedir.
+
+**Durum:** E10-T2 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T3 install ve embedded authentication hazırlığıdır. Migration, Shopify/Partner Dashboard, credential, scope, billing, webhook, provider veya production işlemi yapılmadı.
+
+### E10-T3-A karar kanıtı — embedded auth güvenlik çekirdeği
+
+Install callback HMAC, shop-bound tek kullanımlık state, session token HS256/audience/time/destination/issuer doğrulaması ve active server-side tenant resolution `src/shopify/embedded-auth.js` içinde executable hale getirildi. `tests/e10-t3a-embedded-auth.test.js` tamper, replay, expiry, audience ve reauthorization negatif kapılarını doğrular; karar sınırı `docs/E10_T3A_EMBEDDED_AUTH_CONTRACT.md` içindedir.
+
+**Durum:** E10-T3-A `Done`; parent E10-T3 `In progress`. Sıradaki uygulanabilir repository işi E10-T3-B token exchange/persistence ve HTTP registration hazırlığıdır. Gerçek Shopify API/CLI sürümü ilgili resmi kaynaklardan tekrar doğrulanmadan bağlanmaz; production credential, Partner Dashboard, migration, scope, billing, webhook veya Shopify isteği çalıştırılmadı.
+
+### E10-T3-B karar kanıtı — token exchange/persistence ve HTTP registration
+
+Verified session→active tenant→injectable exchange→encrypted store zinciri `src/shopify/token-exchange.js`, ince callback/session registrar'ı `src/routes/shopify-auth-routes.js` içinde tamamlandı. Strict/redacted contract ve header-only session sınırı `tests/e10-t3b-token-exchange-routes.test.js`; operasyon sınırı `docs/E10_T3B_TOKEN_EXCHANGE_ROUTES.md` ile korunur.
+
+**Durum:** E10-T3-B ve parent E10-T3 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T4 token, uninstall ve privacy lifecycle'dır. Gerçek endpoint/credential, production adapter/store, migration, Partner Dashboard, scope, billing, webhook veya Shopify isteği çalıştırılmadı.
+
+### E10-T4 karar kanıtı — token, uninstall ve privacy lifecycle
+
+Verified-event allowlist, uninstall/access-loss token revocation sırası, compliance subject scope, replay claim ve redacted evidence `src/shopify/privacy-lifecycle.js` içinde executable hale getirildi. Negatif/replay/order testleri `tests/e10-t4-privacy-lifecycle.test.js`, retention/deletion ve production sınırları `docs/E10_T4_TOKEN_PRIVACY_LIFECYCLE.md` içindedir.
+
+**Durum:** E10-T4 `Done`; parent E10 `In progress`. Sıradaki uygulanabilir repository işi E10-T5 minimum scope ve commerce contract'tır. Gerçek webhook, token/data deletion, migration, Partner Dashboard veya production işlemi çalıştırılmadı.
+
+### E10-T5-A ürün/UI karar freeze'i — Shopify-native Funnel ve metrik sözlüğü
+
+**Amaç:** E10-T5 minimum scope matrisi çıkarılmadan önce Funnel bilgi mimarisi, Shopify embedded görünüm sınırı, filtre/tarih/compare davranışı, metrik adları ve commerce provenance kararlarını kalıcı olarak dondurmak.
+
+#### E10-T5 A/B/C ayrıntılı karar kaydı
+
+Bu bölüm E10-T5'in authoritative ürün özetidir. Aşağıdaki kararlar başka bir belge veya alt başlıktan tahmin edilmez:
+
+**E10-T5-A — Shopify kuralları — `Done`**
+
+- Resmi Shopify embedded shell: **Zorunlu**.
+- Resmi App Bridge: **Zorunlu**.
+- Resmi Shopify UI componentleri: Genel UI kontrollerinde **zorunlu**.
+- Özel AdsTable CSS component framework: **Yasak**.
+- AdsTable özel visualization: Yalnız Funnel/Table data presentation alanında **izinli**.
+- Shopify Admin'i taklit eden statik shell: **Yasak**.
+- Iframe/yabancı-site hissi: **Acceptance failure**.
+
+**E10-T5-B — Shopify'dan ne alınacak, nasıl gösterilecek? — `Done`**
+
+| AdsTable contract adı | İnsan dilindeki anlamı | Shopify'daki karşılığı / doğrulama durumu |
+|---|---|---|
+| `platform` | Shopify'ın satışı ilişkilendirdiği reklam/marketing platformu; örneğin Meta veya Google. Serbest UTM tahmini ya da AdsTable'ın provider verisinden üretilmez. | Aday yüzey ShopifyQL `sales` raporundaki attribution/channel kırılımıdır. Exact dimension adı güncel schema ile doğrulanmadan kontrat değildir. |
+| `platform_purchase_count` | Seçili tarih aralığında Shopify'ın ilgili platforma atfettiği satın alma adedi. Mağaza Total Purchase değildir. | Aday yüzey `shopifyqlQuery` içindeki platform/channel kırılımlı order/purchase aggregate metriğidir. Exact metric adı güncel schema ile doğrulanmadan kontrat değildir. |
+| `platform_sales_value` | Seçili tarih aralığında Shopify'ın ilgili platforma atfettiği satış değeri. Mağaza Total Sales değildir. | Aday yüzey ShopifyQL `sales` schema'sındaki platform/channel kırılımlı `total_sales` metriğidir; exact attribution dimension birlikteliği gerçek schema ile doğrulanmalıdır. |
+
+Bu üç contract adı **AdsTable'ın iç normalize isimleridir; Shopify API field adı değildir**. Güncel resmi Shopify örnekleri aggregate rapor erişimini Admin GraphQL `shopifyqlQuery` ve `read_reports` scope'u üzerinden göstermektedir; bu yalnız doğrulanacak aday erişim yüzeyidir, scope talebi değildir. Üçünün birlikte ve PII'siz alınabildiği doğrulanamazsa Order/Customer verisine geçilmez ve sahte mapping yapılmaz.
+
+Amaç yalnız Shopify-reported platform attribution ile provider-reported Purchase/Sales arasındaki muhtemel overlap'i sonraki backend kararında incelemektir. Bu intake mağaza totalı üretmez, Revenue hesaplamaz, kullanıcıya gösterilecek AdsTable çıktısını belirlemez ve Dataset V2'ye yazılmaz.
+
+Gösterim yalnız Shopify-native bir **Attribution comparison / overlap diagnostic** alanında, seçili tarih aralığı ve platform grain'inde yapılır. Satırlar platformdur; kolonlar `Provider Purchase`, `Shopify-attributed Purchase`, `Purchase Difference`, `Provider Sales`, `Shopify-attributed Sales`, `Sales Difference` ve veri durumudur. Farklar backend'de hesaplanır; overlap sinyali kesin duplicate kanıtı veya otomatik deduction değildir. Funnel Total satırına, Revenue hesabına veya provider hierarchy içine eklenmez. Sales karşılaştırması aynı raporlama para birimi doğrulanmadan gösterilmez; bunun için sessizce yeni bir Shopify intake metriği eklenmez.
+
+#### Shopify-native embedded kabulü
+
+- AdsTable, Shopify Admin'i yalnız görsel olarak taklit eden bağımsız bir web sayfası veya iframe hissi veren ikinci bir tasarım sistemi kullanmaz. Embedded shell ve navigation App Bridge'e; genel UI kontrolleri implementation anında güncel ve resmi Shopify UI component sistemine bağlanır.
+- Button, button group/tabs, popover, modal/sheet, date picker, select/choice list, checkbox, applied-filter chip, banner, toast, loading/empty/error state, pagination, tooltip, typography, spacing, color, focus ve accessibility davranışı için özel AdsTable component karşılığı üretilmez. Resmi componentin iç DOM/CSS selector'ına bağımlılık veya onu özel CSS ile taklit etmek acceptance failure'dır.
+- AdsTable'a özgü alan yalnız business information architecture ve veri görselleştirmesidir: Funnel stage'leri, provider hierarchy drill-down, metrik hücreleri, compare delta, metric-support/data-freshness ve capability-aware table body. Bu alan da resmi Shopify design token, responsive ve accessibility sınırlarına uyar.
+- Mevcut Funnel HTML production component kaynağı değil, interaction/data-flow referansıdır. Statik Shopify shell'i, özel toolbar/dropdown/filter modal/toggle ve global theme CSS'i taşınmaz; davranış güncel resmi componentlerle yeniden kurulur.
+- Merchant uygulamayı Shopify'dan kopuk bir site gibi algılıyorsa, duplicate global navigation görüyorsa veya desktop sayfa mobil iframe'e sıkışıyorsa embedded UX kabulü FAIL olur. App Bridge/UI component deprecation ve sürüm geçişleri kontrollü dependency upgrade + visual regression + embedded smoke ile yönetilir.
+
+#### Toolbar, tarih ve comparison
+
+- Toolbar sırası `Time Range → Comparison → Filters`; yardımcı eylemler `Export → Data freshness/auto refresh → Data Sources → Funnel/Table` olur. Responsive kırılımda aynı resmi componentler ikinci satır/sheet düzenine geçebilir.
+- `Summary` varsayılan hızlı yönetici modudur ve `Today`, `Yesterday`, `Last 7 Days`, `This Month` kolonlarını gösterir. `Custom Range` seçildiğinde kolonlar `Current period`, `Comparison period`, `Change` olur; dört summary kolonu ile iki dönemli compare aynı tabloda üst üste bindirilmez.
+- İlk compare allowlist'i `No comparison`, `Previous period`, `Previous year`, `Previous year (match day of week)`, `Custom` olur. `Targets`, ayrı hedef/bütçe modeli olmadan ilk dilime alınmaz.
+- Compare/normalization/zero-denominator sonucu backend'de hesaplanır. Previous=0 iken yüzde uydurulmaz; `not comparable/new` semantiği taşınır. Unsupported veya unknown metrik `0` değil `null`/görsel `—` olur. Shop timezone ve server contract authority'dir; browser timezone authority değildir.
+
+#### Filters
+
+- Shopify Analytics'in `Visualization`, `Annotations`, `Cumulative` veya `Human or bot session` filtreleri kopyalanmaz. Filtre taxonomy'si AdsTable'a; button, popover/sheet, choice/search, selected chip, apply/clear ve mobil davranış resmi Shopify componentlerine aittir.
+- İlk UI filter allowlist'i `Platform`, `Connected account`, `Campaign/Flow`, provider-capability-aware group (`Ad Set`, `Ad Group`, `Asset Group`) ve leaf (`Ad`, `Campaign Message`, `Flow Message`) olur. `Data availability` daha sonraki kontrollü genişlemedir.
+- `Paid`, `Organic`, `Paid + Organic`, `Traffic Type` ve UTM-derived Organic frontend filter/segment değildir. GA4/Organic ingestion parked kalır; eksik veya güvenilmez UTM'den Organic üretilmez. Provider'a atfedilemeyen Shopify commerce `Unattributed` olur, otomatik `Organic` olmaz. Backend canonical `traffic_type` yalnız internal provenance/capability amacıyla kalabilir.
+- Filtre parent/child seçimi yalnız API'nin gerçek entity identity'leriyle yapılır; görünen addan identity türetilmez. Aktif seçimler removable chip ve açık seçim sayısıyla sunulur; authorization filtreden türetilmez.
+
+#### Funnel/Table akışı ve hierarchy
+
+- `Funnel` ve `Table`, aynı backend query/compare sonucunun iki resmi-component renderer'ıdır; frontend ayrı aggregation/formula/hierarchy üretmez. Switch sırasında time range, comparison, currency, filters ve data-source state korunur.
+- Funnel görünümünde dikey stage sırası `Traffic/Acquisition → Cart → Checkout → Purchase/Revenue`; ilk kolon metrik + expandable hierarchy, sağ kolonlar Summary dönemleri veya Custom current/comparison/change olur.
+- Table görünümünde ilk sticky kolon provider hierarchy; sağa doğru metric kolonlarıdır. Desktop geniş tablo, mobilde sticky identity + kontrollü yatay metric scroll/column selection kullanır.
+- Gerçek provider hierarchy korunur: Meta `Campaign → Ad Set → Ad`; Google Standard `Campaign → Ad Group → Ad`; Google PMax `Campaign → Asset Group`; TikTok `Campaign → Ad Group → Ad`; Klaviyo `Campaign → Campaign Message` ve sibling `Flow → Flow Message`; Organic parked/platform-only. Eksik `Ad Group`, `Ad` veya parent uydurulmaz.
+
+#### Metrik sözlüğü ve provenance
+
+- AdsTable ürün sözlüğü: `Sales = satış değeri`, `Spend = reklam harcaması`, **`Revenue = Sales - Spend`**. Mevcut Formula Engine'deki aynı aritmetiği taşıyan teknik `profit` alanı UI/API contract geçişinde `Revenue` olarak adlandırılır; aynı değer hem Revenue hem Profit olarak iki kez sunulmaz.
+- Gerçek `Profit`, COGS, refund, shipping, transaction/payment fee ve diğer maliyet sözleşmeleri tamamlanmadan gösterilmez. `Margin` ilk dilimde kaldırılır; ileride hangi numerator/cost setini kullandığı isimli/versionlı contract olmadan açılmaz.
+- İlk Funnel metric ailesi: `Impression`, `Click`, `Spend`, `CTR`, `CPC`, `Add to Cart`, `Add to Cart Value`, `Checkout`, `Checkout Value`, `Abandoned`, `Abandoned Value`, `Purchase`, `Sales`, `Revenue`, `ROAS`, `CPS`. Her metric support durumu korunur; missing/unsupported/unknown sıfıra çevrilmez.
+- `Shopify-reported attribution`, `provider-reported attribution`, `AdsTable-calculated` ve `Unattributed` ayrı provenance aileleridir. İlk Shopify intake'i yalnız platform bazlı Purchase Count/Sales Value taşır; total Sales veya Refund almaz. İki attribution kaynağı sessizce toplanmaz, birbirinin yerine geçirilmez ve frontend provenance birleştirme kararı vermez.
+
+#### E10-T5 alt paketleri, kanıt ve sıra kapısı
+
+- **E10-T5-A — Done — Shopify kuralları:** Resmi embedded shell, App Bridge ve genel Shopify UI component zorunlulukları; özel framework/statik shell yasağı; Funnel/Table özel visualization sınırı ve iframe acceptance failure.
+- **E10-T5-B — Done — Shopify'dan ne alınacak, nasıl gösterilecek?:** Yalnız platform bazlı Purchase Count ve Sales Value alınır; yalnız attribution comparison/overlap diagnostic alanında ayrı provenance ile gösterilir. Total commerce, Refund, PII, Dataset V2, otomatik deduction ve Revenue etkisi yoktur.
+- **E10-T5-C — Done — Shopify'a ne verilecek, nasıl gösterilecek?:** C1–C7 first-slice output/display ve integrated acceptance onaylandı; C5-B verified reconciliation `Deferred`.
+
+#### E10-T5-C modül sırası ve durumları
+
+1. **E10-T5-C1 — `Done` — Funnel:** Funnel varsayılan görünüm; Funnel/Table aynı backend sonucunun state-koruyan iki renderer'ı; Table compare yalnız seçili focus metric'i genişletir; aynı anda yalnız bir toolbar popover açılır ve mobilde modal/sheet kullanılır.
+2. **E10-T5-C2 — `Done` — Ad Analysis:** UI/ranking freeze'i ve Creative capability/data model kararı tamamlandı.
+   - **E10-T5-C2-A — `Done` — Ad Analysis UI:** Sales varsayılan ranking, Purchase/Sales/Revenue switch, compare growth ranking, Creative metadata-only sınırı ve Shopify component yönü onaylandı.
+   - **E10-T5-C2-B — `Done` — Creative provider capability ve data model:** Provider-specific metadata sidecar kararı verildi; Creative performance kapalı, Dataset V2 ve Funnel hierarchy değişmez.
+3. **E10-T5-C3 — `Done` — Dashboard:** Completed-day dönemleri, proportional automatic compare, count+value Funnel Overview ve state-koruyan View Funnel kararı tamamlandı.
+4. **E10-T5-C4 — `Done` — Platforms:** Currency-first onboarding; Meta/Google/Klaviyo açıklama modalı → OAuth → server-verified tek aktif account seçimi; warning modalı ile Disconnect. Provider scope revizyonuyla TikTok ve Pinterest `Parked`tır.
+5. **E10-T5-C5 — `Done for first slice` — Attribution:** C5-A `Done`; C5-B `Deferred`.
+   - **E10-T5-C5-A — `Done` — Attribution Differences:** Nötr platform aggregate fark tablosu ve read-only Review modalı; compare/renk/decrease/adjustment yoktur.
+   - **E10-T5-C5-B — `Deferred` — Verified Reconciliation:** Aynı order + click identity + server-resolved leaf Ad ve privacy/scope/idempotency kanıtı olmadan açılmaz.
+6. **E10-T5-C6 — `Done` — Settings:** Currency, Klaviyo Email Monthly Plan Cost ve OAuth ile doğrulanmış hesaplar arasından Funnel için tek aktif Ad Account seçimi C4 ile birlikte onaylandı.
+7. **E10-T5-C7 — `Done` — Integrated navigation/acceptance:** Tek resmi embedded navigation, typed context handoff, canonical OAuth return, responsive/accessibility ve iframe-hissi acceptance matrisi tamamlandı.
+
+#### E10-T5-C1 Funnel — onaylı output/display ve Shopify component freeze'i
+
+- **Onaylanan üç iş kararı:** Açılışta varsayılan görünüm **Funnel**'dır. Table compare bütün metrikleri çoğaltmaz; yalnız seçili focus metric `Comparison / Current / Absolute change / % change` olarak genişler. Desktop toolbar'da aynı anda yalnız bir popover açık kalır; mobilde yoğun seçim yüzeyi resmi modal/sheet davranışına geçer.
+- **Component yönü:** Sayfa/layout `s-page`, `s-section`, `s-grid`, `s-stack`; eylemler `s-button`, `s-button-group`, `s-menu`; overlay `s-popover`, `s-modal`; tarih `s-date-picker`, `s-date-field`, `s-choice-list`; filter `s-search-field`, `s-checkbox`, `s-clickable-chip`; durum `s-badge`, `s-banner`, `s-spinner`, `s-tooltip` ile kurulur. Component/property yönü E10-T6-A Dev MCP validator revision 2'de doğrulandı; implementation artifact'leri ayrıca yeniden validate edilir.
+- **Tablo sınırı:** İlk tercih resmi `s-table`dır. Gerçek hierarchy, sticky/multi-header ve accessibility ihtiyacını karşılamazsa özel renderer yalnız Funnel/tree-table veri sunum gövdesinde kullanılabilir; Shopify token ve accessibility kabulü zorunludur. Özel shell, toolbar, popover, modal, button veya CSS component framework yasaktır.
+- **Funnel akışı:** Aşağı doğru `Traffic → Cart → Checkout → Outcome`; sağa doğru dönem/compare. Traffic `Impression, Click, Spend, CTR, CPC`; Cart `Add to Cart, Add to Cart Value`; Checkout `Checkout, Checkout Value, Abandoned, Abandoned Value`; Outcome `Purchase, Sales, Revenue, ROAS, CPS` metriklerini taşır.
+- **Table akışı:** Aşağı doğru yalnız gerçek provider hierarchy, sağa doğru metriklerdir. Desktop identity kolonu + yatay metric alanı; mobil identity + seçili metric grubu ve kontrollü drill-down kullanır.
+- **State ve authority:** Switch, time range, comparison, filters, currency, data sources, expanded entities ve compare focus metric'i korur. İki görünüm aynı backend response'u kullanır; frontend aggregation, formül, hierarchy, capability veya sahte veri üretmez.
+- **Acceptance failure:** Eşzamanlı çoklu toolbar popover, Shopify shell kopyası, desktop sayfanın mobil iframe'e sıkıştırılması, switch state kaybı, unsupported değerin `0` yapılması veya yabancı-site hissi.
+
+Karar belgesi `docs/E10_T5C1_FUNNEL_SHOPIFY_COMPONENT_FREEZE.md`, executable contract `contracts/shopify/e10-t5c1-funnel-ui.json`, guard `tests/e10-t5c1-funnel-ui-freeze.test.js` içindedir. Bu freeze UI implementasyonu veya Shopify teması değildir.
+
+#### E10-T5-C2-A Ad Analysis — onaylı ranking, Creative sınırı ve component freeze'i
+
+- **Normal ranking:** Varsayılan ranking `Sales` ve yüksekten düşüğedir. `Purchase / Sales / Revenue` ranking metric switch'idir; kullanıcı yüksekten düşüğe veya düşükten yükseğe geçebilir. Total satırı ranking'e girmez.
+- **Compare ranking:** Varsayılan sıra aktif metric'in backend `percent_change` değerine göre en çok yükselenden en çok düşenedir; yön ters çevrilebilir. Önceki değer sıfırsa sonsuz yüzde üretilmez, `new/not comparable`; unsupported ise `—` ve son bucket kullanılır.
+- **Kolonlar:** `Platform / Ad or analytical leaf / Creative / Purchase / Sales / Spend / Revenue / Intent / Performance`. `Sales Value` etiketi `Sales` olur; cost contract olmadan `Margin` kaldırılır.
+- **Detay:** Intent `Add to Cart Rate / Checkout Rate / Abandoned Rate / Purchase Rate`; Performance `CTR / CPC / ROAS / CPS` modalıdır. Aynı anda yalnız bir analiz modalı ve satır bağlamı açık olabilir.
+- **Creative ilk dilim:** Creative ortak canonical leaf değildir; Ad/Asset Group performansından ayrı yalnız preview/metadata'dır. Creative bu pakette Dataset V2'ye yazılmaz, Funnel hierarchy'sine eklenmez ve Ad Purchase/Sales/Spend/Revenue değeri Creative'e kopyalanmaz veya dağıtılmaz.
+- **Provider farkı:** Standart provider'larda analytical leaf Ad; Google PMax'te Asset Group kalır. Creative/asset-level metric yalnız provider gerçek grain'i kanıtlanır ve ayrı versionlı fact kararı onaylanırsa açılır.
+- **Component yönü:** Sayfa/layout `s-page`, `s-section`, `s-grid`, `s-stack`; ranking `s-button-group`; ana liste önce `s-table`; detay `s-button` + `s-modal`; durum `s-badge`, `s-banner`, `s-spinner`, `s-tooltip`. Exact media/image ve sort component/property'si C2-B/T6-A güncel resmi doğrulamasına bağlıdır.
+- **C2-B kapısı:** Provider bazında Creative identity, Ad association, version/effective time, preview güvenliği, metric grain, scope, retention ve PMax/dynamic/responsive davranışı araştırılır. C2-B tamamlanmadan C2 `Done`, C3 Dashboard `Ready` veya Dataset V2 değişikliği yapılamaz.
+
+Karar belgesi `docs/E10_T5C2A_AD_ANALYSIS_SHOPIFY_COMPONENT_FREEZE.md`, executable contract `contracts/shopify/e10-t5c2a-ad-analysis-ui.json`, guard `tests/e10-t5c2a-ad-analysis-ui-freeze.test.js` içindedir. Bu freeze provider ingest, migration, UI implementasyonu veya Shopify teması değildir.
+
+#### E10-T5-C2-B Creative — provider capability ve data model sonucu
+
+- **Kesin karar:** Creative ilk dilimde provider-specific metadata sidecar'dır; ortak performance leaf değildir. Creative performance kapalıdır; Dataset V2 ve Funnel hierarchy değişmez.
+- **Sidecar grain:** `workspace + platform + account + analytical entity key + provider creative/asset id + association effective time`. Aynı Creative'in birden fazla Ad'de kullanımı ve zaman içindeki değişim ezilmez.
+- **İzinli içerik:** Creative type, display label, server-mediated preview reference, status, effective/observed time ve capability status. Purchase, Sales, Spend, Revenue, PII, provider token veya kalıcı signed media URL yasaktır.
+- **Provider kararı:** Meta AdCreative, TikTok video/image/identity, Pinterest Pin ve Klaviyo template/content yüzeyleri implementation öncesi resmi revalidation adayıdır. Google Standard `ad_group_ad_asset_view`, PMax `asset_group_asset` belgelenmiş adaylardır; aday metric alanı production/parity onayı değildir.
+- **Double-count kapısı:** Parent Ad/Asset Group ile Creative/Asset aynı aggregation setine giremez. Asset-level metric; stable identity, date grain, attribution anlamı, reconciliation, duplicate, currency/time ve scope kanıtı olmadan açılamaz.
+- **Scope/runtime:** Bu karar yeni scope talep etmez veya provider query çalıştırmaz. Preview on-demand ve server-authoritative olur; credential/token browser'a taşınmaz.
+
+Karar belgesi `docs/E10_T5C2B_CREATIVE_CAPABILITY_DATA_MODEL.md`, executable matris `contracts/shopify/e10-t5c2b-creative-capability.json`, guard `tests/e10-t5c2b-creative-capability.test.js` içindedir. C2-A ve C2-B ile E10-T5-C2 `Done`dur.
+
+#### E10-T5-C3 Dashboard — onaylı dönem, compare ve Funnel Overview freeze'i
+
+- **Dönem:** Yalnız `Last 7/14/30/90 Completed Days`; custom range ve bugün yoktur. Shop timezone ve backend dönem authority'sidir.
+- **Compare:** Yalnız On/Off; serbest comparison tarihi yoktur. Hemen önceki eşit uzunluktaki completed dönem backend tarafından otomatik türetilir.
+- **Grafik:** `Sales / Spend / Revenue`; current solid, comparison dashed ve ordinal gün hizalıdır. Revenue backend `Sales - Spend` sonucudur.
+- **KPI:** `Impressions / Clicks / CTR / CPC / ROAS / CPS`; renk metric direction metadata'sına göre anlam taşır, unsupported `—` kalır.
+- **Funnel Overview:** Add to Cart, Checkout, Abandoned ve Purchase stage'lerinin her biri count ve value taşır. Compare açıkken count ve value ayrı ayrı `Current / Comparison / Change` gösterir; Purchase Value etiketi `Sales`dır.
+- **Navigasyon:** Dashboard'daki Funnel/Table switch kaldırılır. `View Funnel`, time range, comparison, filters, currency ve data sources context'ini koruyarak ana Funnel'a gider.
+- **Sınır:** Creative ve attribution overlap Dashboard'a girmez; grafik/KPI/Funnel Overview aynı backend context'ini kullanır; frontend formula veya fake zero yoktur.
+
+Karar belgesi `docs/E10_T5C3_DASHBOARD_SHOPIFY_COMPONENT_FREEZE.md`, executable contract `contracts/shopify/e10-t5c3-dashboard-ui.json`, guard `tests/e10-t5c3-dashboard-ui-freeze.test.js` içindedir. E10-T5-C3 `Done`; sıradaki ürün paketi E10-T5-C4 Platforms'dur.
+
+#### E10-T5-C4 Platforms + C6 Settings — onaylı bağlantı, hesap ve ayar freeze'i
+
+- **İlk kullanım:** Shopify install sonrasında Currency zorunlu ilk adımdır; sonra Platforms açılır.
+- **Aktif provider'lar:** İlk dilimde yalnız Meta, Google Ads ve Klaviyo. TikTok ve Pinterest `Parked` kalır; Organic ve Google Sheets ilk Shopify connect yüzeyinde yoktur. Parked provider için Connect/OAuth/reconnect/refresh/production activation sunulmaz.
+- **Connect:** Shopify-native açıklama modalındaki açık onaydan sonra top-level OAuth başlar. Callback sonrası server-side ownership doğrulamalı hesap seçilir; aktif hesap olmadan `Connected` olunmaz.
+- **Klaviyo farkı:** Hesap seçiminden sonra `Email Monthly Plan Cost` tutarı/para birimi kaydedilerek kurulum tamamlanır. `Estimated Monthly Spend` etiketi kullanılmaz.
+- **Disconnect/Reconnect:** Disconnect ikinci warning onayıyla provider erişimi ve refresh'i durdurur, tarihsel veriyi silmez. Reconnect aynı güvenli Connect zincirini yeniden kurar.
+- **Settings:** Currency, Klaviyo sabit aylık tutarı ve Ad Accounts bölümleri bulunur. İlk aktif dilimde OAuth ile doğrulanmış Meta/Google Ads hesapları arasından aynı anda yalnız bir aktif reklam hesabı seçilir; Funnel yalnız bu hesabı gösterir ve merchant seçimi sonradan değiştirebilir. TikTok parked olduğu sürece seçim listesine girmez.
+- **Shopify standardı:** Genel layout, modal, button, form, single-choice ve status kontrolleri güncel resmi Shopify componentleriyle kurulur. Mevcut dashboard özel CSS/HTML'si yalnız davranış referansıdır; embedded UI olarak taşınmaz. Exact component/API yönü E10-T6-A'da doğrulandı; implementation artifact'i ayrıca yeniden validate edilir.
+- **Sıra sapması:** Kullanıcı C4 ve C6 iş akışlarını birlikte verdiği için iki ürün kararı aynı pakette kapatılmıştır. C5 atlanmaz; C7 C5 sonrasında gelir.
+
+Karar belgesi `docs/E10_T5C4_PLATFORMS_SETTINGS_SHOPIFY_FREEZE.md`, executable contract `contracts/shopify/e10-t5c4-platforms-settings-ui.json`, guard `tests/e10-t5c4-platforms-settings-ui-freeze.test.js` içindedir. Bu freeze UI/runtime implementasyonu, Shopify teması, provider çağrısı veya production işlemi değildir.
+
+#### E10-T5-C5-A Attribution Differences — onaylı nötr fark ve Review freeze'i
+
+- **Adlandırma:** Kullanıcı yüzeyi `Attribution Differences`dır. Platform-level aggregate fark `overlap`, duplicate veya belirli bir Ad hatası sayılmaz.
+- **Tablo:** `Platform / Provider Purchase / Shopify-attributed Purchase / Purchase Difference / Provider Sales / Shopify-attributed Sales / Sales Difference / Data Status / Action`. Difference backend `provider - Shopify-attributed` hesabıdır.
+- **Sunum:** Compare, percent change, ranking ve yeşil/kırmızı performans semantiği yoktur. Sıfır yalnız sayısal eşitliktir; event-level eşleşme kanıtı değildir.
+- **Aksiyon:** Son kolonda yalnız `Review`; modal `Close` ve context-koruyan `View Funnel` sunar. Decrease/fix/deduplicate/apply veya kullanıcıya Ad seçtirerek dağıtım yoktur.
+- **KPI sınırı:** Dataset V2, provider fact, Funnel/Dashboard KPI ve hierarchy değişmez; Shopify/provider aggregate'leri birleştirilmez veya reconciled truth yapılmaz.
+- **C5-B:** Aynı Shopify order, provider click identity, server-resolved leaf Ad, time/currency/attribution, privacy/scope, retention/deletion, idempotency ve rollback kanıtı olmadan `Deferred` kalır. İleride doğrulansa bile provider fact overwrite edilmez; ayrı versionlı/reversible leaf adjustment sidecar gerekir.
+- **Shopify standardı:** Genel page/banner/table/badge/modal/action güncel resmi Shopify componentleri ve App Bridge ile kurulur; exact uygunluk E10-T6-A'da yeniden doğrulanır.
+
+Karar belgesi `docs/E10_T5C5A_ATTRIBUTION_DIFFERENCES_FREEZE.md`, executable contract `contracts/shopify/e10-t5c5a-attribution-differences-ui.json`, guard `tests/e10-t5c5a-attribution-differences-ui-freeze.test.js` içindedir. C5-A `Done`, C5-B `Deferred`; sıradaki ürün paketi **E10-T5-C7 Integrated navigation/acceptance**tır.
+
+#### E10-T5-C7 Integrated navigation/acceptance — onaylı bütünleşik akış
+
+- **İlk kullanım:** Verified Shopify session → Currency → Platforms verified account → conditional Klaviyo Email Monthly Plan Cost → Funnel.
+- **Navigation:** Funnel, Dashboard, Ad Analysis, Attribution Differences, Platforms ve Settings tek resmi Shopify embedded navigation içindedir; Funnel/Table global route değildir.
+- **Context:** Workspace currency ve tek aktif account server-authoritative'dir; desteklenmeyen state sessizce dönüştürülmez.
+- **OAuth dönüşü:** Callback canonical Platforms route'una, server-bound allowlisted return target ile döner; standalone login/dashboard ve caller URL yasaktır.
+- **Acceptance:** Shopify responsive navigation; keyboard/focus/back/deep-link; 320px overflow, duplicate shell, stale/multiple account ve open-redirect negatif kapıları zorunludur.
+
+E10-T5-C output/display ürün sözleşmesi `Done`. Karar belgesi `docs/E10_T5C7_INTEGRATED_NAVIGATION_ACCEPTANCE.md`, executable contract `contracts/shopify/e10-t5c7-integrated-navigation.json`, guard `tests/e10-t5c7-integrated-navigation.test.js` içindedir. C7 ve parent E10-T5-C/T5 `Done`; **E10-T6-A ve E10-T6-B — `Done / PASS`**; sıradaki iş **E10-T6-C embedded provider OAuth smoke**tur. Development kabulü production onayı değildir.
+
+
+### E10-T5-B karar kanıtı — Shopify attribution intake ve gösterim
+
+İlk intake yalnız `platform` boyutunda `platform_purchase_count` ve `platform_sales_value` değerlerini overlap inceleme girdisi olarak kabul eder. Gösterim yalnız Shopify-native attribution comparison/overlap diagnostic alanındadır; Funnel totalı veya Revenue girdisi değildir. Total Purchase/Sales, Refund, currency, timezone, Order/Customer satırı ve PII alınmaz. Güncel resmi API doğrulamasına kadar `read_orders` dahil scope, resource ve field kararı ertelendi; scope listesi boştur. Executable matris `contracts/shopify/e10-t5b-minimum-scope.json`, karar ve gösterim açıklaması `docs/E10_T5B_MINIMUM_SHOPIFY_SCOPE_MATRIX.md`, guard `tests/e10-t5b-minimum-scope-matrix.test.js` içindedir.
+
+### E10-T5-C sıra kapısı — Shopify'a verilecek AdsTable çıktıları
+
+`docs/E10_T5C_COMMERCE_PRESENTATION_CONTRACT.md` tamamlanan C1–C7 ilk dilim freeze'lerini izler. C5-B verified reconciliation ertelenmiştir. E10-T6-A offline readiness PASS olmuştur; açık development onayı olmadan E10-T6-B ve onu izleyen Shopify temaslı işler, ayrıca gerekli plan kapıları olmadan E10-T7–T10, E11 veya E12 implementation'ı açılamaz.
+
+**Durum:** E10-T5-A/B ve E10-T5-C1–C7 ilk dilim kararları `Done`; C5-B `Deferred`; parent T5-C ve E10-T5 `Done`; E10-T6-A ve E10-T6-B `Done / PASS`; sıradaki iş **E10-T6-C Embedded provider OAuth smoke**; parent E10 `In progress`. T6-A scope talebi, storage tasarımı, Dataset V2 yazımı, webhook, initial sync, migration veya production query yapmadı.
+
+### E10-T6-A1/A2 official-source readiness evidence
+
+**A1 (2026-09-09):** Resmi package/repository envanteri PASS iken `shopify.dev` proxy CONNECT erişimi blokeli olduğu için exact UI/navigation/ShopifyQL/scope satırları fail-closed bırakıldı.
+
+**A2 corrective revalidation (2026-09-09):** Ağ erişimi geri geldikten sonra yalnız blokeli satırlar güncel resmi `shopify.dev` Markdown/reference sayfaları ve `@shopify/dev-mcp` 1.15.0 ile yeniden doğrulandı. App Home `v1.0`/Polaris 1, unversioned App Bridge, Admin API `2026-07`, `_top` external navigation, callback/CSP/ID-token contract'ı ve Development Store checklist'i donduruldu. T5 component matrisi Dev MCP validator revision 2'de PASS oldu.
+
+ShopifyQL `sales` schema için `referring_platform`, `orders__last_click` ve `total_sales__last_click` exact adayları doğrulandı. Admin GraphQL `shopifyqlQuery` resmi olarak `read_reports` ve doğrudan tanımlayıcı alanlar dahil Level 2 protected customer data access gerektirir; T6-A hiçbir scope istemedi. Bu ağır platform gereksinimi T6-B development onayı içinde görünür tutulur ve exact canlı uygunluk T6-D read-only smoke'a kadar runtime kanıtı sayılmaz. Order/Customer ingest veya `read_orders` fallback açılmadı.
+
+**Evidence:** `contracts/shopify/e10-t6a-official-readiness.json`, `docs/E10_T6A_OFFICIAL_CAPABILITY_READINESS.md`, `tests/e10-t6a-official-readiness.test.js`.
+
+**Durum:** E10-T6-A — `Done / PASS`; E10-T6-B — `Ready / explicit development approval required`. T6-A Shopify/Development Store/production teması, app/credential/scope oluşturma, API query, migration, deployment veya Shopify CLI kurulumu yapmadı.
+
+## 15. E11 — Funnel API
+
+**Durum:** `Blocked by E10 Shopify Foundation`
+
+### Planlanan işler
+
+- **E11-T1:** Versionlı `/api/funnel/data` request/response contract.
+- **E11-T2:** Shopify embedded session veya açıkça desteklenen bağımsız bearer auth; shop/workspace/user/account ownership ve query identity yasağı.
+- **E11-T3:** Date/platform/account/entity ve pagination guard'ları.
+- **E11-T4:** Aktif provider attribution ile onaylı Shopify-reported platform overlap girdisini ayrı provenance altında query et; Shopify total commerce varsayma. Parked GA4 Organic capability backend'de korunur fakat Shopify Funnel response'unda Paid/Organic/Blend segmenti açılmaz.
+- **E11-T5:** Formula, Compare ve provider-attribution Intent backend output'u; UI'ya Paid etiketi veya Organic çıkarımı taşınmaz.
+- **E11-T6:** Metric support, currency, contract/engine version metadata.
+- **E11-T7:** Freshness, partial ve warnings metadata.
+- **E11-T8:** Contract, security, performance ve observability testleri.
+- **E11-T9:** V4 §2.1 hierarchy contract'ına göre branch-aware root/parent/leaf ve stable `entity_key` response'u.
+
+### Kabul kriterleri
+
+- UI business math yapmadan response ile render edebilir.
+- Shopify Funnel API `Paid`, `Organic` veya `Blend` UI segmenti üretmez; atfedilemeyen commerce `Unattributed` kalır.
+- Cross-user/account sorgu reddedilir.
+- Unsupported/unknown hiçbir noktada gerçek `0`a dönüşmez.
+- Previous denominator `0` için delta `null` olur.
+- Capability-aware stable entity identity döner.
+- API olmayan hierarchy seviyesini üretmez ve parent/leaf fact'lerini aynı analytical grain'de double-count etmez.
+- Query bounds ve performans bütçesi uygulanır.
+
+### Test planı
+
+Auth/IDOR, ownership, scope, compare-zero, mixed support/currency, her capability branch için hierarchy/drilldown ve deterministic key, double-count negatif, bounds/pagination, empty/partial/stale ve load testleri.
+
+### Rollback planı
+
+API version ve read feature flag; V1 endpoint'leri korunur; breaking contract yeni versiyonla çıkar.
+
+### Bağımlılıklar
+
+E2, E3 ve en az bir kabul edilmiş gerçek provider V2 veri seti; contract freeze.
+
+## 16. E12 — Shopify Embedded dashboard modularization ve Funnel UI binding
+
+**Durum:** `Not started`
+
+### Hedef yapı
+
+```text
+public/
+  dashboard.html
+  assets/dashboard/
+    bootstrap.js
+    api-client.js
+    auth-session.js
+    state.js
+    router.js
+    components/
+    features/
+      connections/
+      accounts/
+      legacy-dashboard/
+      funnel/
+```
+
+Framework değişimi bu planın ön koşulu değildir; önce sorumluluk sınırları kurulur.
+
+### Planlanan işler
+
+- **E12-T1:** Kritik dashboard davranışları için browser E2E baseline.
+- **E12-T2:** Minimal dashboard shell/bootstrap ayrımı.
+- **E12-T3:** Merkezi auth-aware API client ve error/timeout/abort davranışı.
+- **E12-T4:** Feature-based state ve component sınırları.
+- **E12-T5:** Funnel API→presentation adapter; business math yok.
+- **E12-T6:** `0`, `null`, unsupported, unknown, loading, empty, partial, stale ve error state'leri.
+- **E12-T7:** Standard/PMax/Klaviyo ve diğer aktif provider capability-aware hierarchy; parked Organic frontend hierarchy/filter olarak render edilmez.
+- **E12-T8:** Compare/Intent/Export backend contract binding.
+- **E12-T9:** `legacy_dashboard|funnel_api_canary|funnel_api_enabled` flags.
+- **E12-T10:** Mock/API golden parity, responsive E2E ve canary telemetry.
+- **E12-T11:** Yeni UI business logic'inin inline `dashboard.html`a eklenmesini engelleyen architecture guard.
+
+### Kabul kriterleri
+
+- Production Funnel inline script içinde değildir.
+- Funnel aggregation/formula/compare/intent frontend'de çalışmaz.
+- UI state'leri ve capability hierarchy doğru render edilir.
+- UI API'de bulunmayan AdGroup/Ad veya Campaign parent seviyesini üretmez; görünen isimden identity türetmez.
+- Merkezi API client auth/error davranışının tek sahibidir.
+- Mock/API golden parity ve kritik E2E geçer.
+- Eski dashboard feature flag ile geri açılabilir.
+- Yeni Funnel işi `dashboard.html` sorumluluk ve satır sayısını büyütmez.
+
+### Test planı
+
+- Presentation adapter unit testleri.
+- Null/zero/support state testleri.
+- Bütün V4 §2.1 branch'leri için hierarchy component ve forbidden synthetic level testleri.
+- Auth expiry, network error, abort, partial/stale testleri.
+- Compare/Intent/Export parity.
+- Legacy/Funnel flag ve responsive browser E2E.
+- Visual regression ve accessibility smoke.
+
+### Rollback planı
+
+- UI flag anında legacy dashboard'a döner.
+- V1 ve mock yolu canary/stabilizasyon boyunca korunur.
+- Yeni asset yüklenemezse güvenli fallback sunulur.
+- Eski inline kod stabilizasyon bitmeden silinmez.
+
+### Bağımlılıklar
+
+- E10 Shopify Embedded shell contract ve E11 Funnel API.
+- Kabul edilmiş provider parity/readiness.
+- UI E2E baseline ve feature flag altyapısı.
+
+### Evidence
+
+- Before/after UI responsibility map.
+- Golden parity ve E2E sonuçları.
+- Canary telemetry.
+- Gerekli perceptible değişiklikler için ekran görüntüleri.
+
+## 17. E13 — Production cutover
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E13-T1:** GO/NO-GO checklist ve sorumlu onayları.
+- **E13-T2:** Provider/account yüzdeli canary ramp.
+- **E13-T3:** Error, lag, partial, rejection ve parity alertleri.
+- **E13-T4:** Backup/restore ve rollback tatbikatı.
+- **E13-T5:** Support/incident runbook ve iletişim planı.
+- **E13-T6:** Full production enable ve stabilizasyon gözlemi.
+
+### Kabul kriterleri
+
+- Hedef provider'lar coverage/parity eşiklerini belirlenen süre korur.
+- API/UI security ve performance SLO'ları sağlanır.
+- Backup/restore hedefi ve rollback uygulanarak doğrulanmıştır.
+- Canary hata bütçesi aşılmamıştır.
+- Product, engineering, security ve operations GO vermiştir.
+
+### Test planı
+
+Canary synthetic checks, smoke/E2E, load, failure injection, flag rollback ve restore rehearsal.
+
+### Rollback planı
+
+UI ve API read flag'leri legacy'ye döner; provider V2 write gerekirse ayrı kapatılır; V1 hattı ve veri korunur; incident evidence saklanır.
+
+### Bağımlılıklar
+
+E4–E12 kapsamındaki hedef provider, readiness, API ve UI kapıları.
+
+## 18. E14 — Legacy retirement ve monolit kapanışı
+
+**Durum:** `Not started`
+
+### Planlanan işler
+
+- **E14-T1:** V1/snapshot consumer envanteri ve sıfırlama.
+- **E14-T2:** Read-disable/observe dönemi.
+- **E14-T3:** Legacy route/function/inline UI dead-code kaldırma.
+- **E14-T4:** `server.js`i composition root seviyesine indirme.
+- **E14-T5:** `dashboard.html`ı minimal presentation shell seviyesine indirme.
+- **E14-T6:** Dataset retention/audit ve ayrı retirement migration kararı.
+- **E14-T7:** Operasyon/runbook/documentation kapanışı.
+
+### Hedef son durum
+
+`server.js` yalnız configuration, dependency composition, app creation, listen ve graceful shutdown taşır. Provider mapping, OAuth business logic, refresh/snapshot orchestration, FX ve Funnel query burada bulunmaz.
+
+`dashboard.html` yalnız shell/root container ve asset bootstrap taşır. API erişimi, business state, aggregation/formula ve provider connection business logic'i inline bulunmaz.
+
+### Kabul kriterleri
+
+- V1 analytics consumer sayısı sıfırdır.
+- Rollback/stabilizasyon dönemi tamamlanmıştır.
+- Legacy read path kapatılıp gözlenmiştir.
+- Kullanılmayan route, function, inline script ve asset kaldırılmıştır.
+- Snapshot'ın evidence/operational rolü ve retention kararı belgelidir.
+- Ayrı retirement migration ve geri dönüş planı onaylıdır.
+- Monolitler yeni sistemin business logic sahibi değildir.
+
+### Test planı
+
+Consumer scan, dead-code/static analysis, full regression, production smoke, restore/rollback doğrulaması ve post-removal observability kontrolü.
+
+### Rollback planı
+
+Read-disable gözleminden önce destructive işlem yoktur. Retirement ayrı migration/release olur; restore noktası ve süreli legacy artifact saklama politikası bulunur.
+
+### Bağımlılıklar
+
+E13 stabilizasyon süresi; V1 consumer sıfır; retention/audit ve rollback onayı.
+
+## 18. Ortak kalite, güvenlik ve evidence kapıları
+
+### 18.1 Her provider için zorunlu zincir
+
+```text
+Provider raw sample
+→ Tek standart Canonical Envelope
+→ Time/FX result
+→ Dataset V2 raw fact
+→ Formula Engine
+→ Funnel API
+→ Funnel rendered value
+→ Metric Support/NULL sonucu
+```
+
+Her halka aynı test periodu ve stable identity ile reconcile edilmelidir.
+
+Her provider satırı ilk canonical halkada aynı yedi bloklu schema validator'dan geçmelidir. Provider'a göre değişen şey envelope değil; identity değerleri, capability-aware entity kombinasyonu, metric support ve provenance'dır.
+
+### 18.2 Minimum CI kapısı
+
+- Unit/core tests.
+- Syntax/lint/format.
+- Architecture boundary guard.
+- Migration static validation.
+- Security regression.
+- DB/repository integration.
+- API contract/security.
+- Kritik browser E2E.
+- `git diff --check` eşdeğeri whitespace kontrolü.
+
+### 18.3 Evidence standardı
+
+Evidence:
+
+- Run ID, commit SHA, environment ve timestamp taşır.
+- Secret, token ve PII içermez.
+- Beklenen/gerçek sonucu ve kabul eşiğini gösterir.
+- Başarısız sonuçlar silinmez; takip issue'suna bağlanır.
+- Canlı veriyi değiştiren test cleanup sonucunu içerir.
+
+### 18.4 GO kriterleri
+
+**Provider ingest GO:** E1 ve E2 tamam; wrong-user/account write reddediliyor.  
+**Funnel API GO:** Gerçek V2 veri, freshness ve null/support semantiği doğrulanmış.  
+**UI canary GO:** Backfill/parity eşiği, golden parity ve rollback flag'i tamam.  
+**Full cutover GO:** Coverage/parity belirlenen süre stabil; telemetry ve restore hazır.  
+**Legacy retirement GO:** Consumer sıfır; retention ve geri dönüş planı onaylı.
+
+## 19. Ortak task kayıt örneği
+
+```markdown
+## E4-T5 — Meta canonical V2 write
+
+### Amaç
+Meta raw sonucunu doğrulanmış user/account kapsamında canonical V2'ye idempotent yazmak.
+
+### Mevcut durum
+Meta legacy snapshot hattı çalışıyor; V2 production write yok.
+
+### Planlanan durum
+Meta adapter output'u canonical validation sonrası repository ile V2'ye yazılır.
+
+### Kapsam
+Validation, ownership, repository upsert, telemetry.
+
+### Kapsam dışı
+UI cutover ve legacy retirement.
+
+### Bağımlılıklar
+E2, E3, E4-T2–T4.
+
+### Uygulama adımları
+1. Ownership context oluştur.
+2. Canonical output doğrula.
+3. Repository upsert çağır.
+4. Result/rejection telemetry üret.
+
+### Kabul kriterleri
+- Same-key retry duplicate üretmez.
+- Wrong user/account reddedilir.
+- Support/null korunur.
+
+### Test planı
+Unit mapping, repository integration, ownership negative, retry testleri.
+
+### Rollback planı
+`meta_v2_write` flag kapatılır; V1 etkilenmez.
+
+### Gözlemlenebilirlik
+Accepted/rejected/upserted counts, latency, adapter version.
+
+### Güvenlik ve veri etkisi
+Service-role yalnız backend'de; token/log redaction zorunlu.
+
+### Planlanan
+Onaylanan başlangıç kapsamı yazılır.
+
+### Gerçekleşen
+Commit, migration ve fiili davranış tamamlanınca yazılır.
+
+### Sapmalar
+Yok veya gerekçeli farklar.
+
+### Evidence
+CI run, integration run ID, parity raporu.
+
+### Durum
+Not started.
+```
+
+## 20. Decision log ve plan değişikliği
+
+Her kapsam/sıra/contract değişikliği şu kayıtla yapılır:
+
+| Alan | İçerik |
+|---|---|
+| Decision ID | `ADR/EXEC-YYYY-NNN` |
+| Tarih | Karar tarihi |
+| Sahip | Karar sahibi |
+| Bağlam | Değişikliği gerektiren bulgu |
+| Karar | Seçilen yaklaşım |
+| Alternatifler | Reddedilen seçenekler |
+| Etkilenen işler | Epic/task/contract listesi |
+| Migration/Rollback etkisi | Geri dönüş ve veri etkisi |
+| Evidence | Kaynak ve test bağlantıları |
+
+## 21. İlk uygulama sırası
+
+1. E0 repository/PR mutabakatını tamamla.
+2. E1 OAuth/session threat model ve characterization ile başla.
+3. E1 güvenlik uygulaması ve regresyonlarını kapat.
+4. E2 canlı Dataset V2 acceptance paketini üret.
+5. E3 composition/config/auth/route sınırlarını kur.
+6. E4 Meta referans vertical slice'ı dual-write/parity ile aç.
+7. E5–E8 provider'larını kontrollü ilerlet.
+8. E9 backfill/readiness'i provider bazında işlet.
+9. E10 Shopify Public Embedded Foundation ve review-first paketini tamamla.
+10. E11 Funnel API'yi Shopify-aware auth ve gerçek V2 veriyle kabul et.
+11. E12 embedded dashboard ve UI canary'yi tamamla.
+12. E13 kontrollü production cutover yap.
+13. E14'te consumer sıfırlandıktan sonra legacy ve monolit kapanışını gerçekleştir.
+
+## 22. Nihai mutabakat
+
+Bu V4 plan ile:
+
+- Final Rapor değiştirilmeden baseline olarak tutulur.
+- V3 Implementation Plan teknik referans olarak tutulur.
+- Phase 1 tamamlanmış core, Phase 2 ise artefaktı tamam/canlı kabulü açık olarak izlenir.
+- Meta, Google, TikTok, Klaviyo ve GA4 Organic aynı yedi bloklu canonical provider envelope'una normalize edilir; bu standart hiçbir adapter epic'inde çatallanamaz.
+- Time→FX→Dataset V2→aggregate→Formula/Compare/Intent→API→UI işlem sırası hiçbir provider için atlanamaz veya yeniden sıralanamaz.
+- Paid/Organic/Blend, aggregate-first formulas, canonical Dataset grain, deterministic Organic account mapping ve backend-only analysis boundary ortak mimari standartlardır.
+- Gate 0/E1 güvenlik ve Gate 1/E2 canlı DB kabulü provider ingest'in önündedir.
+- `server.js` ve `dashboard.html` yorgunluğu bağımsız kabul/test/rollback/bağımlılıkları olan E3, E12 ve E14 işleriyle yönetilir.
+- Big-bang rewrite yapılmaz; monolit büyütülmez ve dokunulan alan güvenli biçimde çıkarılır.
+- Her task planlanan/gerçekleşen/sapma/evidence ayrımını taşır.
+- Production cutover ve legacy retirement ölçülebilir GO kapıları olmadan yapılmaz.
+
+
+### E1-T5 task aynası
+
+- Production configuration pure/testable bir modülde merkezileştirildi ve unsafe review/sandbox flag'leri production başlangıcında reddediliyor.
+- Google/TikTok review fallback kimlikleri runtime/UI kaynaklarından kaldırıldı.
+- TikTok sandbox token yalnız explicit non-production sandbox modunda `X-Sandbox-Access-Token` header'ından kabul ediliyor.
+- `/tiktok-test` route matrisi ve güvenli UI varsayılanları otomatik testlerle korunuyor.
+- Evidence metin/Markdown ve test çıktılarıyla sınırlıdır; E1-T6 sıradaki pakettir.
+- Production incident'ında `TIKTOK_SANDBOX_ACCESS_TOKEN` değişken adı PR #15'in secret-free diagnostic'iyle güvenli biçimde belirlendi; değer kaldırılıp deployment yenilendiğinde site/login düzeldi ve hiçbir secret loglanmadı.
+
+### E1-T6 task aynası — Provider token protection
+
+**Planlanan:** Provider access/refresh token'larını application-level envelope encryption ile korumak; key rotation, backfill, rollback ve plaintext retirement kapılarını tanımlamak.
+
+**Gerçekleşen (E1-T6A foundation):** AES-256-GCM token vault eklendi. Ciphertext; `user_id`, `platform` ve `token_type` AAD bağlamına bağlıdır. Raw token envelope içine yazılmaz. Version ve key ID envelope'da tutulur; önceki key'ler read-only keyring içinde kalabilir ve active key dışındaki envelope'lar rotation adayı olarak işaretlenir.
+
+**Gerçekleşen (E1-T6B — canlı schema/grant acceptance tamamlandı):** İlk `platform_connection_tokens` migration'ı canlıda uygulandı; kolon, primary key, foreign key, envelope constraint, DDL, RLS ve grant acceptance'ı yapıldı. İlk kabulde `service_role` için gerekli CRUD'a ek `REFERENCES`, `TRIGGER` ve `TRUNCATE` yetkileri saptandı. PR #10 ile forward-only corrective migration merge edildi ve canlıda uygulandı. Post-migration kabulünde `service_role` üzerinde yalnız `SELECT`, `INSERT`, `UPDATE`, `DELETE` kaldığı; `anon`, `authenticated` ve `PUBLIC` tablo grantlerinin bulunmadığı; RLS'in enabled ve forced kaldığı doğrulandı. Böylece E1-T6B canlı schema/grant acceptance tamamlandı.
+
+**Gerçekleşen (E1-T6C — Production activation tamamlandı):** Encrypted-only provider runtime kabulü tamamlandı. Final Production değerleri `PROVIDER_TOKEN_ENCRYPTION_ENABLED=true` ve `PROVIDER_TOKEN_LEGACY_READ_ENABLED=false` durumundadır.
+
+**Gerçekleşen (E1-T6D — backfill ve orphan cleanup tamamlandı):** Final kabul 7 connected, 7 encrypted, 0 auth-orphan ve 0 connected-without-encrypted-token sonucunu verdi.
+
+**Gerçekleşen (E1-T6E — plaintext nulling tamamlandı):** Global plaintext access token 0, plaintext refresh token 0 ve herhangi bir plaintext token 0 olarak kabul edildi. Encrypted envelope'lar korunmuştur. Fiziksel plaintext kolon drop işlemi E14 Legacy Retirement kapsamına taşındı.
+
+**Sapma:** İlk backfill'de iki auth-orphan bağlantı görüldü ve guarded cleanup ile kaldırıldı. Production config incident'ı Production scope'undaki `TIKTOK_SANDBOX_ACCESS_TOKEN` nedeniyle oluştu; PR #15 secret-free diagnostic yalnız variable ismini gösterdi ve variable kaldırıldı. Plaintext kolonların fiziksel drop işlemi T6'dan E14 Legacy Retirement kapsamına taşındı.
+
+**Kabul:** Final Production kabulü 7 connected, 7 encrypted, 0 auth-orphan, 0 connected-without-encrypted-token, 0 plaintext access ve 0 plaintext refresh sonucunu verdi. Encryption enabled = `true`, legacy read enabled = `false`; site/login başarılıdır ve legacy read kapalıyken Refresh Completed sonucu alınmıştır. Ciphertext/AAD tamper reddedilir; token veya secret log ve evidence artefaktlarına girmez.
+
+**Rollback:** Güvenli olmayan query-controlled/session-bound OAuth identity yolu geri getirilemez ve active encryption key silinemez. Gerekli eski keyler rotation/rollback süresi boyunca keyring'de korunur; encrypted envelope'lar rollback amacıyla silinmez ve plaintext tokenlar geri yüklenmez. Runtime sorunu olursa yeni bağlantı/refresh kontrollü durdurulur; plaintext identity/token yoluna dönülmez. Fiziksel kolon drop E14 stabilizasyon kapısına kadar uygulanmaz.
+
+**Evidence:** E1-T6B schema/RLS/grant acceptance tamamlandı. Production dry-run 9 eligible; controlled write 7 written / 2 auth-orphan failure verdi ve guarded orphan cleanup sonrasında final 7 connected / 7 encrypted / 0 auth-orphan / 0 missing encrypted kabulü alındı. Plaintext nulling sonrasında global plaintext access ve refresh sayıları 0 oldu. Production encryption `true`, legacy read `false` durumunda encrypted-only Refresh Completed sonucu alındı. PR #15 secret-free diagnostic production config incident'ında yalnız unsafe variable ismini raporladı. E1-T7 dedicated `test:security` komutu ve secretsiz CI kapısı security ve full regression paketlerini başarıyla çalıştırır.
+
+**E1 kapanış evidence:** Production OAuth/session güvenlik kontrolleri, fail-closed production config, encrypted-only token runtime, plaintext retirement ve CI security regression tamamlandı. Site ve login çalışıyor; legacy read kapalıyken Refresh Completed sonucu alındı. E1-T7 security suite deterministik `test:security` komutunda toplandı; CI production secret/environment kullanmadan security ve full regression paketlerini çalıştırır. E1 `Done`.
+
+**Sonraki adım:** Önce DB–Execution Plan drift kontrolü, ardından E2 Dataset V2 canlı acceptance.
+
+**E1-T6D production dry-run acceptance ve write artefaktı (2026-08-19):** `production-token-backfill` GitHub Environment oluşturuldu; 3 variable ve 3 secret provision edildi. `main` üzerindeki `f97f1934a98016f129a1bc79263629c2ec8384fa` commit'i için **Provider token production dry-run** run `32245732566` genel, validation ve production dry-run sonuçları success oldu. Redacted sonuç: 9 scanned, 9 eligible, 0 written, 0 already encrypted, 0 rotation candidate, 0 empty, 0 failed ve `nextCursor=null`; dry-run acceptance tamamlandı. Daha sonraki controlled write 7 kayıt yazdı ve iki auth-orphan kayıtta fail-closed oldu; bu kayıtlar guarded cleanup ile kaldırıldı. Güncel production kabulü 7 connected/encrypted, 0 orphan ve 0 missing encrypted'dır; encrypted runtime refresh kabulü de tamamlanmıştır.
+
+
+### E2-T6 task aynası — rollback-only Dataset V2 RLS acceptance hazırlığı
+
+**Mevcut durum:** E2-T1/T2 `Done`; E2-T3/T4/T5/T6/T7/T8 `Verification`. E2-T6 repository preparation tamamlandı, canlı acceptance yapılmadı.
+
+**Planlanan durum:** Ayrı insan onayından sonra exact read-only preflight, iki izole eligible kullanıcıyla tek intact rollback-only User A/User B/anon/service-role transaction, redacted evidence conversion ve read-only postcheck; review tamamlanana kadar E2-T6 `Verification`.
+
+**Kapsam:** Exact 16-case RLS matrix, symbolic fixture contract, aggregate-only preflight/postcheck, transaction-local role/JWT claim emülasyonu, yalnız `pg_temp` evidence, ayrı nested authenticated mutation denial blokları, tek redacted response ve zorunlu final `ROLLBACK`.
+
+**Kapsam dışı:** Canlı SQL/RLS acceptance, Management API, migration/schema/policy/grant/ledger/data değişikliği, persistent DDL, cleanup, auth/subscription/connection mutation, environment, deployment ve E2-T7.
+
+**Test planı:** Dedicated E2-T6 artifact/converter testi; E2-T3/T4/T5, metadata ve ledger regression'ları; full/security suite; JavaScript syntax, SQL safety, allowlist ve secret/PII kontrolleri. Static testler canlı PostgreSQL acceptance değildir.
+
+**Rollback:** Repository preparation canlı sistemi değiştirmez. Gelecekteki kontrollü operation'ın koşulsuz normal sonu `ROLLBACK`; residue halinde ad hoc cleanup ve automatic retry yasaktır.
+
+**Gerçekleşen:** Repository preparation tamamlandı. Canlı preflight çalıştırılmadı; canlı fixture yazılmadı; User A/User B/anon/service-role canlı matrisi çalıştırılmadı; canlı postcheck çalıştırılmadı; Management API kullanılmadı; data/schema/policy/grant/ledger/deployment değişmedi.
+
+**Durum:** `Verification` — canlı operation, postcheck ve redacted evidence insan review'ı tamamlanmadan E2-T6 `Done` değildir.
+
+
+### E2-T7 task aynası — fixture cleanup ve no-change acceptance hazırlığı
+
+**Amaç:** E2-T3–T6 outer rollback işlemleri sonrasında sıfır aggregate fixture residue ve Dataset V2/V1/snapshot ile ledger/OAuth/token/schema/RLS/policy/grant exact no-change kanıtı üretmek.
+
+**Mevcut durum:** E2-T1–T7 `Done`; yalnız E2-T8 `Verification`. T7 named-baseline 19/19 PASS evidence, PR #89 merge ve açık insan iş kabulüyle kapandı.
+
+**Planlanan durum:** Ayrı insan onaylı baseline, rollback-only operation serisi, final read-only parity check ve redacted evidence review; tamamlanana kadar `Verification`.
+
+**Kapsam:** Exact T3/T4 ve escaped-prefix T5/T6 aggregate residue, V2/V1/snapshot parity, ledger/OAuth/token/schema/index/RLS/policy/grant ve persistent-object kontrolleri.
+
+**Kapsam dışı:** Canlı SQL, otomatik/ad hoc DELETE, fixture recovery, Management API, data/schema/policy/grant/ledger/environment/deployment değişikliği ve E2-T8 restore doğrulaması.
+
+**Bağımlılıklar:** Merge edilmiş E2-T3–T6 SQL/runbook'ları, metadata evidence, ledger baseline, exact approved main/checksum ve her canlı adım için ayrı insan onayı.
+
+**Uygulama adımları:** Exact source doğrula; baseline gates'i çalıştır; sayımları operator-local tut; ayrı onaylı rollback-only seriyi yürüt; üç placeholder'ı lokal doldur; final check ve converter çalıştır; insan review'ı al.
+
+**Kabul kriterleri:** Dört residue ve total sıfır; V2/V1/snapshot exact; tüm security/metadata parity PASS; persistent object sıfır; redacted evidence PASS.
+
+**Test planı:** Dedicated artifact/converter, önceki E2, metadata, ledger, full/security, syntax, SQL safety, diff ve leak taramaları. Static testler canlı kabul değildir.
+
+**Rollback planı:** Repository değişikliği commit revert ile geri alınır. Canlı acceptance'ın tek normal cleanup'ı transaction outer `ROLLBACK`tır; residue halinde STOP, cleanup yoktur.
+
+**Gözlemlenebilirlik:** Yalnız allowlisted check kodları, boolean sonuçlar ve aggregate residue; production count/row/identity committed evidence'a girmez.
+
+**Güvenlik ve veri etkisi:** Preparation-only; credential/PII/raw row yoktur. Canlı data, schema, policy, grant, ledger veya deployment etkisi oluşmadı.
+
+**Planlanan:** İnsan onaylı canlı baseline, rollback-only seri, final no-change evidence ve review.
+
+**Gerçekleşen:** Repository preparation tamamlandı. Canlı baseline, fixture cleanup ve final check çalıştırılmadı. Management API kullanılmadı. Data/schema/policy/grant/ledger/deployment değişmedi.
+
+**Sapmalar:** Yok; canlı execution bilinçli olarak ayrı onaya bırakıldı.
+
+**Evidence:** Fixture inventory, no-change contract, iki read-only SQL, redacted converter, runbook ve static regression testleri.
+
+**Durum:** `Verification` — canlı final evidence ve insan review'ı olmadan `Done` değildir.
+
+### E2-C1 — Captured provider-token security parity corrective kararı
+
+**Planlanan:** E2-T3–T7 acceptance artefaktlarındaki E1 kapanış anından kalan hardcoded 7/7 provider nüfusunu, production sayısı disclosure etmeden operator-local capture ve exact parity ile değiştirmek; missing/orphan/plaintext kontrollerini zero tutmak.
+
+**Gerçekleşen:** Management API bağlantısı HTTP 201 ile doğrulandı. E2-T3 read-only preflight çalıştı. `CONNECTED_CONNECTIONS` ve `ENCRYPTED_TOKEN_ROWS` hardcoded 7 beklentileri başarısız oldu. Diğer preflight güvenlik/schema kapıları geçti. Actual production sayıları evidence'a veya repository'ye alınmadı.
+
+**Sapmalar:** Değişebilir production provider nüfusu nedeniyle fixed population kabulü güvenlik sözleşmesinden çıkarıldı. Bu corrective paket production data correction değildir; transaction, INSERT ve postcheck çalıştırılmadı, production değişmedi.
+
+**Evidence:** Paylaşılabilir response yalnız captured-baseline parity sonuçlarını ve `missing_encrypted_unchanged`, `orphan_encrypted_unchanged`, `plaintext_unchanged` boolean sonuçlarını taşır. Operator-local connected/encrypted baseline source control'a alınmaz.
+
+**Durum:** E2-T1/T2 `Done`; E2-T3–T8 `Verification` olarak korunur.
+
+### E2-C2 — E2-T3 ordered read-back v2 corrective preparation
+
+**Durum:** E2-T3 `Verification`; E2-T4–T8 durumları değişmedi.
+
+**Gerçekleşen (safe/redacted):** Management API transport HTTP 201 ve updated preflight 17/17 PASS oldu. v1 transaction HTTP 201 döndü; insert/contract PASS, read-back/overall FAIL oldu. PostgreSQL same-statement snapshot semantiği nedeniyle v1 read-back tasarımı geçersizdi. v1 postcheck invalid aggregate projection nedeniyle HTTP 400 döndürdü. v1 transaction retry edilmedi. Ayrı insan-onaylı recovery sorgusu HTTP 201 ve 13/13 PASS verdi; fixture residue zero ve production no-change doğrulandı. Actual count/identity paylaşılmadı.
+
+**Corrective hazırlık:** `e2_t3_static_v2` yeni namespace'i ve `E2_T3_TRANSACTION_V2` operation code'u kullanılır. Tek intact transaction payload'ı ordered top-level temp baseline, INSERT ve ayrı target-table read-back statement'ları ile zorunlu final `ROLLBACK` taşır. Postcheck scalar actual/expected sorgularına çevrildi. v2 eski operation'ın retry'ı değildir; yeni preflight ve ayrı insan onayı zorunludur. Bu corrective task canlı SQL çalıştırmaz; static testler live PostgreSQL acceptance yerine geçmez.
+
+### E2-T4 corrective V2 kaydı — integer evidence ve scalar postcheck
+
+**Durum:** E2-T3 `Done`; E2-T4 `Verification`; E2-T5–T8 durumları değişmedi.
+
+**Canlı v1 bulguları:** v1 preflight HTTP 201 ve 16/16 PASS. v1 transaction HTTP 201; initial write, same-key upsert, final fixture row, updated contract ve duplicate-group PASS; duplicate-excess evidence contract FAIL. Final statement `ROLLBACK`; transaction retry: no. v1 postcheck HTTP 400 ve retry edilmedi.
+
+**Recovery:** read-only recovery HTTP 201 ve recovery 11/11 PASS; fixture residue zero, Dataset V2 zero ve production no-change. Actual production counts and identities were not shared.
+
+**Corrective kapsam:** v2 corrective preparation; `E2_T4_TRANSACTION_V2`, `e2_t4_same_key_v2` ve `e2-t4-upsert-v2`; duplicate excess explicit bigint ve postcheck tamamen scalar actual/expected bigint sözleşmesi. Bu repository taskında canlı SQL veya Management API çalıştırılmadı. E2-T4 `Verification` kalır.
+
+### E2-C3 — E2-T6 fail-closed recovery kaydı
+
+**Durum:** E2-T6 `Verification`; canlı PASS iddiası yoktur.
+
+**Gerçekleşen:** İnsan onaylı E2-T6 v1 transaction bir kez gönderildi; CLI fail-closed durdu. Capsule `CONSUMED`, transaction intent ve postcheck intent kayıtlıdır; ikisi de retry edilmedi. Ayrı insan onaylı distinct read-only recovery sorgusu 19/19 PASS verdi. E2-T6 residue, total E2 residue ve persistent evidence object sıfır; Dataset V2/V1/snapshot, OAuth/token/ledger ve RLS/policy/grant korunan baseline kapıları değişmedi. Production count ve identity paylaşılmadı.
+
+**Sapma:** v1 CLI güvenli kategorik terminal sonucu kalıcılaştırmadığı için transaction evidence failure ile original mandatory postcheck failure birbirinden sonradan ayrıştırılamadı. Recovery production no-change kanıtıdır; 16-case RLS acceptance PASS yerine geçmez. v1 transaction tekrar edilemez. Yeni canlı deneme ancak ayrı namespace/version, düzeltilmiş terminal observability, yeni preflight ve ayrı production onayıyla yapılabilir.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/recovery-v1.json`.
+
+### E2-C4 — E2-T6 corrective v2 terminal observability hazırlığı
+
+**Durum:** Repository preparation; E2-T6 `Verification`, canlı işlem yapılmadı.
+
+**Corrective kapsam:** `e2_t6_rls_v2` ayrı namespace/version; checksum-bound 21-gate preflight, intact rollback-only 16-case transaction ve 19-gate postcheck. V2, transaction evidence ve postcheck sonuçlarını `PASS`, `TRANSACTION_EVIDENCE_FAILED_POSTCHECK_PASS`, `POSTCHECK_FAILED` veya `TRANSACTION_AND_POSTCHECK_FAILED` kapalı safe-code sözleşmesiyle ayrı outcome sidecar'ında kalıcılaştırır. Sidecar repository dışındadır, `0600` modundadır ve raw hata/identity/count içermez. v1 capsule veya namespace tekrar kullanılamaz.
+
+**Canlı sınır:** V2 preparation SQL, Management API veya production işlemi çalıştırmaz. Yeni preflight ve transaction ayrı production onaylarına tabidir.
+
+### E2-C5 — E2-T6 v2 fail-closed recovery kaydı
+
+**Durum:** E2-T6 `Verification`; canlı PASS iddiası yoktur.
+
+**Gerçekleşen:** İnsan onaylı v2 transaction ve mandatory postcheck birer kez gönderildi; terminal outcome `TRANSACTION_AND_POSTCHECK_FAILED` olarak güvenli sidecar'a yazıldı. İkisi de retry edilmedi. Ayrı insan onaylı distinct read-only recovery 19/19 PASS verdi; v2/total residue ve persistent evidence object sıfır, korunan baseline ve RLS/policy/grant kapıları değişmedi.
+
+**Karar:** Recovery production no-change kanıtıdır ve 16-case acceptance PASS yerine geçmez. E2-T7 inventory ve read-only selector'ları v1/v2 T6 namespace'lerini ayrı izler. Yeni canlı deneme hazırlanmayacaktır; transaction SQL root cause repository/static ve disposable ortamda çözülmeden production E2-T6 tekrarına izin verilmez.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/recovery-v2.json`.
+
+### E2-C6 — E2-T6 repository/static root-cause audit
+
+**Durum:** `Verification`; production retry hazırlığı veya canlı PASS iddiası değildir.
+
+**Gerçekleşen:** V2 transaction içindeki iki fixture'ın `entity_key` değerlerinin frozen canonical hierarchy üzerinden üretilmesi gereken anahtarlarla eşleşmediği repository/static olarak doğrulandı. Bu bulgu iki fixture'ı da etkiler ve transaction tasarımında kesin bir contract ihlalidir. Güvenli terminal sidecar ham database/transport hatası taşımadığından tüketilmiş transaction ile postcheck'in terminal hata nedeni geriye dönük olarak kesinleştirilemez; recovery yalnız production no-change durumunu kanıtlar.
+
+**Karar:** Production retry yasağı korunur. Yeni bir namespace/operation hazırlanmasından önce canonical anahtarlı düzeltme ve disposable PostgreSQL ortamında transaction/postcheck reproduksiyonu zorunludur. Bu taskta SQL, Management API, production data, schema, policy, grant, ledger, environment veya deployment değişikliği yapılmadı.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/static-root-cause-v1.json` ve `tests/e2-t6-static-root-cause.test.js`.
+
+### E2-C7 — E2-T6 disposable PostgreSQL root-cause reproduction
+
+**Durum:** Repository/disposable reproduction `Done`; E2-T6 production acceptance hâlâ `Verification`.
+
+**Gerçekleşen:** PostgreSQL 16 disposable şeması historical V2 transaction'ı gerçek parser, role switching, RLS ve nested exception davranışıyla yeniden çalıştırdı. V2 final payload SQL'inde `jsonb_build_object` kapanış parantezinin ve case aggregate'in `pg_temp.e2_t6_rls_evidence` source ifadesinin eksik olduğu doğrulandı. C6'daki canonical `entity_key` ihlali de yeni V3 disposable fixture'larında düzeltildi. Corrected V3 disposable transaction 16/16 case PASS, zero unexpected allow, overall PASS ve final outer `ROLLBACK` verdi.
+
+**Reproduction kapısı:** Redacted runner PostgreSQL 16 ile yerel/disposable ortamda çalıştırıldı; executable schema ve runner repository'de tutulur. Disposable şema yalnız sembolik iki kullanıcı ve boş korunan tablolar içerir; production credential, identity, count veya bağlantı kullanmaz.
+
+**Karar:** Repository/static ve disposable root-cause şartı tamamlandı. Bu sonuç production acceptance değildir. Yeni production preflight/transaction operatörü hazırlanması ve çalıştırılması ayrı task, yeni namespace, review ve açık insan production onayına tabidir.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/disposable-reproduction-v1.json`, `tests/fixtures/e2-t6-disposable-schema.sql` ve `scripts/e2-t6-disposable-reproduction.js`.
+
+### E2-C8 — E2-T6 V3 production operator preparation
+
+**Durum:** Repository preparation; E2-T6 production acceptance `Verification`, canlı işlem yapılmadı.
+
+**Kapsam:** Disposable ortamda doğrulanan canonical V3 transaction; yeni `e2_t6_rls_v3` namespace'i; checksum-bound 21-gate preflight; 16-case rollback-only transaction; 19-gate postcheck; tek kullanımlık `0600` state/outcome sidecar; exact confirmation ve fail-closed terminal outcome sözleşmesi.
+
+**Gerçekleşen:** V3 preflight/transaction/postcheck, fixture contract, evidence converter, operator/CLI ve regression testleri repository'de hazırlandı. Approved-main binding PR #44 merge commit'ine sabitlendi. Bu taskta Management API, production SQL, credential, data, schema, policy, grant, ledger, environment veya deployment değişikliği yapılmadı.
+
+**Canlı sınır:** Preflight dahil hiçbir production isteği review ve açık insan production onayı olmadan çalıştırılamaz. Repository testleri ve disposable PASS production acceptance yerine geçmez.
+
+### E2-C9 — E2-T6 V3 preflight fail-closed diagnostic revizyonu
+
+**Durum:** Repository revision; production preflight retry edilmedi, E2-T6 `Verification`.
+
+**Bulgu:** İnsan onaylı V3 read-only production preflight tek istek sonrasında genel `STOPPED_FAIL_CLOSED` ile durdu. Approval-ready state ve outcome sidecar oluşmadı; transaction/postcheck gönderilmedi ve production mutation olmadı. Genel kod query/transport-response aşaması ile 21-gate validation aşamasını ayırmadığı için kör retry yasaklandı.
+
+**Düzeltme:** V3 preflight, raw hata/count/identity taşımayan kapalı safe-code sözleşmesiyle `PREFLIGHT_QUERY_FAILED` ve `PREFLIGHT_GATES_FAILED` aşamalarını ayırır. Her iki hata state/outcome oluşturmadan durur. Bu repository taskında Management API veya production isteği çalıştırılmadı.
+
+**Merge sonrası yürütme sırası:** PR #46 `main` üzerine merge edilmiştir. Bu merge E2-T6 kabulünü tamamlamaz; yalnız bir sonraki read-only production preflight'in hata aşamasını güvenli biçimde ayırt edebilecek operator revizyonunu hazırlar. E2 ana iş hattındaki sıradaki karar kapısı, yeni V3 diagnostic production preflight için açık insan production onayıdır. Onay verilmeden preflight gönderilmez; preflight PASS olmadan transaction/postcheck aşamasına geçilmez; transaction/postcheck PASS ve evidence review olmadan E2-T6 `Done` olmaz; E2-T6 tamamlanmadan E2-T7 final no-change kabulü kapatılamaz.
+
+**Paralel iş ayrımı:** E3-T1 repository characterization hazırlığı E0+E1'e bağlı bağımsız bir koruma işidir. E2-T6 veya E2-T7'nin yerine geçmez, bu iki taskın durumunu değiştirmez ve E2 ana iş hattında yeni bir aşama tamamlandığı anlamına gelmez.
+
+### E3-T1 task aynası — kritik V1 route characterization baseline
+
+**Amaç:** E3 extraction başlamadan önce kritik public, config, auth ve fail-closed HTTP davranışlarını executable baseline ile sabitlemek.
+
+**Mevcut durum:** Kök `server.js` app creation, dependency construction, route registration, provider/job orchestration, listener ve export sorumluluklarını birlikte taşır; seçili V1 HTTP sözleşmeleri için dedicated characterization testi yoktu.
+
+**Planlanan durum:** Ephemeral loopback listener üzerinden production/provider/Supabase çağrısı yapmadan kritik status, content-type ve response shape sözleşmelerini koruyan test ve responsibility map.
+
+**Kapsam:** Landing/login, public config, unauthenticated account status, disabled TikTok test yüzeyi, unknown API 404 ve mevcut sorumluluk envanteri.
+
+**Kapsam dışı:** Route extraction, composition root, canlı HTTP/provider/DB isteği, environment/deployment, business logic, response contract değişikliği ve production mutation.
+
+**Bağımlılıklar:** E0 mimari sınırları, tamamlanmış E1 güvenlik baseline'ı ve mevcut V1 entrypoint.
+
+**Uygulama adımları:** Kritik yüzeyler seçildi; exported Express app `VERCEL=1` altında ephemeral loopback porta bağlandı; public/auth/fail-closed assertions ve extraction guard dokümante edildi; test full/security CI kapsamına alındı.
+
+**Kabul kriterleri:** Seçili route status/body/content-type sözleşmeleri deterministik PASS; harici servis çağrısı yok; listener test sonunda kapanır; full ve security regression PASS.
+
+**Test planı:** Dedicated E3-T1 testi, full suite, security suite, JavaScript syntax ve diff kontrolü.
+
+**Rollback planı:** Test/doküman/package script commit'i revert edilir; runtime ve production state değişmediği için data rollback yoktur.
+
+**Gözlemlenebilirlik:** Yalnız route adı, HTTP status ve public response shape; credential, gerçek user/account identity veya provider payload yok.
+
+**Güvenlik ve veri etkisi:** Read-only local characterization; production, database, OAuth/token, schema, policy, grant ve deployment etkisi yok.
+
+**Planlanan:** E3-T1 characterization baseline ve responsibility map.
+
+**Gerçekleşen:** Repository artefaktları ve CI entegrasyonu PR #47 ile review edilmiş, bütün kontrolleri geçmiş ve `main` üzerine merge edilmiştir.
+
+**Sapmalar:** E2-T6 production acceptance açık insan onayı gerektirdiği için üretim işlemi yapılmadı. E3-T1 yalnız bağımsız/paralel repository hazırlığı olarak yürütüldü; E2 ana iş hattının sıradaki adımı veya E2 kabulünün ikamesi değildir.
+
+**Evidence:** `tests/e3-t1-critical-route-characterization.test.js`, `docs/architecture/e3-t1-characterization-baseline.md`, full/security test çıktıları ve PR CI.
+
+**Durum:** `Done` — PR #47 merge commit `8728f5934005b01c0605ed7f60253127a3e4d3c2`; characterization, full/security CI ve review kapıları tamamlandı.
+
+### E3-T2 task aynası — composition root
+
+**Amaç:** Express application oluşturma ve process listener başlatma sorumluluklarını kök monolitten test edilebilir bir composition sınırına taşımak.
+
+**Mevcut durum:** E3-T1 `Done`. Kök `server.js` Express instance, base middleware/static yüzey ve `listen()` lifecycle'ını doğrudan kuruyordu.
+
+**Planlanan durum:** `src/app.js` port dinlemeden application oluşturur; listener yalnız explicit `startApplication` sınırıyla açılır; kök entrypoint mevcut route registration davranışını koruyarak bu sınıra delegation yapar.
+
+**Kapsam:** Express app creation, trust proxy, JSON middleware, disabled TikTok static guard, public static middleware, listener başlangıcı, dependency validation ve lifecycle testleri.
+
+**Kapsam dışı:** Route extraction, shared Supabase/provider client extraction, OAuth/job business logic taşıma, response contract, environment, deployment, database ve production işlemleri.
+
+**Bağımlılıklar:** E3-T1 characterization baseline ve E1 production configuration guard.
+
+**Uygulama adımları:** Application/listener factory eklendi; kök server delegation'a geçirildi; app-without-listener, explicit listener ve missing dependency negatif testleri security/full regression kapsamına alındı.
+
+**Kabul kriterleri:** App port açmadan oluşturulabilir; yalnız explicit start listener açar; mevcut base middleware sırası ve kritik V1 characterization değişmez; invalid composition input fail-closed olur; full/security CI PASS.
+
+**Test planı:** Dedicated E3-T2 lifecycle testi, E3-T1 characterization, full suite, security suite, JavaScript syntax ve diff kontrolü.
+
+**Rollback planı:** `src/app.js` delegation commit'i revert edilerek önceki kök app/listener kurulumu geri alınır; data veya schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Listener başlangıç mesajı ve test lifecycle sonucu; request body, credential, identity veya provider payload loglanmaz.
+
+**Güvenlik ve veri etkisi:** Repository/runtime composition refactor; production request, data/schema/policy/grant/token veya deployment değişikliği yoktur.
+
+**Planlanan:** E3-T2 composition-root sınırı ve executable lifecycle evidence.
+
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu PR #49 ile review edilmiş, bütün kontrolleri geçmiş ve `main` üzerine merge edilmiştir.
+
+**Sapmalar:** Shared Supabase/provider client construction E3-T4 kapsamı olarak yerinde bırakıldı; E3-T2 route/business logic taşımadı.
+
+**Evidence:** `src/app.js`, `tests/e3-t2-composition-root.test.js`, E3-T1/full/security test çıktıları ve PR CI.
+
+**Durum:** `Done` — PR #49 merge commit `ea4f6f8233dfb6aabe7d082881c15d7c74cf19d9`; composition-root, characterization, full/security CI ve review kapıları tamamlandı.
+
+### E3-T3 task aynası — runtime config boundary
+
+**Amaç:** App boot için gereken environment/configuration değerlerini tek, immutable ve fail-closed runtime sınırında toplamak.
+
+**Mevcut durum:** E3-T1/T2 `Done`. Port, public path ve production security flags kök `server.js` içinde ayrı ayrı kuruluyordu; production güvenlik doğrulaması zaten `security/production-config.js` içinde korunuyordu.
+
+**Planlanan durum:** `src/config/runtime-config.js` port, public directory ve mevcut production security contract'ını tek typed/immutable nesne olarak üretir; kök entrypoint yalnız bu nesneyi tüketir.
+
+**Kapsam:** PORT default/normalization/range validation, absolute root/public path, production config delegation, immutable runtime object ve root composition delegation.
+
+**Kapsam dışı:** Provider credential okumalarının tamamını taşıma, shared client creation, feature flag redesign, route/OAuth/job extraction, environment/deployment veya production değişikliği.
+
+**Bağımlılıklar:** E3-T2 composition root ve E1 fail-closed production config contract'ı.
+
+**Uygulama adımları:** Runtime config loader ve port parser eklendi; server boot yeni immutable config'e geçirildi; default/valid/invalid/unsafe-production testleri full/security suite'e bağlandı.
+
+**Kabul kriterleri:** Runtime config immutable; default port deterministik; malformed/out-of-range port ve invalid dependency fail-closed; absolute public path deterministik; E1 unsafe-production rejection korunur; E3-T1/T2 ve full/security CI PASS.
+
+**Test planı:** Dedicated E3-T3 config testi, production-config regression, E3-T1/T2 testleri, full/security suite, syntax ve diff kontrolü.
+
+**Rollback planı:** Runtime config delegation commit'i revert edilerek E3-T2 sonrası server boot kurulumu geri alınır; data/schema rollback yoktur.
+
+**Gözlemlenebilirlik:** Yalnız güvenli config error code/variable name ve test sonucu; environment value, credential veya identity loglanmaz.
+
+**Güvenlik ve veri etkisi:** Fail-closed startup doğrulamasını merkezileştirir; production request, database/provider, data/schema/policy/grant/token veya deployment etkisi yoktur.
+
+**Planlanan:** E3-T3 immutable runtime config ve executable validation evidence.
+
+**Gerçekleşen:** Repository implementasyonu ve test entegrasyonu PR #50 ile review edilmiş, bütün kontrolleri geçmiş ve `main` üzerine merge edilmiştir.
+
+**Sapmalar:** Provider-specific URL/version/account değerleri bu küçük extraction'da taşınmadı; shared/provider config kapsamı sonraki kontrollü tasklarda ele alınacaktır.
+
+**Evidence:** `src/config/runtime-config.js`, `tests/e3-t3-runtime-config.test.js`, production-config/E3/full/security test çıktıları ve PR CI.
+
+**Durum:** `Done` — PR #50 merge commit `38a70cab16d3d5bddbb9a9b0f368e1d0bda44e10`; runtime config, characterization, full/security CI ve review kapıları tamamlandı.
+
+### E3-T4 task aynası — shared clients
+
+**Amaç:** Supabase admin, OAuth transaction store ve provider-token vault/store creation'ını kök monolitten tek test edilebilir dependency graph sınırına taşımak.
+
+**Mevcut durum:** E3-T1/T2/T3 `Done`. Shared server-side client ve store nesneleri kök `server.js` içinde doğrudan ve birbirine bağlı ifadelerle kuruluyordu.
+
+**Planlanan durum:** `src/clients/shared-clients.js` bütün shared client/store nesnelerini explicit factory dependency'leriyle bir kez üretir; kök entrypoint yalnız immutable graph sonucunu tüketir.
+
+**Kapsam:** Supabase service-role client options, OAuth transaction store, provider-token vault/store composition, optional dependency davranışı, factory validation ve immutable graph.
+
+**Kapsam dışı:** Provider API client extraction, credential veya feature-flag redesign, route/OAuth/job business logic taşıma, schema/data/policy/grant ve production işlemi.
+
+**Bağımlılıklar:** E3-T3 runtime config boundary ve E1 OAuth/provider-token güvenlik contract'ları.
 
 **Uygulama adımları:** Shared client factory eklendi; kök doğrudan constructor import/çağrıları kaldırıldı; enabled/disabled, wiring ve invalid dependency testleri full/security suite'e bağlandı.
 
@@ -1955,4 +3727,3 @@ Account identity/timezone/provider date doğrulaması, ortak FX normalization, t
 > **2026-09-07 — Pinterest Paket 1 ID-only discovery corrective:** `time_zone` düzeltmesi sonrasında canlı picker yine boş kaldı. Resmi Pinterest V5 OpenAPI yeniden incelendi: list endpoint'indeki `AdAccount` şemasında yalnız `id` zorunlu; `name`, `currency`, `time_zone` opsiyoneldir. Dolayısıyla list row'unun tam profil olduğu varsayımı kaldırıldı. Runtime accessible ID listesini alıp her ID'yi resmi `/ad_accounts/{id}` ile, mevcut üç hesap sınırı içinde zenginleştirir; eksik alan uydurmadan fail-closed kalır. Canlı account-selection kanıtına kadar Paket 1 `Verification` durumundadır.
 
 > **2026-09-07 — Pinterest ürün kararı / PARKED:** Kullanıcı Pinterest entegrasyonundan vazgeçti. Paket 1 `Stopped/Parked`; Paket 2–3 `Not started/Parked` durumuna alındı. Yeni OAuth start/callback, provider token değişimi ve account discovery kapatıldı; dashboard `Parked` gösterir. Mevcut encrypted connection/token, ownership ve tarihsel snapshot kayıtları destructive olarak silinmez. Yeniden başlatma yalnız yeni açık kullanıcı iş kararıyla mümkündür.
-

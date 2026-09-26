@@ -46,6 +46,7 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
   const managers = [];
   let queriedRootCount = 0;
   let failedRootCount = 0;
+  let lastFailure = null;
   for (const resourceName of resourceNames) {
     const loginCustomerId = customerId(resourceName);
     // The root is directly accessible by definition. Query it without a
@@ -57,6 +58,7 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
       queriedRootCount += 1;
     } catch (error) {
       if (String(error?.code || error?.message || '') === 'PROVIDER_REAUTHORIZE') throw error;
+      lastFailure = error;
       failedRootCount += 1;
       continue;
     }
@@ -67,7 +69,18 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
       else if (!accounts.has(client.customerId)) accounts.set(client.customerId, client);
     }
   }
-  if (resourceNames.length && queriedRootCount === 0) throw new Error('Google Ads customer hierarchy discovery failed');
+  if (resourceNames.length && queriedRootCount === 0) {
+    const error = new Error('Google Ads customer hierarchy discovery failed');
+    if (lastFailure?.code === 'PROVIDER_ACCOUNTS_UNAVAILABLE') {
+      error.code = 'PROVIDER_ACCOUNTS_UNAVAILABLE';
+      error.status = 503;
+      error.providerStage = lastFailure.providerStage || null;
+      error.upstreamStatus = lastFailure.upstreamStatus ?? null;
+      error.upstreamCode = lastFailure.upstreamCode || null;
+      error.upstreamRequestId = lastFailure.upstreamRequestId || null;
+    }
+    throw error;
+  }
   return Object.freeze({
     customers: Object.freeze([...accounts.values()]),
     managers: Object.freeze(managers),

@@ -5,6 +5,15 @@ const { discoverGoogleCustomers } = require('../providers/google/customer-discov
 const PROVIDERS = Object.freeze(['meta', 'google_ads']);
 
 function failure(code, status = 503) { return Object.assign(new Error(code), {code, status}); }
+function googleFailure(stage, response, payload) {
+  const error = failure('PROVIDER_ACCOUNTS_UNAVAILABLE');
+  error.providerStage = stage;
+  error.upstreamStatus = Number.isInteger(response?.status) ? response.status : null;
+  error.upstreamCode = typeof payload?.error?.status === 'string' ? payload.error.status.slice(0, 64) : null;
+  const requestId = response?.headers?.get?.('request-id') || payload?.requestId || payload?.request_id;
+  error.upstreamRequestId = typeof requestId === 'string' ? requestId.slice(0, 128) : null;
+  return error;
+}
 const ACCOUNT_LIMIT = 3;
 function validAccount(item) {
   if (!item || typeof item.id !== 'string' || !item.id || typeof item.name !== 'string' || !item.name || !/^[A-Z]{3}$/.test(item.currency || '')) {
@@ -39,18 +48,18 @@ function createGoogleAdsAccountDiscovery({fetchImpl = fetch, developerToken, api
     const accessible = await fetchImpl(`https://googleads.googleapis.com/${apiVersion}/customers:listAccessibleCustomers`, {
       headers: headers(accessToken), signal: AbortSignal.timeout(15000), redirect: 'error',
     });
+    const body = await accessible.json().catch(() => null);
     if (accessible.status === 401 || accessible.status === 403) throw failure('PROVIDER_REAUTHORIZE', 409);
-    if (!accessible.ok) throw failure('PROVIDER_ACCOUNTS_UNAVAILABLE');
-    const body = await accessible.json();
+    if (!accessible.ok) throw googleFailure('list_accessible_customers', accessible, body);
     const resourceNames = Array.isArray(body?.resourceNames) ? body.resourceNames : [];
     const discovered = await discoverGoogleCustomers({resourceNames, search: async ({customerId, query}) => {
       const response = await fetchImpl(`https://googleads.googleapis.com/${apiVersion}/customers/${customerId}/googleAds:searchStream`, {
         method: 'POST', headers: headers(accessToken), body: JSON.stringify({query}), signal: AbortSignal.timeout(15000), redirect: 'error',
       });
+      const payload = await response.json().catch(() => null);
       if (response.status === 401 || response.status === 403) throw failure('PROVIDER_REAUTHORIZE', 409);
-      if (!response.ok) throw new Error('GOOGLE_CUSTOMER_DISCOVERY_FAILED');
-      const chunks = await response.json();
-      return {results: (Array.isArray(chunks) ? chunks : []).flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : [])};
+      if (!response.ok) throw googleFailure('customer_client_search', response, payload);
+      return {results: (Array.isArray(payload) ? payload : []).flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : [])};
     }});
     return discovered.customers.map(item => validGoogleAccount({
       id: item.customerId,

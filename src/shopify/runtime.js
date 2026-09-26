@@ -71,9 +71,10 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
   const runtimeReady = providerRuntimeReady({env, oauthTransactionStore, embeddedProviderOAuthAdapters});
   const oauthProviders = embeddedProviderOAuthAdapters ? Object.keys(embeddedProviderOAuthAdapters) : configuredOAuthProviders(env);
   const providerOAuthEnabled = providerOAuthRequested && runtimeReady && oauthProviders.length > 0;
+  const googleDeveloperToken = String(env.GOOGLE_ADS_DEVELOPER_TOKEN || env.GOOGLE_DEVELOPER_TOKEN || "").trim();
   const providerAvailability = Object.freeze({
     meta: providerOAuthEnabled && oauthProviders.includes("meta"),
-    google_ads: providerOAuthEnabled && oauthProviders.includes("google_ads") && Boolean(String(env.GOOGLE_ADS_DEVELOPER_TOKEN || "").trim()),
+    google_ads: providerOAuthEnabled && oauthProviders.includes("google_ads") && Boolean(googleDeveloperToken),
     klaviyo: providerOAuthEnabled && oauthProviders.includes("klaviyo"),
   });
   const authenticateEmbedded = ({session_token}) => authenticateEmbeddedRequest({session_token, config: authConfig, tenant_resolver: tenantResolver});
@@ -185,7 +186,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           meta: adapters.meta ? createMetaAccountDiscovery({fetchImpl, graphVersion: env.META_GRAPH_VERSION || "v20.0"}) : unavailableAccountDiscovery,
           google_ads: adapters.google_ads && providerAvailability.google_ads ? createGoogleAdsAccountDiscovery({
             fetchImpl,
-            developerToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
+            developerToken: googleDeveloperToken,
             apiVersion: env.GOOGLE_ADS_API_VERSION || "v25",
           }) : unavailableAccountDiscovery,
         },

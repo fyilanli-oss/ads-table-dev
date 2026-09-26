@@ -54,6 +54,22 @@ test('Google Ads discovery uses accessible customers and verified customer_clien
   assert.equal(calls[1].options.method, 'POST');
 });
 
+test('Google Ads discovery preserves only safe upstream diagnostics', async () => {
+  const discover = createGoogleAdsAccountDiscovery({developerToken: 'developer', apiVersion: 'v25', fetchImpl: async url => {
+    if (url.endsWith('customers:listAccessibleCustomers')) return response(200, {resourceNames: ['customers/123']});
+    return response(500, {error: {status: 'INTERNAL', message: 'raw provider detail must stay server-side'}, requestId: 'safe-request-id'});
+  }});
+  await assert.rejects(
+    discover('access'),
+    error => error.code === 'PROVIDER_ACCOUNTS_UNAVAILABLE' &&
+      error.providerStage === 'customer_client_search' &&
+      error.upstreamStatus === 500 &&
+      error.upstreamCode === 'INTERNAL' &&
+      error.upstreamRequestId === 'safe-request-id' &&
+      !JSON.stringify(error).includes('raw provider detail')
+  );
+});
+
 test('selection re-fetches provider accounts and ignores caller name/currency/tenant claims', async () => {
   const writes = [];
   const store = {

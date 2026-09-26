@@ -56,6 +56,20 @@ test('all inaccessible roots fail with a redacted discovery error', async () => 
   await assert.rejects(discoverGoogleCustomers({ resourceNames: ['customers/100'], search: async () => { throw new Error('raw provider body'); } }), error => error.message === 'Google Ads customer hierarchy discovery failed' && !error.message.includes('raw provider body'));
 });
 
+test('all inaccessible roots retain allowlisted diagnostics without raw provider content', async () => {
+  const failure = Object.assign(new Error('raw provider body'), {
+    code: 'PROVIDER_ACCOUNTS_UNAVAILABLE', status: 503, providerStage: 'customer_client_search',
+    upstreamStatus: 403, upstreamCode: 'PERMISSION_DENIED', upstreamRequestId: 'request-id',
+  });
+  await assert.rejects(
+    discoverGoogleCustomers({resourceNames: ['customers/100'], search: async () => { throw failure; }}),
+    error => error.message === 'Google Ads customer hierarchy discovery failed' &&
+      error.code === 'PROVIDER_ACCOUNTS_UNAVAILABLE' && error.providerStage === 'customer_client_search' &&
+      error.upstreamStatus === 403 && error.upstreamCode === 'PERMISSION_DENIED' &&
+      error.upstreamRequestId === 'request-id' && !error.message.includes('raw provider body')
+  );
+});
+
 test('account-selection discovery failure consumes reconnect URL before Close reloads', () => {
   for (const file of ['dashboard.html', 'dashboard-patch17H-fixed.html', 'dashboard-patch17H-fixed-v2.html']) {
     const source = fs.readFileSync(path.join(__dirname, '..', 'public', file), 'utf8');
@@ -68,3 +82,4 @@ test('OAuth token without completed account selection is not shown as connected'
   assert.match(source, /selectionRequired=r\?\.metadata\?\.accountSelectionRequired===true/);
   assert.match(source, /refresh_token\)&&!selectionRequired/);
 });
+

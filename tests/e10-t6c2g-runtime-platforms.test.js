@@ -137,6 +137,12 @@ test("Google Ads account-discovery configuration cannot disable Klaviyo OAuth ro
   assert.equal(env.GOOGLE_ADS_DEVELOPER_TOKEN, undefined);
 });
 
+test("Google Ads runtime accepts the legacy developer-token name only as a server-side fallback", () => {
+  const source = registerShopifyRuntime.toString();
+  assert.match(source, /env\.GOOGLE_ADS_DEVELOPER_TOKEN \|\| env\.GOOGLE_DEVELOPER_TOKEN/);
+  assert.doesNotMatch(source, /NEXT_PUBLIC_(?:GOOGLE_ADS_)?DEVELOPER_TOKEN/);
+});
+
 test("incomplete provider activation stays isolated without crashing Shopify App Home", () => {
   const routes = {};
   const app = {

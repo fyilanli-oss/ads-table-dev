@@ -1,0 +1,55 @@
+{
+  "evidence_version": "r6d3f-meta-disconnect-reconnect-live-acceptance-v1",
+  "captured_at_utc": "2026-09-26T10:01:20.3382693Z",
+  "project": "adstable-dev",
+  "project_ref": "xnstrzhavqkztvmlwsrx",
+  "pull_request": 268,
+  "merge_commit": "2f7014a6ed89eccc85e2c38d76ef518734493597",
+  "post_merge_checks": "PASS",
+  "production_deployment": {
+    "status": "READY",
+    "deployment_id": "dpl_MVBHJF3myguKFg7pJ9h53zDPsuUJ",
+    "immutable_url": "https://ads-table-nm625mnql-firats-projects-d22284db.vercel.app",
+    "canonical_alias": "https://dev.adstable.app",
+    "runtime_error_scan": "CLEAN"
+  },
+  "merchant_acceptance": {
+    "result": "PASS",
+    "initial_connected_account_count": 1,
+    "cancel_preserved_connection": true,
+    "disconnect_returned_not_connected": true,
+    "clean_reconnect_completed": true,
+    "reconnected_account_count": 1
+  },
+  "disconnect_postcheck": {
+    "result": "PASS",
+    "canonical_meta_count": 1,
+    "disconnected_meta_count": 1,
+    "valid_disconnected_meta_count": 1,
+    "connected_klaviyo_count": 1,
+    "reporting_currency": "TRY",
+    "dataset_v2_total_count": 0,
+    "dataset_v2_meta_count": 0,
+    "active_meta_schedule_count": 0,
+    "open_meta_job_count": 0,
+    "legacy_meta_connection_count": 1,
+    "browser_grant_count": 0
+  },
+  "reconnect_postcheck": {
+    "result": "PASS",
+    "canonical_meta_count": 1,
+    "connected_meta_count": 1,
+    "valid_connected_meta_count": 1,
+    "selected_account_count": 1,
+    "connected_klaviyo_count": 1,
+    "reporting_currency": "TRY",
+    "dataset_v2_total_count": 0,
+    "dataset_v2_meta_count": 0,
+    "active_meta_schedule_count": 0,
+    "open_meta_job_count": 0,
+    "legacy_meta_connection_count": 1,
+    "browser_grant_count": 0
+  },
+  "decision": "PASS_META_COMPLETE_LIFECYCLE",
+  "next_gate": "R6-D4_GOOGLE_ADS_ANALYST_BRIEF"
+}

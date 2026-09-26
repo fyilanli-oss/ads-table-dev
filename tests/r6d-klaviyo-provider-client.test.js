@@ -318,3 +318,18 @@ test('Klaviyo Flow/Event diagnostics reject pagination outside the provider orig
     /KLAVIYO_FLOW_PAGINATION_INVALID/,
   );
 });
+
+
+test('Klaviyo Flow/Event diagnostics accept an empty event page without an included collection', async () => {
+  const client = createKlaviyoProviderClient({
+    fetchImpl: async url => url.includes('/api/flows/')
+      ? response({ data: [], links: { next: null } })
+      : response({ data: [], links: { next: null } }),
+  });
+  const result = await client.fetchFlowEventInventory({ accessToken: 'secret', timeZone: 'UTC' });
+  assert.equal(result.flow_count, 0);
+  assert.equal(result.scanned_event_count, 0);
+  assert.equal(result.earliest_event_date, null);
+  assert.equal(result.latest_event_date, null);
+  assert.equal(result.event_scan_truncated, false);
+});

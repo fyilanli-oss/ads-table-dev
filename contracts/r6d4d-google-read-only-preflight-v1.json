@@ -1,0 +1,76 @@
+{
+  "contract_version": "r6d4d-google-read-only-preflight-v1",
+  "status": "PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING",
+  "provider": "google_ads",
+  "business_outcome": "Verify that every selected canonical Google Ads customer can supply provider metadata plus the completed E5 Standard and Performance Max branches for one closed business day without writing Dataset V2.",
+  "reuse": {
+    "e5_customer_metadata": true,
+    "e5_standard_query_and_mapper": true,
+    "e5_performance_max_query_and_mapper": true,
+    "e5_conversion_mapping": true,
+    "e5_time_fx": true,
+    "new_metric_contract": false,
+    "legacy_server_runtime_reactivated": false,
+    "dashboard_manual_refresh_reactivated": false
+  },
+  "authority": {
+    "workspace": "verified_shopify_session",
+    "connection": "public.workspace_provider_connections",
+    "reporting_currency": "public.workspace_settings.merchant_selected",
+    "browser_tenant_or_date_fields_are_authority": false
+  },
+  "provider_scope": {
+    "selected_account_minimum": 1,
+    "selected_account_maximum": 3,
+    "manager_context": "canonical_selected_accounts.login_customer_id",
+    "customer_metadata": ["id", "currency_code", "time_zone"],
+    "branches": ["standard", "performance_max"],
+    "date_strategy": "previous_closed_business_date_per_customer_timezone",
+    "metrics": "E5_FIXED_CONTRACT"
+  },
+  "token_lifecycle": {
+    "existing_r6d4b_contract_reused": true,
+    "refresh_only_when_expired_or_after_one_unauthorized_response": true,
+    "one_controlled_retry": true,
+    "credential_envelope_rotation_may_occur": true,
+    "analytics_or_dataset_mutation": false
+  },
+  "acceptance": {
+    "all_selected_accounts_must_be_refetched": true,
+    "login_customer_id_must_be_used_per_account": true,
+    "source_currency_must_match_canonical_selection": true,
+    "reporting_currency_must_be_merchant_selected": true,
+    "standard_and_performance_max_must_both_execute": true,
+    "time_fx_must_validate": true,
+    "empty_result_must_be_provider_verified": true,
+    "aggregate_response_only": true,
+    "normal_data_sources_ui_changed": false,
+    "operator_surface": "/shopify/app/platforms?acceptance=r6d4-google"
+  },
+  "excluded": [
+    "dataset_v2_write",
+    "schedule_or_backfill",
+    "production_activation",
+    "v1_snapshot_write",
+    "legacy_connection_or_ownership",
+    "new_metric_selection",
+    "google_sheets_or_ga4_reactivation",
+    "disconnect_or_provider_revoke"
+  ],
+  "production_mutation": "TOKEN_REFRESH_ONLY_IF_REQUIRED_BY_EXISTING_R6D4B_CONTRACT",
+  "provider_contact": true,
+  "dataset_v2_write": false,
+  "live_acceptance": {
+    "status": "PENDING",
+    "selected_account_count": null,
+    "verified_row_count": null,
+    "provider_result_status": null,
+    "customer_metadata_verified": null,
+    "standard_and_performance_max_verified": null,
+    "time_fx_verified": null,
+    "supabase_postcheck": null,
+    "evidence": null
+  },
+  "next_gate": "R6-D4-E_CONTROLLED_DATASET_V2_ACCEPTANCE_BRIEF_AFTER_LIVE_PASS"
+}
+

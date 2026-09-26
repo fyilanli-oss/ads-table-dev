@@ -188,6 +188,16 @@ Eski `server.js + dashboard.html` referansında bulunan Meta Disconnect yaşam d
 
 Her provider'ın Connect → Connected → Disconnect → temiz Reconnect zinciri kendi R6-D kabulünde tamamlanacaktır. Meta için Shopify-native warning modalı, session-bound endpoint, revoke-first service ve optimistic canonical cleanup uygulandı. PR #268 production deployment'ı READY ve `dev.adstable.app` alias eşleşmesi PASS'tir. Merchant `Connected · 1 account` → Cancel ile değişmeyen bağlantı → Disconnect → `Not connected` → temiz OAuth/tek verified hesap → yeniden `Connected · 1 account` zincirini tamamladı. İki salt-okunur Supabase postcheck Meta cleanup ve reconnect'i doğrularken Klaviyo, `TRY` reporting currency, legacy geçmiş ve sıfır Dataset/schedule/job durumunu korudu. Redacted kanıt `docs/security/evidence/R6D3F_META_DISCONNECT_RECONNECT_LIVE_ACCEPTANCE_2026-09-26.json` içindedir. R6-D3 Meta tam yaşam döngüsü PASS; sıradaki kapı R6-D4 Google Ads analist brief'idir.
 
+### R6-D4-C Google Ads bağlantı ve üç hesap seçimi — production PASS
+
+Merchant production akışında üç provider-doğrulanmış Google Ads hesabını seçip kaydetti; reload sonrasında `Connected · 3 accounts` durumu korundu. Accounts GET ve selection POST runtime'da `200` verdi. Salt-okunur Supabase postcheck tek canonical bağlantıyı `connected`, hesap sayısını `3`, hesap şekli ve credential envelope'larını geçerli, authority adapter'ını `shopify_verified_session` olarak doğruladı. Dataset V2 Google Ads satırı `0` kaldı. Bu sonuç yalnız bağlantı/hesap seçimi kapısını kapatır; sıradaki ayrı kapı R6-D4-D salt-okunur Google Ads preflight'tır. Redacted kanıt `docs/security/evidence/R6D4C_GOOGLE_ADS_CONNECTION_LIVE_ACCEPTANCE_2026-09-26.json` içindedir.
+
+### R6-D4-D Google Ads salt-okunur runtime preflight — repository PASS
+
+Bu paket yeni Google Ads analitiği geliştirmez. R6-D4-C'de seçilen üç canonical hesabın `login_customer_id` manager bağlamını, tamamlanmış E5 müşteri metadata, Standard Ads, Performance Max, conversion mapping ve Time/FX motoruna taşır. Her hesabın provider kimliği, source currency'si ve timezone'u yeniden doğrulanır; önceki kapanmış business date için iki E5 dalı da çalışır. Normal Data Sources ekranı değişmez; yalnız `?acceptance=r6d4-google` operatör yüzeyi toplu ve redacted sonuç gösterir.
+
+Dataset V2/V1 write, schedule, backfill, yeni metrik sözleşmesi, Google Sheets/GA4 aktivasyonu ve Disconnect bu kapsamda yoktur. Mevcut R6-D4-B token yaşam döngüsü yalnız access token süresi dolmuşsa veya bir kez yetkisiz yanıt alınırsa credential envelope'u yenileyebilir. Repository testleri PASS'tir; production provider sonucu ve salt-okunur Supabase postcheck henüz yapılmadığı için R6-D4-D canlı PASS değildir. Contract `contracts/r6d4d-google-read-only-preflight-v1.json`, ayrıntılı analist kaydı `docs/R6D4D_GOOGLE_READ_ONLY_PREFLIGHT.md` içindedir.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.
@@ -207,6 +217,3 @@ Her provider'ın Connect → Connected → Disconnect → temiz Reconnect zincir
 - Meta, Google Ads veya Klaviyo primary runtime yapılmadı.
 - TikTok/Pinterest park durumu değiştirilmedi.
 
-### R6-D4-C Google Ads bağlantı ve üç hesap seçimi — production PASS
-
-Merchant production akışında üç provider-doğrulanmış Google Ads hesabını seçip kaydetti; reload sonrasında `Connected · 3 accounts` durumu korundu. Accounts GET ve selection POST runtime'da `200` verdi. Salt-okunur Supabase postcheck tek canonical bağlantıyı `connected`, hesap sayısını `3`, hesap şekli ve credential envelope'larını geçerli, authority adapter'ını `shopify_verified_session` olarak doğruladı. Dataset V2 Google Ads satırı `0` kaldı. Bu sonuç yalnız bağlantı/hesap seçimi kapısını kapatır; sıradaki ayrı kapı R6-D4-D salt-okunur Google Ads preflight'tır. Redacted kanıt `docs/security/evidence/R6D4C_GOOGLE_ADS_CONNECTION_LIVE_ACCEPTANCE_2026-09-26.json` içindedir.

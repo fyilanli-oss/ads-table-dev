@@ -31,6 +31,8 @@ const {createKlaviyoTokenLifecycle} = require("../providers/klaviyo/token-lifecy
 const {createMetaReadOnlyPreflight} = require("../providers/meta/read-only-preflight");
 const {createMetaControlledDatasetAcceptance} = require("../providers/meta/controlled-dataset-acceptance");
 const {createGoogleAdsTokenLifecycle} = require("../providers/google/token-lifecycle");
+const {createGoogleAdsSearchClient} = require("../providers/google/search-client");
+const {createGoogleReadOnlyPreflight} = require("../providers/google/read-only-preflight");
 const {WorkspaceSupabaseDatasetRepository} = require("../../funnel-core/workspace-supabase-dataset-repository");
 
 function enabled(value) {
@@ -220,6 +222,21 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           graphVersion: env.META_GRAPH_VERSION || "v20.0",
         })
         : null,
+      googlePreflight: adapters.google_ads && providerAvailability.google_ads && typeof resolveFxRate === "function"
+        ? createGoogleReadOnlyPreflight({
+          connectionStore,
+          settingsStore,
+          tokenLifecycle: googleTokenLifecycle,
+          search: createGoogleAdsSearchClient({
+            fetchImpl,
+            developerToken: googleDeveloperToken,
+            apiVersion: env.GOOGLE_ADS_API_VERSION || "v25",
+          }),
+          resolveFxRate,
+        })
+        : adapters.google_ads
+          ? {execute: async () => {throw Object.assign(new Error("GOOGLE_PREFLIGHT_NOT_CONFIGURED"), {code: "GOOGLE_PREFLIGHT_NOT_CONFIGURED", status: 503});}}
+          : null,
       });
     }
   }

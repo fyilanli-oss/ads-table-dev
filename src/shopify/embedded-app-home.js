@@ -230,6 +230,15 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
   <s-page heading="Data sources">
     <s-link slot="breadcrumb-actions" href="/shopify/app">Home</s-link>
     <s-banner id="status" heading="Data sources" tone="info" hidden></s-banner>
+    <div id="r6d4-google-acceptance" hidden>
+      <s-section heading="Google Ads acceptance check">
+        <s-stack gap="base">
+          <s-paragraph>This one-time check reads the selected Google Ads accounts, Standard Ads and Performance Max Asset Groups through the completed E5 contract. It does not write Dataset V2.</s-paragraph>
+          <s-paragraph id="r6d4-google-message" aria-live="polite"></s-paragraph>
+          <s-button id="r6d4-google-run" variant="primary">Run read-only acceptance</s-button>
+        </s-stack>
+      </s-section>
+    </div>
     <div id="r6d3-meta-acceptance" hidden>
       <s-section heading="Meta acceptance check">
         <s-stack gap="base">
@@ -296,6 +305,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const currency = document.getElementById("reporting-currency");
       const saveCurrency = document.getElementById("save-reporting-currency");
       const currencyMessage = document.getElementById("platforms-currency-message");
+      const googleAcceptancePanel = document.getElementById("r6d4-google-acceptance");
+      const googleAcceptanceButton = document.getElementById("r6d4-google-run");
+      const googleAcceptanceMessage = document.getElementById("r6d4-google-message");
       const metaAcceptancePanel = document.getElementById("r6d3-meta-acceptance");
       const metaAcceptanceButton = document.getElementById("r6d3-meta-run");
       const metaAcceptanceMessage = document.getElementById("r6d3-meta-message");
@@ -452,6 +464,23 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           } finally { metaDatasetAcceptanceButton.loading = false; }
         });
       }
+      if (params.get("acceptance") === "r6d4-google") {
+        googleAcceptancePanel.hidden = false;
+        googleAcceptanceButton.addEventListener("click", async () => {
+          googleAcceptanceButton.disabled = true;
+          googleAcceptanceButton.loading = true;
+          googleAcceptanceMessage.textContent = "Running the read-only checks…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/google_ads/runtime/preflight", {method: "POST"});
+            googleAcceptanceMessage.textContent = result.status === "PASS_R6_D4_D_GOOGLE_READ_ONLY_PREFLIGHT"
+              ? "PASS — " + result.selected_account_count + " account(s), " + result.row_count + " verified row(s) across Standard and Performance Max. Time and FX checks succeeded. Dataset V2 writes: 0."
+              : "The acceptance result could not be verified.";
+          } catch (error) {
+            googleAcceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "GOOGLE_PREFLIGHT_FAILED";
+            googleAcceptanceButton.disabled = false;
+          } finally { googleAcceptanceButton.loading = false; }
+        });
+      }
       document.querySelectorAll("s-button[data-provider]").forEach((button) => button.addEventListener("click", async () => {
         button.disabled = true;
         button.loading = true;
@@ -533,3 +562,4 @@ function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}
 }
 
 module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms});
+

@@ -38,7 +38,7 @@ test('R6-D is provider-by-provider and Klaviyo PASS grants no authority to other
     'R6-D5 provider-by-provider controlled activation decision'
   ]);
   assert.equal(contract.r6d_work_packages.current_live_connection_state.klaviyo, 'live_accepted_verified_empty');
-  assert.equal(contract.r6d_work_packages.current_live_connection_state.google_ads, 'read_only_live_accepted_verified_empty');
+  assert.equal(contract.r6d_work_packages.current_live_connection_state.google_ads, 'controlled_dataset_live_accepted_verified_empty_disconnect_pending');
   assert.ok(contract.r6d_work_packages.rules.includes('repository preparation does not authorize provider contact'));
   assert.ok(contract.r6d_work_packages.rules.includes('repository preparation does not authorize Dataset V2 writes'));
   assert.ok(contract.r6d_work_packages.rules.includes('one provider acceptance does not activate another provider'));

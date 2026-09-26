@@ -206,3 +206,7 @@ Her provider'ın Connect → Connected → Disconnect → temiz Reconnect zincir
 - Dataset V2'ye veri yazılmadı.
 - Meta, Google Ads veya Klaviyo primary runtime yapılmadı.
 - TikTok/Pinterest park durumu değiştirilmedi.
+
+### R6-D4-C Google Ads bağlantı ve üç hesap seçimi — production PASS
+
+Merchant production akışında üç provider-doğrulanmış Google Ads hesabını seçip kaydetti; reload sonrasında `Connected · 3 accounts` durumu korundu. Accounts GET ve selection POST runtime'da `200` verdi. Salt-okunur Supabase postcheck tek canonical bağlantıyı `connected`, hesap sayısını `3`, hesap şekli ve credential envelope'larını geçerli, authority adapter'ını `shopify_verified_session` olarak doğruladı. Dataset V2 Google Ads satırı `0` kaldı. Bu sonuç yalnız bağlantı/hesap seçimi kapısını kapatır; sıradaki ayrı kapı R6-D4-D salt-okunur Google Ads preflight'tır. Redacted kanıt `docs/security/evidence/R6D4C_GOOGLE_ADS_CONNECTION_LIVE_ACCEPTANCE_2026-09-26.json` içindedir.

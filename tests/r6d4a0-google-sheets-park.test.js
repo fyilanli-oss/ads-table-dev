@@ -36,7 +36,7 @@ test('park contract preserves history and forbids provider or Dataset V1 work', 
   assert.equal(contract.preservation.google_grant_revoked, false);
 });
 
-test('server blocks every Google Sheets execution edge before token or sheet access', () => {
+test('server keeps every Google Sheets execution edge closed and reports retirement', () => {
   const server = read('server.js');
   assert.match(server, /createGoogleSheetsOAuthHandlers\([\s\S]*enabled:GOOGLE_SHEETS_EXPORT_ENABLED/);
   assert.match(server, /async function getFreshGoogleSheetsClient\(userId\)\{\s*requireGoogleSheetsExport\(\)/);
@@ -44,7 +44,7 @@ test('server blocks every Google Sheets execution edge before token or sheet acc
   assert.match(server, /async function fetchGoogleSheetsDatasetRows\(userId\)\{\s*requireGoogleSheetsExport\(\)/);
   assert.match(server, /async function syncPerformanceDatasetToGoogleSheets\(userId,options=\{\}\)\{\s*requireGoogleSheetsExport\(\)/);
   assert.match(server, /async function maybeAutoSyncGoogleSheets\(userId\)\{\s*if\(!GOOGLE_SHEETS_EXPORT_ENABLED\)return/);
-  assert.match(server, /\/api\/google-sheets\/status[\s\S]*status:"parked",parked:true/);
+  assert.match(server, /\/api\/google-sheets\/status[\s\S]*status:"retired",retired:true/);
   assert.match(server, /\/api\/google-sheets\/disconnect[\s\S]*requireGoogleSheetsExport\(\)/);
   assert.match(server, /platform==="google_sheets"\)requireGoogleSheetsExport\(\)/);
 });

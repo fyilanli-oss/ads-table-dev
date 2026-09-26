@@ -254,7 +254,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         })
         : null,
       googleDisconnect: adapters.google_ads
-        ? createGoogleDisconnect({store: connectionStore})
+        ? createGoogleDisconnect({store: connectionStore, fetchImpl})
         : null,
       });
     }

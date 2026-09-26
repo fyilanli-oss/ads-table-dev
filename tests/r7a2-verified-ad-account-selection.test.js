@@ -70,6 +70,23 @@ test('Google Ads discovery preserves only safe upstream diagnostics', async () =
   );
 });
 
+test('Google Ads discovery identifies successful but invalid verified account shapes', async () => {
+  const discover = createGoogleAdsAccountDiscovery({developerToken: 'developer', apiVersion: 'v25', fetchImpl: async url => {
+    if (url.endsWith('customers:listAccessibleCustomers')) return response(200, {resourceNames: ['customers/123']});
+    return response(200, [{results: [{customerClient: {id: '456', descriptiveName: 'No currency', manager: false, level: 1}}]}]);
+  }});
+  await assert.rejects(discover('access'), error => error.code === 'PROVIDER_ACCOUNTS_UNAVAILABLE' && error.providerStage === 'verified_account_shape');
+});
+
+test('Google Ads selection distinguishes token lifecycle failures from account discovery', async () => {
+  const selection = createAdAccountSelection({
+    store: {readPendingProvider: async () => ({status: 'pending_account_selection', accessToken: 'access', connection_version: 1})},
+    discoverByProvider: {meta: async () => [], google_ads: async () => []},
+    tokenLifecycleByProvider: {google_ads: {run: async () => { throw Object.assign(new Error('GOOGLE_TOKEN_REFRESH_FAILED'), {code: 'GOOGLE_TOKEN_REFRESH_FAILED'}); }}},
+  });
+  await assert.rejects(selection.list(authority, 'google_ads'), error => error.code === 'GOOGLE_TOKEN_REFRESH_FAILED' && error.providerStage === 'token_lifecycle');
+});
+
 test('selection re-fetches provider accounts and ignores caller name/currency/tenant claims', async () => {
   const writes = [];
   const store = {

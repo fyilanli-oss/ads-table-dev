@@ -29,6 +29,15 @@ function isAccessTokenError(error) {
   return ['PROVIDER_REAUTHORIZE', 'GOOGLE_ACCESS_TOKEN_INVALID', 'GOOGLE_REAUTHORIZE'].includes(String(error?.code || error?.message || ''));
 }
 
+function reauthorizeFrom(error) {
+  const result = codedError('GOOGLE_REAUTHORIZE', 409);
+  result.providerStage = error?.providerStage || 'token_lifecycle';
+  result.upstreamStatus = error?.upstreamStatus ?? null;
+  result.upstreamCode = error?.upstreamCode || null;
+  result.upstreamRequestId = error?.upstreamRequestId || null;
+  return result;
+}
+
 function scopes(value, fallback = []) {
   const source = Array.isArray(value) ? value : (typeof value === 'string' ? value.split(/[\s,]+/) : fallback);
   return [...new Set(source.map(item => typeof item === 'string' ? item.trim() : '').filter(Boolean))];
@@ -135,12 +144,12 @@ function createGoogleAdsTokenLifecycle({
       return Object.freeze({value: await operation(connection), connection});
     } catch (error) {
       if (!isAccessTokenError(error)) throw error;
-      if (refreshed) throw codedError('GOOGLE_REAUTHORIZE', 409);
+      if (refreshed) throw reauthorizeFrom(error);
       connection = await refresh(authority, connection);
       try {
         return Object.freeze({value: await operation(connection), connection});
       } catch (retryError) {
-        if (isAccessTokenError(retryError)) throw codedError('GOOGLE_REAUTHORIZE', 409);
+        if (isAccessTokenError(retryError)) throw reauthorizeFrom(retryError);
         throw retryError;
       }
     }

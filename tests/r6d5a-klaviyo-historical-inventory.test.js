@@ -17,7 +17,7 @@ const connection = {
   conversionMetric: { id: 'metric-1', name: 'Placed Order', integrationName: 'Klaviyo' },
 };
 
-function inventory({ dates, onFx = () => {} }) {
+function inventory({ dates, counts = { total: 3, sent: 3, dated: 3, undated: 0 }, onFx = () => {} }) {
   const providerDates = [];
   return {
     providerDates,
@@ -40,10 +40,16 @@ function inventory({ dates, onFx = () => {} }) {
           assert.equal(accountId, 'account-1');
           return { id: 'account-1', currency: 'USD', timezone: 'UTC' };
         },
-        fetchSentCampaignDates: async ({ accessToken, timeZone }) => {
+        fetchCampaignInventory: async ({ accessToken, timeZone }) => {
           assert.equal(accessToken, 'secret-token');
           assert.equal(timeZone, 'UTC');
-          return dates;
+          return {
+            total_campaign_count: counts.total,
+            sent_campaign_count: counts.sent,
+            sent_with_scheduled_at_count: counts.dated,
+            sent_without_scheduled_at_count: counts.undated,
+            sent_dates: dates,
+          };
         },
         fetchMessageFacts: async ({ accessToken, providerDate, conversionMetricId }) => {
           assert.equal(accessToken, 'secret-token');
@@ -72,6 +78,10 @@ test('R6-D5-A checks only the most recent closed sent-campaign date and writes n
     status: 'PASS_R6_D5_A_KLAVIYO_HISTORICAL_INVENTORY',
     provider_result_status: 'empty',
     selected_account_count: 1,
+    total_campaign_count: 3,
+    sent_campaign_count: 3,
+    sent_with_scheduled_at_count: 3,
+    sent_without_scheduled_at_count: 0,
     closed_sent_date_count: 2,
     checked_date_count: 1,
     row_count: 0,
@@ -92,10 +102,14 @@ test('R6-D5-A checks only the most recent closed sent-campaign date and writes n
 
 test('R6-D5-A reports a verified inventory with no eligible date without resolving FX or reports', async () => {
   let fxCalls = 0;
-  const setup = inventory({ dates: ['2026-09-24'], onFx: () => { fxCalls += 1; } });
+  const setup = inventory({ dates: [], counts: { total: 4, sent: 2, dated: 0, undated: 2 }, onFx: () => { fxCalls += 1; } });
   const result = await setup.service.execute(authority);
   assert.equal(result.checked_date_count, 0);
   assert.equal(result.provider_date, null);
+  assert.equal(result.total_campaign_count, 4);
+  assert.equal(result.sent_campaign_count, 2);
+  assert.equal(result.sent_with_scheduled_at_count, 0);
+  assert.equal(result.sent_without_scheduled_at_count, 2);
   assert.equal(result.dataset_v2_write, false);
   assert.equal(fxCalls, 0);
   assert.deepEqual(setup.providerDates, []);

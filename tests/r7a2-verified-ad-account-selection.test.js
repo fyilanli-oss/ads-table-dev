@@ -70,6 +70,13 @@ test('Google Ads discovery preserves only safe upstream diagnostics', async () =
   );
 });
 
+test('Google Ads discovery treats 401 as reauthorization and preserves 403 as provider authorization evidence', async () => {
+  for (const [status, expectedCode] of [[401, 'PROVIDER_REAUTHORIZE'], [403, 'PROVIDER_ACCOUNTS_UNAVAILABLE']]) {
+    const discover = createGoogleAdsAccountDiscovery({developerToken: 'developer', apiVersion: 'v25', fetchImpl: async () => response(status, {error: {status: 'PERMISSION_DENIED', message: 'redacted'}})});
+    await assert.rejects(discover('access'), error => error.code === expectedCode && error.providerStage === 'list_accessible_customers' && error.upstreamStatus === status && error.upstreamCode === 'PERMISSION_DENIED');
+  }
+});
+
 test('Google Ads discovery identifies successful but invalid verified account shapes', async () => {
   const discover = createGoogleAdsAccountDiscovery({developerToken: 'developer', apiVersion: 'v25', fetchImpl: async url => {
     if (url.endsWith('customers:listAccessibleCustomers')) return response(200, {resourceNames: ['customers/123']});

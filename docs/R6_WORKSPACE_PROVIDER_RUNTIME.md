@@ -204,6 +204,12 @@ Bu paket yeni Google metriği veya adapter geliştirmez. Tamamlanmış E5 Standa
 
 PR #280 production'a dağıtıldıktan sonra merchant exact-confirmation kontrollü kabulü bir kez çalıştırmış ve `attempted: 0 / persisted: 0 / verified empty: true` sonucu almıştır. Supabase salt-okunur son kontrolü canonical Google bağlantısını `connected`, üç hesabı doğrulanmış `login_customer_id` bağlamıyla, token zarfları/access expiry ve reporting currency kaydını mevcut; Dataset V2 toplam/workspace/Google/sentetik Google satırları ile browser grant sayısını `0` doğrulamıştır. Normal Data Sources ekranı değişmemiştir. Schedule, backfill, Dataset V1, Google Sheets, GA4, yeni metrik, Disconnect ve production aktivasyonu açılmamıştır. Contract `contracts/r6d4e-google-controlled-dataset-acceptance-v1.json`, ayrıntılı analist kaydı `docs/R6D4E_GOOGLE_CONTROLLED_DATASET_ACCEPTANCE.md`, redacted kanıt `docs/security/evidence/R6D4E_GOOGLE_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-26.json` içindedir. R6-D4-E veri kapısı tamamlanmıştır; sıradaki ayrı karar R6-D4-F Google bağımsız Disconnect analist brief'idir.
 
+### R6-D4-F Google Ads bağımsız Disconnect — repository PASS / production acceptance pending
+
+Shopify-native warning modalı, non-destructive Cancel, session-bound exact-confirmation endpoint'i ve optimistic canonical cleanup hazırlanmıştır. Shared Google OAuth client riski nedeniyle provider global revoke yapılmaz; yalnız canonical `google_ads` bağlantısının yerel credential, expiry, scope ve seçilmiş hesap alanları temizlenir. Reporting currency, Meta, Klaviyo, tarihsel analytics ve parked Google servisleri korunur. Migration gerekmez.
+
+Repository kapsamı ve ilgili regresyonlar PASS'tir. Merchant Cancel, Disconnect, `Not connected`, temiz OAuth, doğrulanmış 1–3 hesap seçimi ve yeniden `Connected` zincirini; ayrıca cleanup ve reconnect sonrası iki salt-okunur Supabase postcheck'i tamamlamadan R6-D4-F production PASS sayılmaz. Contract `contracts/r6d4f-google-independent-disconnect-v1.json`, analist kaydı `docs/R6D4F_GOOGLE_INDEPENDENT_DISCONNECT.md` içindedir.
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

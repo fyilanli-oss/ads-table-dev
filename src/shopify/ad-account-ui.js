@@ -68,7 +68,7 @@ function initializeAdAccounts() {
       } catch (error) { showError(error); }
       finally { busy = false; save.disabled = false; save.loading = false; }
     });
-    if (provider === 'meta' && disconnectConfirm && disconnectModal && disconnectMessage) {
+    if (disconnectConfirm && disconnectModal && disconnectMessage) {
       disconnectConfirm.addEventListener('click', async () => {
         if (busy) return;
         busy = true;
@@ -76,18 +76,18 @@ function initializeAdAccounts() {
         disconnectConfirm.loading = true;
         disconnectMessage.textContent = 'Disconnecting…';
         try {
-          await request('/disconnect', {confirmation: 'DISCONNECT_META'});
+          await request('/disconnect', {confirmation: provider === 'meta' ? 'DISCONNECT_META' : 'DISCONNECT_GOOGLE_ADS'});
           message.textContent = 'Not connected';
           connect.hidden = false;
           connected.hidden = true;
           disconnectMessage.textContent = '';
           if (typeof disconnectModal.hideOverlay === 'function') disconnectModal.hideOverlay();
         } catch (error) {
-          disconnectMessage.textContent = error.message === 'META_REVOKE_FAILED'
+          disconnectMessage.textContent = provider === 'meta' && error.message === 'META_REVOKE_FAILED'
             ? 'Meta access could not be revoked. The connection remains active.'
-            : error.message === 'META_REAUTHORIZE'
+            : provider === 'meta' && error.message === 'META_REAUTHORIZE'
               ? 'Meta authorization must be renewed before this connection can be revoked.'
-              : 'Meta could not be disconnected. The connection remains active.';
+              : (provider === 'meta' ? 'Meta' : 'Google Ads') + ' could not be disconnected. The connection remains active.';
         } finally {
           busy = false;
           disconnectConfirm.disabled = false;

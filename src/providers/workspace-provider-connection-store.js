@@ -399,6 +399,39 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     return data;
   }
 
+  async function disconnectGoogle({ authority: authorityInput, version }) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
+    const timestamp = now().toISOString();
+    const { data, error } = await client.from(TABLE).update({
+      status: 'disconnected',
+      active_account_id: null,
+      active_account_name: null,
+      source_currency: null,
+      monthly_plan_cost: null,
+      selected_accounts: [],
+      conversion_metric_id: null,
+      conversion_metric_name: null,
+      conversion_metric_integration_name: null,
+      conversion_metric_integration_category: null,
+      conversion_metric_verified_at: null,
+      access_token_envelope: null,
+      refresh_token_envelope: null,
+      access_token_expires_at: null,
+      refresh_token_expires_at: null,
+      granted_scopes: [],
+      account_verified_at: null,
+      disconnected_at: timestamp,
+      connection_version: version + 1,
+      updated_at: timestamp,
+    }).eq('workspace_id', authority.workspace_id).eq('provider', 'google_ads')
+      .eq('connection_version', version).eq('status', 'connected')
+      .select('status,connection_version').maybeSingle();
+    if (error) throw new Error('CONNECTION_WRITE_FAILED');
+    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), {code: 'CONNECTION_CHANGED', status: 409});
+    return data;
+  }
+
   async function bindKlaviyoConversionMetric({ authority: authorityInput, version, accountId, metric: metricInput } = {}) {
     const authority = requireServerWorkspaceAuthority(authorityInput);
     if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
@@ -437,6 +470,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     completeKlaviyo,
     disconnectKlaviyo,
     disconnectMeta,
+    disconnectGoogle,
     bindKlaviyoConversionMetric,
   });
 }

@@ -27,6 +27,7 @@ const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
 const {createKlaviyoProviderClient} = require("../providers/klaviyo/provider-client");
 const {createKlaviyoReadOnlyPreflight} = require("../providers/klaviyo/read-only-preflight");
 const {createKlaviyoHistoricalInventory} = require("../providers/klaviyo/historical-inventory");
+const {createKlaviyoFlowEventInventory} = require("../providers/klaviyo/flow-event-inventory");
 const {createKlaviyoMetricBinding} = require("../providers/klaviyo/metric-binding");
 const {createKlaviyoControlledDatasetAcceptance} = require("../providers/klaviyo/controlled-dataset-acceptance");
 const {createKlaviyoTokenLifecycle} = require("../providers/klaviyo/token-lifecycle");
@@ -162,6 +163,11 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           resolveFxRate,
         })
         : null;
+      const flowEventInventory = createKlaviyoFlowEventInventory({
+        connectionStore,
+        providerClient,
+        tokenLifecycle,
+      });
       const datasetAcceptance = typeof resolveFxRate === "function"
         ? createKlaviyoControlledDatasetAcceptance({
           connectionStore,
@@ -182,6 +188,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       }),
       preflight,
       historicalInventory,
+      flowEventInventory,
       datasetAcceptance,
       metricBinding: createKlaviyoMetricBinding({connectionStore, providerClient, tokenLifecycle}),
       });

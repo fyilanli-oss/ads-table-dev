@@ -38,3 +38,9 @@ Provider sonucu boşsa `attempted: 0`, `persisted: 0` döner. Sentetik satır ol
 
 Repository uygulaması ve testleri hazırlanacaktır. Production provider çağrısı ve Dataset V2 kabulü ayrı açık onay olmadan çalıştırılmaz.
 
+
+## Canlı kabul sonucu — PASS
+
+PR #280 merge commit `6b4d4c1abb7a9a3fe83959c176a0213abd3ffa90` production deployment sonrasında merchant kontrollü kabulü bir kez çalıştırdı. Sonuç `attempted: 0`, `persisted: 0`, `verified empty: true` oldu.
+
+Salt-okunur Supabase son kontrolü tek canonical Google bağlantısını, üç doğrulanmış hesabı, token zarfları/access expiry ve merchant reporting currency kaydını doğruladı. Dataset V2 toplam, bağlı workspace, Google ve sentetik Google satırları ile browser grant sayısı `0` kaldı. Bu nedenle boş sonuç güvenli ve kanıtlıdır; production schedule/backfill aktivasyonu değildir. Sonraki paket R6-D4-F bağımsız Google Disconnect brief'idir.

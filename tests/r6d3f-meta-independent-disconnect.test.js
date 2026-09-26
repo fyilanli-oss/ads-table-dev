@@ -9,16 +9,20 @@ const root = path.resolve(__dirname, '..');
 const contract = JSON.parse(fs.readFileSync(path.join(root, 'contracts/r6d3f-meta-independent-disconnect-v1.json'), 'utf8'));
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('R6-D3-F freezes an independent Meta lifecycle before implementation', () => {
-  assert.equal(contract.status, 'PASS_CONTRACT_ONLY_IMPLEMENTATION_GATE');
+test('R6-D3-F preserves the decision baseline and records repository implementation separately', () => {
+  assert.equal(contract.status, 'PASS_REPOSITORY_IMPLEMENTATION_PRODUCTION_ACCEPTANCE_PENDING');
   assert.equal(contract.provider, 'meta');
-  assert.equal(contract.current_gap.legacy_reference_has_meta_disconnect, true);
-  assert.equal(contract.current_gap.embedded_meta_disconnect_route_exists, false);
-  assert.equal(contract.current_gap.canonical_meta_disconnect_store_operation_exists, false);
+  assert.equal(contract.decision_baseline_gap.legacy_reference_has_meta_disconnect, true);
+  assert.equal(contract.decision_baseline_gap.embedded_meta_disconnect_route_exists, false);
+  assert.equal(contract.decision_baseline_gap.canonical_meta_disconnect_store_operation_exists, false);
+  assert.equal(contract.repository_implementation.status, 'PASS');
+  assert.equal(contract.repository_implementation.production_deployment_verified, false);
+  assert.equal(contract.repository_implementation.live_disconnect_verified, false);
+  assert.equal(contract.repository_implementation.clean_reconnect_verified, false);
   assert.equal(contract.schema_migration_required, false);
   assert.equal(contract.production_provider_contact, false);
   assert.equal(contract.supabase_mutation, false);
-  assert.equal(contract.next_gate, 'R6-D3-F_META_DISCONNECT_IMPLEMENTATION');
+  assert.equal(contract.next_gate, 'R6-D3-F_PRODUCTION_DEPLOYMENT_AND_MERCHANT_ACCEPTANCE');
 });
 
 test('R6-D3-F is revoke-first, optimistic and isolated from other providers and analytics', () => {
@@ -34,20 +38,16 @@ test('R6-D3-F is revoke-first, optimistic and isolated from other providers and 
 
 test('Execution Plan keeps Meta open until Disconnect and clean Reconnect acceptance', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Contract PASS \/ implementation gate/);
+  assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Repository implementation PASS \/ production acceptance pending/);
   assert.match(plan, /Her provider Connect → Connected → Disconnect → temiz Reconnect zincirini bağımsız tamamlamadan kendi kabulü kapanmaz/);
-  assert.match(plan, /Sıradaki kapı R6-D3-F uygulamasıdır; Google Ads henüz başlamaz/);
+  assert.match(plan, /Sıradaki kapı production deployment ve merchant acceptance'tır; Google Ads henüz başlamaz/);
 });
 
-test('The documented reference and embedded gap are present in the current code', () => {
+test('The documented reference and pre-implementation gap remain auditable', () => {
   const server = read('server.js');
   const dashboard = read('public/dashboard.html');
-  const embedded = read('src/shopify/embedded-app-home.js');
-  const routes = read('src/routes/shopify-ad-account-routes.js');
-  const store = read('src/providers/workspace-provider-connection-store.js');
   assert.match(server, /graph\.facebook\.com\/\$\{META_GRAPH_VERSION\}\/me\/permissions/);
   assert.match(dashboard, /\/api\/platform\/meta\/disconnect/);
-  assert.match(embedded, /id === "klaviyo".*disconnect-modal/);
-  assert.doesNotMatch(routes, /providers\/meta\/accounts\/disconnect/);
-  assert.doesNotMatch(store, /disconnectMeta/);
+  assert.equal(contract.decision_baseline_gap.embedded_meta_disconnect_route_exists, false);
+  assert.equal(contract.decision_baseline_gap.canonical_meta_disconnect_store_operation_exists, false);
 });

@@ -87,6 +87,22 @@ function metricPagePath(value) {
   return `${url.pathname}${url.search}`;
 }
 
+function campaignPagePath(value) {
+  const url = new URL(value, API_BASE);
+  if (url.origin !== API_BASE || !['/api/campaigns', '/api/campaigns/'].includes(url.pathname)) {
+    throw new Error('KLAVIYO_CAMPAIGN_PAGINATION_INVALID');
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+function campaignBusinessDate(item, timeZone) {
+  const scheduledAt = item?.attributes?.scheduled_at;
+  if (scheduledAt === null || scheduledAt === undefined || scheduledAt === '') return null;
+  const instant = new Date(scheduledAt);
+  if (Number.isNaN(instant.getTime())) throw new Error('KLAVIYO_CAMPAIGN_SCHEDULE_INVALID');
+  return businessDateFromTimestamp(instant, validateTimeZone(timeZone));
+}
+
 function metricCandidate(item) {
   const name = required(item?.attributes?.name, 'metric.name');
   if (name.trim().toLowerCase() !== 'placed order') return null;
@@ -182,6 +198,32 @@ function createKlaviyoProviderClient({
     return Object.freeze([...candidates.values()].sort((left, right) => left.id.localeCompare(right.id)));
   }
 
+  async function fetchSentCampaignDates({ accessToken, timeZone } = {}) {
+    validateTimeZone(timeZone);
+    const dates = new Set();
+    for (const channel of ['email', 'sms']) {
+      const params = new URLSearchParams({
+        filter: `and(equals(messages.channel,'${channel}'),equals(status,'Sent'))`,
+        'fields[campaign]': 'scheduled_at',
+        'page[size]': '100',
+        sort: '-scheduled_at',
+      });
+      let path = `/api/campaigns/?${params.toString()}`;
+      for (let page = 0; page < 100 && path; page += 1) {
+        const payload = await request(accessToken, path);
+        if (!Array.isArray(payload?.data)) throw new Error('KLAVIYO_CAMPAIGN_RESPONSE_INVALID');
+        for (const item of payload.data) {
+          const date = campaignBusinessDate(item, timeZone);
+          if (date) dates.add(date);
+        }
+        const next = payload?.links?.next;
+        path = next ? campaignPagePath(next) : null;
+        if (page === 99 && path) throw new Error('KLAVIYO_CAMPAIGN_PAGINATION_LIMIT');
+      }
+    }
+    return Object.freeze([...dates].sort((left, right) => right.localeCompare(left)));
+  }
+
   async function report(accessToken, branch, timeframe, conversionMetricIdInput) {
     const metricId = required(conversionMetricIdInput || defaultMetricId, 'Klaviyo conversion metric id');
     const type = `${branch}-values-report`;
@@ -230,11 +272,11 @@ function createKlaviyoProviderClient({
     return Object.freeze({ rows, verified_empty: rows.length === 0 });
   }
 
-  return Object.freeze({ fetchAccount, fetchPlacedOrderMetricCandidates, fetchMessageFacts });
+  return Object.freeze({ fetchAccount, fetchPlacedOrderMetricCandidates, fetchSentCampaignDates, fetchMessageFacts });
 }
 
 function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
 }
 
-module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, zonedInstant, reportRows, metricPagePath, metricCandidate, createKlaviyoProviderClient });
+module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, zonedInstant, reportRows, metricPagePath, campaignPagePath, campaignBusinessDate, metricCandidate, createKlaviyoProviderClient });

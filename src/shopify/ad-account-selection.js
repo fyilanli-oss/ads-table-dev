@@ -14,6 +14,15 @@ function googleFailure(stage, response, payload) {
   error.upstreamRequestId = typeof requestId === 'string' ? requestId.slice(0, 128) : null;
   return error;
 }
+function googleReauthorize(stage, response, payload) {
+  const error = failure('PROVIDER_REAUTHORIZE', 409);
+  const diagnostic = googleFailure(stage, response, payload);
+  error.providerStage = diagnostic.providerStage;
+  error.upstreamStatus = diagnostic.upstreamStatus;
+  error.upstreamCode = diagnostic.upstreamCode;
+  error.upstreamRequestId = diagnostic.upstreamRequestId;
+  return error;
+}
 const ACCOUNT_LIMIT = 3;
 function validAccount(item) {
   if (!item || typeof item.id !== 'string' || !item.id || typeof item.name !== 'string' || !item.name || !/^[A-Z]{3}$/.test(item.currency || '')) {
@@ -49,7 +58,7 @@ function createGoogleAdsAccountDiscovery({fetchImpl = fetch, developerToken, api
       headers: headers(accessToken), signal: AbortSignal.timeout(15000), redirect: 'error',
     });
     const body = await accessible.json().catch(() => { throw googleFailure('list_accessible_customers_response', accessible, null); });
-    if (accessible.status === 401 || accessible.status === 403) throw failure('PROVIDER_REAUTHORIZE', 409);
+    if (accessible.status === 401) throw googleReauthorize('list_accessible_customers', accessible, body);
     if (!accessible.ok) throw googleFailure('list_accessible_customers', accessible, body);
     const resourceNames = Array.isArray(body?.resourceNames) ? body.resourceNames : [];
     let discovered;
@@ -58,7 +67,7 @@ function createGoogleAdsAccountDiscovery({fetchImpl = fetch, developerToken, api
         method: 'POST', headers: headers(accessToken), body: JSON.stringify({query}), signal: AbortSignal.timeout(15000), redirect: 'error',
       });
       const payload = await response.json().catch(() => { throw googleFailure('customer_client_response', response, null); });
-      if (response.status === 401 || response.status === 403) throw failure('PROVIDER_REAUTHORIZE', 409);
+      if (response.status === 401) throw googleReauthorize('customer_client_search', response, payload);
       if (!response.ok) throw googleFailure('customer_client_search', response, payload);
       return {results: (Array.isArray(payload) ? payload : []).flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : [])};
     }}); } catch (error) {

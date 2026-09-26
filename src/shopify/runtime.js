@@ -30,6 +30,7 @@ const {createKlaviyoControlledDatasetAcceptance} = require("../providers/klaviyo
 const {createKlaviyoTokenLifecycle} = require("../providers/klaviyo/token-lifecycle");
 const {createMetaReadOnlyPreflight} = require("../providers/meta/read-only-preflight");
 const {createMetaControlledDatasetAcceptance} = require("../providers/meta/controlled-dataset-acceptance");
+const {createGoogleAdsTokenLifecycle} = require("../providers/google/token-lifecycle");
 const {WorkspaceSupabaseDatasetRepository} = require("../../funnel-core/workspace-supabase-dataset-repository");
 
 function enabled(value) {
@@ -169,7 +170,14 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       metricBinding: createKlaviyoMetricBinding({connectionStore, providerClient, tokenLifecycle}),
       });
     }
-    if (adapters.meta || adapters.google_ads) registerShopifyAdAccountRoutes(app, {
+    if (adapters.meta || adapters.google_ads) {
+      const googleTokenLifecycle = adapters.google_ads ? createGoogleAdsTokenLifecycle({
+        connectionStore,
+        fetchImpl,
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+      }) : null;
+      registerShopifyAdAccountRoutes(app, {
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createAdAccountSelection({
         store: connectionStore,
@@ -181,6 +189,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
             apiVersion: env.GOOGLE_ADS_API_VERSION || "v25",
           }) : unavailableAccountDiscovery,
         },
+        tokenLifecycleByProvider: googleTokenLifecycle ? {google_ads: googleTokenLifecycle} : {},
       }),
       metaPreflight: adapters.meta && typeof resolveFxRate === "function"
         ? createMetaReadOnlyPreflight({
@@ -210,9 +219,11 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           graphVersion: env.META_GRAPH_VERSION || "v20.0",
         })
         : null,
-    });
+      });
+    }
   }
   return Object.freeze({enabled: true, providerOAuthEnabled, providerOAuthRequested, providerAvailability});
 }
 
 module.exports = Object.freeze({registerShopifyRuntime, enabled, providerRuntimeReady});
+

@@ -1,0 +1,120 @@
+{
+  "contract_version": "r6d4a-google-ads-connection-lifecycle-v1",
+  "status": "PASS_CONTRACT_ONLY_R6_D4_B_IMPLEMENTATION_GATE",
+  "provider": "google_ads",
+  "business_outcome": "A Google Ads connection belongs to the AdsTable workspace, retains the manager context required for every selected ad account, renews access server-side with its refresh token, and cannot appear connected before 1 to 3 verified ad accounts are selected.",
+  "existing_completed_work": {
+    "reuse_without_redevelopment": [
+      "E5 Google Ads Standard and Performance Max adapters",
+      "E5 metric and conversion mapping",
+      "E5 customer metadata, source currency and timezone verification",
+      "E5 Time and FX normalization",
+      "E5 Dataset V2 writer and verified empty result handling",
+      "R7-A Shopify embedded OAuth and provider-verified 1 to 3 account selection foundation"
+    ],
+    "google_sheets_status": "parked",
+    "ga4_organic_status": "parked"
+  },
+  "legacy_disposition": {
+    "standalone_google_connection_is_workspace_authority": false,
+    "reuse_standalone_token_for_embedded_connection": false,
+    "delete_legacy_history": false,
+    "activate_legacy_schedule_or_job": false,
+    "clean_embedded_oauth_required": true
+  },
+  "oauth_entry": {
+    "channel": "shopify_embedded",
+    "workspace_authority_resolved_server_side": true,
+    "scope": "https://www.googleapis.com/auth/adwords",
+    "offline_access_required": true,
+    "refresh_token_required_before_canonical_save": true,
+    "callback_state_after_token_validation": "pending_account_selection",
+    "callback_may_mark_connected": false
+  },
+  "token_lifecycle": {
+    "access_token_stored_as_encrypted_envelope": true,
+    "refresh_token_stored_as_encrypted_envelope": true,
+    "access_expiry_required": true,
+    "server_side_refresh_required": true,
+    "refresh_before_provider_request_when_expired_or_near_expiry": true,
+    "refresh_token_rotation_must_be_persisted_when_returned": true,
+    "single_refresh_then_single_retry_on_unexpected_auth_failure": true,
+    "invalid_grant_or_missing_refresh_token_result": "reauthorization_required",
+    "merchant_action_label": "Reconnect Google Ads",
+    "browser_token_exposure_allowed": false
+  },
+  "account_selection": {
+    "minimum": 1,
+    "maximum": 3,
+    "discovery": "ListAccessibleCustomers plus customer_client hierarchy",
+    "manager_accounts_selectable": false,
+    "server_side_refetch_required_on_save": true,
+    "browser_supplied_account_metadata_is_authority": false,
+    "required_canonical_fields_per_account": [
+      "id",
+      "name",
+      "currency",
+      "login_customer_id"
+    ],
+    "login_customer_id_source": "verified accessible root that exposed the selected non-manager customer",
+    "connected_transition": "only_after_successful_verified_account_selection"
+  },
+  "currency_policy": {
+    "workspace_reporting_currency_source": "merchant_selected_workspace_setting",
+    "provider_source_currency_source": "verified Google Ads customer metadata",
+    "shopify_currency_allowed": false,
+    "manager_account_currency_allowed_as_selected_account_currency": false
+  },
+  "disconnect_policy": {
+    "independent_google_ads_disconnect_required": true,
+    "confirmation_required": true,
+    "provider_global_revoke_allowed": false,
+    "reason": "Google Ads, parked Google Sheets and parked GA4 have used the same Google OAuth client; provider-level revoke may invalidate another Google grant.",
+    "local_credentials_removed": true,
+    "selected_accounts_removed": true,
+    "historical_analytics_preserved": true,
+    "clean_reconnect_required": true
+  },
+  "state_flow": [
+    "not_connected",
+    "oauth_in_progress",
+    "pending_account_selection",
+    "connected",
+    "reauthorization_required",
+    "disconnected"
+  ],
+  "fail_closed_rules": [
+    "missing_refresh_token_does_not_create_or_update_a_canonical_connection",
+    "missing_or_invalid_access_expiry_does_not_create_or_update_a_canonical_connection",
+    "zero_or_more_than_three_selected_accounts_does_not_mark_connected",
+    "manager_account_does_not_become_a_selected_ad_account",
+    "unverified_account_does_not_mark_connected",
+    "selected_account_without_verified_login_customer_id_does_not_mark_connected",
+    "stale_connection_version_cannot_overwrite_a_newer_connection",
+    "refresh_failure_does_not_fall_back_to_legacy_tokens",
+    "disconnect_does_not_revoke_the_shared_google_provider_grant",
+    "legacy_write_schedule_backfill_and_v1_fallback_remain_forbidden"
+  ],
+  "r6_d4_packages": {
+    "R6-D4-A": "connection, token, account-context and disconnect decision contract",
+    "R6-D4-B": "canonical OAuth token validation, refresh lifecycle and login-customer persistence implementation",
+    "R6-D4-C": "merchant Connect, 1 to 3 verified account selection and reload acceptance",
+    "R6-D4-D": "workspace-bound read-only Google Ads preflight using completed E5 runtime",
+    "R6-D4-E": "single controlled Dataset V2 acceptance with verified empty or real rows",
+    "R6-D4-F": "independent local Disconnect, Cancel and clean Reconnect acceptance"
+  },
+  "excluded_from_r6_d4_a": [
+    "production_google_oauth",
+    "provider_api_contact",
+    "database_mutation",
+    "dataset_v2_write",
+    "schedule_or_backfill_activation",
+    "E5_adapter_mapper_time_fx_or_writer_redevelopment",
+    "google_sheets_reactivation",
+    "ga4_organic_reactivation"
+  ],
+  "production_mutation": false,
+  "provider_contact": false,
+  "dataset_v2_write": false
+}
+

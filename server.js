@@ -12,7 +12,7 @@ const {createOAuthTransactionBoundary}=require("./src/oauth/transaction-boundary
 const {registerOAuthProviderRoutes}=require("./src/oauth/provider-routes");
 const {createMetaOAuthHandlers}=require("./src/oauth/meta-handlers");
 const {createGoogleAdsOAuthHandlers}=require("./src/oauth/google-ads-handlers");
-const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");
+const {createGoogleSheetsOAuthHandlers}=require("./src/oauth/google-sheets-handlers");const {GOOGLE_SHEETS_EXPORT_ENABLED,GOOGLE_SHEETS_PARK_REASON,requireGoogleSheetsExport}=require("./src/providers/google-sheets/availability-policy");
 const {createOrganicOAuthHandlers}=require("./src/oauth/organic-handlers");const {ORGANIC_GA4_INGEST_ENABLED,ORGANIC_GA4_PARK_REASON,requireOrganicGa4Ingest}=require("./src/providers/organic/ingest-policy");
 const {createKlaviyoOAuthHandlers}=require("./src/oauth/klaviyo-handlers");
 const {createPinterestOAuthHandlers}=require("./src/oauth/pinterest-handlers");const {pinterestAdAccountIds,discoverPinterestAdAccounts}=require("./src/providers/pinterest/account-discovery");const {createPinterestClient}=require("./src/providers/pinterest/client");
@@ -62,7 +62,7 @@ const {requireUser,requireAccess,requireLifecycleAccess,requireConnection,requir
 const requireConnectAccessForOAuth=createRequireConnectAccessForOAuth({requireUser,getUserSubscription,getAccessByStatus});
 const {createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse}=createOAuthTransactionBoundary({transactionStore:oauthTransactionStore});
 function parseExpiry(s){return s?new Date(Date.now()+Number(s)*1000).toISOString():null}
-async function saveConnection(userId,platform,payload){assertLegacyProviderWriteAllowed(platform);
+async function saveConnection(userId,platform,payload){assertLegacyProviderWriteAllowed(platform);if(platform==="google_sheets")requireGoogleSheetsExport();
   if(!supabaseAdmin||!userId)throw new Error("Supabase not configured or user missing");
   const {data:existing,error:existingError}=await supabaseAdmin
     .from("platform_connections")
@@ -1109,7 +1109,7 @@ function sanitizedGoogleSheetsMetadata(conn){
     last_sync_error:m.last_sync_error||null
   };
 }
-async function getFreshGoogleSheetsClient(userId){
+async function getFreshGoogleSheetsClient(userId){requireGoogleSheetsExport();
   const conn=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
   if(!conn)throw Object.assign(new Error("Google Sheets not connected"),{status:404,code:"GOOGLE_SHEETS_NOT_CONNECTED"});
   const client=googleSheetsOAuthClient();
@@ -1135,7 +1135,7 @@ async function getFreshGoogleSheetsClient(userId){
   }
   return {client,conn:await getConnection(userId,GOOGLE_SHEETS_PLATFORM)};
 }
-async function updateGoogleSheetsMetadata(userId,patch={}){
+async function updateGoogleSheetsMetadata(userId,patch={}){requireGoogleSheetsExport();
   const conn=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
   if(!conn)throw Object.assign(new Error("Google Sheets not connected"),{status:404});
   await saveConnection(userId,GOOGLE_SHEETS_PLATFORM,{
@@ -1155,7 +1155,7 @@ async function ensureGoogleSheetsWorksheet(sheets,spreadsheetId,worksheetName){
   }
   return {spreadsheet_name:spreadsheetName,worksheet_name:worksheetName};
 }
-async function fetchGoogleSheetsDatasetRows(userId){
+async function fetchGoogleSheetsDatasetRows(userId){requireGoogleSheetsExport();
   const pageSize=1000;
   const rows=[];
   for(let from=0;;from+=pageSize){
@@ -1180,7 +1180,7 @@ function googleSheetsCellValue(value){
   if(typeof value==="object")return JSON.stringify(value);
   return value;
 }
-async function syncPerformanceDatasetToGoogleSheets(userId,options={}){
+async function syncPerformanceDatasetToGoogleSheets(userId,options={}){requireGoogleSheetsExport();
   const startedAt=new Date().toISOString();
   const {client,conn}=await getFreshGoogleSheetsClient(userId);
   const metadata=sanitizedGoogleSheetsMetadata(conn);
@@ -1216,7 +1216,7 @@ async function syncPerformanceDatasetToGoogleSheets(userId,options={}){
     const err=new Error(message);err.status=Number.isInteger(e.status)?e.status:(Number.isInteger(e.code)?e.code:502);err.code=e.code||"GOOGLE_SHEETS_SYNC_FAILED";throw err;
   }
 }
-async function maybeAutoSyncGoogleSheets(userId){
+async function maybeAutoSyncGoogleSheets(userId){if(!GOOGLE_SHEETS_EXPORT_ENABLED)return {attempted:false,ok:true,skipped:true,reason:GOOGLE_SHEETS_PARK_REASON,spreadsheet_id:null,rows_written:0,error:null};
   try{
     const conn=await getConnection(userId,GOOGLE_SHEETS_PLATFORM);
     if(!conn)return {attempted:false,ok:true,skipped:true,reason:"google_sheets_not_connected",spreadsheet_id:null,rows_written:0,error:null};
@@ -1228,18 +1228,17 @@ async function maybeAutoSyncGoogleSheets(userId){
     return {attempted:true,ok:false,spreadsheet_id:null,rows_written:0,error:e.message};
   }
 }
-const {start:handleGoogleSheetsOAuthStart,callback:handleGoogleSheetsOAuthCallback}=createGoogleSheetsOAuthHandlers({scopes:GOOGLE_SHEETS_SCOPES,defaultWorksheet:GOOGLE_SHEETS_DEFAULT_WORKSHEET,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:googleSheetsRedirectUri,createClient:googleSheetsOAuthClient,getConnection,saveConnection});
+const {start:handleGoogleSheetsOAuthStart,callback:handleGoogleSheetsOAuthCallback}=createGoogleSheetsOAuthHandlers({scopes:GOOGLE_SHEETS_SCOPES,defaultWorksheet:GOOGLE_SHEETS_DEFAULT_WORKSHEET,requireConnectAccess:requireConnectAccessForOAuth,createTransaction:createOAuthTransaction,consumeTransaction:consumeOAuthTransaction,sendAuthorizationResponse:sendOAuthAuthorizationResponse,getRedirectUri:googleSheetsRedirectUri,createClient:googleSheetsOAuthClient,getConnection,saveConnection,enabled:GOOGLE_SHEETS_EXPORT_ENABLED});
 registerOAuthProviderRoutes({app,provider:"google-sheets",startHandler:handleGoogleSheetsOAuthStart,callbackHandler:handleGoogleSheetsOAuthCallback});
 app.get("/api/google-sheets/status",async(req,res)=>{
   try{
     const user=await requireUser(req,res);if(!user)return;
-    const conn=await getConnection(user.id,GOOGLE_SHEETS_PLATFORM);
-    res.json({ok:true,connected:Boolean(conn),platform:GOOGLE_SHEETS_PLATFORM,...sanitizedGoogleSheetsMetadata(conn)});
+    res.json({ok:true,connected:false,platform:GOOGLE_SHEETS_PLATFORM,status:"parked",parked:true,reason:GOOGLE_SHEETS_PARK_REASON});
   }catch(e){res.status(e.status||500).json({ok:false,error:e.message})}
 });
 app.post("/api/google-sheets/disconnect",async(req,res)=>{
-  try{const user=await requireUser(req,res);if(!user)return;res.json(await disconnectPlatformLifecycle(user.id,GOOGLE_SHEETS_PLATFORM,{reason:req.body?.reason||"user_disconnect"}))}
-  catch(e){res.status(e.status||500).json({ok:false,error:e.message})}
+  try{const user=await requireUser(req,res);if(!user)return;requireGoogleSheetsExport();res.json(await disconnectPlatformLifecycle(user.id,GOOGLE_SHEETS_PLATFORM,{reason:req.body?.reason||"user_disconnect"}))}
+  catch(e){res.status(e.status||500).json({ok:false,code:e.code||null,parked:e.code==="GOOGLE_SHEETS_EXPORT_PARKED",error:e.message})}
 });
 app.post("/api/google-sheets/spreadsheets/create",async(req,res)=>{
   try{
@@ -3644,9 +3643,9 @@ app.get("/api/debug/time-sync",async(req,res)=>{
   }
 });
 
-app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic"),googleSheets=await connectionStatus(user.id,"google_sheets");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:false,google_sheets:googleSheets.connected,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:"parked",google_sheets:googleSheets.source},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:googleSheets.updatedAt},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"parked",label:"Organic",message:"GA4 Organic ingestion is parked; Paid/Organic Blend capability remains available for a future backend source."}}})});
+app.get("/api/unified/status",async(req,res)=>{const user=await requireUser(req,res);if(!user)return;const meta=await connectionStatus(user.id,"meta"),google=await connectionStatus(user.id,"google"),pinterest=await connectionStatus(user.id,"pinterest"),klaviyo=await connectionStatus(user.id,"klaviyo"),tiktok=await connectionStatus(user.id,"tiktok"),organic=await connectionStatus(user.id,"organic");res.json({meta:meta.connected,google:google.connected,pinterest:pinterest.connected,klaviyo:klaviyo.connected,tiktok:tiktok.connected,organic:false,google_sheets:false,sources:{meta:meta.source,google:google.source,pinterest:pinterest.source,klaviyo:klaviyo.source,tiktok:tiktok.source,organic:"parked",google_sheets:"parked"},updatedAt:{meta:meta.updatedAt,google:google.updatedAt,pinterest:pinterest.updatedAt,klaviyo:klaviyo.updatedAt,tiktok:tiktok.updatedAt,organic:organic.updatedAt,google_sheets:null},platformStatus:{pinterest:passiveLegacyPlatformStatus("pinterest"),organic:{platform:"organic",status:"parked",label:"Organic",message:"GA4 Organic ingestion is parked; Paid/Organic Blend capability remains available for a future backend source."},google_sheets:{platform:"google_sheets",status:"parked",label:"Google Sheets",message:"Google Sheets export is parked until a Dataset V2 workspace export is designed."}}})});
 app.get("/api/debug/connections",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const{data,error}=await supabaseAdmin.from("platform_connections").select("platform,connected,account_id,account_name,token_expires_at,metadata,updated_at").eq("user_id",user.id).order("updated_at",{ascending:false});if(error)throw error;res.json({connections:data||[]})}catch(e){res.status(500).json({error:e.message})}});
-app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic","google_sheets"].includes(platform))return res.status(400).json({error:"Unsupported platform"});const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({error:e.message})}});
+app.post("/api/connections/:platform/disconnect",async(req,res)=>{try{const user=await requireUser(req,res);if(!user)return;const platform=req.params.platform;if(!["meta","google","pinterest","klaviyo","tiktok","organic","google_sheets"].includes(platform))return res.status(400).json({error:"Unsupported platform"});if(platform==="google_sheets")requireGoogleSheetsExport();const result=await disconnectPlatformLifecycle(user.id,platform);res.json(result)}catch(e){res.status(e.status||500).json({code:e.code||null,parked:e.code==="GOOGLE_SHEETS_EXPORT_PARKED",error:e.message})}});
 async function upsertAdAccount(userId,platform,account){
   if(!supabaseAdmin||!userId)return null;
   const row={

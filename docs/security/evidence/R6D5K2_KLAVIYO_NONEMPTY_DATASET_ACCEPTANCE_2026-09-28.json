@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "check_name": "R6D5K2_KLAVIYO_NONEMPTY_DATASET_ACCEPTANCE",
+  "observed_at": "2026-09-28",
+  "environment": "production",
+  "result": "PASS_FIRST_NONEMPTY_WRITE_JOURNEY_AND_FLOW_EVIDENCE_PENDING",
+  "corrective_pull_request": 290,
+  "corrective_merge_commit": "a3494436df6df95d3f51ac48b7d23ed49cc3717d",
+  "corrective_migration_version": "20260928155903",
+  "corrective_migration_name": "fix_dataset_v2_workspace_upsert_index",
+  "index_postcheck": {
+    "unique": true,
+    "partial_predicate": null,
+    "columns": [
+      "workspace_id",
+      "platform",
+      "platform_account_id",
+      "business_date",
+      "traffic_type",
+      "entity_key"
+    ],
+    "dataset_rows_before_acceptance": 0
+  },
+  "controlled_acceptance": {
+    "ui_result": "PASS",
+    "attempted": 1,
+    "persisted": 1,
+    "verified_empty": false,
+    "automatic_retry": false
+  },
+  "dataset_postcheck": {
+    "dataset_v2_rows": 1,
+    "klaviyo_rows": 1,
+    "duplicate_groups": 0,
+    "workspace_count": 1,
+    "account_count": 1,
+    "platform": "klaviyo",
+    "source_system": "klaviyo",
+    "channel": "email",
+    "business_date": "2026-09-26",
+    "root_entity_type": "campaign",
+    "entity_type": "campaign_message",
+    "impressions": 10,
+    "ad_clicks": 0,
+    "purchase": 0,
+    "purchase_value": 0,
+    "add_to_cart": null,
+    "add_to_cart_support": "unknown",
+    "checkout": null,
+    "checkout_support": "unknown",
+    "source_currency": "USD",
+    "target_currency": "TRY",
+    "fx_rate": "48.93229851793387",
+    "fx_rate_date": "2026-09-25",
+    "fx_provider": "frankfurter_v1",
+    "persisted_spend": "1223.307462948347",
+    "expected_spend_for_observed_allocation": "1223.307462948347",
+    "spend_difference": "0.000000000000",
+    "source_confidence": "partial",
+    "synthetic": false
+  },
+  "connection_postcheck": {
+    "status": "connected",
+    "connection_version": 19,
+    "access_token_envelope_present": true,
+    "refresh_token_envelope_present": true
+  },
+  "production_activation": false,
+  "schedule_or_backfill_enabled": false,
+  "remaining_gate": "Prove Flow persistence and provider-attributed Added to Cart, Started Checkout and Placed Order count/value coverage before R6-D5 can be Done."
+}

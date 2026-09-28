@@ -15,6 +15,11 @@ const connection = {
   monthlyPlanCost: '25.00',
   selectedAccounts: [{ id: 'account-1', name: 'Account', currency: 'USD' }],
   conversionMetric: { id: 'metric-1', name: 'Placed Order', integrationName: 'Klaviyo' },
+  journeyMetrics: {
+    addToCart: { id: 'metric-add', name: 'Added to Cart', integrationName: 'Klaviyo' },
+    checkout: { id: 'metric-checkout', name: 'Checkout Started', integrationName: 'Klaviyo' },
+    purchase: { id: 'metric-1', name: 'Placed Order', integrationName: 'Klaviyo' },
+  },
 };
 
 function inventory({ dates, counts = { total: 3, sent: 3, dated: 3, undated: 0 }, onFx = () => {} }) {
@@ -51,9 +56,10 @@ function inventory({ dates, counts = { total: 3, sent: 3, dated: 3, undated: 0 }
             sent_dates: dates,
           };
         },
-        fetchMessageFacts: async ({ accessToken, providerDate, conversionMetricId }) => {
+        fetchMessageFacts: async ({ accessToken, providerDate, conversionMetricId, journeyMetricIds }) => {
           assert.equal(accessToken, 'secret-token');
           assert.equal(conversionMetricId, 'metric-1');
+          assert.deepEqual(journeyMetricIds, { addToCart: 'metric-add', checkout: 'metric-checkout', purchase: 'metric-1' });
           providerDates.push(providerDate);
           return { rows: [], verified_empty: true };
         },

@@ -56,11 +56,17 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
       if (!connection || connection.provider !== 'klaviyo' || connection.status !== 'connected') {
         throw new Error('KLAVIYO_CANONICAL_CONNECTION_REQUIRED');
       }
+      const journeyMetrics = connection.journeyMetrics || {};
+      const purchaseMetric = journeyMetrics.purchase || connection.conversionMetric;
       return Object.freeze({
         workspaceId,
         connection,
         selected: onlySelectedAccount(connection),
-        conversionMetricId: required(connection?.conversionMetric?.id, 'connection.conversionMetric.id'),
+        journeyMetricIds: Object.freeze({
+          addToCart: required(journeyMetrics.addToCart?.id, 'connection.journeyMetrics.addToCart.id'),
+          checkout: required(journeyMetrics.checkout?.id, 'connection.journeyMetrics.checkout.id'),
+          purchase: required(purchaseMetric?.id, 'connection.conversionMetric.id'),
+        }),
         providerDate: required(context?.request?.provider_date, 'request.provider_date'),
         reportingCurrency: normalizeCurrencyCode(context.reportingCurrency, 'reportingCurrency'),
         accessToken: required(connection.accessToken, 'connection.accessToken'),
@@ -85,7 +91,8 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
       accessToken: runtime.accessToken,
       account: Object.freeze({ id: runtime.selected.id, currency: verifiedAccount.sourceCurrency, timezone: verifiedAccount.timezone }),
       providerDate: runtime.providerDate,
-      conversionMetricId: runtime.conversionMetricId,
+      conversionMetricId: runtime.journeyMetricIds.purchase,
+      journeyMetricIds: runtime.journeyMetricIds,
     }));
     syncStage('PROVIDER_RESULT_VALIDATION', () => {
       if (!providerResult || !Array.isArray(providerResult.rows)) throw new Error('KLAVIYO_PROVIDER_RESULT_INVALID');
@@ -119,3 +126,6 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
 }
 
 module.exports = Object.freeze({ createKlaviyoWorkspaceRunner });
+
+
+

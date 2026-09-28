@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "check_name": "R6D5K1_KLAVIYO_JOURNEY_BINDING_PREFLIGHT",
+  "observed_at": "2026-09-28",
+  "environment": "production",
+  "result": "PASS",
+  "canonical_table_exists": true,
+  "rls_enabled": true,
+  "force_rls_enabled": true,
+  "target_column_count": 0,
+  "add_to_cart_constraint_count": 0,
+  "checkout_constraint_count": 0,
+  "browser_grant_count": 0,
+  "canonical_connection_count": 3,
+  "connected_klaviyo_count": 1,
+  "purchase_binding_count": 0,
+  "dataset_v2_count": 0,
+  "klaviyo_dataset_v2_count": 0,
+  "database_mutation": false,
+  "provider_contact": false,
+  "dataset_v2_write": false,
+  "next_gate": "explicit approval for additive production migration"
+}
+

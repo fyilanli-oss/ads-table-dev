@@ -11,6 +11,11 @@ const connection = {
   provider: 'klaviyo', status: 'connected', accessToken: 'secret-token', sourceCurrency: 'USD', monthlyPlanCost: '25.00',
   selectedAccounts: [{ id: 'account-1', name: 'Account', currency: 'USD' }],
   conversionMetric: { id: 'metric-1', name: 'Placed Order', integrationName: 'Shopify' },
+  journeyMetrics: {
+    addToCart: { id: 'metric-add', name: 'Added to Cart', integrationName: 'Shopify' },
+    checkout: { id: 'metric-checkout', name: 'Checkout Started', integrationName: 'Shopify' },
+    purchase: { id: 'metric-1', name: 'Placed Order', integrationName: 'Shopify' },
+  },
 };
 
 function preflight({ facts = { rows: [], verified_empty: true }, providerError = null } = {}) {
@@ -24,9 +29,10 @@ function preflight({ facts = { rows: [], verified_empty: true }, providerError =
         if (providerError) throw new Error(providerError);
         return { id: 'account-1', currency: 'USD', timezone: 'UTC' };
       },
-      fetchMessageFacts: async ({ providerDate, conversionMetricId }) => {
+      fetchMessageFacts: async ({ providerDate, conversionMetricId, journeyMetricIds }) => {
         assert.equal(providerDate, '2026-09-23');
         assert.equal(conversionMetricId, 'metric-1');
+        assert.deepEqual(journeyMetricIds, { addToCart: 'metric-add', checkout: 'metric-checkout', purchase: 'metric-1' });
         return facts;
       },
     },
@@ -41,7 +47,7 @@ test('R6-D2 chooses a provider date closed across supported timezones', () => {
 
 test('R6-D2 preflight fails closed when the canonical metric binding is absent', async () => {
   const missing = createKlaviyoReadOnlyPreflight({
-    connectionStore: { resolveConnected: async () => ({ ...connection, conversionMetric: null }) },
+    connectionStore: { resolveConnected: async () => ({ ...connection, conversionMetric: null, journeyMetrics: { ...connection.journeyMetrics, purchase: null } }) },
     settingsStore: { resolveReportingCurrency: async () => ({ reportingCurrency: 'TRY', currencyVersion: 2 }) },
     providerClient: { fetchAccount: async () => ({ id: 'account-1', currency: 'USD', timezone: 'UTC' }), fetchMessageFacts: async () => ({ rows: [], verified_empty: true }) },
     resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: '2026-09-23', fx_provider: 'test' }),
@@ -128,3 +134,6 @@ test('R6-D2 C6 controlled Dataset acceptance route is session-bound and forwards
   assert.deepEqual(received, { input: authority, confirmation: 'RUN_R6_D2_C6_KLAVIYO_WRITE' });
   assert.equal(res.code, 200);
 });
+
+
+

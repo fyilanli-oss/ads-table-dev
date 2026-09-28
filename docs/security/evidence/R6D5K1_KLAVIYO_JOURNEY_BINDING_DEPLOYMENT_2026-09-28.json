@@ -1,0 +1,32 @@
+{
+  "schema_version": "r6d5k1-klaviyo-journey-deployment-evidence-v1",
+  "recorded_at": "2026-09-28T15:28:52Z",
+  "repository": "fyilanli-oss/ads-table-dev",
+  "pull_request": 288,
+  "merge_commit": "7244a739e164f39047d75d4cc9d80c9e8e9a18b0",
+  "ci": {
+    "security_suite": "PASS",
+    "full_regression_suite": "PASS",
+    "workflow_run": 36443689663
+  },
+  "vercel": {
+    "project": "ads-table-dev",
+    "deployment_id": "dpl_Fw3Cock9Sb2HhDf1tPSWac9qjU8E",
+    "state": "READY",
+    "target": "production",
+    "commit_sha": "7244a739e164f39047d75d4cc9d80c9e8e9a18b0",
+    "aliases": [
+      "dev.adstable.app",
+      "ads-table-dev.vercel.app"
+    ],
+    "alias_error": null,
+    "runtime_error_scan": "PASS_NO_ERRORS"
+  },
+  "boundaries": {
+    "provider_contact": false,
+    "metric_binding_write": false,
+    "dataset_v2_write": false,
+    "production_activation": false
+  },
+  "next_gate": "Explicit approval for live Klaviyo journey metric discovery and canonical binding"
+}

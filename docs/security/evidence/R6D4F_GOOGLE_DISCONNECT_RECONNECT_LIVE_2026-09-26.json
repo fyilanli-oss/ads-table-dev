@@ -1,0 +1,28 @@
+{
+  "evidence_version": "r6d4f-live-2026-09-26",
+  "redacted": true,
+  "result": "PASS",
+  "merchant_observation": {
+    "entry_state": "Connected · 3 accounts",
+    "cancel_result": "Connected · 3 accounts",
+    "disconnect_result": "Not connected",
+    "clean_reconnect_result": "Connected · 3 accounts"
+  },
+  "final_supabase_postcheck_reference": "docs/security/evidence/R6D4G_GOOGLE_LEGACY_RETIREMENT_LIVE_2026-09-26.json",
+  "final_supabase_postcheck": {
+    "google_ads_status": "connected",
+    "connection_version": 13,
+    "access_token_envelope_present": true,
+    "refresh_token_envelope_present": true,
+    "access_expiry_present": true,
+    "selected_account_count": 3,
+    "meta_connected": true,
+    "klaviyo_connected": true,
+    "reporting_currency": "TRY",
+    "dataset_v2_rows_at_observation": 0
+  },
+  "migration_performed": false,
+  "dataset_v2_write_performed": false,
+  "schedule_or_backfill_activated": false,
+  "note": "A later, separately approved R6-D4-G operation retired the legacy Google services and performed a real provider grant revoke before clean Google Ads reconnect. That later operation does not change the PASS result of the earlier local Disconnect/Cancel/Reconnect lifecycle."
+}

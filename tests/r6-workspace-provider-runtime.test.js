@@ -143,7 +143,7 @@ test('R6 preflight is read-only and fail-closed', () => {
 
 test('Execution Plan records the failed C6 attempts and the verified-empty live corrective', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4-E Google Ads verified-empty live PASS; R6-D4-F repository PASS \/ production acceptance pending/);
+  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4 Google Ads full lifecycle live PASS; R6-D5-K2 first non-empty Klaviyo write PASS; K3 data maturity pending/);
   assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS \/ C3 next/);
   assert.match(plan, /R6-D2-C3 salt-okunur satış kaynağı keşfi — Live PASS/);
   assert.match(plan, /R6-D2-C4 canonical satış kaynağı bağı — Live PASS/);

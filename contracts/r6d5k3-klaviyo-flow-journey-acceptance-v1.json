@@ -1,0 +1,62 @@
+{
+  "contract_version": "r6d5k3-klaviyo-flow-journey-acceptance-v1",
+  "status": "PASS_ACCEPTANCE_CONTRACT_DATA_MATURITY_PENDING",
+  "provider": "klaviyo",
+  "business_outcome": "Prove that Campaign and Flow performance, journey count/value metrics, monthly Email plan cost allocation, Time, FX and idempotent Dataset V2 persistence work together without synthetic fallback.",
+  "entry_conditions": [
+    "canonical_klaviyo_connection_is_connected",
+    "single_provider_verified_account_is_selected",
+    "added_to_cart_started_checkout_and_placed_order_bindings_are_provider_verified",
+    "flow_send_business_date_is_closed_in_source_timezone",
+    "r6d5k2_campaign_row_remains_unique"
+  ],
+  "execution_sequence": [
+    "read_only_account_campaign_flow_inventory",
+    "read_only_exact_journey_metric_inventory",
+    "read_only_time_fx_and_recipient_allocation_validation",
+    "classify_pass_wait_or_fail",
+    "separate_explicit_approval_for_one_controlled_dataset_v2_acceptance",
+    "read_only_dataset_and_connection_postcheck"
+  ],
+  "read_only_pass_requirements": {
+    "campaign_scope_observed": true,
+    "flow_scope_observed": true,
+    "provider_rows_only": true,
+    "synthetic_fallback_allowed": false,
+    "closed_business_date_required": true,
+    "account_month_recipient_denominator_required": true,
+    "journey_metrics": [
+      "added_to_cart_count_and_value",
+      "started_checkout_count_and_value",
+      "placed_order_count_and_value"
+    ]
+  },
+  "decision_rules": {
+    "flow_date_not_closed": "WAIT_NO_WRITE",
+    "provider_flow_result_empty": "WAIT_OR_VERIFIED_EMPTY_NOT_FLOW_PERSISTENCE_PASS",
+    "journey_stage_missing_or_unknown": "KEEP_R6D5_OPEN_NO_SYNTHETIC_VALUE",
+    "binding_invalid": "FAIL_CLOSED_REBIND_REQUIRED",
+    "time_or_fx_invalid": "FAIL_CLOSED_NO_WRITE",
+    "unexpected_existing_duplicate": "FAIL_CLOSED_NO_WRITE"
+  },
+  "controlled_write_acceptance": {
+    "one_explicitly_approved_run": true,
+    "automatic_retry": false,
+    "idempotent_upsert_required": true,
+    "campaign_row_may_be_updated": true,
+    "provider_returned_flow_row_must_persist": true,
+    "duplicate_group_count": 0,
+    "connection_and_encrypted_tokens_must_be_preserved": true,
+    "production_activation": false,
+    "schedule_or_backfill_activation": false
+  },
+  "cost_allocation": {
+    "source": "canonical_email_monthly_plan_cost",
+    "basis": "provider_verified_account_month_recipients",
+    "row_numerator": "provider_verified_row_recipients",
+    "delivered_is_not_recipient_denominator": true,
+    "closed_month_source_allocation_sum_equals_monthly_plan_cost": true,
+    "target_currency_conversion_uses_each_row_business_date_fx_provenance": true
+  },
+  "done_rule": "R6-D5 remains open until Flow persistence and provider-attributed Added to Cart, Started Checkout and Placed Order count/value coverage are live-proven."
+}

@@ -14,15 +14,26 @@ const candidates = [
   { id: 'metric-shopify', name: 'Placed Order', integration_name: 'Shopify', integration_category: 'Ecommerce' },
   { id: 'metric-woo', name: 'Placed Order', integration_name: 'WooCommerce', integration_category: 'Ecommerce' },
 ];
+const journeyCandidates = {
+  addToCart: [
+    { id: 'add-shopify', name: 'Added to Cart', integration_name: 'Shopify', integration_category: 'Ecommerce' },
+    { id: 'add-woo', name: 'Added to Cart', integration_name: 'WooCommerce', integration_category: 'Ecommerce' },
+  ],
+  checkout: [
+    { id: 'checkout-shopify', name: 'Checkout Started', integration_name: 'Shopify', integration_category: 'Ecommerce' },
+    { id: 'checkout-woo', name: 'Started Checkout', integration_name: 'WooCommerce', integration_category: 'Ecommerce' },
+  ],
+  purchase: candidates,
+};
 
-function fixture(items = candidates) {
+function fixture(items = journeyCandidates) {
   const writes = [];
   const binding = createKlaviyoMetricBinding({
     connectionStore: {
       resolveConnected: async () => connection,
-      bindKlaviyoConversionMetric: async input => { writes.push(input); return { connection_version: 8 }; },
+      bindKlaviyoJourneyMetrics: async input => { writes.push(input); return { connection_version: 8 }; },
     },
-    providerClient: { fetchPlacedOrderMetricCandidates: async ({ accessToken }) => { assert.equal(accessToken, 'secret'); return items; } },
+    providerClient: { fetchJourneyMetricCandidates: async ({ accessToken }) => { assert.equal(accessToken, 'secret'); return items; } },
   });
   return { binding, writes };
 }
@@ -33,6 +44,7 @@ test('metric discovery is read-only and preserves provider integration provenanc
   assert.equal(result.candidate_count, 2);
   assert.equal(result.connection_write, false);
   assert.deepEqual(result.candidates, candidates);
+  assert.deepEqual(result.journey_candidate_counts, { add_to_cart: 2, checkout: 2, purchase: 2 });
   assert.deepEqual(writes, []);
 });
 
@@ -44,12 +56,30 @@ test('metric selection revalidates the provider candidate and binds it to accoun
   assert.equal(writes.length, 1);
   assert.equal(writes[0].accountId, 'account-1');
   assert.equal(writes[0].version, 7);
-  assert.deepEqual(writes[0].metric, candidates[1]);
+  assert.deepEqual(writes[0].metrics, {
+    addToCart: journeyCandidates.addToCart[1],
+    checkout: journeyCandidates.checkout[1],
+    purchase: candidates[1],
+  });
+  assert.deepEqual(result.journey_bindings, {
+    add_to_cart: 'Added to Cart', checkout: 'Started Checkout', purchase: 'Placed Order',
+  });
 });
 
 test('metric selection never guesses on missing or unknown candidates', async () => {
-  await assert.rejects(fixture([]).binding.discover(authority), error => error.code === 'KLAVIYO_CONVERSION_METRIC_NOT_FOUND');
+  await assert.rejects(fixture({ ...journeyCandidates, purchase: [] }).binding.discover(authority), error => error.code === 'KLAVIYO_CONVERSION_METRIC_NOT_FOUND');
   await assert.rejects(fixture().binding.select(authority, { metric_id: 'unknown' }), error => error.code === 'KLAVIYO_CONVERSION_METRIC_SELECTION_INVALID');
+});
+
+test('metric selection leaves a missing provider stage unbound and fails closed on ambiguous same-integration stages', async () => {
+  const missing = fixture({ ...journeyCandidates, addToCart: [] });
+  await missing.binding.select(authority, { metric_id: 'metric-shopify' });
+  assert.equal(missing.writes[0].metrics.addToCart, null);
+  const ambiguous = fixture({
+    ...journeyCandidates,
+    checkout: [...journeyCandidates.checkout, { ...journeyCandidates.checkout[0], id: 'checkout-shopify-2' }],
+  });
+  await assert.rejects(ambiguous.binding.select(authority, { metric_id: 'metric-shopify' }), error => error.code === 'KLAVIYO_JOURNEY_METRIC_AMBIGUOUS');
 });
 
 test('conversion metric migration is additive, workspace-scoped and commerce-channel independent', () => {
@@ -58,6 +88,15 @@ test('conversion metric migration is additive, workspace-scoped and commerce-cha
   assert.match(sql, /conversion_metric_id text/);
   assert.match(sql, /provider = 'klaviyo'/);
   assert.match(sql, /lower\(btrim\(conversion_metric_name\)\) = 'placed order'/);
+  assert.doesNotMatch(sql, /shop_id|woocommerce_id|insert into|update public\.workspace_provider_connections/i);
+});
+
+test('journey metric migration adds only nullable exact-name bindings without data mutation', () => {
+  const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '20260928145812_add_workspace_provider_journey_metrics.sql'), 'utf8');
+  assert.match(sql, /add_to_cart_metric_id text/);
+  assert.match(sql, /checkout_metric_id text/);
+  assert.match(sql, /lower\(btrim\(add_to_cart_metric_name\)\) = 'added to cart'/);
+  assert.match(sql, /'checkout started', 'started checkout'/);
   assert.doesNotMatch(sql, /shop_id|woocommerce_id|insert into|update public\.workspace_provider_connections/i);
 });
 
@@ -88,8 +127,12 @@ test('canonical store binds a metric only to the same connected account and conn
     vault: { encrypt() {}, decrypt() {} },
     now: () => new Date('2026-09-25T09:00:00.000Z'),
   });
-  await store.bindKlaviyoConversionMetric({
-    authority, version: 7, accountId: 'account-1', metric: candidates[0],
+  await store.bindKlaviyoJourneyMetrics({
+    authority, version: 7, accountId: 'account-1', metrics: {
+      addToCart: journeyCandidates.addToCart[0],
+      checkout: journeyCandidates.checkout[0],
+      purchase: candidates[0],
+    },
   });
   assert.deepEqual(calls.filter(call => call[0] === 'eq'), [
     ['eq', 'workspace_id', WORKSPACE], ['eq', 'provider', 'klaviyo'],
@@ -98,5 +141,10 @@ test('canonical store binds a metric only to the same connected account and conn
   ]);
   const update = calls.find(call => call[0] === 'update')[1];
   assert.equal(update.conversion_metric_id, 'metric-shopify');
+  assert.equal(update.add_to_cart_metric_id, 'add-shopify');
+  assert.equal(update.checkout_metric_id, 'checkout-shopify');
   assert.equal(update.connection_version, 8);
 });
+
+
+

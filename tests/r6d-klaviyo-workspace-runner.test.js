@@ -22,6 +22,11 @@ function context(patch = {}) {
       provider: 'klaviyo', status: 'connected', accessToken: 'secret', sourceCurrency: 'USD', monthlyPlanCost: '50.00',
       selectedAccounts: [{ id: 'account-1', name: 'Account', currency: 'USD' }],
       conversionMetric: { id: 'metric-1', name: 'Placed Order', integrationName: 'Shopify' },
+      journeyMetrics: {
+        addToCart: { id: 'metric-add', name: 'Added to Cart', integrationName: 'Shopify' },
+        checkout: { id: 'metric-checkout', name: 'Checkout Started', integrationName: 'Shopify' },
+        purchase: { id: 'metric-1', name: 'Placed Order', integrationName: 'Shopify' },
+      },
     },
     reportingCurrency: 'TRY', currencyVersion: 1,
     request: { provider_date: '2026-09-24' },
@@ -72,8 +77,15 @@ test('Klaviyo workspace runner uses canonical monthly plan cost, not caller or p
 
 test('Klaviyo workspace runner requires a canonical account-scoped conversion metric', async () => {
   await assert.rejects(
-    runner()(context({ connection: { ...context().connection, conversionMetric: null } })),
+    runner()(context({ connection: { ...context().connection, conversionMetric: null, journeyMetrics: { ...context().connection.journeyMetrics, purchase: null } } })),
     /connection\.conversionMetric\.id is required/
+  );
+});
+
+test('Klaviyo workspace runner requires canonical Add to Cart and Checkout bindings before activation', async () => {
+  await assert.rejects(
+    runner()(context({ connection: { ...context().connection, journeyMetrics: { ...context().connection.journeyMetrics, checkout: null } } })),
+    /connection\.journeyMetrics\.checkout\.id is required/
   );
 });
 
@@ -93,3 +105,6 @@ test('workspace runner tags provider and FX failures without exposing upstream e
     });
   }
 });
+
+
+

@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "check_name": "R6D5K1_KLAVIYO_JOURNEY_BINDING_MIGRATION",
+  "observed_at": "2026-09-28",
+  "environment": "production",
+  "result": "PASS",
+  "migration_version": "20260928145812",
+  "migration_name": "add_workspace_provider_journey_metrics",
+  "target_column_count": 10,
+  "add_to_cart_validated_constraint_count": 1,
+  "checkout_validated_constraint_count": 1,
+  "rls_enabled": true,
+  "force_rls_enabled": true,
+  "browser_grant_count": 0,
+  "canonical_connection_count": 3,
+  "connected_klaviyo_count": 1,
+  "add_to_cart_binding_count": 0,
+  "checkout_binding_count": 0,
+  "partial_binding_count": 0,
+  "dataset_v2_count": 0,
+  "klaviyo_dataset_v2_count": 0,
+  "provider_contact": false,
+  "canonical_binding_write": false,
+  "dataset_v2_write": false,
+  "advisor_result": "No finding introduced by this additive column-and-constraint migration; existing project-wide advisor backlog remains out of scope.",
+  "next_gate": "application deployment"
+}
+

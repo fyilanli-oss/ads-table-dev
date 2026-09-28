@@ -35,7 +35,7 @@ test('Klaviyo provider client verifies account and maps documented campaign/flow
       ? { campaign_id: 'campaign-1', campaign_message_id: 'message-1', campaign_message_name: 'Message', send_channel: 'email' }
       : { flow_id: 'flow-1', flow_name: 'Flow', flow_message_id: 'message-2', flow_message_name: 'Flow message', send_channel: 'sms' };
     return response({ data: { attributes: { results: [{ groupings, statistics: {
-      delivered: monthly ? 1000 : 100, clicks_unique: 10, opens_unique: 20,
+      recipients: monthly ? 1200 : 120, delivered: monthly ? 1000 : 100, clicks_unique: 10, opens_unique: 20,
       conversions: 2, conversion_value: 50, text_message_spend: branch === 'flow' ? 4 : null,
     } }] } } });
   };
@@ -44,7 +44,8 @@ test('Klaviyo provider client verifies account and maps documented campaign/flow
   const result = await client.fetchMessageFacts({ accessToken: 'secret', account, providerDate: '2026-09-24' });
   assert.equal(result.verified_empty, false);
   assert.equal(result.rows.length, 2);
-  assert.equal(result.rows[0].spend_allocation.monthlySentCount, 1000);
+  assert.equal(result.rows[0].spend_allocation.dailySentCount, 120);
+  assert.equal(result.rows[0].spend_allocation.monthlySentCount, 1200);
   assert.equal(result.rows[1].metrics.provider_spend, 4);
   assert.equal(calls.filter(call => call.url.includes('values-reports')).length, 4);
   assert.ok(calls.every(call => call.options.headers.Authorization === 'Bearer secret'));
@@ -115,6 +116,68 @@ test('Klaviyo metric discovery paginates and returns only exact provider-reporte
 test('Klaviyo metric discovery rejects pagination outside the provider origin', async () => {
   const client = createKlaviyoProviderClient({ fetchImpl: async () => response({ data: [], links: { next: 'https://attacker.invalid/steal' } }) });
   await assert.rejects(client.fetchPlacedOrderMetricCandidates({ accessToken: 'secret' }), /KLAVIYO_METRIC_PAGINATION_INVALID/);
+});
+
+test('Klaviyo journey discovery classifies only exact provider names and preserves integration provenance', async () => {
+  const client = createKlaviyoProviderClient({ fetchImpl: async () => response({
+    data: [
+      { id: 'add', attributes: { name: 'Added to Cart', integration: { name: 'Shopify', category: 'Ecommerce' } } },
+      { id: 'checkout', attributes: { name: 'Checkout Started', integration: { name: 'Shopify', category: 'Ecommerce' } } },
+      { id: 'purchase', attributes: { name: 'Placed Order', integration: { name: 'Shopify', category: 'Ecommerce' } } },
+      { id: 'lookalike', attributes: { name: 'Placed Orders', integration: { name: 'Shopify', category: 'Ecommerce' } } },
+    ],
+    links: { next: null },
+  }) });
+  const result = await client.fetchJourneyMetricCandidates({ accessToken: 'secret' });
+  assert.deepEqual(result.addToCart.map(item => item.id), ['add']);
+  assert.deepEqual(result.checkout.map(item => item.id), ['checkout']);
+  assert.deepEqual(result.purchase.map(item => item.id), ['purchase']);
+});
+
+test('Klaviyo full journey merges exact stage reports and allocates Email cost against account-wide monthly recipients', async () => {
+  const calls = [];
+  const rows = {
+    campaign: { campaign_id: 'campaign-1', campaign_message_id: 'message-1', campaign_message_name: 'Campaign', send_channel: 'email' },
+    flow: { flow_id: 'flow-1', flow_name: 'Flow', flow_message_id: 'message-2', flow_message_name: 'Flow email', send_channel: 'email' },
+  };
+  const fetchImpl = async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push(body.data.attributes);
+    const branch = body.data.type.startsWith('campaign') ? 'campaign' : 'flow';
+    const metric = body.data.attributes.conversion_metric_id;
+    const monthly = body.data.attributes.timeframe.start.startsWith('2026-09-01');
+    const statistics = metric === 'purchase'
+      ? { recipients: monthly ? (branch === 'campaign' ? 600 : 400) : (branch === 'campaign' ? 60 : 40), delivered: 50, clicks_unique: 5, opens_unique: 10, conversions: 2, conversion_value: 50, text_message_spend: null }
+      : { conversions: metric === 'add' ? 4 : 3, conversion_value: metric === 'add' ? 80 : 70 };
+    return response({ data: { attributes: { results: [{ groupings: rows[branch], statistics }] } } });
+  };
+  const client = createKlaviyoProviderClient({ fetchImpl, reportSpacingMs: 0 });
+  const result = await client.fetchMessageFacts({
+    accessToken: 'secret', account: { id: 'account-1', currency: 'USD', timezone: 'UTC' }, providerDate: '2026-09-24',
+    journeyMetricIds: { addToCart: 'add', checkout: 'checkout', purchase: 'purchase' },
+  });
+  assert.equal(calls.length, 8);
+  assert.equal(result.rows[0].spend_allocation.monthlySentCount, 1000);
+  assert.equal(result.rows[1].spend_allocation.monthlySentCount, 1000);
+  assert.equal(result.rows[0].metrics.add_to_cart, 4);
+  assert.equal(result.rows[0].metrics.checkout, 3);
+  assert.equal(result.rows[0].metrics.purchase, 2);
+  assert.equal(result.rows[0].metric_support.add_to_cart, 'supported');
+});
+
+test('Klaviyo full journey spaces eight alternating report calls at the configured steady-rate cadence', async () => {
+  const waits = [];
+  const client = createKlaviyoProviderClient({
+    fetchImpl: async () => response({ data: { attributes: { results: [] } } }),
+    reportSpacingMs: 15000,
+    sleepImpl: async milliseconds => { waits.push(milliseconds); },
+  });
+  const result = await client.fetchMessageFacts({
+    accessToken: 'secret', account: { id: 'account-1', currency: 'USD', timezone: 'UTC' }, providerDate: '2026-09-24',
+    journeyMetricIds: { addToCart: 'add', checkout: 'checkout', purchase: 'purchase' },
+  });
+  assert.deepEqual(result, { rows: [], verified_empty: true });
+  assert.deepEqual(waits, Array(7).fill(15000));
 });
 test('Klaviyo reporting serializes campaign and flow requests to avoid burst rate limits', async () => {
   let active = 0;
@@ -333,3 +396,4 @@ test('Klaviyo Flow/Event diagnostics accept an empty event page without an inclu
   assert.equal(result.latest_event_date, null);
   assert.equal(result.event_scan_truncated, false);
 });
+

@@ -463,7 +463,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
                 });
                 metricSelect.value = discovery.candidates[0]?.id || "";
                 metricStep.hidden = false;
-                acceptanceMessage.textContent = "Select the provider-verified Placed Order metric, then confirm it for this workspace and Klaviyo account.";
+                acceptanceMessage.textContent = "Select the provider-verified sales source. AdsTable will bind its exact Added to Cart, Checkout and Placed Order metrics for this workspace and Klaviyo account.";
               } catch (discoveryError) {
                 acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(discoveryError.message || "") ? discoveryError.message : "KLAVIYO_METRIC_DISCOVERY_FAILED";
               }
@@ -492,7 +492,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         metricConfirm.addEventListener("click", async () => {
           metricConfirm.disabled = true;
           metricConfirm.loading = true;
-          acceptanceMessage.textContent = "Verifying and binding the selected metric…";
+            acceptanceMessage.textContent = "Verifying and binding the Klaviyo commerce metrics…";
           try {
             await sessionRequest("/api/shopify/providers/klaviyo/runtime/metrics/select", {method: "POST", body: JSON.stringify({metric_id: String(metricSelect.value || "")})});
             metricStep.hidden = true;
@@ -651,4 +651,6 @@ function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}
 }
 
 module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms});
+
+
 

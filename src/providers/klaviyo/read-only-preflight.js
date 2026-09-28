@@ -22,7 +22,7 @@ function safeFailure(error) {
   if (reason.startsWith('WORKSPACE_REPORTING_CURRENCY_')) {
     return codedError('KLAVIYO_PREFLIGHT_CURRENCY_REQUIRED', 409);
   }
-  if (reason === 'connection.conversionMetric.id is required') {
+  if (reason === 'connection.conversionMetric.id is required' || reason.startsWith('connection.journeyMetrics.')) {
     return codedError('KLAVIYO_PREFLIGHT_METRIC_REQUIRED', 409);
   }
   return codedError('KLAVIYO_PREFLIGHT_FAILED', 503);
@@ -92,3 +92,6 @@ function createKlaviyoReadOnlyPreflight({
 }
 
 module.exports = Object.freeze({ closedProviderDate, createKlaviyoReadOnlyPreflight });
+
+
+

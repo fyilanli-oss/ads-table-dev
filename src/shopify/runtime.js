@@ -138,7 +138,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});
     if (adapters.klaviyo) {
-      const providerClient = createKlaviyoProviderClient({fetchImpl});
+      const providerClient = createKlaviyoProviderClient({fetchImpl, reportSpacingMs: 15000});
       const tokenLifecycle = createKlaviyoTokenLifecycle({
         connectionStore,
         fetchImpl,
@@ -281,4 +281,5 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
 }
 
 module.exports = Object.freeze({registerShopifyRuntime, enabled, providerRuntimeReady});
+
 

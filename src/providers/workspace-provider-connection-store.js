@@ -55,6 +55,42 @@ function conversionMetric(metric) {
   });
 }
 
+function emptyKlaviyoJourneyMetricBindings() {
+  return {
+    add_to_cart_metric_id: null,
+    add_to_cart_metric_name: null,
+    add_to_cart_metric_integration_name: null,
+    add_to_cart_metric_integration_category: null,
+    add_to_cart_metric_verified_at: null,
+    checkout_metric_id: null,
+    checkout_metric_name: null,
+    checkout_metric_integration_name: null,
+    checkout_metric_integration_category: null,
+    checkout_metric_verified_at: null,
+  };
+}
+
+function metricFromRow(data, prefix) {
+  return data[`${prefix}_metric_id`] ? Object.freeze({
+    id: data[`${prefix}_metric_id`],
+    name: data[`${prefix}_metric_name`],
+    integrationName: data[`${prefix}_metric_integration_name`],
+    integrationCategory: data[`${prefix}_metric_integration_category`],
+    verifiedAt: data[`${prefix}_metric_verified_at`],
+  }) : null;
+}
+
+function metricUpdate(prefix, metricInput, timestamp) {
+  const metric = metricInput ? conversionMetric(metricInput) : null;
+  return {
+    [`${prefix}_metric_id`]: metric?.id || null,
+    [`${prefix}_metric_name`]: metric?.name || null,
+    [`${prefix}_metric_integration_name`]: metric?.integrationName || null,
+    [`${prefix}_metric_integration_category`]: metric?.integrationCategory || null,
+    [`${prefix}_metric_verified_at`]: metric ? timestamp : null,
+  };
+}
+
 function authorityFromEmbeddedTransaction(transaction) {
   if (!transaction || transaction.surface !== 'shopify_embedded' || transaction.user_id !== null ||
     transaction.return_target !== '/shopify/app/platforms') throw new Error('EMBEDDED_OAUTH_TRANSACTION_REQUIRED');
@@ -92,6 +128,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       conversion_metric_integration_name: null,
       conversion_metric_integration_category: null,
       conversion_metric_verified_at: null,
+      ...emptyKlaviyoJourneyMetricBindings(),
       access_token_envelope: vault.encrypt(accessToken, tokenContext(workspace.workspace_id, provider, 'access')),
       refresh_token_envelope: refreshToken ? vault.encrypt(refreshToken, tokenContext(workspace.workspace_id, provider, 'refresh')) : null,
       access_token_expires_at: expiresAt,
@@ -145,7 +182,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at')
+      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at,add_to_cart_metric_id,add_to_cart_metric_name,add_to_cart_metric_integration_name,add_to_cart_metric_integration_category,add_to_cart_metric_verified_at,checkout_metric_id,checkout_metric_name,checkout_metric_integration_name,checkout_metric_integration_category,checkout_metric_verified_at')
       .eq('workspace_id', workspace.workspace_id)
       .eq('provider', provider)
       .eq('status', 'connected')
@@ -166,6 +203,17 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
         integrationCategory: data.conversion_metric_integration_category,
         verifiedAt: data.conversion_metric_verified_at,
       }) : null,
+      journeyMetrics: Object.freeze({
+        addToCart: metricFromRow(data, 'add_to_cart'),
+        checkout: metricFromRow(data, 'checkout'),
+        purchase: data.conversion_metric_id ? Object.freeze({
+          id: data.conversion_metric_id,
+          name: data.conversion_metric_name,
+          integrationName: data.conversion_metric_integration_name,
+          integrationCategory: data.conversion_metric_integration_category,
+          verifiedAt: data.conversion_metric_verified_at,
+        }) : null,
+      }),
       accessToken: vault.decrypt(data.access_token_envelope, tokenContext(workspace.workspace_id, provider, 'access')),
       refreshToken: data.refresh_token_envelope
         ? vault.decrypt(data.refresh_token_envelope, tokenContext(workspace.workspace_id, provider, 'refresh'))
@@ -253,6 +301,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       conversion_metric_integration_name: null,
       conversion_metric_integration_category: null,
       conversion_metric_verified_at: null,
+      ...emptyKlaviyoJourneyMetricBindings(),
       account_verified_at: timestamp,
       connected_at: timestamp,
       disconnected_at: null,
@@ -323,6 +372,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       conversion_metric_integration_name: null,
       conversion_metric_integration_category: null,
       conversion_metric_verified_at: null,
+      ...emptyKlaviyoJourneyMetricBindings(),
       account_verified_at: timestamp,
       connected_at: timestamp,
       disconnected_at: null,
@@ -351,6 +401,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       conversion_metric_integration_name: null,
       conversion_metric_integration_category: null,
       conversion_metric_verified_at: null,
+      ...emptyKlaviyoJourneyMetricBindings(),
       access_token_envelope: null,
       refresh_token_envelope: null,
       access_token_expires_at: null,
@@ -433,17 +484,28 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
   }
 
   async function bindKlaviyoConversionMetric({ authority: authorityInput, version, accountId, metric: metricInput } = {}) {
+    return bindKlaviyoJourneyMetrics({
+      authority: authorityInput,
+      version,
+      accountId,
+      metrics: { purchase: metricInput },
+    });
+  }
+
+  async function bindKlaviyoJourneyMetrics({ authority: authorityInput, version, accountId, metrics = {} } = {}) {
     const authority = requireServerWorkspaceAuthority(authorityInput);
     if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
     const verifiedAccountId = required(accountId, 'accountId');
-    const metric = conversionMetric(metricInput);
+    const purchase = conversionMetric(metrics.purchase);
     const timestamp = now().toISOString();
     const { data, error } = await client.from(TABLE).update({
-      conversion_metric_id: metric.id,
-      conversion_metric_name: metric.name,
-      conversion_metric_integration_name: metric.integrationName,
-      conversion_metric_integration_category: metric.integrationCategory,
+      conversion_metric_id: purchase.id,
+      conversion_metric_name: purchase.name,
+      conversion_metric_integration_name: purchase.integrationName,
+      conversion_metric_integration_category: purchase.integrationCategory,
       conversion_metric_verified_at: timestamp,
+      ...metricUpdate('add_to_cart', metrics.addToCart, timestamp),
+      ...metricUpdate('checkout', metrics.checkout, timestamp),
       connection_version: version + 1,
       updated_at: timestamp,
     }).eq('workspace_id', authority.workspace_id).eq('provider', 'klaviyo')
@@ -472,6 +534,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     disconnectMeta,
     disconnectGoogle,
     bindKlaviyoConversionMetric,
+    bindKlaviyoJourneyMetrics,
   });
 }
 
@@ -480,7 +543,10 @@ module.exports = Object.freeze({
   ACTIVE_PROVIDERS,
   selectedAccounts,
   conversionMetric,
+  emptyKlaviyoJourneyMetricBindings,
   authorityFromEmbeddedTransaction,
   createCanonicalWorkspaceProviderConnectionStore
 });
+
+
 

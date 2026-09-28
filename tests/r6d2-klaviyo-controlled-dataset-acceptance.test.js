@@ -17,6 +17,11 @@ const connection = Object.freeze({
   provider: 'klaviyo', status: 'connected', accessToken: 'secret', sourceCurrency: 'USD', monthlyPlanCost: '50.00',
   selectedAccounts: [{ id: 'account-1', name: 'Account', currency: 'USD' }],
   conversionMetric: { id: 'metric-1', name: 'Placed Order', integrationName: 'Shopify' },
+  journeyMetrics: {
+    addToCart: { id: 'metric-add', name: 'Added to Cart', integrationName: 'Shopify' },
+    checkout: { id: 'metric-checkout', name: 'Checkout Started', integrationName: 'Shopify' },
+    purchase: { id: 'metric-1', name: 'Placed Order', integrationName: 'Shopify' },
+  },
 });
 const fact = Object.freeze({
   branch: 'campaign', channel: 'email',
@@ -128,3 +133,6 @@ test('C6-D requires reauthorization without contacting the provider or writing D
   assert.equal(calls.some(([name]) => name === 'facts'), false);
   assert.equal(calls.some(([name]) => name === 'write'), false);
 });
+
+
+

@@ -44,10 +44,10 @@ test('Klaviyo provider client verifies account and maps documented campaign/flow
   const result = await client.fetchMessageFacts({ accessToken: 'secret', account, providerDate: '2026-09-24' });
   assert.equal(result.verified_empty, false);
   assert.equal(result.rows.length, 2);
-  assert.equal(result.rows[0].spend_allocation.dailySentCount, 120);
-  assert.equal(result.rows[0].spend_allocation.monthlySentCount, 1200);
-  assert.equal(result.rows[1].metrics.provider_spend, 4);
-  assert.equal(calls.filter(call => call.url.includes('values-reports')).length, 4);
+  assert.deepEqual(result.rows[0].spend_allocation, {});
+  assert.equal(result.rows[0].metrics.provider_spend, null);
+  assert.equal(result.rows[1].metrics.provider_spend, null);
+  assert.equal(calls.filter(call => call.url.includes('values-reports')).length, 2);
   assert.ok(calls.every(call => call.options.headers.Authorization === 'Bearer secret'));
 });
 
@@ -134,7 +134,7 @@ test('Klaviyo journey discovery classifies only exact provider names and preserv
   assert.deepEqual(result.purchase.map(item => item.id), ['purchase']);
 });
 
-test('Klaviyo full journey merges exact stage reports and allocates Email cost against account-wide monthly recipients', async () => {
+test('Klaviyo full journey merges exact stage reports without message-row cost allocation', async () => {
   const calls = [];
   const rows = {
     campaign: { campaign_id: 'campaign-1', campaign_message_id: 'message-1', campaign_message_name: 'Campaign', send_channel: 'email' },
@@ -156,16 +156,16 @@ test('Klaviyo full journey merges exact stage reports and allocates Email cost a
     accessToken: 'secret', account: { id: 'account-1', currency: 'USD', timezone: 'UTC' }, providerDate: '2026-09-24',
     journeyMetricIds: { addToCart: 'add', checkout: 'checkout', purchase: 'purchase' },
   });
-  assert.equal(calls.length, 8);
-  assert.equal(result.rows[0].spend_allocation.monthlySentCount, 1000);
-  assert.equal(result.rows[1].spend_allocation.monthlySentCount, 1000);
+  assert.equal(calls.length, 6);
+  assert.deepEqual(result.rows[0].spend_allocation, {});
+  assert.deepEqual(result.rows[1].spend_allocation, {});
   assert.equal(result.rows[0].metrics.add_to_cart, 4);
   assert.equal(result.rows[0].metrics.checkout, 3);
   assert.equal(result.rows[0].metrics.purchase, 2);
   assert.equal(result.rows[0].metric_support.add_to_cart, 'supported');
 });
 
-test('Klaviyo full journey spaces eight alternating report calls at the configured steady-rate cadence', async () => {
+test('Klaviyo full journey spaces six alternating report calls at the configured steady-rate cadence', async () => {
   const waits = [];
   const client = createKlaviyoProviderClient({
     fetchImpl: async () => response({ data: { attributes: { results: [] } } }),
@@ -177,7 +177,7 @@ test('Klaviyo full journey spaces eight alternating report calls at the configur
     journeyMetricIds: { addToCart: 'add', checkout: 'checkout', purchase: 'purchase' },
   });
   assert.deepEqual(result, { rows: [], verified_empty: true });
-  assert.deepEqual(waits, Array(7).fill(15000));
+  assert.deepEqual(waits, Array(5).fill(15000));
 });
 test('Klaviyo reporting serializes campaign and flow requests to avoid burst rate limits', async () => {
   let active = 0;
@@ -218,7 +218,7 @@ test('Klaviyo provider client respects Retry-After before retrying a 429 respons
     account: { id: 'account-1', currency: 'USD', timezone: 'UTC' },
     providerDate: '2026-09-24',
   });
-  assert.equal(calls, 5);
+  assert.equal(calls, 3);
   assert.deepEqual(waits, [1000]);
   assert.deepEqual(result, { rows: [], verified_empty: true });
 });

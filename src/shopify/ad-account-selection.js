@@ -147,7 +147,7 @@ function createAdAccountSelection({store, discoverByProvider, tokenLifecycleByPr
         provider,
         version,
         accounts: verified,
-        previousReportingAccountId: connection.reporting_account_id || null,
+        ...(connection.reporting_account_id ? {previousReportingAccountId: connection.reporting_account_id} : {}),
       });
       return {status: 'connected', accounts: verified};
     },

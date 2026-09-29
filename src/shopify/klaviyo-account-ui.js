@@ -29,6 +29,7 @@ function initializeKlaviyoAccounts() {
   const spendUpdateSave = document.getElementById("klaviyo-spend-update-save");
   const spendUpdateMessage = document.getElementById("klaviyo-spend-update-message");
   const spendCorrectModal = document.getElementById("klaviyo-spend-correct-modal");
+  const spendCorrectOpen = document.getElementById("klaviyo-spend-correct-open");
   const spendHistoryChoice = document.getElementById("klaviyo-spend-history-choice");
   const spendCorrectValue = document.getElementById("klaviyo-spend-correct-value");
   const spendCorrectSave = document.getElementById("klaviyo-spend-correct-save");
@@ -88,7 +89,8 @@ function initializeKlaviyoAccounts() {
         if (spendCorrectValue) spendCorrectValue.value = entries[0].estimated_30_day_email_spend;
       }
     }
-    if (spendControls) spendControls.hidden = entries.length === 0;
+    if (spendControls) spendControls.hidden = false;
+    if (spendCorrectOpen) spendCorrectOpen.hidden = entries.length === 0;
     return entries;
   }
 

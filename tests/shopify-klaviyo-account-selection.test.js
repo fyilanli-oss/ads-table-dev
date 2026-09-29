@@ -272,16 +272,21 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
 test("UI reads stored status on page load without requesting Klaviyo accounts", async () => {
   const elements=new Map();
   const element=()=>({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
-  for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm"]) elements.set(id,element());
+  for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-correct-open"]) elements.set(id,element());
   const requests=[];
   const context={URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
     requests.push({url,options});
+    if (url.endsWith("/spend-history")) return response(200,{entries:[]});
     return response(200,{status:"connected",estimated_30_day_email_spend:"5.00",currency:"USD"});
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
-  await new Promise(resolve=>setImmediate(resolve));
-  assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/status"]);
+  for (let attempt = 0; attempt < 10 && elements.get("klaviyo-spend-correct-open").hidden !== true; attempt += 1) {
+    await new Promise(resolve=>setImmediate(resolve));
+  }
+  assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/status","/api/shopify/providers/klaviyo/spend-history"]);
   assert.equal(elements.get("klaviyo-connect").hidden,true);
+  assert.equal(elements.get("klaviyo-spend-controls").hidden,false);
+  assert.equal(elements.get("klaviyo-spend-correct-open").hidden,true);
   assert.equal(elements.get("klaviyo-message").textContent,"Connected · 5.00 USD / 30 days");
 });
 

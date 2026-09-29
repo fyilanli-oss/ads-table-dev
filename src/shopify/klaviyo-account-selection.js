@@ -4,11 +4,28 @@ function failure(code, status = 503) {
   return Object.assign(new Error(code), {code, status});
 }
 
-function planCost(value) {
+function estimated30DayEmailSpend(value) {
   if (typeof value !== "string" || !/^(0|[1-9]\d{0,7})(\.\d{1,2})?$/.test(value)) {
-    throw failure("INVALID_PLAN_COST", 400);
+    throw failure("INVALID_ESTIMATED_30_DAY_EMAIL_SPEND", 400);
   }
   return Number(value).toFixed(2);
+}
+
+function businessDate(timeZone, instant = new Date()) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(instant);
+    const values = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+    const value = `${values.year}-${values.month}-${values.day}`;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error("invalid date");
+    return value;
+  } catch {
+    throw failure("KLAVIYO_UNAVAILABLE");
+  }
 }
 
 function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clientSecret}) {
@@ -46,7 +63,12 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
       if (typeof item?.id !== "string" || !item.id || item.id.length > 256) throw failure("KLAVIYO_UNAVAILABLE");
       const attrs = item.attributes || {};
       const name = attrs.contact_information?.organization_name || attrs.name || item.id;
-      return {id: item.id, name: String(name).slice(0, 256), currency: /^[A-Z]{3}$/.test(attrs.preferred_currency) ? attrs.preferred_currency : null};
+      return {
+        id: item.id,
+        name: String(name).slice(0, 256),
+        currency: /^[A-Z]{3}$/.test(attrs.preferred_currency) ? attrs.preferred_currency : null,
+        timezone: typeof attrs.timezone === "string" && attrs.timezone ? attrs.timezone : null,
+      };
     });
     return {connection, accounts: verified};
   }
@@ -66,7 +88,7 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
         }
         return {
           status: "connected",
-          email_monthly_plan_cost: cost,
+          estimated_30_day_email_spend: cost,
           currency: connection.account_currency,
         };
       }
@@ -78,7 +100,7 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
         status: result.connection?.status || "not_connected",
         accounts: result.accounts,
         active_account_id: result.connection?.active_account_id || null,
-        email_monthly_plan_cost: result.connection?.email_monthly_plan_cost ?? null,
+        estimated_30_day_email_spend: result.connection?.email_monthly_plan_cost ?? null,
       };
     },
     async verifyReadOnly(authority) {
@@ -93,15 +115,34 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
       return {status: "verified", active_account_verified: true, currency: account.currency};
     },
     async complete(authority, input) {
-      const cost = planCost(input?.email_monthly_plan_cost);
+      const cost = estimated30DayEmailSpend(input?.estimated_30_day_email_spend);
       if (typeof input?.account_id !== "string") throw failure("INVALID_ACCOUNT", 400);
       const {connection, accounts: verified} = await accounts(authority);
       const account = verified.find(item => item.id === input.account_id);
-      if (!connection || !account || !account.currency) throw failure("INVALID_ACCOUNT", 400);
-      await store.completeKlaviyo({authority, version: connection.updated_at, account, cost});
-      return {status: "connected", active_account_id: account.id, account_name: account.name, currency: account.currency, email_monthly_plan_cost: cost};
+      if (!connection || !account || !account.currency || !account.timezone) throw failure("INVALID_ACCOUNT", 400);
+      const effectiveFrom = businessDate(account.timezone);
+      await store.completeKlaviyoWithSpendHistory({
+        authority,
+        version: connection.updated_at,
+        account,
+        estimated30DayEmailSpend: cost,
+        effectiveFrom,
+      });
+      return {
+        status: "connected",
+        active_account_id: account.id,
+        account_name: account.name,
+        currency: account.currency,
+        estimated_30_day_email_spend: cost,
+        effective_from: effectiveFrom,
+      };
     },
   });
 }
 
-module.exports = {createKlaviyoAccountSelection, planCost};
+module.exports = {
+  createKlaviyoAccountSelection,
+  estimated30DayEmailSpend,
+  planCost: estimated30DayEmailSpend,
+  businessDate,
+};

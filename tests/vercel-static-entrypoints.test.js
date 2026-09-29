@@ -47,7 +47,7 @@ test("serves public entrypoints from static build outputs without booting Expres
 
 test("isolates Shopify presentation while keeping API and OAuth routes on the application function", () => {
   assert.equal(routeFor("/")?.dest, "/server.js");
-  assert.equal(routeFor("/shopify/app(?:/platforms)?")?.dest, "/server.js");
+  assert.equal(routeFor("/shopify/app(?:/(?:settings|platforms|funnel|analysis))?")?.dest, "/server.js");
   assert.equal(routeFor("/api/e10/activation-preflight")?.dest, "/api/e10-activation-preflight.js");
   assert.equal(routeFor("/api/(.*)")?.dest, "/server.js");
   assert.equal(routeFor("/auth/(.*)")?.dest, "/server.js");

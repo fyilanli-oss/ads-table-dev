@@ -4,6 +4,7 @@ function initializeAdAccounts() {
   for (const provider of ['meta', 'google_ads']) {
     const message = document.getElementById(provider + '-message');
     const choices = document.getElementById(provider + '-choice');
+    const choiceError = document.getElementById(provider + '-choice-error');
     const save = document.getElementById(provider + '-save');
     const modal = document.getElementById(provider + '-account-modal');
     const connect = document.getElementById(provider + '-connect');
@@ -16,9 +17,10 @@ function initializeAdAccounts() {
     const disconnectMessage = document.getElementById(provider + '-disconnect-message');
     const query = new URLSearchParams(location.search);
     const reauthorizationRequired = provider === 'meta' && query.get('oauth_error') === 'reauthorization_required' && query.get('provider') === 'meta';
-    if (!message || !choices || !save || !modal) continue;
+    if (!message || !choices || !choiceError || !save || !modal) continue;
     let accounts = [];
     let selectedIds = [];
+    let selectionError = '';
     let busy = false;
     const request = async (path, body) => {
       const token = await window.shopify.idToken();
@@ -36,22 +38,48 @@ function initializeAdAccounts() {
         ? 'Authorization expired. Reconnect will be available after the current connection is resolved.'
         : 'Accounts could not be loaded. Please try again.';
     };
+    const syncSelection = () => {
+      const selected = new Set(selectedIds);
+      choices.querySelectorAll('s-checkbox').forEach(option => {
+        option.checked = selected.has(String(option.getAttribute('value') || ''));
+      });
+      choiceError.textContent = selectionError;
+      save.disabled = selectedIds.length < 1 || selectedIds.length > 3;
+    };
     const loadAccounts = async () => {
       try {
         const result = await request('');
         accounts = result.accounts || [];
         selectedIds = [];
-        choices.values = [];
-        choices.error = '';
-        save.disabled = true;
+        selectionError = '';
         choices.replaceChildren();
-        for (const account of accounts) {
-          const option = document.createElement('s-choice');
-          option.setAttribute('value', String(account.id));
-          option.textContent = account.name + ' (' + account.id + ') · ' + account.currency;
+        for (const [index, account] of accounts.entries()) {
+          const id = String(account.id);
+          const option = document.createElement('s-checkbox');
+          option.setAttribute('value', id);
+          option.setAttribute('name', provider + '-account-' + index);
+          option.label = account.name + ' (' + account.id + ') · ' + account.currency;
+          option.checked = false;
+          option.defaultChecked = false;
+          option.addEventListener('change', event => {
+            const selectedId = String(event.currentTarget.getAttribute('value') || '');
+            if (event.currentTarget.checked) {
+              if (selectedIds.length >= 3 && !selectedIds.includes(selectedId)) {
+                event.currentTarget.checked = false;
+                selectionError = 'Select between 1 and 3 accounts.';
+              } else {
+                selectedIds = [...new Set([...selectedIds, selectedId])];
+                selectionError = '';
+              }
+            } else {
+              selectedIds = selectedIds.filter(id => id !== selectedId);
+              selectionError = '';
+            }
+            syncSelection();
+          });
           choices.append(option);
         }
-        choices.values = [];
+        syncSelection();
         if (!accounts.length) throw new Error('PROVIDER_ACCOUNTS_UNAVAILABLE');
         connect.hidden = true;
         if (resume) resume.hidden = false;
@@ -60,18 +88,11 @@ function initializeAdAccounts() {
         if (typeof modal.showOverlay === 'function') modal.showOverlay();
       } catch (error) { showError(error); }
     };
-    choices.addEventListener('change', event => {
-      const values = Array.isArray(event.currentTarget.values) ? event.currentTarget.values.map(String) : [];
-      selectedIds = [...new Set(values)].filter(id => accounts.some(account => String(account.id) === id));
-      choices.values = selectedIds;
-      const invalid = selectedIds.length < 1 || selectedIds.length > 3;
-      choices.error = selectedIds.length > 3 ? 'Select between 1 and 3 accounts.' : '';
-      save.disabled = invalid;
-    });
     save.addEventListener('click', async () => {
       const submittedIds = selectedIds.slice();
       if (busy || submittedIds.length < 1 || submittedIds.length > 3 || submittedIds.some(id => !accounts.some(account => String(account.id) === id))) {
-        choices.error = 'Select between 1 and 3 accounts.';
+        selectionError = 'Select between 1 and 3 accounts.';
+        syncSelection();
         return;
       }
       busy = true; save.disabled = true; save.loading = true;
@@ -83,10 +104,11 @@ function initializeAdAccounts() {
         if (resume) resume.hidden = true;
         if (connected) connected.hidden = false;
         selectedIds = [];
-        choices.values = [];
+        selectionError = '';
+        syncSelection();
         if (typeof modal.hideOverlay === 'function') modal.hideOverlay();
       } catch (error) { showError(error); }
-      finally { busy = false; save.disabled = false; save.loading = false; }
+      finally { busy = false; save.disabled = selectedIds.length < 1 || selectedIds.length > 3; save.loading = false; }
     });
     if (disconnectConfirm && disconnectModal && disconnectMessage) {
       disconnectConfirm.addEventListener('click', async () => {

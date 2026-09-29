@@ -280,8 +280,9 @@ test("UI reads stored status on page load without requesting Klaviyo accounts", 
     return response(200,{status:"connected",estimated_30_day_email_spend:"5.00",currency:"USD"});
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
-  await new Promise(resolve=>setImmediate(resolve));
-  await new Promise(resolve=>setImmediate(resolve));
+  for (let attempt = 0; attempt < 10 && elements.get("klaviyo-spend-correct-open").hidden !== true; attempt += 1) {
+    await new Promise(resolve=>setImmediate(resolve));
+  }
   assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/status","/api/shopify/providers/klaviyo/spend-history"]);
   assert.equal(elements.get("klaviyo-connect").hidden,true);
   assert.equal(elements.get("klaviyo-spend-controls").hidden,false);

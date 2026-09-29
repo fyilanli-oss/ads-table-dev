@@ -114,6 +114,38 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
       }
       return {status: "verified", active_account_verified: true, currency: account.currency};
     },
+    async history(authority) {
+      const rows = await store.listKlaviyoSpendHistory(authority);
+      return {
+        status: "connected",
+        entries: rows.map(row => ({
+          effective_from: row.effective_from,
+          estimated_30_day_email_spend: Number(row.estimated_30_day_email_spend).toFixed(2),
+          currency: row.source_currency,
+          correction_version: row.correction_version,
+        })),
+      };
+    },
+    async updateSpend(authority, input) {
+      const amount = estimated30DayEmailSpend(input?.estimated_30_day_email_spend);
+      const {connection, accounts: verified} = await accounts(authority);
+      if (!connection || connection.status !== "connected") throw failure("CONNECTION_CHANGED", 409);
+      const account = verified.find(item => item.id === connection.active_account_id);
+      if (!account || !account.currency || !account.timezone || account.currency !== connection.account_currency) {
+        throw failure("INVALID_ACCOUNT", 409);
+      }
+      const effectiveFrom = businessDate(account.timezone);
+      await store.updateKlaviyoSpend({authority, amount, effectiveFrom});
+      return {status: "connected", estimated_30_day_email_spend: amount, currency: account.currency, effective_from: effectiveFrom};
+    },
+    async correctSpend(authority, input) {
+      const amount = estimated30DayEmailSpend(input?.estimated_30_day_email_spend);
+      if (typeof input?.effective_from !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(input.effective_from)) {
+        throw failure("SPEND_HISTORY_ENTRY_NOT_FOUND", 400);
+      }
+      await store.correctKlaviyoSpend({authority, amount, effectiveFrom: input.effective_from});
+      return {status: "corrected", estimated_30_day_email_spend: amount, effective_from: input.effective_from};
+    },
     async complete(authority, input) {
       const cost = estimated30DayEmailSpend(input?.estimated_30_day_email_spend);
       if (typeof input?.account_id !== "string") throw failure("INVALID_ACCOUNT", 400);

@@ -52,7 +52,7 @@ test("creates embedded transactions only from verified Shopify session authority
     redirectUri: "https://app/meta/callback",
     pkceVerifier: null,
     surface: "shopify_embedded",
-    returnTarget: "/shopify/app/platforms",
+    returnTarget: "/shopify/app/settings",
   }]);
   await assert.rejects(
     () => boundary.createEmbeddedTransaction({...authority, authority: "browser_claim"}, "meta", "https://app/meta/callback"),

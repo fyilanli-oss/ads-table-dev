@@ -146,7 +146,7 @@ test('Shopify-native modal and Supabase constraints preserve pending then 1-3 co
   assert.match(html, /Array\.isArray\(choices\.values\)/);
   assert.match(html, /selectedIds\.length < 1 \|\| selectedIds\.length > 3/);
   assert.match(html, /modal\.showOverlay\(\)/);
-  assert.match(html, /result\.status === 'pending_account_selection'.*loadAccounts\(\)/);
+  assert.match(html, /result\.status === 'pending_account_selection'[\s\S]*resume\.hidden = false;[\s\S]*loadAccounts\(\)/);
 
   const migration = read('supabase/migrations/20260924120453_add_workspace_provider_selected_accounts.sql');
   assert.match(migration, /status <> 'pending_account_selection' or jsonb_array_length\(selected_accounts\) = 0/);

@@ -14,7 +14,7 @@ function fixture(overrides = {}) {
   const calls = [];
   const adapters = Object.fromEntries(PROVIDERS.map(provider => [provider, overrides[provider] || {
     start: async input => (calls.push(["start", provider, input]), {authorization_url: "https://consent", navigation: "top_level"}),
-    callback: async input => (calls.push(["callback", provider, input]), {redirect_to: "/shopify/app/platforms"}),
+    callback: async input => (calls.push(["callback", provider, input]), {redirect_to: "/shopify/app/settings"}),
   }]));
   registerShopifyProviderOAuthRoutes(app, {adapters});
   return {routes, calls};
@@ -40,12 +40,12 @@ test("start accepts authority only through the Shopify bearer session", async ()
   assert.deepEqual(res.body, {authorization_url: "https://consent", navigation: "top_level"});
 });
 
-test("callback forwards only state and code and always returns to canonical Platforms", async () => {
+test("callback forwards only state and code and always returns to canonical Settings", async () => {
   const {routes, calls} = fixture();
   const res = response();
   await routes["GET /api/shopify/providers/:provider/oauth/callback"]({params: {provider: "google_ads"}, query: {state: "opaque", code: "code", workspace_id: "attacker"}}, res);
   assert.deepEqual(calls, [["callback", "google_ads", {state: "opaque", code: "code"}]]);
-  assert.equal(res.location, "/shopify/app/platforms?oauth_connected=google_ads&account_selection_required=1");
+  assert.equal(res.location, "/shopify/app/settings?oauth_connected=google_ads&account_selection_required=1");
 });
 
 test("unknown providers and replay failures cannot escape the canonical surface", async () => {
@@ -57,27 +57,27 @@ test("unknown providers and replay failures cannot escape the canonical surface"
   const failed = response();
   const replay = fixture({meta: {start: async () => ({}), callback: async () => { throw new Error("replayed"); }}});
   await replay.routes["GET /api/shopify/providers/:provider/oauth/callback"]({params: {provider: "meta"}, query: {}}, failed);
-  assert.match(failed.location, /^\/shopify\/app\/platforms\?oauth_/);
+  assert.match(failed.location, /^\/shopify\/app\/settings\?oauth_/);
 });
 
 test("a callback failure after transaction resolution returns to Shopify Admin", async () => {
   const error = new Error("PROVIDER_TOKEN_EXCHANGE_FAILED");
-  error.embedded_return_target = "https://verified.myshopify.com/admin/apps/client-id";
+  error.embedded_return_target = "https://verified.myshopify.com/admin/apps/client-id/shopify/app/settings";
   const failed = response();
   const callbackFailure = fixture({meta: {start: async () => ({}), callback: async () => { throw error; }}});
   await callbackFailure.routes["GET /api/shopify/providers/:provider/oauth/callback"]({params: {provider: "meta"}, query: {state: "opaque", code: "code"}}, failed);
-  assert.equal(failed.location, "https://verified.myshopify.com/admin/apps/client-id?oauth_error=connection_failed");
+  assert.equal(failed.location, "https://verified.myshopify.com/admin/apps/client-id/shopify/app/settings?oauth_error=connection_failed");
 });
 
 test("a failed Meta token validation returns a controlled reauthorization state", async () => {
   const error = Object.assign(new Error("META_TOKEN_SCOPE_MISSING"), {
     code: "META_TOKEN_SCOPE_MISSING",
-    embedded_return_target: "https://verified.myshopify.com/admin/apps/client-id",
+    embedded_return_target: "https://verified.myshopify.com/admin/apps/client-id/shopify/app/settings",
   });
   const failed = response();
   const callbackFailure = fixture({meta: {start: async () => ({}), callback: async () => { throw error; }}});
   await callbackFailure.routes["GET /api/shopify/providers/:provider/oauth/callback"]({params: {provider: "meta"}, query: {state: "opaque", code: "code"}}, failed);
-  assert.equal(failed.location, "https://verified.myshopify.com/admin/apps/client-id?oauth_error=reauthorization_required&provider=meta");
+  assert.equal(failed.location, "https://verified.myshopify.com/admin/apps/client-id/shopify/app/settings?oauth_error=reauthorization_required&provider=meta");
 });
 
 test("a configured Klaviyo adapter remains available when another known provider is not ready", async () => {
@@ -87,7 +87,7 @@ test("a configured Klaviyo adapter remains available when another known provider
     get(path, handler) { routes[`GET ${path}`] = handler; },
   }, {adapters: {klaviyo: {
     start: async () => ({authorization_url: "https://consent", navigation: "top_level"}),
-    callback: async () => ({redirect_to: "/shopify/app/platforms"}),
+    callback: async () => ({redirect_to: "/shopify/app/settings"}),
   }}});
 
   const klaviyo = response();

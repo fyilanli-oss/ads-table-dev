@@ -1,7 +1,7 @@
 "use strict";
 
 const EMBEDDED_SURFACE = "shopify_embedded";
-const EMBEDDED_RETURN_TARGET = "/shopify/app/platforms";
+const EMBEDDED_RETURN_TARGET = "/shopify/app/settings";
 
 function createOAuthTransactionBoundary({ transactionStore } = {}) {
   async function createTransaction(userId, provider, redirectUri, pkceVerifier = null) {

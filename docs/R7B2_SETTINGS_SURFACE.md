@@ -44,3 +44,7 @@ Bunlar sırasıyla R7-B3–B6 paketlerinde ele alınır.
 7. Shopify-native App Bridge/Polaris markup korunur; nested iframe ve custom style eklenmez.
 8. Repository testleri, güvenlik regresyonu ve deployment başarılı olur.
 9. Gerçek Shopify merchant kontrolü yapılmadan paket `Done` sayılmaz.
+
+## Kapanış kaydı — 29 Eylül 2026
+
+PR #294, merge commit `a39785bcf54a42a32813ec2f678bf97b16446061` ile main dalına alındı. Post-merge Security ve Full Regression kontrolleri ile Vercel deployment başarılı oldu. Kullanıcı gerçek Shopify Admin oturumunda Dashboard sadeleşmesini, Settings menüsünü, Reporting Currency görünümünü, yalnız Meta/Google Ads/Klaviyo kartlarını ve TikTok/Pinterest'in gizlendiğini doğruladı. R7-B2 durumu `Done / merchant acceptance PASS` olarak kapatıldı.

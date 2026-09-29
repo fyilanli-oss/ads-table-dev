@@ -165,8 +165,10 @@ function renderProviderSection({id, label, description, parked = false}, provide
         <s-modal id="${id}-account-modal" heading="Select ${label} account">
           <s-stack gap="base">
             <s-paragraph>Select between 1 and 3 accounts returned by ${label}.</s-paragraph>
-            <s-choice-list id="${id}-choice" name="${id}-accounts" label="${label} accounts" details="You can connect up to 3 accounts." multiple></s-choice-list>
-            <s-button id="${id}-save" variant="primary">Save and connect</s-button>
+            <s-paragraph>You can connect up to 3 accounts.</s-paragraph>
+            <s-stack id="${id}-choice" gap="small"></s-stack>
+            <s-paragraph id="${id}-choice-error" aria-live="polite"></s-paragraph>
+            <s-button id="${id}-save" variant="primary" disabled>Save and connect</s-button>
           </s-stack>
           <s-button slot="secondary-actions" commandFor="${id}-account-modal" command="--hide">Cancel</s-button>
         </s-modal>

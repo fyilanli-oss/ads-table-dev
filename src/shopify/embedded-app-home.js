@@ -124,6 +124,7 @@ function renderProviderSection({id, label, description, parked = false}, provide
         <s-stack gap="tight">
           <s-paragraph>${description}</s-paragraph>
           ${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
+          ${["meta", "google_ads"].includes(id) && providerAvailable ? `<div id="${id}-reporting" hidden><s-stack gap="tight"><s-paragraph id="${id}-reporting-summary"></s-paragraph><s-button id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button></s-stack></div>` : ""}
           ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
         </s-stack>
         ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button id="${id}-connect-action" variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-resume" hidden><s-button id="${id}-resume-action">Resume setup</s-button></div><div id="${id}-connected" hidden>${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
@@ -173,6 +174,16 @@ function renderProviderSection({id, label, description, parked = false}, provide
           <s-button slot="secondary-actions" commandFor="${id}-account-modal" command="--hide">Cancel</s-button>
         </s-modal>
       </s-stack>` : ""}
+      ${["meta", "google_ads"].includes(id) && providerAvailable ? `<s-modal id="${id}-reporting-modal" heading="${label} reporting account" size="small-100">
+        <s-stack gap="base">
+          <s-paragraph>Choose the single connected account AdsTable will show in Dashboard, Funnel and Analysis.</s-paragraph>
+          <s-paragraph>Changing this preference does not reconnect ${label}, remove connected accounts or delete historical data.</s-paragraph>
+          <s-select id="${id}-reporting-choice" label="Reporting account"></s-select>
+          <s-paragraph id="${id}-reporting-message" aria-live="polite"></s-paragraph>
+        </s-stack>
+        <s-button slot="secondary-actions" commandFor="${id}-reporting-modal" command="--hide">Cancel</s-button>
+        <s-button id="${id}-reporting-save" slot="primary-action" variant="primary">Save reporting account</s-button>
+      </s-modal>` : ""}
     </s-section>`;
 }
 

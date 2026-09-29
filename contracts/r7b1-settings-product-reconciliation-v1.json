@@ -1,0 +1,174 @@
+{
+  "contract": "r7b1-settings-product-reconciliation-v1",
+  "status": "PASS_DECISION_CONTRACT_IMPLEMENTATION_PENDING",
+  "decision_date": "2026-09-29",
+  "authority": "AdsTable workspace resolved from verified Shopify embedded session",
+  "supersedes_where_conflicting": [
+    "contracts/shopify/e10-t5c4-platforms-settings-ui.json"
+  ],
+  "navigation": {
+    "items": [
+      "dashboard",
+      "funnel",
+      "analysis",
+      "settings"
+    ],
+    "home_reserved_for": "dashboard",
+    "temporary_home_content": [
+      "connection_status"
+    ],
+    "remove_from_home": [
+      "data_sources_heading",
+      "data_sources_explanation",
+      "manage_data_sources_button"
+    ],
+    "existing_platforms_route": "compatibility redirect/alias until OAuth return migration is accepted"
+  },
+  "settings": {
+    "sections": [
+      "reporting_currency",
+      "platforms"
+    ],
+    "visible_providers": [
+      "meta",
+      "google_ads",
+      "klaviyo"
+    ],
+    "hidden_providers": [
+      "tiktok",
+      "pinterest"
+    ],
+    "hidden_provider_internal_state": "parked"
+  },
+  "reporting_currency": {
+    "source": "merchant_selected",
+    "selection_sequence": [
+      "select_currency",
+      "first_save",
+      "irreversible_confirmation",
+      "explicit_acknowledgement",
+      "confirm_reporting_currency"
+    ],
+    "immutable_after_confirmation": true,
+    "settings_display": "read_only",
+    "direct_update_forbidden": true,
+    "uninstall_changes_currency": false,
+    "clean_reset_requires": "separate approved workspace data deletion and clean reinstall lifecycle"
+  },
+  "oauth_resume": {
+    "canonical_return_surface": "settings",
+    "browser_supplied_return_target_authoritative": false,
+    "callback_behavior": "resume_incomplete_provider_setup_automatically",
+    "pending_steps": [
+      "verified_account_selection",
+      "conditional_klaviyo_monthly_amount"
+    ],
+    "connected_before_required_steps_complete": false,
+    "closed_incomplete_setup_action": "resume_setup"
+  },
+  "provider_controls": {
+    "meta": {
+      "connected_account_cardinality": {
+        "minimum": 1,
+        "maximum": 3
+      },
+      "reporting_account_cardinality": 1,
+      "reporting_account_change_revalidates_ownership": true,
+      "reporting_account_change_reoauth": false
+    },
+    "google_ads": {
+      "connected_account_cardinality": {
+        "minimum": 1,
+        "maximum": 3
+      },
+      "reporting_account_cardinality": 1,
+      "reporting_account_change_revalidates_ownership": true,
+      "reporting_account_change_reoauth": false
+    },
+    "klaviyo": {
+      "connected_account_cardinality": 1,
+      "control_label": "Connected Account",
+      "reporting_account_control": false,
+      "account_change_requires_reverification": true
+    }
+  },
+  "disconnect_and_reporting": {
+    "stops_new_provider_access_and_refresh": true,
+    "deletes_historical_dataset": false,
+    "never_connected_provider_visible_in_reports": false,
+    "disconnected_provider_with_history_visible_in_reports": true,
+    "disconnected_history_requires": [
+      "disconnected_state",
+      "data_through_or_freshness"
+    ],
+    "historical_reporting_preference_independent_from_live_token_state": true
+  },
+  "klaviyo_monthly_amount_history": {
+    "authority_scope": [
+      "workspace_id",
+      "klaviyo_account_id"
+    ],
+    "currency": "provider_verified_source_currency",
+    "correction": {
+      "meaning": "correct an incorrectly entered existing effective period",
+      "creates_new_change_date": false,
+      "controlled_dataset_recalculation_required_when_rows_exist": true
+    },
+    "new_amount": {
+      "effective_day_rule": "first_day_of_month_only",
+      "closes_previous_period": true
+    },
+    "constraints": [
+      "no_overlapping_periods",
+      "no_duplicate_effective_start",
+      "amount_non_negative",
+      "currency_matches_verified_account"
+    ],
+    "list_fields": [
+      "effective_from",
+      "effective_to",
+      "amount",
+      "currency",
+      "edit_action"
+    ]
+  },
+  "modal_copy": {
+    "baseline": "legacy server.js + dashboard.html working copy",
+    "provider_specific_revision_required": true,
+    "meta_must_explain": [
+      "use the Facebook account that owns or can access the selected ad accounts",
+      "that account must be signed in on the device/browser used for Connect"
+    ],
+    "disconnect_must_explain": [
+      "provider access and refresh stop",
+      "historical analytics remain",
+      "other providers are unaffected"
+    ]
+  },
+  "forward_only_package": {
+    "name": "Workspace Data Deletion and Clean Reinstall Lifecycle",
+    "linked_epics": [
+      "E10-T4",
+      "E14"
+    ],
+    "uninstall_is_not_deletion": true,
+    "separate_explicit_consent_required": true
+  },
+  "implementation_sequence": [
+    "R7-B2_navigation_and_settings_surface",
+    "R7-B3_oauth_settings_return_resume_and_modal_copy",
+    "R7-B4_reporting_account_control",
+    "R7-B5_klaviyo_effective_dated_amount_history",
+    "R7-B6_reporting_visibility_and_historical_disconnect",
+    "R7-B7_integrated_real_device_acceptance"
+  ],
+  "out_of_scope": [
+    "runtime_or_ui_code_change",
+    "database_migration",
+    "provider_api_call",
+    "oauth_or_token_mutation",
+    "dataset_v2_write_or_recalculation",
+    "deployment_or_production_activation",
+    "workspace_data_deletion"
+  ]
+}

@@ -142,16 +142,19 @@ test('Meta account endpoints reject missing Shopify authority and invalid cardin
 test('Shopify-native modal and Supabase constraints preserve pending then 1-3 connected accounts', () => {
   const html = renderEmbeddedPlatforms({clientId: 'client', providerOAuthEnabled: true, providerAvailability: {meta: true}});
   assert.match(html, /id="meta-account-modal" heading="Select Meta account"/);
-  assert.match(html, /id="meta-choice"[^>]+multiple/);
-  assert.match(html, /let selectedIds = \[\]/);
-  assert.match(html, /choices\.values = \[\]/);
-  assert.match(html, /choices\.addEventListener\('change'/);
-  assert.match(html, /Array\.isArray\(event\.currentTarget\.values\)/);
-  assert.match(html, /choices\.values = selectedIds/);
-  assert.match(html, /save\.disabled = invalid/);
+  assert.match(html, /id="meta-choice" gap="small"/);
+  assert.match(html, /id="meta-choice-error" aria-live="polite"/);
+  assert.match(html, /id="meta-save" variant="primary" disabled/);
+  assert.match(html, /document\.createElement\('s-checkbox'\)/);
+  assert.match(html, /option\.checked = false/);
+  assert.match(html, /option\.defaultChecked = false/);
+  assert.match(html, /option\.addEventListener\('change'/);
+  assert.match(html, /event\.currentTarget\.checked/);
+  assert.match(html, /selectedIds\.length >= 3/);
+  assert.match(html, /save\.disabled = selectedIds\.length < 1 \|\| selectedIds\.length > 3/);
   assert.match(html, /const submittedIds = selectedIds\.slice\(\)/);
-  assert.match(html, /submittedIds\.length < 1 \|\| submittedIds\.length > 3/);
-  assert.doesNotMatch(html, /const selectedIds = Array\.isArray\(choices\.values\)/);
+  assert.doesNotMatch(html, /s-choice-list id="meta-choice"/);
+  assert.doesNotMatch(html, /choices\.values/);
   assert.match(html, /modal\.showOverlay\(\)/);
   assert.match(html, /result\.status === 'pending_account_selection'[\s\S]*resume\.hidden = false;[\s\S]*loadAccounts\(\)/);
 

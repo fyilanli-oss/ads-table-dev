@@ -20,7 +20,7 @@ const accounts = Object.freeze([
 ]);
 
 test('R7-B4 migration separates reporting preference from connected accounts', () => {
-  const sql = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/20260929110000_r7b4_add_reporting_account.sql'), 'utf8');
+  const sql = fs.readFileSync(path.resolve(__dirname, '../supabase/migrations/20260929110559_r7b4_add_reporting_account.sql'), 'utf8');
   assert.match(sql, /add column reporting_account_id text/);
   assert.match(sql, /add column reporting_account_name text/);
   assert.match(sql, /add column reporting_account_selected_at timestamptz/);

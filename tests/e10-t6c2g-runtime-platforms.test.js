@@ -36,7 +36,10 @@ test("embedded Settings renders immutable currency setup and only three active p
   }
   assert.match(html, /Facebook account that owns or can access the Meta ad accounts/);
   assert.match(html, /Google may describe the consent broadly/);
-  assert.match(html, /select one verified Klaviyo account and enter its Email Monthly Plan Cost/);
+  assert.match(html, /select one verified Klaviyo account and enter its Estimated 30-Day Klaviyo Email Spend/);
+  assert.match(html, /SMS costs are not included/);
+  assert.match(html, /id="klaviyo-spend-update-modal"/);
+  assert.match(html, /id="klaviyo-spend-correct-modal"/);
   assert.match(html, /Other provider connections are not affected/);
   assert.match(html, /disconnected period may not be recovered automatically/);
   assert.match(html, /\/api\/shopify\/providers\//);

@@ -18,6 +18,7 @@ function initializeAdAccounts() {
     const reauthorizationRequired = provider === 'meta' && query.get('oauth_error') === 'reauthorization_required' && query.get('provider') === 'meta';
     if (!message || !choices || !save || !modal) continue;
     let accounts = [];
+    let selectedIds = [];
     let busy = false;
     const request = async (path, body) => {
       const token = await window.shopify.idToken();
@@ -39,13 +40,18 @@ function initializeAdAccounts() {
       try {
         const result = await request('');
         accounts = result.accounts || [];
+        selectedIds = [];
+        choices.values = [];
+        choices.error = '';
+        save.disabled = true;
         choices.replaceChildren();
         for (const account of accounts) {
           const option = document.createElement('s-choice');
-          option.value = account.id;
+          option.setAttribute('value', String(account.id));
           option.textContent = account.name + ' (' + account.id + ') · ' + account.currency;
           choices.append(option);
         }
+        choices.values = [];
         if (!accounts.length) throw new Error('PROVIDER_ACCOUNTS_UNAVAILABLE');
         connect.hidden = true;
         if (resume) resume.hidden = false;
@@ -54,20 +60,30 @@ function initializeAdAccounts() {
         if (typeof modal.showOverlay === 'function') modal.showOverlay();
       } catch (error) { showError(error); }
     };
+    choices.addEventListener('change', event => {
+      const values = Array.isArray(event.currentTarget.values) ? event.currentTarget.values.map(String) : [];
+      selectedIds = [...new Set(values)].filter(id => accounts.some(account => String(account.id) === id));
+      choices.values = selectedIds;
+      const invalid = selectedIds.length < 1 || selectedIds.length > 3;
+      choices.error = selectedIds.length > 3 ? 'Select between 1 and 3 accounts.' : '';
+      save.disabled = invalid;
+    });
     save.addEventListener('click', async () => {
-      const selectedIds = Array.isArray(choices.values) ? choices.values : [];
-      if (busy || selectedIds.length < 1 || selectedIds.length > 3 || selectedIds.some(id => !accounts.some(account => account.id === id))) {
+      const submittedIds = selectedIds.slice();
+      if (busy || submittedIds.length < 1 || submittedIds.length > 3 || submittedIds.some(id => !accounts.some(account => String(account.id) === id))) {
         choices.error = 'Select between 1 and 3 accounts.';
         return;
       }
       busy = true; save.disabled = true; save.loading = true;
       try {
-        const result = await request('/select', {account_ids: selectedIds.map(String)});
+        const result = await request('/select', {account_ids: submittedIds});
         const selected = result.accounts || [];
         message.textContent = 'Connected · ' + selected.length + ' account' + (selected.length === 1 ? '' : 's');
         connect.hidden = true;
         if (resume) resume.hidden = true;
         if (connected) connected.hidden = false;
+        selectedIds = [];
+        choices.values = [];
         if (typeof modal.hideOverlay === 'function') modal.hideOverlay();
       } catch (error) { showError(error); }
       finally { busy = false; save.disabled = false; save.loading = false; }

@@ -33,7 +33,7 @@ function createOAuthTransactionStore({client, now = () => new Date()} = {}) {
     for (const field of ['shop_id', 'workspace_id', 'shopify_user_id']) {
       if (typeof authority[field] !== 'string' || !authority[field]) throw new TypeError(`authority.${field} is required`);
     }
-    if (surface !== 'shopify_embedded' || returnTarget !== '/shopify/app/platforms') throw new TypeError('canonical embedded surface and return target are required');
+    if (surface !== 'shopify_embedded' || returnTarget !== '/shopify/app/settings') throw new TypeError('canonical embedded surface and return target are required');
     if (!provider || !redirectUri) throw new TypeError('provider and redirectUri are required');
     const state = crypto.randomBytes(32).toString('base64url');
     const createdAt = now();

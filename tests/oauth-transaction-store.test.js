@@ -105,7 +105,7 @@ test('embedded transaction stores workspace authority without an auth-user subst
   };
   const created = await store.createEmbedded({
     authority, provider: 'meta', redirectUri: 'https://app/meta/callback',
-    surface: 'shopify_embedded', returnTarget: '/shopify/app/platforms'
+    surface: 'shopify_embedded', returnTarget: '/shopify/app/settings'
   });
   const [row] = client.rows.values();
   assert.equal(row.user_id, null);
@@ -113,13 +113,13 @@ test('embedded transaction stores workspace authority without an auth-user subst
   assert.equal(row.workspace_id, authority.workspace_id);
   assert.equal(row.shopify_user_id, authority.shopify_user_id);
   assert.equal(row.surface, 'shopify_embedded');
-  assert.equal(row.return_target, '/shopify/app/platforms');
+  assert.equal(row.return_target, '/shopify/app/settings');
   assert.equal(JSON.stringify(row).includes(created.state), false);
 });
 
 test('embedded transaction rejects caller-shaped authority and return targets', async () => {
   const store = createOAuthTransactionStore({client: memoryClient()});
-  const base = {provider: 'meta', redirectUri: 'https://app/meta/callback', surface: 'shopify_embedded', returnTarget: '/shopify/app/platforms'};
+  const base = {provider: 'meta', redirectUri: 'https://app/meta/callback', surface: 'shopify_embedded', returnTarget: '/shopify/app/settings'};
   await assert.rejects(() => store.createEmbedded({...base, authority: {authority: 'query', shop_id: 's', workspace_id: 'w', shopify_user_id: 'u'}}), /verified Shopify authority/);
   await assert.rejects(() => store.createEmbedded({...base, returnTarget: 'https://evil.example', authority: {authority: 'shopify_verified_session', shop_id: 's', workspace_id: 'w', shopify_user_id: 'u'}}), /canonical embedded surface/);
 });

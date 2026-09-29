@@ -4,6 +4,7 @@ const { requireServerWorkspaceAuthority } = require('../../funnel-core/workspace
 
 const TABLE = 'workspace_provider_connections';
 const ACTIVE_PROVIDERS = new Set(['meta', 'google_ads', 'klaviyo']);
+const EMBEDDED_RETURN_TARGETS = new Set(['/shopify/app/settings', '/shopify/app/platforms']);
 
 function required(value, field) {
   if (typeof value !== 'string' || value.trim() === '') throw new TypeError(`${field} is required`);
@@ -93,7 +94,7 @@ function metricUpdate(prefix, metricInput, timestamp) {
 
 function authorityFromEmbeddedTransaction(transaction) {
   if (!transaction || transaction.surface !== 'shopify_embedded' || transaction.user_id !== null ||
-    transaction.return_target !== '/shopify/app/platforms') throw new Error('EMBEDDED_OAUTH_TRANSACTION_REQUIRED');
+    !EMBEDDED_RETURN_TARGETS.has(transaction.return_target)) throw new Error('EMBEDDED_OAUTH_TRANSACTION_REQUIRED');
   required(transaction.workspace_id, 'transaction.workspace_id');
   required(transaction.shop_id, 'transaction.shop_id');
   providerName(transaction.provider);

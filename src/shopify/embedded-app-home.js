@@ -3,7 +3,7 @@
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 const {initializeAdAccounts} = require("./ad-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "r7b2-settings-v1";
+const EMBEDDED_HOME_RELEASE = "r7b3-oauth-resume-v1";
 
 function escapeAttribute(value) {
   return String(value)
@@ -102,6 +102,23 @@ function renderEmbeddedAppHome({clientId}) {
 
 function renderProviderSection({id, label, description, parked = false}, providerOAuthEnabled, providerAvailable = providerOAuthEnabled) {
   const disabled = providerAvailable ? "" : " disabled";
+  const connectCopy = {
+    meta: [
+      "Continue with the Facebook account that owns or can access the Meta ad accounts you intend to connect. Make sure that account is signed in on this device and browser.",
+      "Authorization alone does not complete the connection. After authorization, select between 1 and 3 verified Meta ad accounts.",
+    ],
+    google_ads: [
+      "Continue with a Google account that can access the Google Ads customer accounts you intend to connect. Google may describe the consent broadly; AdsTable uses the connection only to read approved Google Ads reporting data.",
+      "Authorization alone does not complete the connection. After authorization, select between 1 and 3 verified Google Ads accounts.",
+    ],
+    klaviyo: [
+      "Continue with a Klaviyo user that can access the account you intend to connect. AdsTable requests the read access needed for email performance reporting.",
+      "Authorization alone does not complete the connection. After authorization, select one verified Klaviyo account and enter its Email Monthly Plan Cost in the account currency.",
+    ],
+  }[id] || [`Continue to ${label} to authorize AdsTable.`];
+  const disconnectCopy = id === "google_ads"
+    ? "AdsTable will revoke this Google authorization, including the retired Google Sheets and GA4 permissions, and stop future Google Ads access and token refresh."
+    : `AdsTable will revoke this ${label} authorization and stop future provider access and token refresh for this connection.`;
   return `<s-section id="${id}" heading="${label}">
       <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
         <s-stack gap="tight">
@@ -109,20 +126,20 @@ function renderProviderSection({id, label, description, parked = false}, provide
           ${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
           ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
         </s-stack>
-        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button id="${id}-connect-action" variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-connected" hidden>${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
+        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button id="${id}-connect-action" variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-resume" hidden><s-button id="${id}-resume-action">Resume setup</s-button></div><div id="${id}-connected" hidden>${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
       </s-stack>
       ${parked ? "" : `<s-modal id="${id}-connect-modal" heading="Connect ${label} to AdsTable?" size="small-100">
         <s-stack gap="base">
-          <s-paragraph>You will continue to ${label} to authorize AdsTable. Authorization alone does not complete the connection.</s-paragraph>
-          <s-paragraph>After authorization, you must select a verified account${id === "klaviyo" ? " and enter its Email Monthly Plan Cost" : ""}.</s-paragraph>
+          ${connectCopy.map(paragraph => `<s-paragraph>${paragraph}</s-paragraph>`).join("")}
         </s-stack>
         <s-button slot="secondary-actions" commandFor="${id}-connect-modal" command="--hide">Cancel</s-button>
         <s-button slot="primary-action" variant="primary" data-provider="${id}" commandFor="${id}-connect-modal" command="--hide">Continue to ${label}</s-button>
       </s-modal>`}
       ${["meta", "google_ads", "klaviyo"].includes(id) && !parked ? `<s-modal id="${id}-disconnect-modal" heading="Disconnect ${label}?" size="small-100">
         <s-stack gap="base">
-          <s-paragraph>${id === "google_ads" ? "AdsTable will revoke this Google authorization, including the retired Google Sheets and GA4 permissions, then remove the Google Ads connection." : "AdsTable will stop new provider access and refresh activity for this connection."}</s-paragraph>
-          <s-paragraph>Historical analytics will be preserved.</s-paragraph>
+          <s-paragraph>${disconnectCopy}</s-paragraph>
+          <s-paragraph>Historical analytics already stored will remain available. Other provider connections are not affected.</s-paragraph>
+          <s-paragraph>Data from the disconnected period may not be recovered automatically after reconnection.</s-paragraph>
           <s-paragraph id="${id}-disconnect-message" aria-live="polite"></s-paragraph>
         </s-stack>
         <s-button slot="secondary-actions" commandFor="${id}-disconnect-modal" command="--hide">Cancel</s-button>

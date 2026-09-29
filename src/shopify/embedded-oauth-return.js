@@ -9,7 +9,7 @@ function createEmbeddedOAuthReturn({client, clientId}) {
       .eq("status", "active").maybeSingle();
     if (error || !data) throw new Error("SHOPIFY_RETURN_UNAVAILABLE");
     // The installed shop comes from the consumed OAuth transaction, never callback query parameters.
-    return `https://${normalizeShopDomain(data.shop_domain)}/admin/apps/${encodeURIComponent(clientId)}`;
+    return `https://${normalizeShopDomain(data.shop_domain)}/admin/apps/${encodeURIComponent(clientId)}/shopify/app/settings`;
   };
 }
 

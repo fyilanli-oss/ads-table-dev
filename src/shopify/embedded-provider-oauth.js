@@ -1,6 +1,8 @@
 "use strict";
 
-const RETURN_TARGET = "/shopify/app/platforms";
+const RETURN_TARGET = "/shopify/app/settings";
+const LEGACY_RETURN_TARGET = "/shopify/app/platforms";
+const ALLOWED_RETURN_TARGETS = new Set([RETURN_TARGET, LEGACY_RETURN_TARGET]);
 
 function requiredFunction(value, name) {
   if (typeof value !== "function") throw new TypeError(`${name} is required`);
@@ -25,7 +27,7 @@ function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedde
   async function callback({state, code}) {
     if (typeof state !== "string" || !state || typeof code !== "string" || !code) throw new Error("INVALID_OAUTH_CALLBACK");
     const transaction = await consumeTransaction(state, provider, redirectUri);
-    if (!transaction || transaction.surface !== "shopify_embedded" || transaction.provider !== provider || transaction.return_target !== RETURN_TARGET) {
+    if (!transaction || transaction.surface !== "shopify_embedded" || transaction.provider !== provider || !ALLOWED_RETURN_TARGETS.has(transaction.return_target)) {
       throw new Error("INVALID_EMBEDDED_OAUTH_TRANSACTION");
     }
     const returnTarget = await resolveReturnTarget(transaction);
@@ -52,4 +54,4 @@ function createEmbeddedProviderOAuth({provider, redirectUri, authenticateEmbedde
 
   return Object.freeze({start, callback});
 }
-module.exports = Object.freeze({createEmbeddedProviderOAuth, RETURN_TARGET});
+module.exports = Object.freeze({createEmbeddedProviderOAuth, RETURN_TARGET, LEGACY_RETURN_TARGET});

@@ -1,6 +1,7 @@
 "use strict";
 
 const EMBEDDED_SURFACE = "shopify_embedded";
+const EMBEDDED_RETURN_TARGETS = new Set(["/shopify/app/settings", "/shopify/app/platforms"]);
 const PROVIDERS = new Set(["meta", "google_ads", "klaviyo", "tiktok", "pinterest"]);
 
 function required(value, field) {
@@ -13,7 +14,7 @@ function assertEmbeddedTransaction(transaction) {
     throw new Error("EMBEDDED_OAUTH_TRANSACTION_REQUIRED");
   }
   for (const field of ["shop_id", "workspace_id", "shopify_user_id"]) required(transaction[field], `transaction.${field}`);
-  if (transaction.return_target !== "/shopify/app/platforms") throw new Error("INVALID_EMBEDDED_RETURN_TARGET");
+  if (!EMBEDDED_RETURN_TARGETS.has(transaction.return_target)) throw new Error("INVALID_EMBEDDED_RETURN_TARGET");
   if (!PROVIDERS.has(transaction.provider)) throw new Error("UNSUPPORTED_EMBEDDED_PROVIDER");
   return transaction;
 }

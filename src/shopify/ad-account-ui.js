@@ -8,6 +8,8 @@ function initializeAdAccounts() {
     const modal = document.getElementById(provider + '-account-modal');
     const connect = document.getElementById(provider + '-connect');
     const connectAction = document.getElementById(provider + '-connect-action');
+    const resume = document.getElementById(provider + '-resume');
+    const resumeAction = document.getElementById(provider + '-resume-action');
     const connected = document.getElementById(provider + '-connected');
     const disconnectModal = document.getElementById(provider + '-disconnect-modal');
     const disconnectConfirm = document.getElementById(provider + '-disconnect-confirm');
@@ -46,6 +48,7 @@ function initializeAdAccounts() {
         }
         if (!accounts.length) throw new Error('PROVIDER_ACCOUNTS_UNAVAILABLE');
         connect.hidden = true;
+        if (resume) resume.hidden = false;
         if (connected) connected.hidden = true;
         message.textContent = 'Authorization complete. Select the account to connect.';
         if (typeof modal.showOverlay === 'function') modal.showOverlay();
@@ -63,6 +66,7 @@ function initializeAdAccounts() {
         const selected = result.accounts || [];
         message.textContent = 'Connected · ' + selected.length + ' account' + (selected.length === 1 ? '' : 's');
         connect.hidden = true;
+        if (resume) resume.hidden = true;
         if (connected) connected.hidden = false;
         if (typeof modal.hideOverlay === 'function') modal.hideOverlay();
       } catch (error) { showError(error); }
@@ -79,6 +83,7 @@ function initializeAdAccounts() {
           await request('/disconnect', {confirmation: provider === 'meta' ? 'DISCONNECT_META' : 'DISCONNECT_GOOGLE_ADS'});
           message.textContent = 'Not connected';
           connect.hidden = false;
+          if (resume) resume.hidden = true;
           connected.hidden = true;
           disconnectMessage.textContent = '';
           if (typeof disconnectModal.hideOverlay === 'function') disconnectModal.hideOverlay();
@@ -97,15 +102,22 @@ function initializeAdAccounts() {
         }
       });
     }
+    if (resumeAction) resumeAction.addEventListener('click', loadAccounts);
     request('/status').then(result => {
-      if (result.status === 'pending_account_selection') return loadAccounts();
+      if (result.status === 'pending_account_selection') {
+        connect.hidden = true;
+        if (resume) resume.hidden = false;
+        return loadAccounts();
+      }
       if (result.status === 'connected') {
         connect.hidden = true;
+        if (resume) resume.hidden = true;
         if (connected) connected.hidden = false;
         const count = Array.isArray(result.accounts) ? result.accounts.length : 0;
         message.textContent = 'Connected' + (count ? ' · ' + count + ' account' + (count === 1 ? '' : 's') : '');
       } else {
         connect.hidden = false;
+        if (resume) resume.hidden = true;
         if (connected) connected.hidden = true;
         if (reauthorizationRequired) {
           if (connectAction) connectAction.textContent = 'Reconnect Meta';

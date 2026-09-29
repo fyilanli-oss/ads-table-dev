@@ -229,16 +229,16 @@ test("OAuth returns to installed Shopify shop and rejects external redirect targ
   const query={select(){return this;},eq(k,v){filters.push([k,v]);return this;},maybeSingle:async()=>({data:{shop_domain:"verified.myshopify.com"},error:null})};
   const resolve=createEmbeddedOAuthReturn({client:{from:()=>query},clientId:"client-id"});
   const target=await resolve({...authority,shop_domain:"evil.example"});
-  assert.equal(target,"https://verified.myshopify.com/admin/apps/client-id");
+  assert.equal(target,"https://verified.myshopify.com/admin/apps/client-id/shopify/app/settings");
   assert.deepEqual(filters,[["shop_id","shop-a"],["workspace_id","workspace-a"],["status","active"]]);
   const routes={};
   let destination=target;
   registerShopifyProviderOAuthRoutes({get:(p,h)=>routes[p]=h,post(){}},{adapters:Object.fromEntries(PROVIDERS.map(p=>[p,{start:async()=>{},callback:async()=>({redirect_to:destination})}]))});
   let redirected;
   const call=()=>routes["/api/shopify/providers/:provider/oauth/callback"]({params:{provider:"klaviyo"},query:{state:"s",code:"c"}},{redirect:url=>redirected=url});
-  await call(); assert.equal(redirected,target);
+  await call(); assert.equal(redirected,target + "?oauth_connected=klaviyo&account_selection_required=1");
   destination="https://evil.example/";
-  await call(); assert.equal(redirected,"/shopify/app/platforms?oauth_error=connection_failed");
+  await call(); assert.equal(redirected,"/shopify/app/settings?oauth_error=connection_failed");
 });
 
 test("UI requires account choice then explicit cost save and prevents duplicate submits", async () => {

@@ -124,7 +124,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         await settingsStore.resolveReportingCurrency(serverWorkspaceAuthority(verified));
         return verified;
       },
-      createEmbeddedTransaction: (authority, provider, redirectUri, pkceVerifier) => oauthTransactionStore.createEmbedded({authority, provider, redirectUri, pkceVerifier, surface: "shopify_embedded", returnTarget: "/shopify/app/platforms"}),
+      createEmbeddedTransaction: (authority, provider, redirectUri, pkceVerifier) => oauthTransactionStore.createEmbedded({authority, provider, redirectUri, pkceVerifier, surface: "shopify_embedded", returnTarget: "/shopify/app/settings"}),
       consumeTransaction: (state, provider, redirectUri) => oauthTransactionStore.consume({state, provider, redirectUri}),
       connectionStore,
       resolveReturnTarget: createEmbeddedOAuthReturn({client: supabaseAdmin, clientId: config.clientId}),

@@ -30,6 +30,15 @@ test("embedded Settings renders immutable currency setup and only three active p
   assert.match(html, /<s-modal id="klaviyo-connect-modal" heading="Connect Klaviyo to AdsTable\?" size="small-100">/);
   assert.match(html, /<s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">/);
   assert.match(html, /commandFor="klaviyo-connect-modal" command="--show"/);
+  for (const provider of ["meta", "google_ads", "klaviyo"]) {
+    assert.match(html, new RegExp(`id="${provider}-resume" hidden`));
+    assert.match(html, new RegExp(`id="${provider}-resume-action">Resume setup`));
+  }
+  assert.match(html, /Facebook account that owns or can access the Meta ad accounts/);
+  assert.match(html, /Google may describe the consent broadly/);
+  assert.match(html, /select one verified Klaviyo account and enter its Email Monthly Plan Cost/);
+  assert.match(html, /Other provider connections are not affected/);
+  assert.match(html, /disconnected period may not be recovered automatically/);
   assert.match(html, /\/api\/shopify\/providers\//);
   assert.match(html, /open\(body\.authorization_url, "_top"\)/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);

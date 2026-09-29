@@ -143,8 +143,15 @@ test('Shopify-native modal and Supabase constraints preserve pending then 1-3 co
   const html = renderEmbeddedPlatforms({clientId: 'client', providerOAuthEnabled: true, providerAvailability: {meta: true}});
   assert.match(html, /id="meta-account-modal" heading="Select Meta account"/);
   assert.match(html, /id="meta-choice"[^>]+multiple/);
-  assert.match(html, /Array\.isArray\(choices\.values\)/);
-  assert.match(html, /selectedIds\.length < 1 \|\| selectedIds\.length > 3/);
+  assert.match(html, /let selectedIds = \[\]/);
+  assert.match(html, /choices\.values = \[\]/);
+  assert.match(html, /choices\.addEventListener\('change'/);
+  assert.match(html, /Array\.isArray\(event\.currentTarget\.values\)/);
+  assert.match(html, /choices\.values = selectedIds/);
+  assert.match(html, /save\.disabled = invalid/);
+  assert.match(html, /const submittedIds = selectedIds\.slice\(\)/);
+  assert.match(html, /submittedIds\.length < 1 \|\| submittedIds\.length > 3/);
+  assert.doesNotMatch(html, /const selectedIds = Array\.isArray\(choices\.values\)/);
   assert.match(html, /modal\.showOverlay\(\)/);
   assert.match(html, /result\.status === 'pending_account_selection'[\s\S]*resume\.hidden = false;[\s\S]*loadAccounts\(\)/);
 

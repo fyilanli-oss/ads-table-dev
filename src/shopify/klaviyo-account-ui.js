@@ -220,6 +220,10 @@ function initializeKlaviyoAccounts() {
       message.textContent = "Connected: " + result.account_name + ". Estimated 30-Day Klaviyo Email Spend: " + result.estimated_30_day_email_spend + " " + result.currency + ".";
       if (resume) resume.hidden = true;
       if (connected) connected.hidden = false;
+      if (spendControls) {
+        spendControls.hidden = false;
+        await loadSpendHistory();
+      }
       if (accountModal && typeof accountModal.hideOverlay === "function") accountModal.hideOverlay();
     } catch (error) { showError(error); }
     finally { busy = false; save.disabled = false; save.loading = false; }

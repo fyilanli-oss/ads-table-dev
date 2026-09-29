@@ -41,7 +41,8 @@ function initializeKlaviyoAccounts() {
   async function request(path, body) {
     if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
     const token = await window.shopify.idToken();
-    const response = await fetch("/api/shopify/providers/klaviyo/accounts" + path, {
+    const target = path.startsWith("/api/") ? path : "/api/shopify/providers/klaviyo/accounts" + path;
+    const response = await fetch(target, {
       method: body ? "POST" : "GET",
       headers: {Authorization: "Bearer " + token, ...(body ? {"Content-Type": "application/json"} : {})},
       ...(body ? {body: JSON.stringify(body)} : {}),
@@ -70,7 +71,7 @@ function initializeKlaviyoAccounts() {
   }
 
   async function loadSpendHistory() {
-    const result = await request("/../spend-history");
+    const result = await request("/api/shopify/providers/klaviyo/spend-history");
     const entries = Array.isArray(result.entries) ? result.entries : [];
     if (spendHistoryChoice) {
       spendHistoryChoice.replaceChildren();
@@ -231,7 +232,7 @@ function initializeKlaviyoAccounts() {
     spendUpdateSave.loading = true;
     spendUpdateMessage.textContent = "Saving…";
     try {
-      const result = await request("/../spend-history/update", {estimated_30_day_email_spend: String(spendUpdateValue.value)});
+      const result = await request("/api/shopify/providers/klaviyo/spend-history/update", {estimated_30_day_email_spend: String(spendUpdateValue.value)});
       message.textContent = "Connected · " + result.estimated_30_day_email_spend + " " + result.currency + " / 30 days";
       spendUpdateMessage.textContent = "";
       await loadSpendHistory();
@@ -246,14 +247,15 @@ function initializeKlaviyoAccounts() {
     spendCorrectSave.loading = true;
     spendCorrectMessage.textContent = "Saving…";
     try {
-      await request("/../spend-history/correct", {
+      await request("/api/shopify/providers/klaviyo/spend-history/correct", {
         effective_from: String(spendHistoryChoice.value),
         estimated_30_day_email_spend: String(spendCorrectValue.value),
       });
       spendCorrectMessage.textContent = "";
-      await loadSpendHistory();
+      const entries = await loadSpendHistory();
+      const latest = entries[0];
+      if (latest) message.textContent = "Connected · " + latest.estimated_30_day_email_spend + " " + latest.currency + " / 30 days";
       if (spendCorrectModal && typeof spendCorrectModal.hideOverlay === "function") spendCorrectModal.hideOverlay();
-      await loadStatus();
     } catch (error) { spendCorrectMessage.textContent = (showError(error), message.textContent); }
     finally { busy = false; spendCorrectSave.disabled = false; spendCorrectSave.loading = false; }
   });

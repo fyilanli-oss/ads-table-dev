@@ -238,6 +238,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     if (!data) return null;
     return Object.freeze({
       ...data,
+      estimated_30_day_email_spend: data.monthly_plan_cost,
       email_monthly_plan_cost: data.monthly_plan_cost,
       account_currency: data.source_currency,
       updated_at: data.connection_version,
@@ -348,7 +349,12 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
   async function readKlaviyoStatus(authorityInput) {
     const row = await readStatus({ authority: authorityInput, provider: 'klaviyo' });
     if (!row) return null;
-    return Object.freeze({ status: row.status, email_monthly_plan_cost: row.monthly_plan_cost, account_currency: row.source_currency });
+    return Object.freeze({
+      status: row.status,
+      estimated_30_day_email_spend: row.monthly_plan_cost,
+      email_monthly_plan_cost: row.monthly_plan_cost,
+      account_currency: row.source_currency,
+    });
   }
 
   async function refreshKlaviyo({ authority: authorityInput, version, accessToken, refreshToken }) {

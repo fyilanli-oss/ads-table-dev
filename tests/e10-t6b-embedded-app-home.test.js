@@ -10,19 +10,21 @@ test("embedded App Home reuses an active installation and bootstraps only for re
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/app-bridge\.js/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
   assert.match(html, /<s-app-nav>/);
-  assert.match(html, /<s-page heading="AdsTable">/);
-  assert.match(html, /<s-section heading="Data sources">/);
-  assert.match(html, /id="setup-data-sources"[^>]+commandFor="currency-modal"/);
-  assert.match(html, /id="currency-modal" heading="Choose reporting currency" size="small-100"/);
-  assert.match(html, /id="manage-data-sources"[^>]+href="\/shopify\/app\/platforms"/);
-  assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 4);
+  assert.match(html, /<s-page heading="Dashboard">/);
+  assert.match(html, /<s-link href="\/shopify\/app" rel="home">Dashboard<\/s-link>/);
+  assert.match(html, /href="\/shopify\/app\/funnel">Funnel<\/s-link>/);
+  assert.match(html, /href="\/shopify\/app\/analysis">Analysis<\/s-link>/);
+  assert.match(html, /href="\/shopify\/app\/settings">Settings<\/s-link>/);
+  assert.doesNotMatch(html, /<s-section heading="Data sources">/);
+  assert.doesNotMatch(html, /setup-data-sources|manage-data-sources|currency-modal/);
+  assert.equal((html.match(/window\.shopify\.idToken\(\)/g) || []).length, 3);
   assert.equal((html.match(/request\("\/api\/shopify\/bootstrap", "POST"/g) || []).length, 1);
   assert.equal((html.match(/request\("\/api\/shopify\/session", "GET"/g) || []).length, 2);
   assert.match(html, /error\.message !== "SHOP_REAUTHORIZATION_REQUIRED"/);
   assert.match(html, /Reference: /);
   assert.doesNotMatch(html, /<style>|class="primary-action"|data-release=/);
   assert.doesNotMatch(html, /<iframe/i);
-  assert.match(html, /Choose your AdsTable reporting currency, then connect Meta, Google Ads, or Klaviyo/);
+  assert.doesNotMatch(html, /Choose your AdsTable reporting currency|Manage data sources|Set up data sources/);
   assert.doesNotMatch(html, /console\.|localStorage|sessionStorage|shop_domain|workspace_id|access_token/);
 });
 

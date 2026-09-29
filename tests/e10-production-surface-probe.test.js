@@ -7,11 +7,11 @@ const {probe, validateSurface} = require("../scripts/e10-production-surface-prob
 const nativeBody = `
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   <script src="https://cdn.shopify.com/shopifycloud/polaris-1.js"></script>
-  <s-page heading="AdsTable">
-  <s-button id="platforms" variant="primary" href="/shopify/app/platforms">Manage data sources</s-button>`;
+  <s-app-nav><s-link href="/shopify/app/settings">Settings</s-link></s-app-nav>
+  <s-page heading="Dashboard">`;
 
 test("production surface requires the deployed release and Shopify-native markup", () => {
-  const headers = new Headers({"x-adstable-release": "e10-t6c2k"});
+  const headers = new Headers({"x-adstable-release": "r7b2-settings-v1"});
   assert.equal(validateSurface({status: 200, headers, body: nativeBody}).pass, true);
   assert.equal(validateSurface({status: 200, headers: new Headers(), body: nativeBody}).pass, false);
   assert.equal(validateSurface({status: 200, headers, body: `${nativeBody}<style></style>`}).pass, false);
@@ -22,12 +22,12 @@ test("probe contacts only the canonical HTTPS App Home without following redirec
   let request;
   const result = await probe({fetchImpl: async (url, options) => {
     request = {url, options};
-    return new Response(nativeBody, {status: 200, headers: {"x-adstable-release": "e10-t6c2k"}});
+    return new Response(nativeBody, {status: 200, headers: {"x-adstable-release": "r7b2-settings-v1"}});
   }});
   assert.equal(result.pass, true);
   assert.equal(request.url.origin, "https://dev.adstable.app");
   assert.equal(request.url.pathname, "/");
-  assert.equal(request.url.searchParams.get("surface_probe"), "e10-t6c2k");
+  assert.equal(request.url.searchParams.get("surface_probe"), "r7b2-settings-v1");
   assert.equal(request.options.redirect, "error");
   await assert.rejects(() => probe({url: "https://example.com/"}), /canonical App Home root/);
 });

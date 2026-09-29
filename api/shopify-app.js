@@ -4,6 +4,7 @@ const {
   EMBEDDED_HOME_RELEASE,
   renderEmbeddedAppHome,
   renderEmbeddedPlatforms,
+  renderEmbeddedPlaceholder,
 } = require("../src/shopify/embedded-app-home");
 const {configuredOAuthProviders} = require("../src/shopify/embedded-provider-strategies");
 
@@ -15,7 +16,8 @@ function handler(req, res) {
   }
 
   const path = new URL(req.url, "https://dev.adstable.app").pathname;
-  if (path !== "/" && path !== "/shopify/app" && path !== "/shopify/app/platforms") {
+  const allowedPaths = new Set(["/", "/shopify/app", "/shopify/app/settings", "/shopify/app/platforms", "/shopify/app/funnel", "/shopify/app/analysis"]);
+  if (!allowedPaths.has(path)) {
     res.statusCode = 404;
     return res.end();
   }
@@ -27,10 +29,11 @@ function handler(req, res) {
     return res.end("Shopify application configuration is unavailable.");
   }
 
-  const platforms = path === "/shopify/app/platforms";
+  const settings = path === "/shopify/app/settings" || path === "/shopify/app/platforms";
+  const placeholderPage = path === "/shopify/app/funnel" ? "Funnel" : path === "/shopify/app/analysis" ? "Analysis" : null;
   const providerOAuthEnabled = process.env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED === "true";
   const configuredProviders = new Set(configuredOAuthProviders(process.env));
-  const html = platforms
+  const html = settings
     ? renderEmbeddedPlatforms({
         clientId,
         providerOAuthEnabled,
@@ -40,7 +43,9 @@ function handler(req, res) {
           klaviyo: providerOAuthEnabled && configuredProviders.has("klaviyo"),
         },
       })
-    : renderEmbeddedAppHome({clientId});
+    : placeholderPage
+      ? renderEmbeddedPlaceholder({clientId, page: placeholderPage})
+      : renderEmbeddedAppHome({clientId});
 
   res.statusCode = 200;
   res.setHeader("Content-Type", "text/html; charset=utf-8");

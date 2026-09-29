@@ -3,7 +3,7 @@
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 const {initializeAdAccounts} = require("./ad-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "r7a-v2";
+const EMBEDDED_HOME_RELEASE = "r7b2-settings-v1";
 
 function escapeAttribute(value) {
   return String(value)
@@ -26,8 +26,10 @@ function documentHead({clientId, title}) {
 
 function appNavigation() {
   return `<s-app-nav>
-    <s-link href="/shopify/app" rel="home">Home</s-link>
-    <s-link href="/shopify/app/platforms">Data sources</s-link>
+    <s-link href="/shopify/app" rel="home">Dashboard</s-link>
+    <s-link href="/shopify/app/funnel">Funnel</s-link>
+    <s-link href="/shopify/app/analysis">Analysis</s-link>
+    <s-link href="/shopify/app/settings">Settings</s-link>
   </s-app-nav>`;
 }
 
@@ -36,54 +38,21 @@ function renderEmbeddedAppHome({clientId}) {
   return `<!doctype html>
 <html lang="en">
 <head>
-  ${documentHead({clientId, title: "AdsTable"})}
+  ${documentHead({clientId, title: "Dashboard — AdsTable"})}
 </head>
 <body>
   ${appNavigation()}
-  <s-page heading="AdsTable">
+  <s-page heading="Dashboard">
     <s-section heading="Store connection">
       <s-banner id="status" heading="Connecting to your store" tone="info">
         AdsTable is verifying the secure Shopify session.
       </s-banner>
     </s-section>
-    <s-section heading="Data sources">
-      <s-stack gap="base">
-        <s-paragraph>Choose your AdsTable reporting currency, then connect Meta, Google Ads, or Klaviyo.</s-paragraph>
-        <div id="setup-data-sources-container" hidden><s-button id="setup-data-sources" variant="primary" commandFor="currency-modal" command="--show">Set up data sources</s-button></div>
-        <div id="manage-data-sources-container" hidden><s-button id="manage-data-sources" variant="primary" href="/shopify/app/platforms">Manage data sources</s-button></div>
-      </s-stack>
-    </s-section>
-    <s-modal id="currency-modal" heading="Choose reporting currency" size="small-100">
-      <s-stack gap="base">
-        <s-paragraph>This is the currency AdsTable will use for reporting. It is independent from Shopify and provider account currencies.</s-paragraph>
-        <s-select id="reporting-currency" label="Reporting currency">
-          ${["TRY","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","SEK","NOK","DKK","PLN"].map(currency => `<s-option value="${currency}">${currency}</s-option>`).join("")}
-        </s-select>
-        <s-paragraph id="currency-message" aria-live="polite"></s-paragraph>
-      </s-stack>
-      <s-button slot="secondary-actions" commandFor="currency-modal" command="--hide">Cancel</s-button>
-      <s-button id="save-reporting-currency" slot="primary-action" variant="primary">Save and continue</s-button>
-    </s-modal>
   </s-page>
   <script>
     (() => {
       "use strict";
       const status = document.getElementById("status");
-      const setupDataSources = document.getElementById("setup-data-sources");
-      const manageDataSources = document.getElementById("manage-data-sources");
-      const setupDataSourcesContainer = document.getElementById("setup-data-sources-container");
-      const manageDataSourcesContainer = document.getElementById("manage-data-sources-container");
-      const reportingCurrency = document.getElementById("reporting-currency");
-      const saveReportingCurrency = document.getElementById("save-reporting-currency");
-      const currencyMessage = document.getElementById("currency-message");
-      const sessionRequest = async (path, options = {}) => {
-        if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
-        const token = await window.shopify.idToken();
-        const response = await fetch(path, {...options, credentials: "same-origin", headers: {Authorization: "Bearer " + token, ...(options.body ? {"Content-Type": "application/json"} : {})}});
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.code || "REQUEST_FAILED");
-        return body;
-      };
       const request = async (path, method, token) => {
         const response = await fetch(path, {
           method,
@@ -115,30 +84,8 @@ function renderEmbeddedAppHome({clientId}) {
         status.setAttribute("heading", "Development store connected securely");
         status.setAttribute("tone", "success");
         status.textContent = "Your verified Shopify workspace is ready.";
-        const settings = await sessionRequest("/api/shopify/workspace/settings");
-        if (settings.status === "configured") {
-          setupDataSourcesContainer.hidden = true;
-          manageDataSourcesContainer.hidden = false;
-        } else {
-          setupDataSourcesContainer.hidden = false;
-          manageDataSourcesContainer.hidden = true;
-        }
         document.documentElement.dataset.smoke = "pass";
       };
-      saveReportingCurrency.addEventListener("click", async () => {
-        saveReportingCurrency.disabled = true;
-        saveReportingCurrency.loading = true;
-        currencyMessage.textContent = "Saving…";
-        try {
-          await sessionRequest("/api/shopify/workspace/reporting-currency", {method: "POST", body: JSON.stringify({currency: String(reportingCurrency.value)})});
-          location.assign("/shopify/app/platforms");
-        } catch (error) {
-          currencyMessage.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Currency is already configured. Open Data sources again." : "Currency could not be saved. Please try again.";
-        } finally {
-          saveReportingCurrency.disabled = false;
-          saveReportingCurrency.loading = false;
-        }
-      });
       run().catch((error) => {
         const code = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "EMBEDDED_BOOTSTRAP_FAILED";
         const reference = /^[A-Za-z0-9._:-]{1,128}$/.test(error.requestId || "") ? " Reference: " + error.requestId : "";
@@ -216,20 +163,18 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
     {id: "meta", label: "Meta", description: "Meta advertising performance and spend."},
     {id: "google_ads", label: "Google Ads", description: "Google Ads performance and spend."},
     {id: "klaviyo", label: "Klaviyo", description: "Email performance and monthly plan cost."},
-    {id: "tiktok", label: "TikTok", description: "TikTok connection is parked for a later release.", parked: true},
-    {id: "pinterest", label: "Pinterest", description: "Pinterest connection is not available in this release.", parked: true},
   ];
-  const sections = providers.map((provider) => renderProviderSection(provider, providerOAuthEnabled, provider.parked ? false : providerAvailability[provider.id] ?? providerOAuthEnabled)).join("\n    ");
+  const sections = providers.map((provider) => renderProviderSection(provider, providerOAuthEnabled, providerAvailability[provider.id] ?? providerOAuthEnabled)).join("\n    ");
   return `<!doctype html>
 <html lang="en">
 <head>
-  ${documentHead({clientId, title: "Data sources — AdsTable"})}
+  ${documentHead({clientId, title: "Settings — AdsTable"})}
 </head>
 <body>
   ${appNavigation()}
-  <s-page heading="Data sources">
-    <s-link slot="breadcrumb-actions" href="/shopify/app">Home</s-link>
-    <s-banner id="status" heading="Data sources" tone="info" hidden></s-banner>
+  <s-page heading="Settings">
+    <s-link slot="breadcrumb-actions" href="/shopify/app">Dashboard</s-link>
+    <s-banner id="status" heading="Settings" tone="info" hidden></s-banner>
     <div id="r6d4-google-acceptance" hidden>
       <s-section heading="Google Ads acceptance check">
         <s-stack gap="base">
@@ -297,31 +242,59 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         </s-stack>
       </s-section>
     </div>
-    <div id="currency-setup" hidden>
-      <s-section heading="Finish setup">
-        <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
-      </s-section>
-    </div>
+    <s-section heading="Reporting Currency">
+      <div id="reporting-currency-summary" hidden>
+        <s-stack gap="tight">
+          <s-paragraph id="reporting-currency-value"></s-paragraph>
+          <s-paragraph>This currency is fixed for the workspace and cannot be changed after confirmation.</s-paragraph>
+        </s-stack>
+      </div>
+      <div id="currency-setup" hidden>
+        <s-stack gap="base">
+          <s-paragraph>Choose carefully. Reporting Currency cannot be changed after confirmation.</s-paragraph>
+          <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
+        </s-stack>
+      </div>
+    </s-section>
     <s-modal id="platforms-currency-modal" heading="Choose reporting currency" size="small-100">
-      <s-stack gap="base">
-        <s-paragraph>This is independent from Shopify and provider account currencies.</s-paragraph>
-        <s-select id="reporting-currency" label="Reporting currency">
-          ${["TRY","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","SEK","NOK","DKK","PLN"].map(currency => `<s-option value="${currency}">${currency}</s-option>`).join("")}
-        </s-select>
-        <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
-      </s-stack>
+      <div id="currency-selection-step">
+        <s-stack gap="base">
+          <s-paragraph>This is independent from Shopify and provider account currencies.</s-paragraph>
+          <s-select id="reporting-currency" label="Reporting currency">
+            ${["TRY","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","SEK","NOK","DKK","PLN"].map(currency => `<s-option value="${currency}">${currency}</s-option>`).join("")}
+          </s-select>
+          <s-button id="review-reporting-currency" variant="primary">Review selection</s-button>
+        </s-stack>
+      </div>
+      <div id="currency-confirmation-step" hidden>
+        <s-stack gap="base">
+          <s-paragraph id="reporting-currency-confirmation"></s-paragraph>
+          <s-paragraph>This choice is permanent for this workspace. Removing the app does not delete data or reset this currency.</s-paragraph>
+          <s-button id="back-to-currency-selection">Back</s-button>
+          <s-button id="save-reporting-currency" variant="primary">Confirm reporting currency</s-button>
+        </s-stack>
+      </div>
+      <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
       <s-button slot="secondary-actions" commandFor="platforms-currency-modal" command="--hide">Cancel</s-button>
-      <s-button id="save-reporting-currency" slot="primary-action" variant="primary">Save and continue</s-button>
     </s-modal>
-    <div id="provider-sections" hidden>${sections}</div>
+    <s-section heading="Platforms">
+      <div id="provider-sections" hidden>${sections}</div>
+    </s-section>
   </s-page>
   <script>
     (() => {
       "use strict";
       const status = document.getElementById("status");
       const currencySetup = document.getElementById("currency-setup");
+      const currencySummary = document.getElementById("reporting-currency-summary");
+      const currencyValue = document.getElementById("reporting-currency-value");
       const providerSections = document.getElementById("provider-sections");
       const currency = document.getElementById("reporting-currency");
+      const selectionStep = document.getElementById("currency-selection-step");
+      const confirmationStep = document.getElementById("currency-confirmation-step");
+      const confirmationText = document.getElementById("reporting-currency-confirmation");
+      const reviewCurrency = document.getElementById("review-reporting-currency");
+      const backToSelection = document.getElementById("back-to-currency-selection");
       const saveCurrency = document.getElementById("save-reporting-currency");
       const currencyMessage = document.getElementById("platforms-currency-message");
       const googleAcceptancePanel = document.getElementById("r6d4-google-acceptance");
@@ -358,20 +331,27 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       };
       const showProviders = reportingCurrency => {
         currencySetup.hidden = true;
+        currencySummary.hidden = false;
+        currencyValue.textContent = "Reporting Currency: " + reportingCurrency;
         providerSections.hidden = false;
         status.hidden = true;
-        (${initializeAdAccounts.toString()})();
-        (${initializeKlaviyoAccounts.toString()})();
+        if (providerSections.dataset.initialized !== "true") {
+          providerSections.dataset.initialized = "true";
+          (${initializeAdAccounts.toString()})();
+          (${initializeKlaviyoAccounts.toString()})();
+        }
       };
       const loadSettings = async () => {
         try {
           const settings = await sessionRequest("/api/shopify/workspace/settings");
           if (settings.status === "configured") return showProviders(settings.reporting_currency);
           currencySetup.hidden = false;
+          currencySummary.hidden = true;
           providerSections.hidden = true;
           status.hidden = true;
         } catch {
           currencySetup.hidden = true;
+          currencySummary.hidden = true;
           providerSections.hidden = true;
           status.hidden = false;
           status.setAttribute("heading", "Open AdsTable from Shopify Admin");
@@ -379,14 +359,26 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           status.textContent = "";
         }
       };
+      reviewCurrency.addEventListener("click", () => {
+        confirmationText.textContent = "Confirm " + String(currency.value) + " as the permanent Reporting Currency.";
+        selectionStep.hidden = true;
+        confirmationStep.hidden = false;
+        currencyMessage.textContent = "";
+      });
+      backToSelection.addEventListener("click", () => {
+        confirmationStep.hidden = true;
+        selectionStep.hidden = false;
+        currencyMessage.textContent = "";
+      });
       saveCurrency.addEventListener("click", async () => {
         saveCurrency.disabled = true;
         saveCurrency.loading = true;
         try {
           const result = await sessionRequest("/api/shopify/workspace/reporting-currency", {method: "POST", body: JSON.stringify({currency: String(currency.value)})});
           showProviders(result.reporting_currency);
+          location.assign("/shopify/app/settings");
         } catch (error) {
-          currencyMessage.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Currency is already configured. Reload Data sources." : "Please choose a supported currency and try again.";
+          currencyMessage.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Currency is already configured. Reload Settings." : "Please choose a supported currency and try again.";
         } finally { saveCurrency.disabled = false; saveCurrency.loading = false; }
       });
       if (params.get("acceptance") === "r6d5-klaviyo") {
@@ -621,6 +613,23 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
 </html>`;
 }
 
+function renderEmbeddedPlaceholder({clientId, page}) {
+  if (typeof clientId !== "string" || !clientId.trim()) throw new TypeError("clientId is required");
+  if (!["Funnel", "Analysis"].includes(page)) throw new TypeError("page is required");
+  return `<!doctype html>
+<html lang="en">
+<head>
+  ${documentHead({clientId, title: page + " — AdsTable"})}
+</head>
+<body>
+  ${appNavigation()}
+  <s-page heading="${page}">
+    <s-banner heading="${page}" tone="info">This Shopify-native workspace surface is reserved for the planned ${page} package.</s-banner>
+  </s-page>
+</body>
+</html>`;
+}
+
 function setEmbeddedHeaders(res) {
   res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
   res.set("CDN-Cache-Control", "no-store");
@@ -644,13 +653,21 @@ function registerEmbeddedAppHome(app, {clientId}) {
 function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}) {
   if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
   const html = renderEmbeddedPlatforms({clientId, providerOAuthEnabled});
-  app.get("/shopify/app/platforms", (_req, res) => {
+  const settingsHandler = (_req, res) => {
     setEmbeddedHeaders(res);
     return res.type("html").send(html);
-  });
+  };
+  app.get("/shopify/app/settings", settingsHandler);
+  app.get("/shopify/app/platforms", settingsHandler);
+  for (const page of ["Funnel", "Analysis"]) {
+    app.get("/shopify/app/" + page.toLowerCase(), (_req, res) => {
+      setEmbeddedHeaders(res);
+      return res.type("html").send(renderEmbeddedPlaceholder({clientId, page}));
+    });
+  }
 }
 
-module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms});
+module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms, renderEmbeddedPlaceholder});
 
 
 

@@ -1,7 +1,7 @@
 "use strict";
 
 const DEFAULT_URL = "https://dev.adstable.app/";
-const EXPECTED_RELEASE = "e10-t6c2k";
+const EXPECTED_RELEASE = "r7b2-settings-v1";
 
 function validateSurface({status, headers, body}, expectedRelease = EXPECTED_RELEASE) {
   const release = headers.get("x-adstable-release");
@@ -10,8 +10,9 @@ function validateSurface({status, headers, body}, expectedRelease = EXPECTED_REL
     release_header_matches: release === expectedRelease,
     app_bridge_present: body.includes("https://cdn.shopify.com/shopifycloud/app-bridge.js"),
     polaris_present: body.includes("https://cdn.shopify.com/shopifycloud/polaris-1.js"),
-    shopify_page_present: body.includes('<s-page heading="AdsTable">'),
-    data_sources_action_present: body.includes('<s-button id="platforms" variant="primary" href="/shopify/app/platforms">'),
+    shopify_page_present: body.includes('<s-page heading="Dashboard">'),
+    settings_navigation_present: body.includes('<s-link href="/shopify/app/settings">Settings</s-link>'),
+    data_sources_promo_absent: !body.includes("Manage data sources") && !body.includes("Set up data sources"),
     custom_style_absent: !body.includes("<style>"),
     nested_iframe_absent: !/<iframe/i.test(body),
   });

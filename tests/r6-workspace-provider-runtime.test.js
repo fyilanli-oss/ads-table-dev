@@ -160,6 +160,7 @@ test('Execution Plan records the failed C6 attempts and the verified-empty live 
   assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Production Disconnect and clean Reconnect PASS \/ R6-D3 complete/);
   assert.match(plan, /tamamlanmış E4\/E5\/E7.*yeniden geliştirilmedi/i);
   assert.match(plan, /R7-A.*R6-D/i);
-  assert.match(plan, /R7-A merchant acceptance PASS; provider-specific Disconnect acceptance moved into each R6-D provider gate; R7-B final consistency after R6-D/i);
+  assert.match(plan, /R7-A merchant acceptance PASS; R7-B1 Settings decision contract PASS; R7-B2–B7 implementation\/acceptance pending/i);
+  assert.match(plan, /R7-B1 Settings ürün ve veri davranışı uzlaştırması — Contract PASS \/ implementation pending/);
   assert.doesNotMatch(plan, /\| R7 \|[^\n]+`Blocked by R5–R6`/);
 });

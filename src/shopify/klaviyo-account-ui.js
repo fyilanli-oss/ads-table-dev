@@ -88,7 +88,8 @@ function initializeKlaviyoAccounts() {
         if (spendCorrectValue) spendCorrectValue.value = entries[0].estimated_30_day_email_spend;
       }
     }
-    if (spendControls) spendControls.hidden = entries.length === 0;
+    if (spendControls) spendControls.hidden = false;
+    if (spendCorrectOpen) spendCorrectOpen.hidden = entries.length === 0;
     return entries;
   }
 

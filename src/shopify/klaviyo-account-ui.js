@@ -23,6 +23,16 @@ function initializeKlaviyoAccounts() {
   const disconnectMessage = document.getElementById("klaviyo-disconnect-message");
   const resetStep = document.getElementById("klaviyo-reset-step");
   const resetConfirm = document.getElementById("klaviyo-reset-confirm");
+  const spendControls = document.getElementById("klaviyo-spend-controls");
+  const spendUpdateModal = document.getElementById("klaviyo-spend-update-modal");
+  const spendUpdateValue = document.getElementById("klaviyo-spend-update-value");
+  const spendUpdateSave = document.getElementById("klaviyo-spend-update-save");
+  const spendUpdateMessage = document.getElementById("klaviyo-spend-update-message");
+  const spendCorrectModal = document.getElementById("klaviyo-spend-correct-modal");
+  const spendHistoryChoice = document.getElementById("klaviyo-spend-history-choice");
+  const spendCorrectValue = document.getElementById("klaviyo-spend-correct-value");
+  const spendCorrectSave = document.getElementById("klaviyo-spend-correct-save");
+  const spendCorrectMessage = document.getElementById("klaviyo-spend-correct-message");
   let accounts = [];
   let selected = null;
   let busy = false;
@@ -47,14 +57,36 @@ function initializeKlaviyoAccounts() {
       KLAVIYO_REAUTHORIZE: "Your Klaviyo authorization needs to be renewed. Select Connect to authorize again.",
       KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED: "The existing Klaviyo authorization has expired. A clean connection must be prepared before reconnecting.",
       KLAVIYO_REVOKE_FAILED: "The old Klaviyo authorization could not be removed. No local connection data was changed.",
-      INVALID_PLAN_COST: "Enter a monthly cost of 0 or more, with up to two decimal places.",
+      INVALID_ESTIMATED_30_DAY_EMAIL_SPEND: "Enter a 30-day email spend estimate of 0 or more, with up to two decimal places.",
       INVALID_ACCOUNT: "This account could not be verified. Reload the accounts and select again.",
       CONNECTION_CHANGED: "The connection changed. Reload the accounts before saving again.",
+      DUPLICATE_EFFECTIVE_START: "A spend value already starts today. Use Correct value instead.",
+      SPEND_HISTORY_ENTRY_NOT_FOUND: "The selected saved value could not be found. Reload and try again.",
     };
     message.textContent = messages[error.message] || "Klaviyo could not be reached. Please try again shortly.";
     retryStep.hidden = false;
     if (error.message === "KLAVIYO_REAUTHORIZE") connect.hidden = false;
     if (error.message === "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED" && resetStep) resetStep.hidden = false;
+  }
+
+  async function loadSpendHistory() {
+    const result = await request("/../spend-history");
+    const entries = Array.isArray(result.entries) ? result.entries : [];
+    if (spendHistoryChoice) {
+      spendHistoryChoice.replaceChildren();
+      for (const entry of entries) {
+        const option = document.createElement("s-option");
+        option.value = entry.effective_from;
+        option.textContent = entry.effective_from + " · " + entry.estimated_30_day_email_spend + " " + entry.currency;
+        spendHistoryChoice.append(option);
+      }
+      if (entries.length) {
+        spendHistoryChoice.value = entries[0].effective_from;
+        if (spendCorrectValue) spendCorrectValue.value = entries[0].estimated_30_day_email_spend;
+      }
+    }
+    if (spendControls) spendControls.hidden = entries.length === 0;
+    return entries;
   }
 
   async function loadStatus() {
@@ -70,8 +102,10 @@ function initializeKlaviyoAccounts() {
         if (resume) resume.hidden = true;
         if (connected) connected.hidden = false;
         if (resetStep) resetStep.hidden = false;
-        const amount = result.email_monthly_plan_cost == null ? "" : " · " + result.email_monthly_plan_cost + " " + result.currency + "/month";
+        if (spendControls) spendControls.hidden = false;
+        const amount = result.estimated_30_day_email_spend == null ? "" : " · " + result.estimated_30_day_email_spend + " " + result.currency + "/30 days";
         message.textContent = "Connected" + amount;
+        await loadSpendHistory();
       } else if (result.status === "account_selection_required") {
         connect.hidden = true;
         if (resume) resume.hidden = false;
@@ -125,7 +159,7 @@ function initializeKlaviyoAccounts() {
       if (result.status === "connected" && accounts.some(account => account.id === result.active_account_id)) {
         if (resume) resume.hidden = true;
         const account = accounts.find(account => account.id === result.active_account_id);
-        message.textContent = "Connected: " + account.name + ". Email Monthly Plan Cost: " + result.email_monthly_plan_cost + " " + account.currency + ".";
+        message.textContent = "Connected: " + account.name + ". Estimated 30-Day Klaviyo Email Spend: " + result.estimated_30_day_email_spend + " " + account.currency + ".";
         return;
       }
       choices.replaceChildren();
@@ -166,8 +200,8 @@ function initializeKlaviyoAccounts() {
     choiceStep.hidden = true;
     costStep.hidden = false;
     cost.value = "";
-    cost.setAttribute("label", "Email Monthly Plan Cost (" + selected.currency + ")");
-    message.textContent = "Selected: " + selected.name + ". Save your monthly plan cost to complete the connection. Enter 0 for a free plan.";
+    cost.setAttribute("label", "Estimated 30-Day Klaviyo Email Spend (" + selected.currency + ")");
+    message.textContent = "Selected: " + selected.name + ". Save your estimated 30-day email spend to complete the connection. Enter 0 for no email cost.";
   });
   save.addEventListener("click", async () => {
     if (busy || !selected) return;
@@ -175,15 +209,53 @@ function initializeKlaviyoAccounts() {
     save.disabled = true;
     save.loading = true;
     try {
-      const result = await request("/select", {account_id: selected.id, email_monthly_plan_cost: String(cost.value)});
+      const result = await request("/select", {account_id: selected.id, estimated_30_day_email_spend: String(cost.value)});
       costStep.hidden = true;
       retryStep.hidden = true;
-      message.textContent = "Connected: " + result.account_name + ". Email Monthly Plan Cost: " + result.email_monthly_plan_cost + " " + result.currency + ".";
+      message.textContent = "Connected: " + result.account_name + ". Estimated 30-Day Klaviyo Email Spend: " + result.estimated_30_day_email_spend + " " + result.currency + ".";
       if (resume) resume.hidden = true;
       if (connected) connected.hidden = false;
       if (accountModal && typeof accountModal.hideOverlay === "function") accountModal.hideOverlay();
     } catch (error) { showError(error); }
     finally { busy = false; save.disabled = false; save.loading = false; }
+  });
+  if (spendHistoryChoice) spendHistoryChoice.addEventListener("change", async () => {
+    const entries = await loadSpendHistory();
+    const entry = entries.find(item => item.effective_from === spendHistoryChoice.value);
+    if (entry && spendCorrectValue) spendCorrectValue.value = entry.estimated_30_day_email_spend;
+  });
+  if (spendUpdateSave) spendUpdateSave.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
+    spendUpdateSave.disabled = true;
+    spendUpdateSave.loading = true;
+    spendUpdateMessage.textContent = "Saving…";
+    try {
+      const result = await request("/../spend-history/update", {estimated_30_day_email_spend: String(spendUpdateValue.value)});
+      message.textContent = "Connected · " + result.estimated_30_day_email_spend + " " + result.currency + " / 30 days";
+      spendUpdateMessage.textContent = "";
+      await loadSpendHistory();
+      if (spendUpdateModal && typeof spendUpdateModal.hideOverlay === "function") spendUpdateModal.hideOverlay();
+    } catch (error) { spendUpdateMessage.textContent = (showError(error), message.textContent); }
+    finally { busy = false; spendUpdateSave.disabled = false; spendUpdateSave.loading = false; }
+  });
+  if (spendCorrectSave) spendCorrectSave.addEventListener("click", async () => {
+    if (busy || !spendHistoryChoice.value) return;
+    busy = true;
+    spendCorrectSave.disabled = true;
+    spendCorrectSave.loading = true;
+    spendCorrectMessage.textContent = "Saving…";
+    try {
+      await request("/../spend-history/correct", {
+        effective_from: String(spendHistoryChoice.value),
+        estimated_30_day_email_spend: String(spendCorrectValue.value),
+      });
+      spendCorrectMessage.textContent = "";
+      await loadSpendHistory();
+      if (spendCorrectModal && typeof spendCorrectModal.hideOverlay === "function") spendCorrectModal.hideOverlay();
+      await loadStatus();
+    } catch (error) { spendCorrectMessage.textContent = (showError(error), message.textContent); }
+    finally { busy = false; spendCorrectSave.disabled = false; spendCorrectSave.loading = false; }
   });
   retry.addEventListener("click", () => retryAction && retryAction());
   if (disconnectConfirm && disconnectModal) disconnectConfirm.addEventListener("click", async () => {

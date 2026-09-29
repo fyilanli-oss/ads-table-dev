@@ -174,7 +174,7 @@ test("persistence scopes updates to verified shop/workspace and rejects a concur
   const store = createWorkspaceProviderConnectionStore({client: {from: () => ({update: row => {mutation = row; return query;}})}, vault: {encrypt: x=>x, decrypt: x=>x}});
   await assert.rejects(store.completeKlaviyo({authority, version: "old-version", account: {id: "a", currency: "USD"}, cost: "1.00"}), /CONNECTION_CHANGED/);
   assert.deepEqual(filters, [["workspace_id", "workspace-a"], ["shop_id", "shop-a"], ["provider", "klaviyo"], ["updated_at", "old-version"], ["status", "revoked"]]);
-  assert.equal(mutation.estimated_30_day_email_spend, "1.00");
+  assert.equal(mutation.email_monthly_plan_cost, "1.00");
 });
 
 test("account routes require a Shopify bearer session and redact unexpected errors", async () => {

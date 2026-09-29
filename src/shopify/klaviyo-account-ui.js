@@ -29,6 +29,7 @@ function initializeKlaviyoAccounts() {
   const spendUpdateSave = document.getElementById("klaviyo-spend-update-save");
   const spendUpdateMessage = document.getElementById("klaviyo-spend-update-message");
   const spendCorrectModal = document.getElementById("klaviyo-spend-correct-modal");
+  const spendCorrectOpen = document.getElementById("klaviyo-spend-correct-open");
   const spendHistoryChoice = document.getElementById("klaviyo-spend-history-choice");
   const spendCorrectValue = document.getElementById("klaviyo-spend-correct-value");
   const spendCorrectSave = document.getElementById("klaviyo-spend-correct-save");

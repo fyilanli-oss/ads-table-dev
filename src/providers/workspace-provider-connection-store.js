@@ -171,7 +171,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('provider,status,active_account_id,active_account_name,source_currency,monthly_plan_cost,selected_accounts,connection_version,updated_at')
+      .select('provider,status,active_account_id,active_account_name,source_currency,monthly_plan_cost,selected_accounts,reporting_account_id,reporting_account_name,reporting_account_selected_at,connection_version,updated_at')
       .eq('workspace_id', workspace.workspace_id)
       .eq('provider', provider)
       .maybeSingle();
@@ -183,7 +183,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at,add_to_cart_metric_id,add_to_cart_metric_name,add_to_cart_metric_integration_name,add_to_cart_metric_integration_category,add_to_cart_metric_verified_at,checkout_metric_id,checkout_metric_name,checkout_metric_integration_name,checkout_metric_integration_category,checkout_metric_verified_at')
+      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,reporting_account_id,reporting_account_name,reporting_account_selected_at,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at,add_to_cart_metric_id,add_to_cart_metric_name,add_to_cart_metric_integration_name,add_to_cart_metric_integration_category,add_to_cart_metric_verified_at,checkout_metric_id,checkout_metric_name,checkout_metric_integration_name,checkout_metric_integration_category,checkout_metric_verified_at')
       .eq('workspace_id', workspace.workspace_id)
       .eq('provider', provider)
       .eq('status', 'connected')
@@ -196,6 +196,9 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       activeAccountId: data.active_account_id,
       sourceCurrency: data.source_currency,
       selectedAccounts: Array.isArray(data.selected_accounts) ? data.selected_accounts : [],
+      reportingAccountId: data.reporting_account_id,
+      reportingAccountName: data.reporting_account_name,
+      reportingAccountSelectedAt: data.reporting_account_selected_at,
       monthlyPlanCost: data.monthly_plan_cost,
       conversionMetric: data.conversion_metric_id ? Object.freeze({
         id: data.conversion_metric_id,
@@ -247,7 +250,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const authority = requireServerWorkspaceAuthority(authorityInput);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,active_account_name,source_currency,selected_accounts,connection_version,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes')
+      .select('status,active_account_id,active_account_name,source_currency,selected_accounts,reporting_account_id,reporting_account_name,reporting_account_selected_at,connection_version,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes')
       .eq('workspace_id', authority.workspace_id).eq('provider', provider).maybeSingle();
     if (error) throw new Error('CONNECTION_READ_FAILED');
     if (!data) return null;
@@ -283,12 +286,15 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     return data;
   }
 
-  async function completeAccountSelection({ authority: authorityInput, provider: providerInput, version, accounts } = {}) {
+  async function completeAccountSelection({ authority: authorityInput, provider: providerInput, version, accounts, previousReportingAccountId = null } = {}) {
     const authority = requireServerWorkspaceAuthority(authorityInput);
     const provider = providerName(providerInput);
     if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
     const verifiedAccounts = selectedAccounts(provider, accounts);
     const primary = verifiedAccounts[0];
+    const reporting = provider === 'klaviyo'
+      ? null
+      : verifiedAccounts.find(account => account.id === previousReportingAccountId) || primary;
     const timestamp = now().toISOString();
     const { data, error } = await client.from(TABLE).update({
       status: 'connected',
@@ -296,6 +302,9 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       active_account_name: primary.name,
       source_currency: primary.currency,
       selected_accounts: verifiedAccounts,
+      reporting_account_id: reporting?.id || null,
+      reporting_account_name: reporting?.name || null,
+      reporting_account_selected_at: reporting ? timestamp : null,
       monthly_plan_cost: null,
       conversion_metric_id: null,
       conversion_metric_name: null,
@@ -313,6 +322,27 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       .select('active_account_id').maybeSingle();
     if (error) throw new Error('CONNECTION_WRITE_FAILED');
     if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+  }
+
+  async function updateReportingAccount({ authority: authorityInput, provider: providerInput, version, account: accountInput } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    const provider = providerName(providerInput);
+    if (!['meta', 'google_ads'].includes(provider)) throw new Error('REPORTING_ACCOUNT_NOT_SUPPORTED');
+    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
+    const [account] = selectedAccounts(provider, [accountInput]);
+    const timestamp = now().toISOString();
+    const { data, error } = await client.from(TABLE).update({
+      reporting_account_id: account.id,
+      reporting_account_name: account.name,
+      reporting_account_selected_at: timestamp,
+      connection_version: version + 1,
+      updated_at: timestamp,
+    }).eq('workspace_id', authority.workspace_id).eq('provider', provider)
+      .eq('connection_version', version).eq('status', 'connected')
+      .select('reporting_account_id,reporting_account_name,reporting_account_selected_at,connection_version').maybeSingle();
+    if (error) throw new Error('CONNECTION_WRITE_FAILED');
+    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+    return data;
   }
 
   async function readKlaviyoStatus(authorityInput) {
@@ -526,6 +556,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     readPendingProvider,
     refreshGoogle,
     completeAccountSelection,
+    updateReportingAccount,
     readKlaviyo,
     readKlaviyoStatus,
     refreshKlaviyo,

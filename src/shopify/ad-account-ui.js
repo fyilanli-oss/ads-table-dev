@@ -15,10 +15,18 @@ function initializeAdAccounts() {
     const disconnectModal = document.getElementById(provider + '-disconnect-modal');
     const disconnectConfirm = document.getElementById(provider + '-disconnect-confirm');
     const disconnectMessage = document.getElementById(provider + '-disconnect-message');
+    const reporting = document.getElementById(provider + '-reporting');
+    const reportingSummary = document.getElementById(provider + '-reporting-summary');
+    const reportingModal = document.getElementById(provider + '-reporting-modal');
+    const reportingChoice = document.getElementById(provider + '-reporting-choice');
+    const reportingSave = document.getElementById(provider + '-reporting-save');
+    const reportingMessage = document.getElementById(provider + '-reporting-message');
     const query = new URLSearchParams(location.search);
     const reauthorizationRequired = provider === 'meta' && query.get('oauth_error') === 'reauthorization_required' && query.get('provider') === 'meta';
     if (!message || !choices || !choiceError || !save || !modal) continue;
     let accounts = [];
+    let connectedAccounts = [];
+    let reportingAccount = null;
     let selectedIds = [];
     let selectionError = '';
     let busy = false;
@@ -37,6 +45,25 @@ function initializeAdAccounts() {
       message.textContent = error.message === 'PROVIDER_REAUTHORIZE'
         ? 'Authorization expired. Reconnect will be available after the current connection is resolved.'
         : 'Accounts could not be loaded. Please try again.';
+    };
+    const renderReporting = result => {
+      connectedAccounts = Array.isArray(result?.accounts) ? result.accounts : connectedAccounts;
+      reportingAccount = result?.reporting_account || reportingAccount;
+      const available = result?.status === 'connected' && connectedAccounts.length > 0 && reportingAccount?.id;
+      if (!reporting || !reportingSummary || !reportingChoice) return;
+      reporting.hidden = !available;
+      if (!available) return;
+      const current = connectedAccounts.find(account => String(account.id) === String(reportingAccount.id));
+      reportingSummary.textContent = 'Reporting Account: ' + String(current?.name || reportingAccount.name || reportingAccount.id);
+      reportingChoice.replaceChildren();
+      for (const account of connectedAccounts) {
+        const option = document.createElement('s-option');
+        option.setAttribute('value', String(account.id));
+        option.textContent = String(account.name) + ' (' + String(account.id) + ')';
+        reportingChoice.append(option);
+      }
+      reportingChoice.value = String(reportingAccount.id);
+      if (reportingMessage) reportingMessage.textContent = '';
     };
     const syncSelection = () => {
       const selected = new Set(selectedIds);
@@ -103,6 +130,7 @@ function initializeAdAccounts() {
         connect.hidden = true;
         if (resume) resume.hidden = true;
         if (connected) connected.hidden = false;
+        renderReporting({status: 'connected', accounts: selected, reporting_account: selected[0] ? {id: selected[0].id, name: selected[0].name} : null});
         selectedIds = [];
         selectionError = '';
         syncSelection();
@@ -123,6 +151,7 @@ function initializeAdAccounts() {
           connect.hidden = false;
           if (resume) resume.hidden = true;
           connected.hidden = true;
+          if (reporting) reporting.hidden = true;
           disconnectMessage.textContent = '';
           if (typeof disconnectModal.hideOverlay === 'function') disconnectModal.hideOverlay();
         } catch (error) {
@@ -140,6 +169,36 @@ function initializeAdAccounts() {
         }
       });
     }
+    if (reportingSave && reportingChoice && reportingModal && reportingMessage) {
+      reportingSave.addEventListener('click', async () => {
+        const accountId = String(reportingChoice.value || '').trim();
+        if (busy || !connectedAccounts.some(account => String(account.id) === accountId)) {
+          reportingMessage.textContent = 'Choose one connected account.';
+          return;
+        }
+        busy = true;
+        reportingSave.disabled = true;
+        reportingSave.loading = true;
+        reportingMessage.textContent = 'Verifying account access…';
+        try {
+          const result = await request('/reporting', {account_id: accountId});
+          reportingAccount = result.reporting_account;
+          renderReporting({status: 'connected', accounts: connectedAccounts, reporting_account: reportingAccount});
+          reportingMessage.textContent = 'Reporting account saved.';
+          if (typeof reportingModal.hideOverlay === 'function') reportingModal.hideOverlay();
+        } catch (error) {
+          reportingMessage.textContent = error.message === 'REPORTING_ACCOUNT_ACCESS_NOT_VERIFIED'
+            ? 'Account access could not be verified. The previous reporting account is unchanged.'
+            : error.message === 'PROVIDER_REAUTHORIZE'
+              ? 'Authorization expired. Reconnect the provider before changing the reporting account.'
+              : 'Reporting account could not be saved. The previous selection is unchanged.';
+        } finally {
+          busy = false;
+          reportingSave.disabled = false;
+          reportingSave.loading = false;
+        }
+      });
+    }
     if (resumeAction) resumeAction.addEventListener('click', loadAccounts);
     request('/status').then(result => {
       if (result.status === 'pending_account_selection') {
@@ -153,10 +212,12 @@ function initializeAdAccounts() {
         if (connected) connected.hidden = false;
         const count = Array.isArray(result.accounts) ? result.accounts.length : 0;
         message.textContent = 'Connected' + (count ? ' · ' + count + ' account' + (count === 1 ? '' : 's') : '');
+        renderReporting(result);
       } else {
         connect.hidden = false;
         if (resume) resume.hidden = true;
         if (connected) connected.hidden = true;
+        if (reporting) reporting.hidden = true;
         if (reauthorizationRequired) {
           if (connectAction) connectAction.textContent = 'Reconnect Meta';
           message.textContent = 'Meta authorization must be renewed before account selection.';

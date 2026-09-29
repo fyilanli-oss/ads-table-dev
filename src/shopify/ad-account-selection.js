@@ -110,7 +110,16 @@ function createAdAccountSelection({store, discoverByProvider, tokenLifecycleByPr
   return Object.freeze({
     async status(authority, provider) {
       const row = await store.readStatus({authority, provider});
-      return {status: row?.status || 'not_connected', accounts: Array.isArray(row?.selected_accounts) ? row.selected_accounts : []};
+      const reportingAccount = row?.reporting_account_id ? {
+        id: row.reporting_account_id,
+        name: row.reporting_account_name,
+        selected_at: row.reporting_account_selected_at,
+      } : null;
+      return {
+        status: row?.status || 'not_connected',
+        accounts: Array.isArray(row?.selected_accounts) ? row.selected_accounts : [],
+        reporting_account: reportingAccount,
+      };
     },
     async list(authority, provider) {
       if (!PROVIDERS.includes(provider)) throw failure('PROVIDER_NOT_FOUND', 404);
@@ -133,8 +142,33 @@ function createAdAccountSelection({store, discoverByProvider, tokenLifecycleByPr
       const verified = accountIds.map(id => accounts.find(item => item.id === id));
       if (verified.some(account => !account)) throw failure('INVALID_ACCOUNT', 400);
       const version = discovered.connection.version ?? discovered.connection.connection_version;
-      await store.completeAccountSelection({authority, provider, version, accounts: verified});
+      await store.completeAccountSelection({
+        authority,
+        provider,
+        version,
+        accounts: verified,
+        ...(connection.reporting_account_id ? {previousReportingAccountId: connection.reporting_account_id} : {}),
+      });
       return {status: 'connected', accounts: verified};
+    },
+    async reporting(authority, provider, input) {
+      if (!PROVIDERS.includes(provider)) throw failure('PROVIDER_NOT_FOUND', 404);
+      const accountId = typeof input?.account_id === 'string' ? input.account_id.trim() : '';
+      if (!accountId) throw failure('REPORTING_ACCOUNT_REQUIRED', 400);
+      const connection = await store.resolveConnected({authority, provider});
+      if (!connection || connection.status !== 'connected') throw failure('REPORTING_ACCOUNT_CONNECTION_REQUIRED', 409);
+      const connectedAccounts = Array.isArray(connection.selectedAccounts) ? connection.selectedAccounts : [];
+      if (!connectedAccounts.some(account => account?.id === accountId)) throw failure('REPORTING_ACCOUNT_NOT_SELECTED', 400);
+      const discovered = await discover(authority, provider, connection);
+      const verified = discovered.accounts.find(account => account.id === accountId);
+      if (!verified) throw failure('REPORTING_ACCOUNT_ACCESS_NOT_VERIFIED', 409);
+      const version = discovered.connection.version ?? discovered.connection.connection_version;
+      await store.updateReportingAccount({authority, provider, version, account: verified});
+      return {
+        status: 'connected',
+        reporting_account: {id: verified.id, name: verified.name},
+        connected_account_count: connectedAccounts.length,
+      };
     },
   });
 }

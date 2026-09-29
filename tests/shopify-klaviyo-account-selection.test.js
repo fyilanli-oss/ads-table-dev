@@ -245,12 +245,13 @@ test("OAuth returns to installed Shopify shop and rejects external redirect targ
 test("UI requires account choice then explicit cost save and prevents duplicate submits", async () => {
   const elements=new Map();
   const element=()=>({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
-  for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm"]) elements.set(id,element());
+  for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-correct-open","klaviyo-spend-history-choice","klaviyo-spend-correct-value"]) elements.set(id,element());
   const requests=[];
   let finishSave;
   const context={URLSearchParams,location:{search:"?oauth_connected=klaviyo&account_selection_required=1"},document:{getElementById:id=>elements.get(id),querySelector:()=>elements.get("connect"),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
     requests.push({url,options});
     if(options.method==="POST") return new Promise(resolve=>{finishSave=()=>resolve(response(200,{status:"connected",account_name:"Verified",currency:"USD",estimated_30_day_email_spend:"0.00"}));});
+    if(url.endsWith("/spend-history")) return response(200,{entries:[{effective_from:"2026-09-29",estimated_30_day_email_spend:"0.00",currency:"USD"}]});
     return response(200,{status:"pending_account_selection",accounts:[{id:"a",name:"<script>untrusted</script>",currency:"USD"}]});
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
@@ -267,6 +268,10 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   assert.deepEqual(JSON.parse(requests[1].options.body),{account_id:"a",estimated_30_day_email_spend:"0"});
   finishSave(); await saving;
   assert.match(elements.get("klaviyo-message").textContent,/Connected: Verified/);
+  assert.equal(requests.at(-1).url,"/api/shopify/providers/klaviyo/spend-history");
+  assert.equal(elements.get("klaviyo-spend-controls").hidden,false);
+  assert.equal(elements.get("klaviyo-spend-correct-open").hidden,false);
+  assert.equal(elements.get("klaviyo-spend-history-choice").children.length,1);
 });
 
 test("UI reads stored status on page load without requesting Klaviyo accounts", async () => {

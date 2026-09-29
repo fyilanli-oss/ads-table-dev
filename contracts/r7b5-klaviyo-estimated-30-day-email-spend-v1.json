@@ -1,0 +1,93 @@
+{
+  "contract": "r7b5-klaviyo-estimated-30-day-email-spend-v1",
+  "version": 1,
+  "status": "decision_frozen_implementation_pending",
+  "supersedes": [
+    "Email Monthly Plan Cost",
+    "Monthly Amount",
+    "Estimated Monthly Spend",
+    "monthly cost x row recipients / monthly recipients",
+    "first_day_of_month_only"
+  ],
+  "scope": {
+    "provider": "klaviyo",
+    "channel": "email",
+    "sms_included": false,
+    "invoice_reconciliation": false
+  },
+  "product_copy": {
+    "label": "Estimated 30-Day Klaviyo Email Spend",
+    "helper": "Enter your estimated Klaviyo email cost for a 30-day period. SMS costs are not included.",
+    "update_action": "Update spend",
+    "correction_action": "Correct value",
+    "forbidden_active_labels": [
+      "Email Monthly Plan Cost",
+      "Monthly Amount",
+      "Estimated Monthly Spend"
+    ]
+  },
+  "value_semantics": {
+    "source": "merchant_entered_estimate",
+    "provenance": "user_estimated",
+    "provider_actual": false,
+    "source_currency": "provider_verified_account_currency",
+    "daily_formula": "estimated_30_day_email_spend / 30",
+    "volume_weighted": false,
+    "email_metrics_change_cost": false
+  },
+  "rolling_period": {
+    "period_days": 30,
+    "manual_start_date": false,
+    "manual_end_date": false,
+    "initial_effective_from": "server_authoritative_business_date",
+    "unchanged_value": "continues_across_consecutive_30_day_windows",
+    "update_spend": {
+      "effective_from": "server_authoritative_business_date_of_save",
+      "closes_previous_on": "day_before_effective_from",
+      "starts_new_30_day_window": true
+    },
+    "correct_value": {
+      "changes_effective_dates": false,
+      "starts_new_period": false,
+      "changes_selected_historical_amount_only": true
+    },
+    "invariants": [
+      "no_overlapping_effective_ranges",
+      "no_duplicate_effective_start",
+      "amount_non_negative",
+      "currency_matches_verified_account"
+    ]
+  },
+  "dataset_and_formula_boundary": {
+    "copy_daily_cost_to_each_campaign_or_flow_message": false,
+    "choose_arbitrary_message_as_cost_owner": false,
+    "create_synthetic_provider_hierarchy": false,
+    "required_behavior": "join_one_account_day_estimated_cost_once_at_backend_aggregation_boundary",
+    "message_row_spend_before_corrective_activation": "unsupported_or_null",
+    "derived_kpis": [
+      "cost_per_sent",
+      "cost_per_open",
+      "cost_per_click",
+      "cost_per_conversion"
+    ]
+  },
+  "migration_boundary": {
+    "legacy_physical_fields_are_compatibility_only": [
+      "email_monthly_plan_cost",
+      "monthly_plan_cost"
+    ],
+    "automatic_live_row_rewrite": false,
+    "production_schema_change_requires_separate_preflight_and_approval": true,
+    "existing_dataset_v2_row_requires_controlled_correction": true
+  },
+  "acceptance": [
+    "300 USD produces 10 USD estimated daily email spend",
+    "no email volume metric changes the daily amount",
+    "25.11 update closes the prior value on 24.11 and starts the new value on 25.11",
+    "correct value preserves effective dates",
+    "unchanged value continues without merchant re-entry",
+    "SMS is excluded",
+    "daily cost is counted once per workspace-account-business-date",
+    "historical provider evidence is preserved"
+  ]
+}

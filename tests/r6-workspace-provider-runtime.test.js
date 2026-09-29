@@ -162,6 +162,6 @@ test('Execution Plan records the failed C6 attempts and the verified-empty live 
   assert.match(plan, /R7-A.*R6-D/i);
   assert.match(plan, /R7-A merchant acceptance PASS; R7-B1 Settings decision contract PASS; R7-B2 merchant acceptance PASS; R7-B3–B7 pending/i);
   assert.match(plan, /R7-B1 Settings ürün ve veri davranışı uzlaştırması — Contract PASS \/ implementation pending/);
-  assert.match(plan, /R7-B2 Shopify-native navigation ve Settings yüzeyi — Verification/);
+  assert.match(plan, /R7-B2 Shopify-native navigation ve Settings yüzeyi — Done \/ merchant acceptance PASS/);
   assert.doesNotMatch(plan, /\| R7 \|[^\n]+`Blocked by R5–R6`/);
 });

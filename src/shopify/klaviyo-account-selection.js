@@ -80,9 +80,8 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
       if (connection.status === "revoked") return {status: "reset_complete"};
       if (connection.status === "disconnected") return {status: "not_connected"};
       if (connection.status === "connected") {
-        const cost = typeof connection.email_monthly_plan_cost === "number"
-          ? connection.email_monthly_plan_cost.toFixed(2)
-          : connection.email_monthly_plan_cost;
+        const stored = connection.estimated_30_day_email_spend ?? connection.email_monthly_plan_cost;
+        const cost = typeof stored === "number" ? stored.toFixed(2) : stored;
         if (typeof cost !== "string" || !/^(0|[1-9]\d{0,7})\.\d{2}$/.test(cost) || !/^[A-Z]{3}$/.test(connection.account_currency || "")) {
           return {status: "temporarily_unavailable"};
         }
@@ -100,7 +99,7 @@ function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clie
         status: result.connection?.status || "not_connected",
         accounts: result.accounts,
         active_account_id: result.connection?.active_account_id || null,
-        estimated_30_day_email_spend: result.connection?.email_monthly_plan_cost ?? null,
+        estimated_30_day_email_spend: result.connection?.estimated_30_day_email_spend ?? result.connection?.email_monthly_plan_cost ?? null,
       };
     },
     async verifyReadOnly(authority) {

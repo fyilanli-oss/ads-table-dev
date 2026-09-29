@@ -41,12 +41,14 @@ function initializeKlaviyoAccounts() {
   async function request(path, body) {
     if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
     const token = await window.shopify.idToken();
-    const target = path.startsWith("/api/") ? path : "/api/shopify/providers/klaviyo/accounts" + path;
-    const response = await fetch(target, {
+    const options = {
       method: body ? "POST" : "GET",
       headers: {Authorization: "Bearer " + token, ...(body ? {"Content-Type": "application/json"} : {})},
       ...(body ? {body: JSON.stringify(body)} : {}),
-    });
+    };
+    const response = path.startsWith("/api/")
+      ? await fetch(path, options)
+      : await fetch("/api/shopify/providers/klaviyo/accounts" + path, options);
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.code || "KLAVIYO_UNAVAILABLE");
     return result;

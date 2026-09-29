@@ -11,7 +11,7 @@ const {registerShopifyProviderOAuthRoutes, PROVIDERS} = require("../src/routes/s
 const {initializeKlaviyoAccounts} = require("../src/shopify/klaviyo-account-ui");
 
 const authority = {authority: "shopify_verified_session", workspace_id: "workspace-a", shop_id: "shop-a"};
-const payload = {data: [{id: "account-a", attributes: {contact_information: {organization_name: "Verified account"}, preferred_currency: "USD"}}]};
+const payload = {data: [{id: "account-a", attributes: {contact_information: {organization_name: "Verified account"}, preferred_currency: "USD", timezone: "UTC"}}]};
 const response = (status, body) => ({status, ok: status >= 200 && status < 300, json: async () => body});
 
 function fixture() {
@@ -20,7 +20,8 @@ function fixture() {
   const store = {
     readKlaviyo: async auth => { assert.deepEqual(auth, authority); return connection; },
     readKlaviyoStatus: async auth => { assert.deepEqual(auth, authority); return connection; },
-    completeKlaviyo: async input => calls.push(input),
+    completeKlaviyoWithSpendHistory: async input => calls.push(input),
+    listKlaviyoSpendHistory: async () => [],
     refreshKlaviyo: async input => {calls.push(input); Object.assign(connection, {accessToken: input.accessToken, updated_at: "version-2"});},
   };
   const fetchImpl = async (url, options) => {
@@ -33,16 +34,16 @@ function fixture() {
 
 test("reads stored Klaviyo status without contacting the provider or exposing account identity", async () => {
   let contacted = false;
-  const store = {readKlaviyoStatus: async () => ({status: "connected", email_monthly_plan_cost: "5.00", account_currency: "USD"})};
+  const store = {readKlaviyoStatus: async () => ({status: "connected", estimated_30_day_email_spend: "5.00", account_currency: "USD"})};
   const selection = createKlaviyoAccountSelection({store, fetchImpl: async () => {contacted = true;}});
-  assert.deepEqual(await selection.status(authority), {status: "connected", email_monthly_plan_cost: "5.00", currency: "USD"});
+  assert.deepEqual(await selection.status(authority), {status: "connected", estimated_30_day_email_spend: "5.00", currency: "USD"});
   assert.equal(contacted, false);
 });
 
 test("stored Klaviyo status fails closed when cost or currency is incomplete", async () => {
   for (const row of [
-    {status: "connected", email_monthly_plan_cost: null, account_currency: "USD"},
-    {status: "connected", email_monthly_plan_cost: "5.00", account_currency: null},
+    {status: "connected", estimated_30_day_email_spend: null, account_currency: "USD"},
+    {status: "connected", estimated_30_day_email_spend: "5.00", account_currency: null},
   ]) {
     const selection = createKlaviyoAccountSelection({store: {readKlaviyoStatus: async () => row}, fetchImpl: async () => assert.fail("provider must not be contacted")});
     assert.deepEqual(await selection.status(authority), {status: "temporarily_unavailable"});
@@ -67,27 +68,27 @@ test("disconnected canonical Klaviyo connection reopens Connect after page reloa
 test("lists verified accounts without disclosing encrypted or plaintext credentials", async () => {
   const {selection} = fixture();
   const result = await selection.list(authority);
-  assert.deepEqual(result.accounts, [{id: "account-a", name: "Verified account", currency: "USD"}]);
+  assert.deepEqual(result.accounts, [{id: "account-a", name: "Verified account", currency: "USD", timezone: "UTC"}]);
   assert.equal(result.status, "pending_account_selection");
   assert.doesNotMatch(JSON.stringify(result), /secret|token|envelope|version/);
 });
 
 test("save revalidates provider ownership and ignores client tenant/name/currency claims", async () => {
   const {selection, calls} = fixture();
-  await assert.rejects(selection.complete(authority, {account_id: "another-account", email_monthly_plan_cost: "5"}), /INVALID_ACCOUNT/);
+  await assert.rejects(selection.complete(authority, {account_id: "another-account", estimated_30_day_email_spend: "5"}), /INVALID_ACCOUNT/);
   assert.equal(calls.length, 0);
-  const result = await selection.complete(authority, {account_id: "account-a", email_monthly_plan_cost: "0", workspace_id: "victim", currency: "EUR", name: "Fake"});
+  const result = await selection.complete(authority, {account_id: "account-a", estimated_30_day_email_spend: "0", workspace_id: "victim", currency: "EUR", name: "Fake"});
   assert.equal(result.status, "connected");
   assert.equal(result.currency, "USD");
   assert.equal(result.account_name, "Verified account");
-  assert.equal(result.email_monthly_plan_cost, "0.00");
+  assert.equal(result.estimated_30_day_email_spend, "0.00");
   assert.deepEqual(calls[0].authority, authority);
   assert.equal(calls[0].version, "version-1");
 });
 
 test("cost must be explicit, finite, non-negative, and at most two decimals", () => {
   for (const invalid of [undefined, null, 0, "", " ", "-1", "1e3", "NaN", "Infinity", "1.234", "100000000", "01"]) {
-    assert.throws(() => planCost(invalid), /INVALID_PLAN_COST/);
+    assert.throws(() => planCost(invalid), /INVALID_ESTIMATED_30_DAY_EMAIL_SPEND/);
   }
   assert.equal(planCost("12.3"), "12.30");
 });
@@ -98,7 +99,7 @@ test("unavailable and revoked grants do not become connected", async () => {
   let requested = false;
   const selection = createKlaviyoAccountSelection({store, fetchImpl: async () => {requested = true;}});
   assert.equal((await selection.list(authority)).status, "not_connected");
-  await assert.rejects(selection.complete(authority, {account_id: "account-a", email_monthly_plan_cost: "10"}), /INVALID_ACCOUNT/);
+  await assert.rejects(selection.complete(authority, {account_id: "account-a", estimated_30_day_email_spend: "10"}), /INVALID_ACCOUNT/);
   assert.equal(requested, false);
   assert.equal(calls.length, 0);
 });
@@ -117,7 +118,7 @@ test("expired access token refreshes once, persists encrypted store update, and 
     assert.equal(options.headers.Authorization, "Bearer new-access");
     return response(200, payload);
   }});
-  await selection.complete(authority, {account_id: "account-a", email_monthly_plan_cost: "4.99"});
+  await selection.complete(authority, {account_id: "account-a", estimated_30_day_email_spend: "4.99"});
   assert.equal(requests, 3);
   assert.equal(calls[0].refreshToken, "new-refresh");
   assert.equal(calls[1].version, "version-2");
@@ -249,7 +250,7 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   let finishSave;
   const context={URLSearchParams,location:{search:"?oauth_connected=klaviyo&account_selection_required=1"},document:{getElementById:id=>elements.get(id),querySelector:()=>elements.get("connect"),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
     requests.push({url,options});
-    if(options.method==="POST") return new Promise(resolve=>{finishSave=()=>resolve(response(200,{status:"connected",account_name:"Verified",currency:"USD",email_monthly_plan_cost:"0.00"}));});
+    if(options.method==="POST") return new Promise(resolve=>{finishSave=()=>resolve(response(200,{status:"connected",account_name:"Verified",currency:"USD",estimated_30_day_email_spend:"0.00"}));});
     return response(200,{status:"pending_account_selection",accounts:[{id:"a",name:"<script>untrusted</script>",currency:"USD"}]});
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
@@ -263,7 +264,7 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   await elements.get("klaviyo-save").events.click();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(requests.filter(r=>r.options.method==="POST").length,1);
-  assert.deepEqual(JSON.parse(requests[1].options.body),{account_id:"a",email_monthly_plan_cost:"0"});
+  assert.deepEqual(JSON.parse(requests[1].options.body),{account_id:"a",estimated_30_day_email_spend:"0"});
   finishSave(); await saving;
   assert.match(elements.get("klaviyo-message").textContent,/Connected: Verified/);
 });
@@ -275,13 +276,13 @@ test("UI reads stored status on page load without requesting Klaviyo accounts", 
   const requests=[];
   const context={URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
     requests.push({url,options});
-    return response(200,{status:"connected",email_monthly_plan_cost:"5.00",currency:"USD"});
+    return response(200,{status:"connected",estimated_30_day_email_spend:"5.00",currency:"USD"});
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
   await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/status"]);
   assert.equal(elements.get("klaviyo-connect").hidden,true);
-  assert.equal(elements.get("klaviyo-message").textContent,"Connected · 5.00 USD/month");
+  assert.equal(elements.get("klaviyo-message").textContent,"Connected · 5.00 USD / 30 days");
 });
 
 test("R5 operator parameter invokes only the no-refresh verification route", async () => {
@@ -319,7 +320,7 @@ test("reset confirmation performs one session-bound POST and keeps reconnect clo
   const requests = [];
   const context = {URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
     requests.push({url,options});
-    if (url.endsWith("/status")) return response(200,{status:"connected",email_monthly_plan_cost:"5.00",currency:"USD"});
+    if (url.endsWith("/status")) return response(200,{status:"connected",estimated_30_day_email_spend:"5.00",currency:"USD"});
     return response(200,{status:"revoked",canonical_connection_created:false,historical_data_preserved:true});
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);

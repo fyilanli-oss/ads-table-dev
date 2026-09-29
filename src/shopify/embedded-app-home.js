@@ -113,7 +113,7 @@ function renderProviderSection({id, label, description, parked = false}, provide
     ],
     klaviyo: [
       "Continue with a Klaviyo user that can access the account you intend to connect. AdsTable requests the read access needed for email performance reporting.",
-      "Authorization alone does not complete the connection. After authorization, select one verified Klaviyo account and enter its Email Monthly Plan Cost in the account currency.",
+      "Authorization alone does not complete the connection. After authorization, select one verified Klaviyo account and enter its Estimated 30-Day Klaviyo Email Spend in the account currency.",
     ],
   }[id] || [`Continue to ${label} to authorize AdsTable.`];
   const disconnectCopy = id === "google_ads"
@@ -125,6 +125,7 @@ function renderProviderSection({id, label, description, parked = false}, provide
           <s-paragraph>${description}</s-paragraph>
           ${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
           ${["meta", "google_ads"].includes(id) && providerAvailable ? `<div id="${id}-reporting" hidden><s-stack gap="tight"><s-paragraph id="${id}-reporting-summary"></s-paragraph><s-button id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button></s-stack></div>` : ""}
+          ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="tight"><s-button commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show">Correct value</s-button></s-stack></div>` : ""}
           ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
         </s-stack>
         ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button id="${id}-connect-action" variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-resume" hidden><s-button id="${id}-resume-action">Resume setup</s-button></div><div id="${id}-connected" hidden>${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
@@ -154,12 +155,32 @@ function renderProviderSection({id, label, description, parked = false}, provide
             <s-button id="klaviyo-choose" variant="primary">Continue</s-button>
           </s-stack></div>
           <div id="klaviyo-cost-step" hidden><s-stack gap="base">
-            <s-paragraph>The plan cost remains in the verified Klaviyo account currency. AdsTable reporting currency is handled separately.</s-paragraph>
-            <s-number-field id="klaviyo-cost" label="Email Monthly Plan Cost" min="0" max="99999999.99" step="0.01"></s-number-field>
+            <s-paragraph>Enter your estimated Klaviyo email cost for a 30-day period. SMS costs are not included.</s-paragraph>
+            <s-paragraph>The value remains in the verified Klaviyo account currency. AdsTable reporting currency is handled separately.</s-paragraph>
+            <s-number-field id="klaviyo-cost" label="Estimated 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
             <s-button id="klaviyo-save" variant="primary">Save and connect</s-button>
           </s-stack></div>
           <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Try again</s-button></div>
           <s-button slot="secondary-actions" commandFor="klaviyo-account-modal" command="--hide">Cancel</s-button>
+        </s-modal>
+        <s-modal id="klaviyo-spend-update-modal" heading="Update Klaviyo email spend" size="small-100">
+          <s-stack gap="base">
+            <s-paragraph>Enter the new estimated Klaviyo email cost for the next 30-day period starting today. SMS costs are not included.</s-paragraph>
+            <s-number-field id="klaviyo-spend-update-value" label="Estimated 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
+            <s-paragraph id="klaviyo-spend-update-message" aria-live="polite"></s-paragraph>
+          </s-stack>
+          <s-button slot="secondary-actions" commandFor="klaviyo-spend-update-modal" command="--hide">Cancel</s-button>
+          <s-button id="klaviyo-spend-update-save" slot="primary-action" variant="primary">Save new value</s-button>
+        </s-modal>
+        <s-modal id="klaviyo-spend-correct-modal" heading="Correct Klaviyo email spend" size="small-100">
+          <s-stack gap="base">
+            <s-paragraph>Correct a previously saved amount. Its original start date will not change.</s-paragraph>
+            <s-select id="klaviyo-spend-history-choice" label="Saved period"></s-select>
+            <s-number-field id="klaviyo-spend-correct-value" label="Corrected 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
+            <s-paragraph id="klaviyo-spend-correct-message" aria-live="polite"></s-paragraph>
+          </s-stack>
+          <s-button slot="secondary-actions" commandFor="klaviyo-spend-correct-modal" command="--hide">Cancel</s-button>
+          <s-button id="klaviyo-spend-correct-save" slot="primary-action" variant="primary">Save correction</s-button>
         </s-modal>
       </s-stack>` : ""}
       ${["meta", "google_ads"].includes(id) && providerAvailable ? `<s-stack id="${id}-accounts" gap="base">
@@ -192,7 +213,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
   const providers = [
     {id: "meta", label: "Meta", description: "Meta advertising performance and spend."},
     {id: "google_ads", label: "Google Ads", description: "Google Ads performance and spend."},
-    {id: "klaviyo", label: "Klaviyo", description: "Email performance and monthly plan cost."},
+    {id: "klaviyo", label: "Klaviyo", description: "Email performance and estimated 30-day spend."},
   ];
   const sections = providers.map((provider) => renderProviderSection(provider, providerOAuthEnabled, providerAvailability[provider.id] ?? providerOAuthEnabled)).join("\n    ");
   return `<!doctype html>

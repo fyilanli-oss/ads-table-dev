@@ -238,6 +238,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     if (!data) return null;
     return Object.freeze({
       ...data,
+      estimated_30_day_email_spend: data.monthly_plan_cost,
       email_monthly_plan_cost: data.monthly_plan_cost,
       account_currency: data.source_currency,
       updated_at: data.connection_version,
@@ -348,7 +349,12 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
   async function readKlaviyoStatus(authorityInput) {
     const row = await readStatus({ authority: authorityInput, provider: 'klaviyo' });
     if (!row) return null;
-    return Object.freeze({ status: row.status, email_monthly_plan_cost: row.monthly_plan_cost, account_currency: row.source_currency });
+    return Object.freeze({
+      status: row.status,
+      estimated_30_day_email_spend: row.monthly_plan_cost,
+      email_monthly_plan_cost: row.monthly_plan_cost,
+      account_currency: row.source_currency,
+    });
   }
 
   async function refreshKlaviyo({ authority: authorityInput, version, accessToken, refreshToken }) {
@@ -383,6 +389,87 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       .select('connection_version').maybeSingle();
     if (error) throw new Error('CONNECTION_WRITE_FAILED');
     if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+    return data;
+  }
+
+  async function completeKlaviyoWithSpendHistory({
+    authority: authorityInput,
+    version,
+    account,
+    estimated30DayEmailSpend: amount,
+    effectiveFrom,
+  } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
+    const [verifiedAccount] = selectedAccounts('klaviyo', [account]);
+    required(String(amount), 'estimated30DayEmailSpend');
+    required(effectiveFrom, 'effectiveFrom');
+    const { data, error } = await client.rpc('complete_klaviyo_connection_with_spend_history', {
+      p_workspace_id: authority.workspace_id,
+      p_expected_version: version,
+      p_account_id: verifiedAccount.id,
+      p_account_name: verifiedAccount.name,
+      p_source_currency: verifiedAccount.currency,
+      p_estimated_30_day_email_spend: amount,
+      p_effective_from: effectiveFrom,
+    });
+    if (error) {
+      if (/CONNECTION_CHANGED/.test(error.message || '')) {
+        throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
+      }
+      throw new Error('CONNECTION_WRITE_FAILED');
+    }
+    return data;
+  }
+
+  async function listKlaviyoSpendHistory(authorityInput) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    const status = await readStatus({ authority, provider: 'klaviyo' });
+    if (!status || status.status !== 'connected' || !status.active_account_id) return [];
+    const { data, error } = await client.from('workspace_provider_email_spend_history')
+      .select('provider_account_id,source_currency,estimated_30_day_email_spend,effective_from,provenance,correction_version,created_at,updated_at')
+      .eq('workspace_id', authority.workspace_id)
+      .eq('provider', 'klaviyo')
+      .eq('provider_account_id', status.active_account_id)
+      .order('effective_from', { ascending: false });
+    if (error) throw new Error('CONNECTION_READ_FAILED');
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function updateKlaviyoSpend({ authority: authorityInput, amount, effectiveFrom } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    const connection = await readStatus({ authority, provider: 'klaviyo' });
+    if (!connection || connection.status !== 'connected') throw new Error('CONNECTION_CHANGED');
+    const { data, error } = await client.rpc('update_klaviyo_estimated_30_day_email_spend', {
+      p_workspace_id: authority.workspace_id,
+      p_expected_version: connection.connection_version,
+      p_account_id: connection.active_account_id,
+      p_source_currency: connection.source_currency,
+      p_estimated_30_day_email_spend: amount,
+      p_effective_from: effectiveFrom,
+    });
+    if (error) {
+      const code = /DUPLICATE_EFFECTIVE_START/.test(error.message || '') ? 'DUPLICATE_EFFECTIVE_START' : 'CONNECTION_CHANGED';
+      throw Object.assign(new Error(code), { code, status: 409 });
+    }
+    return data;
+  }
+
+  async function correctKlaviyoSpend({ authority: authorityInput, amount, effectiveFrom } = {}) {
+    const authority = requireServerWorkspaceAuthority(authorityInput);
+    const connection = await readStatus({ authority, provider: 'klaviyo' });
+    if (!connection || connection.status !== 'connected') throw new Error('CONNECTION_CHANGED');
+    const { data, error } = await client.rpc('correct_klaviyo_estimated_30_day_email_spend', {
+      p_workspace_id: authority.workspace_id,
+      p_expected_version: connection.connection_version,
+      p_account_id: connection.active_account_id,
+      p_effective_from: effectiveFrom,
+      p_estimated_30_day_email_spend: amount,
+    });
+    if (error) {
+      const code = /SPEND_HISTORY_ENTRY_NOT_FOUND/.test(error.message || '') ? 'SPEND_HISTORY_ENTRY_NOT_FOUND' : 'CONNECTION_CHANGED';
+      throw Object.assign(new Error(code), { code, status: 409 });
+    }
     return data;
   }
 
@@ -561,6 +648,10 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     readKlaviyoStatus,
     refreshKlaviyo,
     refreshConnectedKlaviyo,
+    completeKlaviyoWithSpendHistory,
+    listKlaviyoSpendHistory,
+    updateKlaviyoSpend,
+    correctKlaviyoSpend,
     completeKlaviyo,
     disconnectKlaviyo,
     disconnectMeta,

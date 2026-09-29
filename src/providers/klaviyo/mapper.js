@@ -14,27 +14,20 @@ function number(value,field){if(value===null||value===undefined||value==='')retu
 function support(value,declared,field){if(value!==null){if(declared!==undefined&&declared!=='supported')throw new Error(`${field} measured value requires supported status`);return'supported';}if(declared===undefined)return'unknown';if(!['unknown','unsupported'].includes(declared))throw new Error(`${field} support must be unknown|unsupported when value is absent`);return declared;}
 function optionalNumber(value,field){return value===undefined||value===null||value===''?null:number(value,field);}
 
-function allocateKlaviyoDailySpend({channel,providerSpend,monthlyPlanCost,dailySentCount,monthlySentCount,includedMonthlySends,overageUnitCost,cumulativeSentToday,cumulativeSentYesterday,usageUnitCost,periodClosed=false}={}){
+function allocateKlaviyoDailySpend({channel}={}){
   if(!CHANNELS.includes(channel))throw new Error('channel must be email|sms');
-  if(typeof periodClosed!=='boolean')throw new TypeError('periodClosed must be boolean');
-  const actual=channel==='sms'?optionalNumber(providerSpend,'providerSpend'):null;
-  if(actual!==null)return Object.freeze({spend_value:actual,metric_support:'supported',provenance:Object.freeze({spend_kind:'actual',spend_source:'provider_spend',allocation_status:'finalized',base_allocated:0,overage_estimated:0})});
-  const daily=optionalNumber(dailySentCount,'dailySentCount');
-  if(channel==='sms'){
-    const unit=optionalNumber(usageUnitCost,'usageUnitCost');
-    if(daily===null||unit===null)return Object.freeze({spend_value:null,metric_support:'unsupported',provenance:Object.freeze({spend_kind:null,spend_source:null,allocation_status:null,base_allocated:0,overage_estimated:0})});
-    return Object.freeze({spend_value:daily*unit,metric_support:'supported',provenance:Object.freeze({spend_kind:'estimated',spend_source:'user_sms_unit_cost',allocation_status:periodClosed?'finalized':'provisional',base_allocated:0,overage_estimated:daily*unit})});
-  }
-  const plan=optionalNumber(monthlyPlanCost,'monthlyPlanCost'),monthly=optionalNumber(monthlySentCount,'monthlySentCount');
-  if(plan===null)return Object.freeze({spend_value:null,metric_support:'unsupported',provenance:Object.freeze({spend_kind:null,spend_source:null,allocation_status:null,base_allocated:0,overage_estimated:0})});
-  if(daily===null||monthly===null||monthly===0)return Object.freeze({spend_value:null,metric_support:'unknown',provenance:Object.freeze({spend_kind:'allocated',spend_source:'manual_monthly_plan',allocation_status:periodClosed?'finalized':'provisional',base_allocated:0,overage_estimated:0})});
-  if(daily>monthly)throw new Error('dailySentCount cannot exceed monthlySentCount');
-  const base=plan*daily/monthly;
-  const included=optionalNumber(includedMonthlySends,'includedMonthlySends'),overageRate=optionalNumber(overageUnitCost,'overageUnitCost'),today=optionalNumber(cumulativeSentToday,'cumulativeSentToday'),yesterday=optionalNumber(cumulativeSentYesterday,'cumulativeSentYesterday');
-  const canEstimateOverage=[included,overageRate,today,yesterday].every(value=>value!==null);
-  if(canEstimateOverage&&today<yesterday)throw new Error('cumulativeSentToday cannot be below cumulativeSentYesterday');
-  const overage=canEstimateOverage?(Math.max(today-included,0)-Math.max(yesterday-included,0))*overageRate:0;
-  return Object.freeze({spend_value:base+overage,metric_support:'supported',provenance:Object.freeze({spend_kind:overage>0?'allocated_plus_estimated_overage':'allocated',spend_source:'manual_monthly_plan_by_sent_volume',allocation_status:periodClosed?'finalized':'provisional',base_allocated:base,overage_estimated:overage})});
+  return Object.freeze({
+    spend_value:null,
+    metric_support:'unsupported',
+    provenance:Object.freeze({
+      spend_kind:null,
+      spend_source:null,
+      allocation_status:null,
+      base_allocated:0,
+      overage_estimated:0,
+      reason:'account_day_cost_only',
+    }),
+  });
 }
 
 function mapKlaviyoMessage(input,context={}){

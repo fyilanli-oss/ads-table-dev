@@ -6,7 +6,7 @@ const { normalizeCurrencyCode } = require('../../../funnel-core/fx-service');
 const API_BASE = 'https://a.klaviyo.com';
 const REVISION = '2026-07-15';
 const STATISTICS = Object.freeze([
-  'recipients', 'delivered', 'clicks_unique', 'opens_unique', 'conversions', 'conversion_value', 'text_message_spend'
+  'recipients', 'delivered', 'clicks_unique', 'opens_unique', 'conversions', 'conversion_value'
 ]);
 const JOURNEY_METRIC_NAMES = Object.freeze({
   addToCart: Object.freeze(['added to cart']),
@@ -433,7 +433,6 @@ function createKlaviyoProviderClient({
       purchase: required(journeyMetricIds?.purchase || conversionMetricIdInput || defaultMetricId, 'Klaviyo purchase metric id'),
     });
     const dailyWindow = { start: zonedInstant(providerDate, account.timezone), end: zonedInstant(providerDate, account.timezone, true) };
-    const monthlyWindow = { start: zonedInstant(monthStart(providerDate), account.timezone), end: dailyWindow.end };
     let reportCount = 0;
     const scheduledReport = async (branch, timeframe, metricId, statistics = STATISTICS) => {
       if (reportCount > 0 && reportSpacingMs > 0) await sleepImpl(reportSpacingMs);
@@ -442,8 +441,6 @@ function createKlaviyoProviderClient({
     };
     const dailyCampaign = await scheduledReport('campaign', dailyWindow, metricIds.purchase);
     const dailyFlow = await scheduledReport('flow', dailyWindow, metricIds.purchase);
-    const monthlyCampaign = await scheduledReport('campaign', monthlyWindow, metricIds.purchase);
-    const monthlyFlow = await scheduledReport('flow', monthlyWindow, metricIds.purchase);
     const stageRows = {};
     for (const stage of ['addToCart', 'checkout']) {
       if (!metricIds[stage]) continue;
@@ -456,15 +453,8 @@ function createKlaviyoProviderClient({
     for (const rows of Object.values(stageRows)) {
       if ([...rows.keys()].some(key => !baseKeys.has(key))) throw new Error('KLAVIYO_JOURNEY_METRIC_KEY_DRIFT');
     }
-    const monthlyEmailRows = [...monthlyCampaign, ...monthlyFlow].filter(row => row.channel === 'email');
-    const monthlyEmailRecipients = monthlyEmailRows.length === 0 ? 0 : monthlyEmailRows.reduce((total, row) => {
-      const recipients = finite(row.statistics.recipients, 'monthly.statistics.recipients');
-      return total === null || recipients === null ? null : total + recipients;
-    }, 0);
-    const periodClosed = providerDate.slice(0, 7) < businessDateFromTimestamp(now(), account.timezone).slice(0, 7);
     const rows = baseRows.map(row => {
       const delivered = finite(row.statistics.delivered, 'statistics.delivered');
-      const recipients = finite(row.statistics.recipients, 'statistics.recipients');
       const addToCart = stageRows.addToCart?.get(row.key);
       const checkout = stageRows.checkout?.get(row.key);
       return Object.freeze({
@@ -473,8 +463,7 @@ function createKlaviyoProviderClient({
           delivered,
           unique_clicks: finite(row.statistics.clicks_unique, 'statistics.clicks_unique'),
           unique_opens: finite(row.statistics.opens_unique, 'statistics.opens_unique'),
-          provider_spend: row.channel === 'sms' && normalizeCurrencyCode(account.currency, 'account.currency') === 'USD'
-            ? finite(row.statistics.text_message_spend, 'statistics.text_message_spend') : null,
+          provider_spend: null,
           add_to_cart: addToCart ? finite(addToCart.statistics.conversions, 'add_to_cart.conversions') : null,
           add_to_cart_value: addToCart ? finite(addToCart.statistics.conversion_value, 'add_to_cart.conversion_value') : null,
           checkout: checkout ? finite(checkout.statistics.conversions, 'checkout.conversions') : null,
@@ -488,11 +477,7 @@ function createKlaviyoProviderClient({
           checkout: checkout ? 'supported' : 'unknown',
           checkout_value: checkout ? 'supported' : 'unknown',
         },
-        spend_allocation: {
-          dailySentCount: recipients,
-          monthlySentCount: row.channel === 'email' ? monthlyEmailRecipients : null,
-          periodClosed,
-        },
+        spend_allocation: {},
       });
     });
     return Object.freeze({ rows, verified_empty: rows.length === 0 });

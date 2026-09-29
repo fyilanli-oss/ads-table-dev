@@ -27,7 +27,7 @@ R7-B2, AdsTable içindeki ayarların kullanıcı açısından tek ve anlaşılı
 - OAuth callback ve işlem devam ettirme davranışı
 - Connect/Disconnect modal metinlerinin provider bazında nihai revizyonu
 - Meta/Google Reporting Account seçimi
-- Klaviyo effective-dated Monthly Amount geçmişi
+- Klaviyo rolling `Estimated 30-Day Klaviyo Email Spend` geçmişi
 - Reporting görünürlük ve historical disconnect davranışı
 - Database migration, provider token veya Dataset V2 değişikliği
 
@@ -48,3 +48,8 @@ Bunlar sırasıyla R7-B3–B6 paketlerinde ele alınır.
 ## Kapanış kaydı — 29 Eylül 2026
 
 PR #294, merge commit `a39785bcf54a42a32813ec2f678bf97b16446061` ile main dalına alındı. Post-merge Security ve Full Regression kontrolleri ile Vercel deployment başarılı oldu. Kullanıcı gerçek Shopify Admin oturumunda Dashboard sadeleşmesini, Settings menüsünü, Reporting Currency görünümünü, yalnız Meta/Google Ads/Klaviyo kartlarını ve TikTok/Pinterest'in gizlendiğini doğruladı. R7-B2 durumu `Done / merchant acceptance PASS` olarak kapatıldı.
+
+
+## R7-B5 adlandırma revizyonu
+
+Settings yüzeyindeki aktif ürün adı `Estimated 30-Day Klaviyo Email Spend`dır. `Monthly Amount`, `Email Monthly Plan Cost` ve `Estimated Monthly Spend` aktif kullanıcı metni olarak kullanılmaz. Kullanıcı tarih aralığı girmez; başlangıç tarihi server tarafından kayıt gününden oluşturulur. `Update spend` yeni değeri kayıt gününde başlatır, `Correct value` ise seçili tarihsel tutarı tarihini değiştirmeden düzeltir. SMS kapsam dışıdır.

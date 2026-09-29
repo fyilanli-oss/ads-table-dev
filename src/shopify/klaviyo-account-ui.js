@@ -106,7 +106,7 @@ function initializeKlaviyoAccounts() {
         if (spendControls) spendControls.hidden = false;
         const amount = result.estimated_30_day_email_spend == null ? "" : " · " + result.estimated_30_day_email_spend + " " + result.currency + "/30 days";
         message.textContent = "Connected" + amount;
-        await loadSpendHistory();
+        if (spendControls) await loadSpendHistory();
       } else if (result.status === "account_selection_required") {
         connect.hidden = true;
         if (resume) resume.hidden = false;

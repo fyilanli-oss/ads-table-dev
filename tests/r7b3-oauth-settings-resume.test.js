@@ -14,7 +14,7 @@ test("R7-B3 creates new OAuth transactions for Settings and retains only the exa
   assert.equal(EMBEDDED_RETURN_TARGET, RETURN_TARGET);
   assert.equal(LEGACY_RETURN_TARGET, "/shopify/app/platforms");
 
-  const sql = fs.readFileSync(path.join(__dirname, "..", "supabase", "migrations", "20260929120000_allow_settings_oauth_return_target.sql"), "utf8");
+  const sql = fs.readFileSync(path.join(__dirname, "..", "supabase", "migrations", "20260929100311_r7b3_allow_settings_oauth_return_target.sql"), "utf8");
   assert.match(sql, /return_target in \('\/shopify\/app\/settings', '\/shopify\/app\/platforms'\)/i);
   assert.doesNotMatch(sql, /https?:\/\//i);
   assert.doesNotMatch(sql, /delete\s+from|update\s+public\.oauth_transactions/i);

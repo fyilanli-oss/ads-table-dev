@@ -18,7 +18,7 @@ test("embedded Settings renders immutable currency setup and only three active p
   assert.match(html, /fetch\("\/api\/shopify\/providers\/klaviyo\/accounts" \+ path/);
   assert.match(html, /request\("\/status"\)/);
   assert.match(html, /window\.shopify\.idToken/);
-  assert.match(html, /<s-heading>Reporting Currency<\/s-heading>\s*<s-section>/);
+  assert.match(html, /<s-section heading="Reporting Currency">/);
   assert.match(html, /id="reporting-currency-summary" hidden/);
   assert.match(html, /cannot be changed after confirmation/);
   assert.match(html, /id="review-reporting-currency"[^>]*>Review selection/);
@@ -32,7 +32,7 @@ test("embedded Settings renders immutable currency setup and only three active p
   assert.match(html, /commandFor="klaviyo-connect-modal" command="--show"/);
   for (const provider of ["meta", "google_ads", "klaviyo"]) {
     assert.match(html, new RegExp(`id="${provider}-resume" hidden`));
-    assert.match(html, new RegExp(`id="${provider}-resume-action"><s-text fontWeight="medium">Resume setup`));
+    assert.match(html, new RegExp(`<s-button variant="secondary" id="${provider}-resume-action">Resume setup<\\/s-button>`));
   }
   assert.match(html, /Facebook account that owns or can access the Meta ad accounts/);
   assert.match(html, /Google may describe the consent broadly/);
@@ -47,7 +47,7 @@ test("embedded Settings renders immutable currency setup and only three active p
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
   assert.match(html, /<s-app-nav>/);
   assert.match(html, /<s-page heading="Settings">/);
-  assert.match(html, /<s-heading>Platforms<\/s-heading>\s*<s-section>/);
+  assert.match(html, /<s-section heading="Platforms">/);
   assert.equal((html.match(/data-provider=/g) || []).length, 3);
   assert.doesNotMatch(html, /<style>|<iframe/i);
   assert.doesNotMatch(html, /workspace[_-]id|shop[_-]id|user[_-]id/i);
@@ -183,4 +183,3 @@ test("incomplete provider activation stays isolated without crashing Shopify App
   assert.equal(typeof routes["GET /shopify/app/analysis"], "function");
   assert.equal(routes["POST /api/shopify/providers/meta/oauth/start"], undefined);
 });
-

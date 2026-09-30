@@ -156,7 +156,7 @@ test('Shopify-native modal and Supabase constraints preserve pending then 1-3 co
   assert.doesNotMatch(html, /s-choice-list id="meta-choice"/);
   assert.doesNotMatch(html, /choices\.values/);
   assert.match(html, /modal\.showOverlay\(\)/);
-  assert.match(html, /result\.status === 'pending_account_selection'[\s\S]*resume\.hidden = false;[\s\S]*loadAccounts\(\)/);
+  assert.match(html, /result\.status === 'pending_account_selection'[\s\S]*setVisible\(resume, true\);[\s\S]*loadAccounts\(\)/);
 
   const migration = read('supabase/migrations/20260924120453_add_workspace_provider_selected_accounts.sql');
   assert.match(migration, /status <> 'pending_account_selection' or jsonb_array_length\(selected_accounts\) = 0/);
@@ -218,3 +218,4 @@ test('production postcheck proves a secure 1-3 account connection without activa
   assert.match(sql, /dataset_v2_meta_count = 0/);
   assert.match(sql, /legacy_meta_connection_after/);
 });
+

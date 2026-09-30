@@ -12,8 +12,8 @@ test("R7-B6 Settings uses Shopify-native grouped cards and provider rows", () =>
     providerAvailability: {meta: true, google_ads: true, klaviyo: true},
   });
 
-  assert.match(html, /<s-heading>Reporting Currency<\/s-heading>\s*<s-section>/);
-  assert.match(html, /<s-heading>Platforms<\/s-heading>\s*<s-section>/);
+  assert.match(html, /<s-stack gap="small">\s*<s-heading>Reporting Currency<\/s-heading>\s*<s-section>/);
+  assert.match(html, /<s-stack gap="small">\s*<s-heading>Platforms<\/s-heading>\s*<s-section>/);
   assert.equal((html.match(/<s-divider><\/s-divider>/g) || []).length, 2);
   assert.match(html, /<s-heading>Meta<\/s-heading>/);
   assert.match(html, /<s-heading>Google Ads<\/s-heading>/);
@@ -28,15 +28,16 @@ test("R7-B6 provider actions use neutral, success and critical Shopify semantics
     providerAvailability: {meta: true, google_ads: true, klaviyo: true},
   });
 
-  assert.match(html, /id="meta-connect-action" commandFor="meta-connect-modal"/);
+  assert.match(html, /id="meta-connect-action" variant="secondary" commandFor="meta-connect-modal"/);
   assert.doesNotMatch(html, /id="meta-connect-action" variant="primary"/);
-  assert.match(html, /id="meta-resume-action">Resume setup<\/s-button>/);
-  assert.match(html, /<s-badge tone="success">Connected<\/s-badge>/);
-  assert.match(html, /<s-button tone="critical" commandFor="meta-disconnect-modal"/);
-  assert.match(html, /id="meta-reporting-action"[^>]*>Reporting account<\/s-button>/);
+  assert.match(html, /id="meta-resume-action" variant="secondary">Resume setup<\/s-button>/);
+  assert.match(html, /<s-badge tone="success" color="strong" size="large">Connected<\/s-badge>/);
+  assert.match(html, /<s-button variant="secondary" tone="critical" commandFor="meta-disconnect-modal"/);
+  assert.match(html, /id="meta-reporting-action" variant="secondary"[^>]*>Reporting account<\/s-button>/);
   assert.match(html, />Update spend<\/s-button>/);
   assert.match(html, />Change value<\/s-button>/);
   assert.doesNotMatch(html, />Correct value<\/s-button>/);
+  assert.doesNotMatch(html, /slot="breadcrumb-actions"[^>]*>Dashboard<\/s-link>/);
 });
 
 test("R7-B6 leaves provider OAuth and disconnect modal copy intact", () => {

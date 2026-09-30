@@ -130,15 +130,15 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
             ${supportsReporting && providerAvailable ? `<div id="${id}-reporting" hidden><s-paragraph id="${id}-reporting-summary"></s-paragraph></div>` : ""}
             ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
           </s-stack>
-          ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight">
-            <div id="${id}-connect"><s-button id="${id}-connect-action" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div>
-            <div id="${id}-resume" hidden><s-button id="${id}-resume-action">Resume setup</s-button></div>
+          ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="base">
+            <div id="${id}-connect"><s-button id="${id}-connect-action" variant="secondary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div>
+            <div id="${id}-resume" hidden><s-button id="${id}-resume-action" variant="secondary">Resume setup</s-button></div>
             <div id="${id}-connected" hidden>
-              <s-stack direction="inline" gap="tight">
-                <s-badge tone="success">Connected</s-badge>
-                ${supportsConnection ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : ""}
-                ${supportsReporting && providerAvailable ? `<s-button id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button>` : ""}
-                ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="tight"><s-button commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show">Change value</s-button></s-stack></div>` : ""}
+              <s-stack direction="inline" gap="base" align-items="center">
+                <s-badge tone="success" color="strong" size="large">Connected</s-badge>
+                ${supportsConnection ? `<s-button variant="secondary" tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : ""}
+                ${supportsReporting && providerAvailable ? `<s-button id="${id}-reporting-action" variant="secondary" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button>` : ""}
+                ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="base"><s-button variant="secondary" commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button id="klaviyo-spend-correct-open" variant="secondary" commandFor="klaviyo-spend-correct-modal" command="--show">Change value</s-button></s-stack></div>` : ""}
               </s-stack>
             </div>
           </s-stack>`}
@@ -243,7 +243,6 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
 <body>
   ${appNavigation()}
   <s-page heading="Settings">
-    <s-link slot="breadcrumb-actions" href="/shopify/app">Dashboard</s-link>
     <s-banner id="status" heading="Settings" tone="info" hidden></s-banner>
     <div id="r6d4-google-acceptance" hidden>
       <s-section heading="Google Ads acceptance check">
@@ -312,8 +311,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         </s-stack>
       </s-section>
     </div>
-    <s-heading>Reporting Currency</s-heading>
-    <s-section>
+    <s-stack gap="small">
+      <s-heading>Reporting Currency</s-heading>
+      <s-section>
       <div id="reporting-currency-summary" hidden>
         <s-stack gap="tight">
           <s-paragraph id="reporting-currency-value"></s-paragraph>
@@ -326,7 +326,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
         </s-stack>
       </div>
-    </s-section>
+      </s-section>
+    </s-stack>
     <s-modal id="platforms-currency-modal" heading="Choose reporting currency" size="small-100">
       <div id="currency-selection-step">
         <s-stack gap="base">
@@ -348,10 +349,12 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
       <s-button slot="secondary-actions" commandFor="platforms-currency-modal" command="--hide">Cancel</s-button>
     </s-modal>
-    <s-heading>Platforms</s-heading>
-    <s-section>
-      <div id="provider-sections" hidden><s-stack gap="base">${sections}</s-stack></div>
-    </s-section>
+    <s-stack gap="small">
+      <s-heading>Platforms</s-heading>
+      <s-section>
+        <div id="provider-sections" hidden><s-stack gap="base">${sections}</s-stack></div>
+      </s-section>
+    </s-stack>
   </s-page>
   <script>
     (() => {

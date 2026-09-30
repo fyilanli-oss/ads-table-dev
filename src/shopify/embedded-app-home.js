@@ -3,7 +3,7 @@
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 const {initializeAdAccounts} = require("./ad-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "r7b3-oauth-resume-v1";
+const EMBEDDED_HOME_RELEASE = "r7b6-settings-standard-v1";
 
 function escapeAttribute(value) {
   return String(value)
@@ -100,7 +100,7 @@ function renderEmbeddedAppHome({clientId}) {
 </html>`;
 }
 
-function renderProviderSection({id, label, description, parked = false}, providerOAuthEnabled, providerAvailable = providerOAuthEnabled) {
+function renderProviderSection({id, label, parked = false, showDivider = false}, providerOAuthEnabled, providerAvailable = providerOAuthEnabled) {
   const disabled = providerAvailable ? "" : " disabled";
   const connectCopy = {
     meta: [
@@ -119,16 +119,31 @@ function renderProviderSection({id, label, description, parked = false}, provide
   const disconnectCopy = id === "google_ads"
     ? "AdsTable will revoke this Google authorization, including the retired Google Sheets and GA4 permissions, and stop future Google Ads access and token refresh."
     : `AdsTable will revoke this ${label} authorization and stop future provider access and token refresh for this connection.`;
-  return `<s-section id="${id}" heading="${label}">
-      <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
-        <s-stack gap="tight">
-          <s-paragraph>${description}</s-paragraph>
-          ${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
-          ${["meta", "google_ads"].includes(id) && providerAvailable ? `<div id="${id}-reporting" hidden><s-stack gap="tight"><s-paragraph id="${id}-reporting-summary"></s-paragraph><s-button id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button></s-stack></div>` : ""}
-          ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="tight"><s-button commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show">Correct value</s-button></s-stack></div>` : ""}
-          ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
+  const supportsConnection = ["meta", "google_ads", "klaviyo"].includes(id);
+  const supportsReporting = ["meta", "google_ads"].includes(id);
+  return `<div id="${id}">
+      <s-stack gap="base">
+        <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
+          <s-stack gap="tight">
+            <s-heading>${label}</s-heading>
+            ${supportsConnection ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
+            ${supportsReporting && providerAvailable ? `<div id="${id}-reporting" hidden><s-paragraph id="${id}-reporting-summary"></s-paragraph></div>` : ""}
+            ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
+          </s-stack>
+          ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight">
+            <div id="${id}-connect"><s-button id="${id}-connect-action" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div>
+            <div id="${id}-resume" hidden><s-button id="${id}-resume-action">Resume setup</s-button></div>
+            <div id="${id}-connected" hidden>
+              <s-stack direction="inline" gap="tight">
+                <s-badge tone="success">Connected</s-badge>
+                ${supportsConnection ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : ""}
+                ${supportsReporting && providerAvailable ? `<s-button id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button>` : ""}
+                ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="tight"><s-button commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show">Change value</s-button></s-stack></div>` : ""}
+              </s-stack>
+            </div>
+          </s-stack>`}
         </s-stack>
-        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button id="${id}-connect-action" variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-resume" hidden><s-button id="${id}-resume-action">Resume setup</s-button></div><div id="${id}-connected" hidden>${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
+        ${showDivider ? "<s-divider></s-divider>" : ""}
       </s-stack>
       ${parked ? "" : `<s-modal id="${id}-connect-modal" heading="Connect ${label} to AdsTable?" size="small-100">
         <s-stack gap="base">
@@ -172,15 +187,15 @@ function renderProviderSection({id, label, description, parked = false}, provide
           <s-button slot="secondary-actions" commandFor="klaviyo-spend-update-modal" command="--hide">Cancel</s-button>
           <s-button id="klaviyo-spend-update-save" slot="primary-action" variant="primary">Save new value</s-button>
         </s-modal>
-        <s-modal id="klaviyo-spend-correct-modal" heading="Correct Klaviyo email spend" size="small-100">
+        <s-modal id="klaviyo-spend-correct-modal" heading="Change Klaviyo email spend" size="small-100">
           <s-stack gap="base">
-            <s-paragraph>Correct a previously saved amount. Its original start date will not change.</s-paragraph>
+            <s-paragraph>Change a previously saved amount. Its original start date will not change.</s-paragraph>
             <s-select id="klaviyo-spend-history-choice" label="Saved period"></s-select>
-            <s-number-field id="klaviyo-spend-correct-value" label="Corrected 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
+            <s-number-field id="klaviyo-spend-correct-value" label="Updated 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
             <s-paragraph id="klaviyo-spend-correct-message" aria-live="polite"></s-paragraph>
           </s-stack>
           <s-button slot="secondary-actions" commandFor="klaviyo-spend-correct-modal" command="--hide">Cancel</s-button>
-          <s-button id="klaviyo-spend-correct-save" slot="primary-action" variant="primary">Save correction</s-button>
+          <s-button id="klaviyo-spend-correct-save" slot="primary-action" variant="primary">Save change</s-button>
         </s-modal>
       </s-stack>` : ""}
       ${["meta", "google_ads"].includes(id) && providerAvailable ? `<s-stack id="${id}-accounts" gap="base">
@@ -211,11 +226,15 @@ function renderProviderSection({id, label, description, parked = false}, provide
 function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvailability = {}}) {
   if (typeof clientId !== "string" || !clientId.trim()) throw new TypeError("clientId is required");
   const providers = [
-    {id: "meta", label: "Meta", description: "Meta advertising performance and spend."},
-    {id: "google_ads", label: "Google Ads", description: "Google Ads performance and spend."},
-    {id: "klaviyo", label: "Klaviyo", description: "Email performance and estimated 30-day spend."},
+    {id: "meta", label: "Meta"},
+    {id: "google_ads", label: "Google Ads"},
+    {id: "klaviyo", label: "Klaviyo"},
   ];
-  const sections = providers.map((provider) => renderProviderSection(provider, providerOAuthEnabled, providerAvailability[provider.id] ?? providerOAuthEnabled)).join("\n    ");
+  const sections = providers.map((provider, index) => renderProviderSection(
+    {...provider, showDivider: index < providers.length - 1},
+    providerOAuthEnabled,
+    providerAvailability[provider.id] ?? providerOAuthEnabled,
+  )).join("\n    ");
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -293,7 +312,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         </s-stack>
       </s-section>
     </div>
-    <s-section heading="Reporting Currency">
+    <s-heading>Reporting Currency</s-heading>
+    <s-section>
       <div id="reporting-currency-summary" hidden>
         <s-stack gap="tight">
           <s-paragraph id="reporting-currency-value"></s-paragraph>
@@ -328,8 +348,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
       <s-button slot="secondary-actions" commandFor="platforms-currency-modal" command="--hide">Cancel</s-button>
     </s-modal>
-    <s-section heading="Platforms">
-      <div id="provider-sections" hidden>${sections}</div>
+    <s-heading>Platforms</s-heading>
+    <s-section>
+      <div id="provider-sections" hidden><s-stack gap="base">${sections}</s-stack></div>
     </s-section>
   </s-page>
   <script>

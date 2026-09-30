@@ -15,7 +15,7 @@ Kullanıcı Klaviyo e-posta maliyetini fatura dönemi tarihlerini hesaplamadan t
 - Bitiş tarihi kullanıcıdan istenmez.
 - Kullanıcı değeri değiştirmezse aynı tutar ardışık 30 günlük pencerelerde otomatik devam eder.
 - `Update spend` yeni değeri kayıt gününde başlatır ve önceki değeri bir önceki gün kapatır.
-- `Correct value` yanlış girilmiş tarihsel tutarı düzeltir; tarihleri değiştirmez ve yeni dönem başlatmaz.
+- `Change value` yanlış girilmiş tarihsel tutarı düzeltir; tarihleri değiştirmez ve yeni dönem başlatmaz.
 - SMS maliyetleri dahil edilmez.
 
 ## Örnek

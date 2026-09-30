@@ -35,3 +35,7 @@ Exact App Bridge navigation API'si, navigation component'i, deep-link/host/back 
 Bu freeze UI/runtime kodu, Partner Dashboard/Development Store, credential/scope/redirect/webhook, provider çağrısı, migration, deployment veya production işlemi yapmaz.
 
 C7 ile E10-T5-C output/display ürün sözleşmesi `Done`dır. Sıradaki uygulanabilir repository işi **E10-T6-A — Official capability ve development-readiness**tir. E10-T6-A Shopify'a gerçek temas kurmaz; yalnız güncel resmi gereksinim matrisi ve PASS/BLOCKED readiness evidence üretir.
+
+## 30 Eylül 2026 — UI constitution inheritance
+
+Navigation, page title, icon, responsive yerleşim ve route sunumu `docs/SHOPIFY_EMBEDDED_UI_CONSTITUTION.md` kurallarını miras alır. App Bridge dışı navigation, özel breadcrumb, özel ikon/CSS taklidi ve desktop-only acceptance yasaktır. Desktop ve gerçek mobil Shopify Admin kabulü aynı bilgi mimarisiyle kanıtlanır.

@@ -58,5 +58,6 @@
     "single_choice_for_ad_accounts": true,
     "exact_components_revalidated_in": "E10-T6-A"
   },
-  "forbidden_output": ["provider_token", "oauth_code", "raw_provider_error", "raw_html", "browser_authoritative_account"]
+  "forbidden_output": ["provider_token", "oauth_code", "raw_provider_error", "raw_html", "browser_authoritative_account"],
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
 }

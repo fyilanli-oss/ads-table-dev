@@ -50,5 +50,6 @@
     "fake_zero_for_missing_or_unsupported",
     "paid_organic_blend_frontend_filter",
     "shopify_admin_shell_replica"
-  ]
+  ],
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
 }

@@ -160,7 +160,8 @@ test('Execution Plan records the failed C6 attempts and the verified-empty live 
   assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Production Disconnect and clean Reconnect PASS \/ R6-D3 complete/);
   assert.match(plan, /tamamlanmış E4\/E5\/E7.*yeniden geliştirilmedi/i);
   assert.match(plan, /R7-A.*R6-D/i);
-  assert.match(plan, /R7-A merchant acceptance PASS; R7-B1 Settings decision contract PASS; R7-B2–B4 merchant acceptance PASS; R7-B5-C1\/C2\/C3 repository checks PASS, production migration\/live acceptance pending; R7-B6–B7 pending/i);
+  assert.match(plan, /R7-A merchant acceptance PASS; R7-B1 Settings decision contract PASS; R7-B2–B4 merchant acceptance PASS; R7-B5-C1\/C2\/C3 repository checks PASS, production migration\/live acceptance pending; R7-B6 visual acceptance FAIL \/ corrective work required; UI constitution guard prepared; R7-B7 pending/i);
+  assert.match(plan, /SHOPIFY_EMBEDDED_UI_CONSTITUTION\.md/);
   assert.match(plan, /R7-B5-C3 Dataset cost boundary — Repository checks PASS \/ live acceptance pending/);
   assert.match(plan, /R7-B1 Settings ürün ve veri davranışı uzlaştırması — Contract PASS \/ implementation pending/);
   assert.match(plan, /R7-B2 Shopify-native navigation ve Settings yüzeyi — Done \/ merchant acceptance PASS/);

@@ -33,5 +33,6 @@
     "official_components_only": true,
     "exact_shopify_revalidation": "E10-T6-A"
   },
-  "forbidden": ["duplicate_admin_shell", "standalone_login_or_dashboard_return", "browser_bypassed_onboarding", "supported_context_loss", "silent_context_coercion", "multiple_active_accounts", "stale_account_result", "open_redirect", "custom_mobile_navigation", "custom_control_framework", "secret_pii_identity_or_raw_error_exposure"]
+  "forbidden": ["duplicate_admin_shell", "standalone_login_or_dashboard_return", "browser_bypassed_onboarding", "supported_context_loss", "silent_context_coercion", "multiple_active_accounts", "stale_account_result", "open_redirect", "custom_mobile_navigation", "custom_control_framework", "secret_pii_identity_or_raw_error_exposure"],
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
 }

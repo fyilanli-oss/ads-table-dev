@@ -50,5 +50,6 @@
     "margin_without_cost_contract",
     "simultaneously_open_analysis_modals",
     "shopify_admin_shell_replica"
-  ]
+  ],
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
 }

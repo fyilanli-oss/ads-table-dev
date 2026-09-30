@@ -80,5 +80,6 @@
     "official_components_only": true,
     "custom_control_framework": false,
     "exact_components_revalidated_in": "E10-T6-A"
-  }
+  },
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
 }

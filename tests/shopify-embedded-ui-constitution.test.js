@@ -1,0 +1,97 @@
+"use strict";
+
+const fs = require("node:fs");
+const path = require("node:path");
+const test = require("node:test");
+const assert = require("node:assert/strict");
+
+const root = path.join(__dirname, "..");
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const contract = JSON.parse(
+  read("contracts/shopify/shopify-embedded-ui-constitution-v1.json"),
+);
+const constitution = read("docs/SHOPIFY_EMBEDDED_UI_CONSTITUTION.md");
+const plan = read("codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md");
+const agentRules = read("AGENTS.md");
+const taskTemplate = read("docs/templates/SHOPIFY_EMBEDDED_UI_TASK_TEMPLATE.md");
+const settingsSource = read("src/shopify/embedded-app-home.js");
+
+test("the Shopify embedded UI constitution is binding across plan and task instructions", () => {
+  assert.equal(contract.status, "binding");
+  assert.match(plan, /SHOPIFY_EMBEDDED_UI_CONSTITUTION\.md/);
+  assert.match(agentRules, /SHOPIFY_EMBEDDED_UI_CONSTITUTION\.md/);
+  assert.match(agentRules, /Kanıtlanmamış aşama tamamlanmış kabul edilmez/);
+  assert.match(taskTemplate, /Exact Shopify component/);
+  assert.match(constitution, /yalnız Shopify App Bridge ve güncel stabil App Home Polaris web componentleri/);
+});
+
+test("every frozen Shopify UI contract points to the constitution", () => {
+  const governedContracts = [
+    "contracts/shopify/e10-t5c1-funnel-ui.json",
+    "contracts/shopify/e10-t5c2a-ad-analysis-ui.json",
+    "contracts/shopify/e10-t5c3-dashboard-ui.json",
+    "contracts/shopify/e10-t5c4-platforms-settings-ui.json",
+    "contracts/shopify/e10-t5c5a-attribution-differences-ui.json",
+    "contracts/shopify/e10-t5c7-integrated-navigation.json",
+  ];
+
+  for (const file of governedContracts) {
+    const value = JSON.parse(read(file));
+    assert.equal(
+      value.governance_contract,
+      "contracts/shopify/shopify-embedded-ui-constitution-v1.json",
+      `${file} must inherit the central UI constitution`,
+    );
+  }
+});
+
+test("standard controls cannot be replaced by raw HTML or custom visual CSS", () => {
+  for (const pattern of [
+    /<button\b/i,
+    /<input\b/i,
+    /<select\b/i,
+    /<form\b/i,
+    /<dialog\b/i,
+    /<style\b/i,
+    /class(?:Name)?\s*=/i,
+  ]) {
+    assert.doesNotMatch(settingsSource, pattern);
+  }
+});
+
+test("known Settings visual debt can only decrease and cannot gain new colors", () => {
+  const debt = contract.known_noncompliance.find(
+    (item) => item.id === "R7-B6-SETTINGS-VISUAL-001",
+  );
+  assert.ok(debt, "the current Settings visual debt must stay explicit until removed");
+
+  const inlineStyles = settingsSource.match(/style\s*=/gi) || [];
+  const colors = settingsSource.match(/#[0-9a-f]{3,8}\b/gi) || [];
+  const clickableActions = settingsSource.match(/<s-clickable\b/gi) || [];
+  const allowedColors = new Set(
+    debt.temporary_literal_color_allowlist.map((value) => value.toUpperCase()),
+  );
+
+  assert.ok(
+    inlineStyles.length <= debt.maximum_until_removed.inline_style_count,
+    "inline style debt increased",
+  );
+  assert.ok(
+    colors.length <= debt.maximum_until_removed.literal_color_count,
+    "literal color debt increased",
+  );
+  assert.ok(
+    clickableActions.length <= debt.maximum_until_removed.clickable_action_count,
+    "s-clickable button-imitation debt increased",
+  );
+  for (const color of colors) {
+    assert.ok(allowedColors.has(color.toUpperCase()), `new literal color ${color} is forbidden`);
+  }
+});
+
+test("the constitution requires both desktop and real mobile merchant acceptance", () => {
+  assert.ok(contract.required_before_merge.includes("desktop_real_shopify_admin_pass"));
+  assert.ok(contract.required_before_merge.includes("mobile_320px_real_shopify_admin_pass"));
+  assert.ok(contract.required_before_merge.includes("explicit_product_owner_acceptance"));
+  assert.match(constitution, /kullanıcı\/ürün sahibi açık kabul/i);
+});

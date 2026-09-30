@@ -35,5 +35,6 @@
     "funnel_drilldown": "view_funnel_preserve_context"
   },
   "shared_context": ["time_range", "comparison", "filters", "currency", "data_sources"],
-  "excluded": ["attribution_overlap", "creative", "provider_hierarchy_table", "frontend_formulas", "fake_zero"]
+  "excluded": ["attribution_overlap", "creative", "provider_hierarchy_table", "frontend_formulas", "fake_zero"],
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
 }

@@ -23,7 +23,7 @@ test("R7-B3 creates new OAuth transactions for Settings and retains only the exa
 test("R7-B3 Settings UI exposes resumable pending setup and provider-specific guidance", () => {
   const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: true});
   for (const provider of ["meta", "google_ads", "klaviyo"]) {
-    assert.match(html, new RegExp(`id="${provider}-resume" hidden`));
+    assert.match(html, new RegExp(`id="${provider}-resume" display="none"`));
     assert.match(html, new RegExp(`<s-button variant="secondary" id="${provider}-resume-action">Resume setup<\\/s-button>`));
   }
   assert.match(html, /Facebook account that owns or can access/);

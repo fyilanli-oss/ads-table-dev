@@ -15,6 +15,8 @@ const plan = read("codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md");
 const agentRules = read("AGENTS.md");
 const taskTemplate = read("docs/templates/SHOPIFY_EMBEDDED_UI_TASK_TEMPLATE.md");
 const settingsSource = read("src/shopify/embedded-app-home.js");
+const adAccountSource = read("src/shopify/ad-account-ui.js");
+const klaviyoAccountSource = read("src/shopify/klaviyo-account-ui.js");
 
 test("the Shopify embedded UI constitution is binding across plan and task instructions", () => {
   assert.equal(contract.status, "binding");
@@ -69,6 +71,16 @@ test("Settings corrective implementation has zero custom visual debt", () => {
   assert.equal(inlineStyles.length, 0, "inline style debt must be fully removed");
   assert.equal(colors.length, 0, "literal color debt must be fully removed");
   assert.equal(clickableActions.length, 0, "s-clickable button imitation must be fully removed");
+});
+
+test("Shopify layout components use the supported display property for conditional visibility", () => {
+  assert.doesNotMatch(settingsSource, /<s-(?:stack|box)[^>]*\shidden(?:\s|>)/i);
+  assert.doesNotMatch(settingsSource, /(?:currencySetup|currencySummary|providerSections|selectionStep|confirmationStep|acceptancePanel|metricStep|metaAcceptancePanel|googleAcceptancePanel)\.hidden\s*=/);
+  assert.doesNotMatch(adAccountSource, /\.hidden\s*=/);
+  assert.doesNotMatch(klaviyoAccountSource, /\.hidden\s*=/);
+  assert.match(settingsSource, /display="none"/);
+  assert.match(adAccountSource, /element\.display = visible \? 'auto' : 'none'/);
+  assert.match(klaviyoAccountSource, /element\.display = visible \? "auto" : "none"/);
 });
 
 test("the constitution requires both desktop and real mobile merchant acceptance", () => {

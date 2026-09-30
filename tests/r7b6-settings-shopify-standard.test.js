@@ -25,6 +25,12 @@ test("R7-B6 Settings uses two durable Shopify-native cards and separated provide
   assert.doesNotMatch(html, /advertising performance and spend|Email performance and estimated 30-day spend/);
   assert.equal((html.match(/<s-query-container>/g) || []).length, 3);
   assert.equal((html.match(/gridTemplateColumns="@container \(inline-size > 700px\) 1fr auto, 1fr"/g) || []).length, 3);
+  assert.doesNotMatch(html, /<s-(?:stack|box)[^>]*\shidden(?:\s|>)/i);
+  assert.match(html, /<s-stack id="r6d4-google-acceptance" display="none">/);
+  assert.match(html, /<s-stack id="reporting-currency-summary" display="none"/);
+  assert.match(html, /<s-box id="provider-sections" display="none"/);
+  assert.match(html, /providerSections\.display = "auto"/);
+  assert.match(html, /acceptancePanel\.display = "auto"/);
 });
 
 test("R7-B6 provider actions use only official Shopify action and status semantics", () => {

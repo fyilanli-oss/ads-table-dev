@@ -65,3 +65,9 @@ Bu freeze Shopify UI implementasyonu, mevcut dashboard markup'ını refactor etm
 ## Sıra kararı
 
 Kullanıcı Platforms ve Settings davranışlarını birlikte verdiği için E10-T5-C4 ve E10-T5-C6 ürün kararları aynı freeze içinde kapatılmıştır. Bu bilinçli sıra güncellemesi C5 Attribution kapısını atlamaz: sıradaki uygulanabilir ürün paketi **E10-T5-C5 Attribution**dır. C7 ancak C5 de tamamlandıktan sonra açılır; E10-T6+ parent T5-C/C7 onayından önce başlamaz.
+
+## 30 Eylül 2026 — Bağlayıcı UI governance düzeltmesi
+
+Bu freeze'in bütün görsel/etkileşimli uygulaması artık `docs/SHOPIFY_EMBEDDED_UI_CONSTITUTION.md` ve executable `contracts/shopify/shopify-embedded-ui-constitution-v1.json` altındadır. Koddan önce analist brief'i ve exact resmî Shopify component mapping zorunludur; özel CSS/component taklidi kabul edilmez. Desktop + gerçek mobil Shopify Admin ve açık ürün sahibi kabulü olmadan paket `Done` olamaz.
+
+`e9cd2490f1e9a9c70213baf3f47feba8c264380f` Settings görünümü `s-clickable` button taklidi, inline style ve literal renk içerdiğinden görsel kabul almamıştır. R7-B6 durumu `FAIL / corrective work required`dır; bu governance değişikliği mevcut UI'ı düzeltmiş veya kabul etmiş sayılmaz.

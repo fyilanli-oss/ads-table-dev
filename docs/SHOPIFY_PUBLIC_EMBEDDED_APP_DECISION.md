@@ -17,3 +17,7 @@
 Implementation başlamadan önce Public App, embedded auth/App Bridge, billing, privacy/protected data, mandatory lifecycle webhooks ve App Store review kuralları güncel resmi Shopify dokümantasyonundan linkli decision log ile doğrulanır. Erişilemeyen veya doğrulanmayan bir internet bilgisi teknik sözleşme kabul edilmez.
 
 Production credential, Partner Dashboard değişikliği, scope talebi, billing aktivasyonu, migration, webhook registration veya App Store submission ayrı açık production onayı gerektirir.
+
+## 30 Eylül 2026 — Embedded UI bağlayıcı standardı
+
+Bu GO kararının bütün merchant-facing UI uygulamaları `docs/SHOPIFY_EMBEDDED_UI_CONSTITUTION.md` ve `contracts/shopify/shopify-embedded-ui-constitution-v1.json` ile yönetilir. App Bridge + güncel stabil App Home Polaris web componentleri dışındaki button/card/badge/modal/form/navigation taklitleri; inline CSS, literal renk ve yalnız desktop kabulü yasaktır. Desktop + gerçek mobil kanıt ve açık ürün sahibi kabulü olmadan UI işi tamamlanmış sayılmaz.

@@ -4,7 +4,12 @@
   "module": "Dashboard",
   "purpose": "manager_summary",
   "time": {
-    "preset_completed_days": [7, 14, 30, 90],
+    "preset_completed_days": [
+      7,
+      14,
+      30,
+      90
+    ],
     "includes_today": false,
     "custom_range": false,
     "authority": "backend_shop_timezone"
@@ -16,24 +21,77 @@
     "computed_by": "backend"
   },
   "chart": {
-    "series": ["sales", "spend", "revenue"],
+    "series": [
+      "sales",
+      "spend",
+      "revenue"
+    ],
     "current_style": "solid",
     "comparison_style": "dashed",
     "alignment": "ordinal_day_in_period",
     "revenue_formula": "sales_minus_spend"
   },
-  "kpis": ["impressions", "clicks", "ctr", "cpc", "roas", "cps"],
-  "funnel_overview": [
-    { "stage": "add_to_cart", "count": "add_to_cart", "value": "add_to_cart_value" },
-    { "stage": "checkout", "count": "checkout", "value": "checkout_value" },
-    { "stage": "abandoned", "count": "abandoned", "value": "abandoned_value" },
-    { "stage": "purchase", "count": "purchase", "value": "sales" }
+  "kpis": [
+    "impressions",
+    "clicks",
+    "ctr",
+    "cpc",
+    "roas",
+    "cps"
   ],
-  "compare_fields_per_count_and_value": ["current", "comparison", "change"],
+  "funnel_overview": [
+    {
+      "stage": "add_to_cart",
+      "count": "add_to_cart",
+      "value": "add_to_cart_value"
+    },
+    {
+      "stage": "checkout",
+      "count": "checkout",
+      "value": "checkout_value"
+    },
+    {
+      "stage": "abandoned",
+      "count": "abandoned",
+      "value": "abandoned_value"
+    },
+    {
+      "stage": "purchase",
+      "count": "purchase",
+      "value": "sales"
+    }
+  ],
+  "compare_fields_per_count_and_value": [
+    "current",
+    "comparison",
+    "change"
+  ],
   "navigation": {
     "funnel_table_switch_on_dashboard": false,
     "funnel_drilldown": "view_funnel_preserve_context"
   },
-  "shared_context": ["time_range", "comparison", "filters", "currency", "data_sources"],
-  "excluded": ["attribution_overlap", "creative", "provider_hierarchy_table", "frontend_formulas", "fake_zero"]
+  "shared_context": [
+    "time_range",
+    "comparison",
+    "filters",
+    "currency",
+    "data_sources"
+  ],
+  "excluded": [
+    "attribution_overlap",
+    "creative",
+    "provider_hierarchy_table",
+    "frontend_formulas",
+    "fake_zero"
+  ],
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json",
+  "governance_acceptance": {
+    "analyst_brief_before_code": true,
+    "official_component_mapping_before_code": true,
+    "custom_visual_css": false,
+    "desktop_real_shopify_admin": true,
+    "mobile_320px_real_shopify_admin": true,
+    "explicit_product_owner_acceptance": true,
+    "unverified_done": false
+  }
 }

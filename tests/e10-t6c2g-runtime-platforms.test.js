@@ -32,7 +32,7 @@ test("embedded Settings renders immutable currency setup and only three active p
   assert.match(html, /commandFor="klaviyo-connect-modal" command="--show"/);
   for (const provider of ["meta", "google_ads", "klaviyo"]) {
     assert.match(html, new RegExp(`id="${provider}-resume" hidden`));
-    assert.match(html, new RegExp(`id="${provider}-resume-action" variant="secondary">Resume setup`));
+    assert.match(html, new RegExp(`id="${provider}-resume-action"><s-text fontWeight="medium">Resume setup`));
   }
   assert.match(html, /Facebook account that owns or can access the Meta ad accounts/);
   assert.match(html, /Google may describe the consent broadly/);

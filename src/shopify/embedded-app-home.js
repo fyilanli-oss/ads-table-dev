@@ -131,14 +131,14 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
             ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
           </s-stack>
           ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="base">
-            <div id="${id}-connect"><s-button id="${id}-connect-action" variant="secondary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div>
-            <div id="${id}-resume" hidden><s-button id="${id}-resume-action" variant="secondary">Resume setup</s-button></div>
+            <div id="${id}-connect"><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" id="${id}-connect-action" commandFor="${id}-connect-modal" command="--show"${disabled}><s-text fontWeight="medium">Connect</s-text></s-clickable></div>
+            <div id="${id}-resume" hidden><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" id="${id}-resume-action"><s-text fontWeight="medium">Resume setup</s-text></s-clickable></div>
             <div id="${id}-connected" hidden>
               <s-stack direction="inline" gap="base" align-items="center">
-                <s-badge tone="success" color="strong" size="large">Connected</s-badge>
-                ${supportsConnection ? `<s-button variant="secondary" tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : ""}
-                ${supportsReporting && providerAvailable ? `<s-button id="${id}-reporting-action" variant="secondary" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button>` : ""}
-                ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="base"><s-button variant="secondary" commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button id="klaviyo-spend-correct-open" variant="secondary" commandFor="klaviyo-spend-correct-modal" command="--show">Change value</s-button></s-stack></div>` : ""}
+                <s-badge tone="success" size="large-100">Connected</s-badge>
+                ${supportsConnection ? `<s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="background:#FDE8E7" commandFor="${id}-disconnect-modal" command="--show"><s-text tone="critical" fontWeight="medium">Disconnect</s-text></s-clickable>` : ""}
+                ${supportsReporting && providerAvailable ? `<s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show"><s-text fontWeight="medium">Reporting account</s-text></s-clickable>` : ""}
+                ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="base"><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" commandFor="klaviyo-spend-update-modal" command="--show"><s-text fontWeight="medium">Update spend</s-text></s-clickable><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show"><s-text fontWeight="medium">Change value</s-text></s-clickable></s-stack></div>` : ""}
               </s-stack>
             </div>
           </s-stack>`}

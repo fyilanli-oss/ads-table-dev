@@ -8,7 +8,7 @@ test("embedded App Home reuses an active installation and bootstraps only for re
   const html = renderEmbeddedAppHome({clientId: "development-client"});
   assert.match(html, /name="shopify-api-key" content="development-client"/);
   assert.match(html, /cdn\.shopify\.com\/shopifycloud\/app-bridge\.js/);
-  assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
+  assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-2\.0-rc\.js/);
   assert.match(html, /<s-app-nav>/);
   assert.match(html, /<s-page heading="Dashboard">/);
   assert.match(html, /<s-link href="\/shopify\/app" rel="home">Dashboard<\/s-link>/);

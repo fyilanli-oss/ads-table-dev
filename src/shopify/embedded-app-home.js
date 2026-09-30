@@ -123,7 +123,7 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
   const supportsReporting = ["meta", "google_ads"].includes(id);
   return `<div id="${id}">
       <s-stack gap="base">
-        <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
+        <s-stack direction="inline" gap="base" justifyContent="space-between" alignItems="center">
           <s-stack gap="tight">
             <s-heading>${label}</s-heading>
             ${supportsConnection ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
@@ -131,14 +131,14 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
             ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
           </s-stack>
           ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="base">
-            <div id="${id}-connect"><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" id="${id}-connect-action" commandFor="${id}-connect-modal" command="--show"${disabled}><s-text fontWeight="medium">Connect</s-text></s-clickable></div>
-            <div id="${id}-resume" hidden><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" id="${id}-resume-action"><s-text fontWeight="medium">Resume setup</s-text></s-clickable></div>
+            <div id="${id}-connect"><s-button variant="secondary" id="${id}-connect-action" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div>
+            <div id="${id}-resume" hidden><s-button variant="secondary" id="${id}-resume-action">Resume setup</s-button></div>
             <div id="${id}-connected" hidden>
-              <s-stack direction="inline" gap="base" align-items="center">
-                <s-badge tone="success" size="large-100">Connected</s-badge>
-                ${supportsConnection ? `<s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto;background:#FDE8E7" commandFor="${id}-disconnect-modal" command="--show"><s-text tone="critical" fontWeight="medium">Disconnect</s-text></s-clickable>` : ""}
-                ${supportsReporting && providerAvailable ? `<s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show"><s-text fontWeight="medium">Reporting account</s-text></s-clickable>` : ""}
-                ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="base"><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" commandFor="klaviyo-spend-update-modal" command="--show"><s-text fontWeight="medium">Update spend</s-text></s-clickable><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show"><s-text fontWeight="medium">Change value</s-text></s-clickable></s-stack></div>` : ""}
+              <s-stack direction="inline" gap="base" alignItems="center">
+                <s-badge tone="success" size="base">Connected</s-badge>
+                ${supportsConnection ? `<s-button variant="secondary" tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : ""}
+                ${supportsReporting && providerAvailable ? `<s-button variant="secondary" id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button>` : ""}
+                ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="base"><s-button variant="secondary" commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button variant="secondary" id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show">Change value</s-button></s-stack></div>` : ""}
               </s-stack>
             </div>
           </s-stack>`}
@@ -311,9 +311,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         </s-stack>
       </s-section>
     </div>
-    <s-stack gap="small">
-      <s-heading>Reporting Currency</s-heading>
-      <s-section>
+    <s-section heading="Reporting Currency">
       <div id="reporting-currency-summary" hidden>
         <s-stack gap="tight">
           <s-paragraph id="reporting-currency-value"></s-paragraph>
@@ -326,8 +324,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
         </s-stack>
       </div>
-      </s-section>
-    </s-stack>
+    </s-section>
     <s-modal id="platforms-currency-modal" heading="Choose reporting currency" size="small-100">
       <div id="currency-selection-step">
         <s-stack gap="base">
@@ -349,12 +346,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
       <s-button slot="secondary-actions" commandFor="platforms-currency-modal" command="--hide">Cancel</s-button>
     </s-modal>
-    <s-stack gap="small">
-      <s-heading>Platforms</s-heading>
-      <s-section>
-        <div id="provider-sections" hidden><s-stack gap="base">${sections}</s-stack></div>
-      </s-section>
-    </s-stack>
+    <s-section heading="Platforms">
+      <div id="provider-sections" hidden><s-stack gap="base">${sections}</s-stack></div>
+    </s-section>
   </s-page>
   <script>
     (() => {
@@ -743,6 +737,5 @@ function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}
 }
 
 module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms, renderEmbeddedPlaceholder});
-
 
 

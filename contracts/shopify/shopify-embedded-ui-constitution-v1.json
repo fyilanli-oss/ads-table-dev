@@ -56,22 +56,19 @@
     "https://shopify.dev/docs/api/app-home/latest/app-bridge-web-components",
     "https://shopify.dev/docs/api/polaris/using-polaris-web-components"
   ],
-  "known_noncompliance": [
+  "known_noncompliance": [],
+  "resolved_noncompliance": [
     {
       "id": "R7-B6-SETTINGS-VISUAL-001",
-      "status": "open_corrective_required",
+      "status": "implementation_corrected_acceptance_pending",
       "file": "src/shopify/embedded-app-home.js",
       "baseline_commit": "e9cd2490f1e9a9c70213baf3f47feba8c264380f",
-      "maximum_until_removed": {
-        "inline_style_count": 6,
-        "literal_color_count": 1,
-        "clickable_action_count": 6
+      "required_zero_counts": {
+        "inline_style_count": 0,
+        "literal_color_count": 0,
+        "clickable_action_count": 0
       },
-      "temporary_literal_color_allowlist": [
-        "#FDE8E7"
-      ],
-      "rule": "counts_may_only_decrease_and_no_new_exception_may_be_added_without_explicit_product_decision"
+      "acceptance": "desktop_and_real_mobile_product_owner_acceptance_required_before_merge"
     }
   ]
 }
-

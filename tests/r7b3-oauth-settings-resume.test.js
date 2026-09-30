@@ -24,7 +24,7 @@ test("R7-B3 Settings UI exposes resumable pending setup and provider-specific gu
   const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: true});
   for (const provider of ["meta", "google_ads", "klaviyo"]) {
     assert.match(html, new RegExp(`id="${provider}-resume" hidden`));
-    assert.match(html, new RegExp(`id="${provider}-resume-action"><s-text fontWeight="medium">Resume setup`));
+    assert.match(html, new RegExp(`<s-button variant="secondary" id="${provider}-resume-action">Resume setup<\\/s-button>`));
   }
   assert.match(html, /Facebook account that owns or can access/);
   assert.match(html, /Google may describe the consent broadly/);

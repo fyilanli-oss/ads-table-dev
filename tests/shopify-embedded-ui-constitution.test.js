@@ -59,34 +59,15 @@ test("standard controls cannot be replaced by raw HTML or custom visual CSS", ()
   }
 });
 
-test("known Settings visual debt can only decrease and cannot gain new colors", () => {
-  const debt = contract.known_noncompliance.find(
-    (item) => item.id === "R7-B6-SETTINGS-VISUAL-001",
-  );
-  assert.ok(debt, "the current Settings visual debt must stay explicit until removed");
-
+test("Settings corrective implementation has zero custom visual debt", () => {
   const inlineStyles = settingsSource.match(/style\s*=/gi) || [];
   const colors = settingsSource.match(/#[0-9a-f]{3,8}\b/gi) || [];
   const clickableActions = settingsSource.match(/<s-clickable\b/gi) || [];
-  const allowedColors = new Set(
-    debt.temporary_literal_color_allowlist.map((value) => value.toUpperCase()),
-  );
 
-  assert.ok(
-    inlineStyles.length <= debt.maximum_until_removed.inline_style_count,
-    "inline style debt increased",
-  );
-  assert.ok(
-    colors.length <= debt.maximum_until_removed.literal_color_count,
-    "literal color debt increased",
-  );
-  assert.ok(
-    clickableActions.length <= debt.maximum_until_removed.clickable_action_count,
-    "s-clickable button-imitation debt increased",
-  );
-  for (const color of colors) {
-    assert.ok(allowedColors.has(color.toUpperCase()), `new literal color ${color} is forbidden`);
-  }
+  assert.deepEqual(contract.known_noncompliance, []);
+  assert.equal(inlineStyles.length, 0, "inline style debt must be fully removed");
+  assert.equal(colors.length, 0, "literal color debt must be fully removed");
+  assert.equal(clickableActions.length, 0, "s-clickable button imitation must be fully removed");
 });
 
 test("the constitution requires both desktop and real mobile merchant acceptance", () => {

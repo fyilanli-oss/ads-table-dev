@@ -17,6 +17,13 @@
     "shopify_app_bridge",
     "shopify_app_home_polaris_web_components"
   ],
+  "approved_runtime": {
+    "decision_date": "2026-09-30",
+    "environment": "development",
+    "polaris_script": "https://cdn.shopify.com/shopifycloud/polaris-2.0-rc.js",
+    "reason": "match_the_current_shopify_admin_design_without_custom_visual_imitation",
+    "stable_transition": "requires_separate_validation_when_polaris_2_stable_is_published"
+  },
   "forbidden": [
     "raw_html_form_or_action_controls",
     "custom_button_card_badge_modal_form_or_navigation",
@@ -54,7 +61,9 @@
     "https://shopify.dev/docs/api/app-home/latest/web-components/actions/button",
     "https://shopify.dev/docs/api/app-home-ui-extension/latest/web-components/feedback-and-status-indicators/badge",
     "https://shopify.dev/docs/api/app-home/latest/app-bridge-web-components",
-    "https://shopify.dev/docs/api/polaris/using-polaris-web-components"
+    "https://shopify.dev/docs/api/polaris/using-polaris-web-components",
+    "https://shopify.dev/docs/apps/build/app-home/polaris2",
+    "https://shopify.dev/docs/api/app-home/v2.0-rc/web-components/versioning"
   ],
   "known_noncompliance": [],
   "resolved_noncompliance": [

@@ -20,7 +20,7 @@ function documentHead({clientId, title}) {
   <meta name="shopify-api-key" content="${apiKey}">
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
-  <script src="https://cdn.shopify.com/shopifycloud/polaris-1.js"></script>
+  <script src="https://cdn.shopify.com/shopifycloud/polaris-2.0-rc.js"></script>
   <title>${title}</title>`;
 }
 

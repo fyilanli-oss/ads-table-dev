@@ -24,7 +24,13 @@ test("the Shopify embedded UI constitution is binding across plan and task instr
   assert.match(agentRules, /SHOPIFY_EMBEDDED_UI_CONSTITUTION\.md/);
   assert.match(agentRules, /Kanıtlanmamış aşama tamamlanmış kabul edilmez/);
   assert.match(taskTemplate, /Exact Shopify component/);
-  assert.match(constitution, /yalnız Shopify App Bridge ve güncel stabil App Home Polaris web componentleri/);
+  assert.match(constitution, /yalnız Shopify App Bridge ve ürün sahibi tarafından açıkça onaylanmış güncel App Home Polaris web component sürümü/);
+  assert.equal(
+    contract.approved_runtime.polaris_script,
+    "https://cdn.shopify.com/shopifycloud/polaris-2.0-rc.js",
+  );
+  assert.match(settingsSource, /shopifycloud\/polaris-2\.0-rc\.js/);
+  assert.doesNotMatch(settingsSource, /shopifycloud\/polaris-(?:1|1\.\d+)\.js/);
 });
 
 test("every frozen Shopify UI contract points to the constitution", () => {

@@ -6,7 +6,9 @@
 
 ## 1. Temel karar
 
-AdsTable bir Shopify Public Embedded App'tir. Shopify Admin içindeki arayüz ikinci bir AdsTable tasarım sistemi değildir. UI yalnız Shopify App Bridge ve güncel stabil App Home Polaris web componentleri ile kurulur.
+AdsTable bir Shopify Public Embedded App'tir. Shopify Admin içindeki arayüz ikinci bir AdsTable tasarım sistemi değildir. UI yalnız Shopify App Bridge ve ürün sahibi tarafından açıkça onaylanmış güncel App Home Polaris web component sürümü ile kurulur.
+
+**Onaylı runtime kararı — 30 Eylül 2026:** Development ortamı, Shopify'ın 24 Eylül 2026'da yayımladığı `polaris-2.0-rc.js` sürümünü kullanır. Amaç, 15 Eylül 2026'da dağıtıma başlayan yeni Shopify Admin görünümünü özel CSS veya component taklidi olmadan resmî Shopify runtime'ıyla izlemektir. Polaris 2 stable yayımlandığında geçiş ayrı bir doğrulama kapısıyla `polaris-2.0.js` adresine yapılır.
 
 Shopify iframe uygulamanın teknik taşıyıcısıdır; özel görünüm üretme izni değildir. Merchant, AdsTable'ı Shopify'dan kopuk bir web sitesi gibi görmemelidir.
 
@@ -40,6 +42,8 @@ Resmî dayanaklar:
 - https://shopify.dev/docs/api/app-home-ui-extension/latest/web-components/feedback-and-status-indicators/badge
 - https://shopify.dev/docs/api/app-home/latest/app-bridge-web-components
 - https://shopify.dev/docs/api/polaris/using-polaris-web-components
+- https://shopify.dev/docs/apps/build/app-home/polaris2
+- https://shopify.dev/docs/api/app-home/v2.0-rc/web-components/versioning
 
 Shopify'ın güncel resmî rehberi `s-clickable` bileşenini, button/link ile çözülemeyen özel durumlar için bir **escape hatch** olarak tanımlar. Bu nedenle standart bir eylemi button gibi göstermek için `s-clickable` kullanmak yasaktır.
 
@@ -98,4 +102,3 @@ Bu durum **kabul edilmiş tasarım değildir** ve R7-B6 görsel kabulü `FAIL / 
 ## 8. Değişiklik yönetimi
 
 Bu anayasa ancak açık kullanıcı/ürün kararı, Execution Plan kaydı ve executable contract/test güncellemesiyle değiştirilebilir. Bir task veya ajan kendi başına istisna üretemez.
-

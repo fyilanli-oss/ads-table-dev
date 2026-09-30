@@ -220,7 +220,7 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
         <s-button slot="secondary-actions" commandFor="${id}-reporting-modal" command="--hide">Cancel</s-button>
         <s-button id="${id}-reporting-save" slot="primary-action" variant="primary">Save reporting account</s-button>
       </s-modal>` : ""}
-    </s-section>`;
+    </div>`;
 }
 
 function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvailability = {}}) {
@@ -737,5 +737,4 @@ function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}
 }
 
 module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms, renderEmbeddedPlaceholder});
-
 

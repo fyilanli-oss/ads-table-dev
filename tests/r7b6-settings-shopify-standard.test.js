@@ -21,6 +21,11 @@ test("R7-B6 Settings uses Shopify-native sections and separated provider rows", 
   assert.match(html, /<s-heading>Google Ads<\/s-heading>/);
   assert.match(html, /<s-heading>Klaviyo<\/s-heading>/);
   assert.doesNotMatch(html, /advertising performance and spend|Email performance and estimated 30-day spend/);
+  assert.equal(
+    (html.match(/<s-section\b/g) || []).length,
+    (html.match(/<\/s-section>/g) || []).length,
+    "every Shopify section must close at the same hierarchy level",
+  );
 });
 
 test("R7-B6 provider actions use only official Shopify action and status semantics", () => {

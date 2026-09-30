@@ -44,7 +44,7 @@ test("embedded Settings renders immutable currency setup and only three active p
   assert.match(html, /disconnected period may not be recovered automatically/);
   assert.match(html, /\/api\/shopify\/providers\//);
   assert.match(html, /open\(body\.authorization_url, "_top"\)/);
-  assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
+  assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-2\.0-rc\.js/);
   assert.match(html, /<s-app-nav>/);
   assert.match(html, /<s-page heading="Settings" inlineSize="base">/);
   assert.match(html, /<s-heading>Platforms<\/s-heading>\s*<s-box id="provider-sections"[^>]+accessibilityLabel="Platforms">/);

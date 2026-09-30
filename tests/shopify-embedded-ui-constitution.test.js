@@ -52,6 +52,7 @@ test("standard controls cannot be replaced by raw HTML or custom visual CSS", ()
     /<select\b/i,
     /<form\b/i,
     /<dialog\b/i,
+    /<div\b/i,
     /<style\b/i,
     /class(?:Name)?\s*=/i,
   ]) {

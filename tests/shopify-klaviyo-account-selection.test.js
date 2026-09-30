@@ -244,7 +244,7 @@ test("OAuth returns to installed Shopify shop and rejects external redirect targ
 
 test("UI requires account choice then explicit cost save and prevents duplicate submits", async () => {
   const elements=new Map();
-  const element=()=>({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element=()=>({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-correct-open","klaviyo-spend-history-choice","klaviyo-spend-correct-value"]) elements.set(id,element());
   const requests=[];
   let finishSave;
@@ -256,10 +256,10 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(elements.get("klaviyo-cost-step").hidden,true);
+  assert.equal(elements.get("klaviyo-cost-step").display,"none");
   assert.equal(elements.get("klaviyo-choice").children[0].textContent,"<script>untrusted</script> (a)");
   elements.get("klaviyo-choose").events.click();
-  assert.equal(elements.get("klaviyo-cost-step").hidden,false);
+  assert.equal(elements.get("klaviyo-cost-step").display,"auto");
   elements.get("klaviyo-cost").value="0";
   const saving=elements.get("klaviyo-save").events.click();
   await elements.get("klaviyo-save").events.click();
@@ -269,14 +269,14 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   finishSave(); await saving;
   assert.match(elements.get("klaviyo-message").textContent,/Connected: Verified/);
   assert.equal(requests.at(-1).url,"/api/shopify/providers/klaviyo/spend-history");
-  assert.equal(elements.get("klaviyo-spend-controls").hidden,false);
-  assert.equal(elements.get("klaviyo-spend-correct-open").hidden,false);
+  assert.equal(elements.get("klaviyo-spend-controls").display,"auto");
+  assert.equal(elements.get("klaviyo-spend-correct-open").display,"auto");
   assert.equal(elements.get("klaviyo-spend-history-choice").children.length,1);
 });
 
 test("UI reads stored status on page load without requesting Klaviyo accounts", async () => {
   const elements=new Map();
-  const element=()=>({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element=()=>({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-correct-open"]) elements.set(id,element());
   const requests=[];
   const context={URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
@@ -285,19 +285,19 @@ test("UI reads stored status on page load without requesting Klaviyo accounts", 
     return response(200,{status:"connected",estimated_30_day_email_spend:"5.00",currency:"USD"});
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
-  for (let attempt = 0; attempt < 10 && elements.get("klaviyo-spend-correct-open").hidden !== true; attempt += 1) {
+  for (let attempt = 0; attempt < 10 && elements.get("klaviyo-spend-correct-open").display !== "none"; attempt += 1) {
     await new Promise(resolve=>setImmediate(resolve));
   }
   assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/status","/api/shopify/providers/klaviyo/spend-history"]);
-  assert.equal(elements.get("klaviyo-connect").hidden,true);
-  assert.equal(elements.get("klaviyo-spend-controls").hidden,false);
-  assert.equal(elements.get("klaviyo-spend-correct-open").hidden,true);
+  assert.equal(elements.get("klaviyo-connect").display,"none");
+  assert.equal(elements.get("klaviyo-spend-controls").display,"auto");
+  assert.equal(elements.get("klaviyo-spend-correct-open").display,"none");
   assert.equal(elements.get("klaviyo-message").textContent,"Connected · 5.00 USD / 30 days");
 });
 
 test("R5 operator parameter invokes only the no-refresh verification route", async () => {
   const elements = new Map();
-  const element = () => ({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm"]) elements.set(id,element());
   const requests = [];
   const context = {URLSearchParams,location:{search:"?r5_read_only_verify=1"},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
@@ -313,19 +313,19 @@ test("R5 operator parameter invokes only the no-refresh verification route", asy
 
 test("expired R5 verification explains clean reconnect requirement and keeps early Connect hidden", async () => {
   const elements = new Map();
-  const element = () => ({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm"]) elements.set(id,element());
   const context = {URLSearchParams,location:{search:"?r5_read_only_verify=1"},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async()=>response(409,{code:"KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED"})};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(elements.get("klaviyo-connect").hidden,true);
-  assert.equal(elements.get("klaviyo-reset-step").hidden,false);
+  assert.equal(elements.get("klaviyo-connect").display,"none");
+  assert.equal(elements.get("klaviyo-reset-step").display,"auto");
   assert.equal(elements.get("klaviyo-message").textContent,"The existing Klaviyo authorization has expired. A clean connection must be prepared before reconnecting.");
 });
 
 test("reset confirmation performs one session-bound POST and keeps reconnect closed", async () => {
   const elements = new Map();
-  const element = () => ({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm"]) elements.set(id,element());
   const requests = [];
   const context = {URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
@@ -335,7 +335,7 @@ test("reset confirmation performs one session-bound POST and keeps reconnect clo
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(elements.get("klaviyo-reset-step").hidden,false);
+  assert.equal(elements.get("klaviyo-reset-step").display,"auto");
   await elements.get("klaviyo-reset-confirm").events.click();
   assert.deepEqual(requests.map(item=>item.url),[
     "/api/shopify/providers/klaviyo/accounts/status",
@@ -343,8 +343,8 @@ test("reset confirmation performs one session-bound POST and keeps reconnect clo
   ]);
   assert.equal(requests[1].options.method,"POST");
   assert.deepEqual(JSON.parse(requests[1].options.body),{confirmation:"REVOKE_KLAVIYO_AND_START_FRESH"});
-  assert.equal(elements.get("klaviyo-connect").hidden,true);
-  assert.equal(elements.get("klaviyo-reset-step").hidden,true);
+  assert.equal(elements.get("klaviyo-connect").display,"none");
+  assert.equal(elements.get("klaviyo-reset-step").display,"none");
   assert.equal(elements.get("klaviyo-message").textContent,"Old Klaviyo connection removed. Clean connection setup is not open yet.");
 });
 

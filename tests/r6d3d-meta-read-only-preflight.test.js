@@ -120,8 +120,9 @@ test('Meta preflight route is Shopify-session-bound and ignores caller tenant fi
 
 test('Meta acceptance surface stays hidden outside its explicit operator parameter', () => {
   const html = renderEmbeddedPlatforms({ clientId: 'client', providerOAuthEnabled: true, providerAvailability: { meta: true } });
-  assert.match(html, /id="r6d3-meta-acceptance" hidden/);
+  assert.match(html, /id="r6d3-meta-acceptance" display="none"/);
   assert.match(html, /params\.get\("acceptance"\) === "r6d3-meta"/);
   assert.match(html, /\/api\/shopify\/providers\/meta\/runtime\/preflight/);
   assert.match(html, /Dataset V2 writes: 0/);
 });
+

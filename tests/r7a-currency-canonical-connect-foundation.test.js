@@ -77,7 +77,7 @@ test('embedded OAuth writes a pending row only to the canonical workspace connec
 test('Data Sources is currency-first, modal-first, and excludes parked providers from OAuth', () => {
   const html = renderEmbeddedPlatforms({clientId: 'client', providerOAuthEnabled: true});
   assert.match(html, /id="currency-setup"/);
-  assert.match(html, /id="provider-sections" hidden/);
+  assert.match(html, /id="provider-sections" display="none"/);
   assert.match(html, /commandFor="meta-connect-modal" command="--show"/);
   assert.match(html, /id="klaviyo-account-modal" heading="Finish Klaviyo setup"/);
   assert.match(html, /data-provider="meta"/);
@@ -85,3 +85,4 @@ test('Data Sources is currency-first, modal-first, and excludes parked providers
   assert.deepEqual(PROVIDERS, ['meta', 'google_ads', 'klaviyo']);
   assert.doesNotMatch(html, /<iframe/i);
 });
+

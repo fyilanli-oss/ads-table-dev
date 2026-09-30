@@ -10,7 +10,7 @@ test('R6-D2 acceptance control is hidden from the normal Data Sources experience
     providerOAuthEnabled: true,
     providerAvailability: { meta: true, google_ads: true, klaviyo: true },
   });
-  assert.match(html, /id="r6d2-klaviyo-acceptance" hidden/);
+  assert.match(html, /id="r6d2-klaviyo-acceptance" display="none"/);
   assert.match(html, /params\.get\("acceptance"\) === "r6d2-klaviyo"/);
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/preflight/);
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/metrics/);

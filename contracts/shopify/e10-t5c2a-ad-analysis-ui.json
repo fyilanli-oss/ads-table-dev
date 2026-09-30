@@ -7,42 +7,20 @@
     "google_performance_max": "asset_group"
   },
   "ranking": {
-    "metric_allowlist": [
-      "purchase",
-      "sales",
-      "revenue"
-    ],
+    "metric_allowlist": ["purchase", "sales", "revenue"],
     "default_metric": "sales",
     "normal_default_direction": "descending",
-    "normal_toggle_directions": [
-      "descending",
-      "ascending"
-    ],
+    "normal_toggle_directions": ["descending", "ascending"],
     "compare_default_key": "selected_metric_percent_change",
     "compare_default_direction": "descending",
-    "compare_toggle_directions": [
-      "descending",
-      "ascending"
-    ],
+    "compare_toggle_directions": ["descending", "ascending"],
     "zero_denominator_bucket": "new_or_not_comparable",
     "unsupported_bucket": "last",
     "total_row_ranked": false,
     "computed_by": "backend"
   },
-  "main_columns": [
-    "platform",
-    "analytical_leaf_name",
-    "creative",
-    "purchase",
-    "sales",
-    "spend",
-    "revenue",
-    "intent",
-    "performance"
-  ],
-  "removed_columns": [
-    "margin"
-  ],
+  "main_columns": ["platform", "analytical_leaf_name", "creative", "purchase", "sales", "spend", "revenue", "intent", "performance"],
+  "removed_columns": ["margin"],
   "detail_surfaces": {
     "intent": "single_modal",
     "performance": "single_modal",
@@ -57,28 +35,11 @@
     "requires_capability_package": "E10-T5-C2-B"
   },
   "shopify_component_map": {
-    "page": [
-      "s-page",
-      "s-section",
-      "s-grid",
-      "s-stack"
-    ],
-    "ranking_switch": [
-      "s-button-group"
-    ],
-    "table_first_choice": [
-      "s-table"
-    ],
-    "details": [
-      "s-button",
-      "s-modal"
-    ],
-    "status": [
-      "s-badge",
-      "s-banner",
-      "s-spinner",
-      "s-tooltip"
-    ]
+    "page": ["s-page", "s-section", "s-grid", "s-stack"],
+    "ranking_switch": ["s-button-group"],
+    "table_first_choice": ["s-table"],
+    "details": ["s-button", "s-modal"],
+    "status": ["s-badge", "s-banner", "s-spinner", "s-tooltip"]
   },
   "forbidden": [
     "creative_as_universal_canonical_leaf",
@@ -90,14 +51,5 @@
     "simultaneously_open_analysis_modals",
     "shopify_admin_shell_replica"
   ],
-  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json",
-  "governance_acceptance": {
-    "analyst_brief_before_code": true,
-    "official_component_mapping_before_code": true,
-    "custom_visual_css": false,
-    "desktop_real_shopify_admin": true,
-    "mobile_320px_real_shopify_admin": true,
-    "explicit_product_owner_acceptance": true,
-    "unverified_done": false
-  }
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
 }

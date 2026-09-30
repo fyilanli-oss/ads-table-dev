@@ -4,12 +4,7 @@
   "user_facing_name": "Attribution Differences",
   "surface": "separate_shopify_embedded_page",
   "context": {
-    "preserved": [
-      "completed_day_time_range",
-      "workspace_currency",
-      "platform",
-      "active_ad_account"
-    ],
+    "preserved": ["completed_day_time_range", "workspace_currency", "platform", "active_ad_account"],
     "comparison": false,
     "provider_grain": "active_provider_account_aggregate",
     "shopify_grain": "platform_attribution_aggregate",
@@ -35,10 +30,7 @@
     "action": "review"
   },
   "review_modal": {
-    "actions": [
-      "close",
-      "view_funnel_preserve_context"
-    ],
+    "actions": ["close", "view_funnel_preserve_context"],
     "disclosure": "difference_is_not_duplicate_proof_and_does_not_change_funnel_totals",
     "mutation": false
   },
@@ -82,25 +74,12 @@
     ],
     "provider_fact_overwrite": false,
     "future_adjustment": "separate_versioned_reversible_leaf_sidecar",
-    "forbidden_allocation": [
-      "largest_ad",
-      "proportional",
-      "user_selected_ad"
-    ]
+    "forbidden_allocation": ["largest_ad", "proportional", "user_selected_ad"]
   },
   "shopify_ui": {
     "official_components_only": true,
     "custom_control_framework": false,
     "exact_components_revalidated_in": "E10-T6-A"
   },
-  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json",
-  "governance_acceptance": {
-    "analyst_brief_before_code": true,
-    "official_component_mapping_before_code": true,
-    "custom_visual_css": false,
-    "desktop_real_shopify_admin": true,
-    "mobile_320px_real_shopify_admin": true,
-    "explicit_product_owner_acceptance": true,
-    "unverified_done": false
-  }
+  "governance_contract": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
 }

@@ -17,8 +17,8 @@ test('R6-D2 acceptance control is hidden from the normal Data Sources experience
   assert.match(html, /Confirm metric and continue/);
   assert.match(html, /Dataset V2 writes: 0/);
   const acceptanceMarkup = html.slice(
-    html.indexOf('<div id="r6d2-klaviyo-acceptance"'),
-    html.indexOf('<div id="currency-setup"'),
+    html.indexOf('<s-stack id="r6d2-klaviyo-acceptance"'),
+    html.indexOf('<s-stack id="currency-setup"'),
   );
   assert.doesNotMatch(acceptanceMarkup, /row\.identity|active_account_id|accessToken|account-1/);
 });
@@ -34,8 +34,8 @@ test('R6-D2 C6 controlled write stays inside the acceptance surface and is confi
   assert.match(html, /RUN_R6_D2_C6_KLAVIYO_WRITE/);
   assert.match(html, /Do not retry; review runtime evidence/);
   const acceptanceMarkup = html.slice(
-    html.indexOf('<div id="r6d2-klaviyo-acceptance"'),
-    html.indexOf('<div id="currency-setup"'),
+    html.indexOf('<s-stack id="r6d2-klaviyo-acceptance"'),
+    html.indexOf('<s-stack id="currency-setup"'),
   );
   assert.match(acceptanceMarkup, /may write real verified Klaviyo rows to Dataset V2/);
   assert.doesNotMatch(acceptanceMarkup, /row\.identity|active_account_id|accessToken|account-1/);

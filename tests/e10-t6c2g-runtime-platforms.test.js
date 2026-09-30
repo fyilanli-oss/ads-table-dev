@@ -19,19 +19,19 @@ test("embedded Settings renders immutable currency setup and only three active p
   assert.match(html, /request\("\/status"\)/);
   assert.match(html, /window\.shopify\.idToken/);
   assert.match(html, /<s-heading>Reporting Currency<\/s-heading>\s*<s-box[^>]+accessibilityLabel="Reporting Currency">/);
-  assert.match(html, /id="reporting-currency-summary" hidden/);
+  assert.match(html, /id="reporting-currency-summary" display="none"/);
   assert.match(html, /cannot be changed after confirmation/);
   assert.match(html, /id="review-reporting-currency"[^>]*>Review selection/);
   assert.match(html, /id="save-reporting-currency"[^>]*>Confirm reporting currency/);
   assert.match(html, /Removing the app does not delete data or reset this currency/);
-  assert.match(html, /currencySetup\.hidden = true;[\s\S]*providerSections\.hidden = true;[\s\S]*Open AdsTable from Shopify Admin/);
+  assert.match(html, /currencySetup\.display = "none";[\s\S]*providerSections\.display = "none";[\s\S]*Open AdsTable from Shopify Admin/);
   assert.match(html, /id="platforms-currency-modal" heading="Choose reporting currency" size="small-100"/);
   assert.match(html, /\/api\/shopify\/workspace\/reporting-currency/);
   assert.match(html, /<s-modal id="klaviyo-connect-modal" heading="Connect Klaviyo to AdsTable\?" size="small-100">/);
   assert.match(html, /<s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">/);
   assert.match(html, /commandFor="klaviyo-connect-modal" command="--show"/);
   for (const provider of ["meta", "google_ads", "klaviyo"]) {
-    assert.match(html, new RegExp(`id="${provider}-resume" hidden`));
+    assert.match(html, new RegExp(`id="${provider}-resume" display="none"`));
     assert.match(html, new RegExp(`<s-button variant="secondary" id="${provider}-resume-action">Resume setup<\\/s-button>`));
   }
   assert.match(html, /Facebook account that owns or can access the Meta ad accounts/);

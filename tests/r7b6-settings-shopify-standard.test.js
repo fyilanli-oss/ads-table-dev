@@ -28,12 +28,12 @@ test("R7-B6 provider actions use neutral, success and critical Shopify semantics
     providerAvailability: {meta: true, google_ads: true, klaviyo: true},
   });
 
-  assert.match(html, /<s-clickable[^>]*id="meta-connect-action"[^>]*background="subdued"[^>]*minBlockSize="32px"[^>]*commandFor="meta-connect-modal"/);
+  assert.match(html, /<s-clickable background="subdued"[^>]*minBlockSize="32px"[^>]*id="meta-connect-action"[^>]*commandFor="meta-connect-modal"/);
   assert.doesNotMatch(html, /id="meta-connect-action" variant="primary"/);
-  assert.match(html, /<s-clickable[^>]*id="meta-resume-action"[^>]*minBlockSize="32px"[^>]*>.*Resume setup.*<\/s-clickable>/);
+  assert.match(html, /<s-clickable background="subdued"[^>]*minBlockSize="32px"[^>]*id="meta-resume-action"[^>]*>.*Resume setup.*<\/s-clickable>/);
   assert.match(html, /<s-badge tone="success" size="large-100">Connected<\/s-badge>/);
   assert.match(html, /<s-clickable[^>]*style="background:#FDE8E7"[^>]*commandFor="meta-disconnect-modal"/);
-  assert.match(html, /<s-clickable[^>]*id="meta-reporting-action"[^>]*background="subdued"[^>]*>.*Reporting account.*<\/s-clickable>/);
+  assert.match(html, /<s-clickable background="subdued"[^>]*id="meta-reporting-action"[^>]*>.*Reporting account.*<\/s-clickable>/);
   assert.match(html, />Update spend<\/s-button>/);
   assert.match(html, />Change value<\/s-button>/);
   assert.doesNotMatch(html, />Correct value<\/s-button>/);

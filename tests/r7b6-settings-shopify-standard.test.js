@@ -32,7 +32,8 @@ test("R7-B6 provider actions use neutral, success and critical Shopify semantics
   assert.doesNotMatch(html, /id="meta-connect-action" variant="primary"/);
   assert.match(html, /<s-clickable background="subdued"[^>]*minBlockSize="32px"[^>]*id="meta-resume-action"[^>]*>.*Resume setup.*<\/s-clickable>/);
   assert.match(html, /<s-badge tone="success" size="large-100">Connected<\/s-badge>/);
-  assert.match(html, /<s-clickable[^>]*style="background:#FDE8E7"[^>]*commandFor="meta-disconnect-modal"/);
+  assert.match(html, /style="display:inline-flex;inline-size:auto" id="meta-reporting-action"/);
+  assert.match(html, /<s-clickable[^>]*style="display:inline-flex;inline-size:auto;background:#FDE8E7"[^>]*commandFor="meta-disconnect-modal"/);
   assert.match(html, /<s-clickable background="subdued"[^>]*id="meta-reporting-action"[^>]*>.*Reporting account.*<\/s-clickable>/);
   assert.match(html, />Update spend<\/s-text><\/s-clickable>/);
   assert.match(html, />Change value<\/s-text><\/s-clickable>/);

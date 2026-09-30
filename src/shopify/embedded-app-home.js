@@ -243,7 +243,6 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
 <body>
   ${appNavigation()}
   <s-page heading="Settings">
-    <s-link slot="breadcrumb-actions" href="/shopify/app">Dashboard</s-link>
     <s-banner id="status" heading="Settings" tone="info" hidden></s-banner>
     <div id="r6d4-google-acceptance" hidden>
       <s-section heading="Google Ads acceptance check">
@@ -312,8 +311,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         </s-stack>
       </s-section>
     </div>
-    <s-heading>Reporting Currency</s-heading>
-    <s-section>
+    <s-stack gap="small">
+      <s-heading>Reporting Currency</s-heading>
+      <s-section>
       <div id="reporting-currency-summary" hidden>
         <s-stack gap="tight">
           <s-paragraph id="reporting-currency-value"></s-paragraph>
@@ -326,7 +326,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
         </s-stack>
       </div>
-    </s-section>
+      </s-section>
+    </s-stack>
     <s-modal id="platforms-currency-modal" heading="Choose reporting currency" size="small-100">
       <div id="currency-selection-step">
         <s-stack gap="base">
@@ -348,10 +349,12 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
       <s-button slot="secondary-actions" commandFor="platforms-currency-modal" command="--hide">Cancel</s-button>
     </s-modal>
-    <s-heading>Platforms</s-heading>
-    <s-section>
-      <div id="provider-sections" hidden><s-stack gap="base">${sections}</s-stack></div>
-    </s-section>
+    <s-stack gap="small">
+      <s-heading>Platforms</s-heading>
+      <s-section>
+        <div id="provider-sections" hidden><s-stack gap="base">${sections}</s-stack></div>
+      </s-section>
+    </s-stack>
   </s-page>
   <script>
     (() => {

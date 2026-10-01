@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
-const {createKlaviyoAccountSelection, planCost} = require("../src/shopify/klaviyo-account-selection");
+const {createKlaviyoAccountSelection, planCost, businessDate} = require("../src/shopify/klaviyo-account-selection");
 const {createWorkspaceProviderConnectionStore} = require("../src/shopify/workspace-provider-connection-store");
 const {registerShopifyKlaviyoAccountRoutes} = require("../src/routes/shopify-klaviyo-account-routes");
 const {createEmbeddedOAuthReturn} = require("../src/shopify/embedded-oauth-return");
@@ -122,6 +122,60 @@ test("expired access token refreshes once, persists encrypted store update, and 
   assert.equal(requests, 3);
   assert.equal(calls[0].refreshToken, "new-refresh");
   assert.equal(calls[1].version, "version-2");
+});
+
+test("connected Update spend uses canonical token lifecycle before persisting the new period", async () => {
+  const connection = {
+    status: "connected",
+    active_account_id: "account-a",
+    account_currency: "USD",
+    accessToken: "expired-access",
+    refreshToken: "secret-refresh",
+    updated_at: "version-2",
+  };
+  const writes = [];
+  let lifecycleCalls = 0;
+  let providerCalls = 0;
+  const store = {
+    readKlaviyo: async auth => {
+      assert.deepEqual(auth, authority);
+      return connection;
+    },
+    updateKlaviyoSpend: async input => writes.push(input),
+    refreshKlaviyo: async () => {
+      throw new Error("pending-account refresh must not be used for a connected account");
+    },
+  };
+  const tokenLifecycle = {
+    run: async ({authority: inputAuthority, operation}) => {
+      lifecycleCalls++;
+      assert.deepEqual(inputAuthority, authority);
+      return {
+        value: await operation({accessToken: "new-access"}),
+        connection: {version: "canonical-version-3"},
+      };
+    },
+  };
+  const selection = createKlaviyoAccountSelection({
+    store,
+    tokenLifecycle,
+    fetchImpl: async (url, options) => {
+      providerCalls++;
+      assert.equal(url, "https://a.klaviyo.com/api/accounts/");
+      assert.equal(options.headers.Authorization, "Bearer new-access");
+      return response(200, payload);
+    },
+  });
+
+  const result = await selection.updateSpend(authority, {estimated_30_day_email_spend: "37"});
+
+  assert.equal(lifecycleCalls, 1);
+  assert.equal(providerCalls, 1);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].amount, "37.00");
+  assert.equal(writes[0].effectiveFrom, businessDate("UTC"));
+  assert.equal(result.estimated_30_day_email_spend, "37.00");
+  assert.equal(result.effective_from, businessDate("UTC"));
 });
 
 test("provider 401 and 429 produce recoverable errors without retry loops", async () => {

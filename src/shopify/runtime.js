@@ -181,7 +181,11 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       registerShopifyKlaviyoAccountRoutes(app, {
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createKlaviyoAccountSelection({
-        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
+        store: connectionStore,
+        fetchImpl,
+        clientId: env.KLAVIYO_CLIENT_ID,
+        clientSecret: env.KLAVIYO_CLIENT_SECRET,
+        tokenLifecycle,
       }),
       disconnect: createKlaviyoDisconnect({
         store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,

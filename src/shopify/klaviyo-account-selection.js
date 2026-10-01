@@ -28,32 +28,50 @@ function businessDate(timeZone, instant = new Date()) {
   }
 }
 
-function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clientSecret}) {
+function createKlaviyoAccountSelection({store, fetchImpl = fetch, clientId, clientSecret, tokenLifecycle = null}) {
   async function accounts(authority, {allowRefresh = true} = {}) {
     let connection = await store.readKlaviyo(authority);
     if (!connection || connection.status === "revoked") return {connection: null, accounts: []};
-    const getAccounts = () => fetchImpl("https://a.klaviyo.com/api/accounts/", {
-      headers: {Authorization: `Bearer ${connection.accessToken}`, accept: "application/vnd.api+json", revision: "2026-07-15"},
+    const getAccounts = accessToken => fetchImpl("https://a.klaviyo.com/api/accounts/", {
+      headers: {Authorization: `Bearer ${accessToken}`, accept: "application/vnd.api+json", revision: "2026-07-15"},
       signal: AbortSignal.timeout(15000),
       redirect: "error",
     });
-    let response = await getAccounts();
-    if (response.status === 401 && !allowRefresh) throw failure("KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", 409);
-    if (response.status === 401 && connection.refreshToken && clientId && clientSecret) {
-      const refreshed = await fetchImpl("https://a.klaviyo.com/oauth/token", {
-        method: "POST", redirect: "error", signal: AbortSignal.timeout(15000),
-        headers: {Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded"},
-        body: new URLSearchParams({grant_type: "refresh_token", refresh_token: connection.refreshToken}).toString(),
+    let response;
+    if (allowRefresh && connection.status === "connected" && tokenLifecycle) {
+      const runtime = await tokenLifecycle.run({
+        authority,
+        operation: async runtimeConnection => {
+          const providerResponse = await getAccounts(runtimeConnection.accessToken);
+          if (providerResponse.status === 401 || providerResponse.status === 403) {
+            throw failure("KLAVIYO_ACCESS_TOKEN_INVALID", 401);
+          }
+          return providerResponse;
+        },
       });
-      if (refreshed.status === 400 || refreshed.status === 401) throw failure("KLAVIYO_REAUTHORIZE", 409);
-      if (!refreshed.ok) throw failure("KLAVIYO_UNAVAILABLE");
-      const tokens = await refreshed.json();
-      if (typeof tokens.access_token !== "string" || !tokens.access_token) throw failure("KLAVIYO_UNAVAILABLE");
-      await store.refreshKlaviyo({authority, version: connection.updated_at, accessToken: tokens.access_token,
-        refreshToken: typeof tokens.refresh_token === "string" && tokens.refresh_token ? tokens.refresh_token : connection.refreshToken});
+      response = runtime.value;
       connection = await store.readKlaviyo(authority);
-      if (!connection || connection.status === "revoked") throw failure("KLAVIYO_REAUTHORIZE", 409);
-      response = await getAccounts();
+      if (!connection || connection.status !== "connected") throw failure("CONNECTION_CHANGED", 409);
+    } else {
+      response = await getAccounts(connection.accessToken);
+      if (response.status === 401 && !allowRefresh) throw failure("KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED", 409);
+      if (response.status === 401 && connection.status === "pending_account_selection" &&
+        connection.refreshToken && clientId && clientSecret) {
+        const refreshed = await fetchImpl("https://a.klaviyo.com/oauth/token", {
+          method: "POST", redirect: "error", signal: AbortSignal.timeout(15000),
+          headers: {Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded"},
+          body: new URLSearchParams({grant_type: "refresh_token", refresh_token: connection.refreshToken}).toString(),
+        });
+        if (refreshed.status === 400 || refreshed.status === 401) throw failure("KLAVIYO_REAUTHORIZE", 409);
+        if (!refreshed.ok) throw failure("KLAVIYO_UNAVAILABLE");
+        const tokens = await refreshed.json();
+        if (typeof tokens.access_token !== "string" || !tokens.access_token) throw failure("KLAVIYO_UNAVAILABLE");
+        await store.refreshKlaviyo({authority, version: connection.updated_at, accessToken: tokens.access_token,
+          refreshToken: typeof tokens.refresh_token === "string" && tokens.refresh_token ? tokens.refresh_token : connection.refreshToken});
+        connection = await store.readKlaviyo(authority);
+        if (!connection || connection.status === "revoked") throw failure("KLAVIYO_REAUTHORIZE", 409);
+        response = await getAccounts(connection.accessToken);
+      }
     }
     if (response.status === 401 || response.status === 403) throw failure("KLAVIYO_REAUTHORIZE", 409);
     if (!response.ok) throw failure("KLAVIYO_UNAVAILABLE");

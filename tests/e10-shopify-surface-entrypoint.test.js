@@ -25,7 +25,7 @@ test("dedicated Shopify entrypoint renders the native App Home without booting t
   const res = response();
   withShopifyApiKey("test-key", () => handler({method: "GET", url: "/shopify/app"}, res));
   assert.equal(res.statusCode, 200);
-  assert.equal(res.headers.get("x-adstable-release"), "r7b6-settings-standard-v2");
+  assert.equal(res.headers.get("x-adstable-release"), "r7b6-settings-standard-v3");
   assert.equal(res.headers.get("surrogate-control"), "no-store");
   assert.match(res.body, /<s-page heading="Dashboard">/);
   assert.doesNotMatch(res.body, /<iframe|<style/i);

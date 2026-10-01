@@ -55,7 +55,7 @@ test("embedded Settings renders immutable currency setup and only three active p
 
 test("embedded Platforms keeps Connect actions disabled until runtime activation", () => {
   const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: false});
-  assert.equal((html.match(/ disabled/g) || []).length, 3);
+  assert.equal((html.match(/id="(?:meta|google_ads|klaviyo)-connect-action"[^>]* disabled/g) || []).length, 3);
   assert.match(html, /Connection setup unavailable/);
   assert.doesNotMatch(html, /Checking connection status/);
 });

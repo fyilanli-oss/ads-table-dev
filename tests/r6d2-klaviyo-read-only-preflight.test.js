@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { closedProviderDate, createKlaviyoReadOnlyPreflight } = require('../src/providers/klaviyo/read-only-preflight');
+const { closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight } = require('../src/providers/klaviyo/read-only-preflight');
 const { registerShopifyKlaviyoAccountRoutes } = require('../src/routes/shopify-klaviyo-account-routes');
 
 const WORKSPACE = '11111111-1111-4111-8111-111111111111';
@@ -45,6 +45,15 @@ test('R6-D2 chooses a provider date closed across supported timezones', () => {
   assert.equal(closedProviderDate(new Date('2026-09-25T00:01:00Z')), '2026-09-23');
 });
 
+test('R6-D2 accepts only valid closed provider dates inside the bounded acceptance window', () => {
+  const now = new Date('2026-09-25T12:00:00Z');
+  assert.equal(resolveProviderDate(null, now), '2026-09-23');
+  assert.equal(resolveProviderDate('2026-09-22', now), '2026-09-22');
+  assert.throws(() => resolveProviderDate('2026-09-24', now), error => error.code === 'KLAVIYO_PROVIDER_DATE_NOT_CLOSED');
+  assert.throws(() => resolveProviderDate('2026-02-30', now), error => error.code === 'KLAVIYO_PROVIDER_DATE_INVALID');
+  assert.throws(() => resolveProviderDate('2026-08-01', now), error => error.code === 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE');
+});
+
 test('R6-D2 preflight fails closed when the canonical metric binding is absent', async () => {
   const missing = createKlaviyoReadOnlyPreflight({
     connectionStore: { resolveConnected: async () => ({ ...connection, conversionMetric: null, journeyMetrics: { ...connection.journeyMetrics, purchase: null } }) },
@@ -60,7 +69,7 @@ test('R6-D2 read-only preflight returns aggregate evidence and never returns pro
   const result = await preflight().execute(authority);
   assert.deepEqual(result, {
     status: 'PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT',
-    provider_result_status: 'empty', selected_account_count: 1, row_count: 0, empty_provider_result: true,
+    provider_result_status: 'empty', selected_account_count: 1, row_count: 0, campaign_row_count: 0, flow_row_count: 0, empty_provider_result: true,
     account_api_verified: true, campaign_reporting_verified: true, flow_reporting_verified: true, time_fx_verified: true,
     dataset_v2_write: false, production_activation: false, provider_date: '2026-09-23', currency_version: 2,
   });
@@ -78,18 +87,18 @@ test('R6-D2 read-only preflight redacts provider failures', async () => {
   });
 });
 
-test('R6-D2 route requires Shopify authority and ignores caller tenant/date fields', async () => {
+test('R6-D2 route requires Shopify authority and forwards only the validated provider date candidate', async () => {
   const routes = {};
   const app = { get() {}, post: (path, handler) => { routes[path] = handler; } };
   let receivedAuthority;
   registerShopifyKlaviyoAccountRoutes(app, {
     authenticateEmbedded: async ({ session_token }) => { assert.equal(session_token, 'session'); return authority; },
     selection: {},
-    preflight: { execute: async input => { receivedAuthority = input; return { status: 'PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT' }; } },
+    preflight: { execute: async (input, providerDate) => { receivedAuthority = { input, providerDate }; return { status: 'PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT' }; } },
   });
   const res = { set() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return body; } };
   await routes['/api/shopify/providers/klaviyo/runtime/preflight']({ get: () => 'Bearer session', body: { workspace_id: 'attacker', provider_date: '2099-01-01' } }, res);
-  assert.deepEqual(receivedAuthority, authority);
+  assert.deepEqual(receivedAuthority, { input: authority, providerDate: '2099-01-01' });
   assert.equal(res.code, 200);
 });
 
@@ -114,15 +123,15 @@ test('R6-D2 metric discovery and selection routes remain Shopify-session-bound',
   ]);
 });
 
-test('R6-D2 C6 controlled Dataset acceptance route is session-bound and forwards only confirmation', async () => {
+test('R6-D2 C6 controlled Dataset acceptance route is session-bound and forwards confirmation plus provider date', async () => {
   const routes = {};
   const app = { get() {}, post: (path, handler) => { routes[path] = handler; } };
   let received;
   registerShopifyKlaviyoAccountRoutes(app, {
     authenticateEmbedded: async ({ session_token }) => { assert.equal(session_token, 'session'); return authority; },
     selection: {},
-    datasetAcceptance: { execute: async (input, confirmation) => {
-      received = { input, confirmation };
+    datasetAcceptance: { execute: async (input, confirmation, providerDate) => {
+      received = { input, confirmation, providerDate };
       return { status: 'PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE', attempted: 0, persisted: 0 };
     } },
   });
@@ -131,7 +140,7 @@ test('R6-D2 C6 controlled Dataset acceptance route is session-bound and forwards
     get: () => 'Bearer session',
     body: { confirmation: 'RUN_R6_D2_C6_KLAVIYO_WRITE', workspace_id: 'attacker', provider_date: '2099-01-01' },
   }, res);
-  assert.deepEqual(received, { input: authority, confirmation: 'RUN_R6_D2_C6_KLAVIYO_WRITE' });
+  assert.deepEqual(received, { input: authority, confirmation: 'RUN_R6_D2_C6_KLAVIYO_WRITE', providerDate: '2099-01-01' });
   assert.equal(res.code, 200);
 });
 

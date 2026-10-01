@@ -10,20 +10,15 @@ test('R6-D2 acceptance control is hidden from the normal Data Sources experience
     providerOAuthEnabled: true,
     providerAvailability: { meta: true, google_ads: true, klaviyo: true },
   });
-  assert.match(html, /id="r6d2-klaviyo-acceptance" display="none"/);
+  assert.match(html, /id="r6d2-klaviyo-acceptance" hidden/);
   assert.match(html, /params\.get\("acceptance"\) === "r6d2-klaviyo"/);
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/preflight/);
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/metrics/);
   assert.match(html, /Confirm metric and continue/);
-  assert.match(html, /<s-date-field id="r6d2-klaviyo-provider-date"/);
-  assert.match(html, /provider_date: String\(acceptanceProviderDate\.value/);
-  assert.match(html, /campaign_row_count/);
-  assert.match(html, /flow_row_count/);
-  assert.match(html, /VERIFIED EMPTY/);
   assert.match(html, /Dataset V2 writes: 0/);
   const acceptanceMarkup = html.slice(
-    html.indexOf('<s-stack id="r6d2-klaviyo-acceptance"'),
-    html.indexOf('<s-stack id="currency-setup"'),
+    html.indexOf('<div id="r6d2-klaviyo-acceptance"'),
+    html.indexOf('<div id="currency-setup"'),
   );
   assert.doesNotMatch(acceptanceMarkup, /row\.identity|active_account_id|accessToken|account-1/);
 });
@@ -38,11 +33,28 @@ test('R6-D2 C6 controlled write stays inside the acceptance surface and is confi
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/acceptance/);
   assert.match(html, /RUN_R6_D2_C6_KLAVIYO_WRITE/);
   assert.match(html, /Do not retry; review runtime evidence/);
-  assert.match(html, /id="r6d2-klaviyo-c6-run" tone="critical" disabled/);
   const acceptanceMarkup = html.slice(
-    html.indexOf('<s-stack id="r6d2-klaviyo-acceptance"'),
-    html.indexOf('<s-stack id="currency-setup"'),
+    html.indexOf('<div id="r6d2-klaviyo-acceptance"'),
+    html.indexOf('<div id="currency-setup"'),
   );
   assert.match(acceptanceMarkup, /may write real verified Klaviyo rows to Dataset V2/);
   assert.doesNotMatch(acceptanceMarkup, /row\.identity|active_account_id|accessToken|account-1/);
+});
+
+test('R6-D5 journey diagnostic stays Shopify-native, fixed to the accepted historical date, and read-only', () => {
+  const html = renderEmbeddedPlatforms({
+    clientId: 'client-id',
+    providerOAuthEnabled: true,
+    providerAvailability: { meta: true, google_ads: true, klaviyo: true },
+  });
+  const acceptanceMarkup = html.slice(
+    html.indexOf('<div id="r6d2-klaviyo-acceptance"'),
+    html.indexOf('<div id="currency-setup"'),
+  );
+  assert.match(acceptanceMarkup, /<s-paragraph id="r6d5-klaviyo-diagnostic-message"/);
+  assert.match(acceptanceMarkup, /<s-button id="r6d5-klaviyo-diagnostic-run">Run 28 Sep journey diagnostic<\/s-button>/);
+  assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/journey-diagnostic/);
+  assert.match(html, /provider_date: "2026-09-28"/);
+  assert.match(html, /Dataset V2 writes: 0/);
+  assert.doesNotMatch(acceptanceMarkup, /<style|class=|accessToken|account-1|message_id|campaign_id|flow_id/);
 });

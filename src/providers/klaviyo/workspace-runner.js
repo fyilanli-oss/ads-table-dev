@@ -8,6 +8,12 @@ function required(value, field) {
   return value.trim();
 }
 
+function positiveCost(value) {
+  const cost = Number(value);
+  if (!Number.isFinite(cost) || cost < 0) throw new Error('KLAVIYO_MONTHLY_PLAN_COST_REQUIRED');
+  return cost;
+}
+
 function onlySelectedAccount(connection) {
   const accounts = Array.isArray(connection?.selectedAccounts) ? connection.selectedAccounts : [];
   if (accounts.length !== 1) throw new Error('KLAVIYO_SINGLE_SELECTED_ACCOUNT_REQUIRED');
@@ -64,6 +70,7 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
         providerDate: required(context?.request?.provider_date, 'request.provider_date'),
         reportingCurrency: normalizeCurrencyCode(context.reportingCurrency, 'reportingCurrency'),
         accessToken: required(connection.accessToken, 'connection.accessToken'),
+        monthlyPlanCost: positiveCost(connection.monthlyPlanCost),
       });
     });
     const account = await asyncStage('PROVIDER_ACCOUNT', () => providerClient.fetchAccount({
@@ -86,6 +93,7 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
       providerDate: runtime.providerDate,
       conversionMetricId: runtime.journeyMetricIds.purchase,
       journeyMetricIds: runtime.journeyMetricIds,
+      includeDiagnostics: context?.request?.include_diagnostics === true,
     }));
     syncStage('PROVIDER_RESULT_VALIDATION', () => {
       if (!providerResult || !Array.isArray(providerResult.rows)) throw new Error('KLAVIYO_PROVIDER_RESULT_INVALID');
@@ -95,7 +103,10 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
     const rows = syncStage('ROW_NORMALIZATION', () => {
       const keys = new Set();
       return providerResult.rows.map(input => {
-        const normalized = normalizeKlaviyoTimeFxMessage(input, {
+        const spendAllocation = input.channel === 'email'
+          ? { ...(input.spend_allocation || {}), monthlyPlanCost: runtime.monthlyPlanCost }
+          : { ...(input.spend_allocation || {}) };
+        const normalized = normalizeKlaviyoTimeFxMessage({ ...input, spend_allocation: spendAllocation }, {
           workspaceId: runtime.workspaceId,
           accountId: runtime.selected.id,
           account: { id: runtime.selected.id, currency: verifiedAccount.sourceCurrency, timezone: verifiedAccount.timezone },
@@ -111,11 +122,13 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
         return normalized.row;
       });
     });
-    return Object.freeze({ rows, checked_account_ids: [runtime.selected.id], provider_result_status: rows.length === 0 ? 'empty' : 'non_empty' });
+    return Object.freeze({
+      rows,
+      checked_account_ids: [runtime.selected.id],
+      provider_result_status: rows.length === 0 ? 'empty' : 'non_empty',
+      ...(providerResult.diagnostics ? { provider_diagnostics: providerResult.diagnostics } : {}),
+    });
   };
 }
 
 module.exports = Object.freeze({ createKlaviyoWorkspaceRunner });
-
-
-

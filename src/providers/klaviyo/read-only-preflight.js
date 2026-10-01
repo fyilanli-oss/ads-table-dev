@@ -13,34 +13,20 @@ function closedProviderDate(now) {
   return new Date(instant.getTime() - (48 * 60 * 60 * 1000)).toISOString().slice(0, 10);
 }
 
-function resolveProviderDate(requestedProviderDate, now) {
-  const latestClosedDate = closedProviderDate(now);
-  if (requestedProviderDate === undefined || requestedProviderDate === null || requestedProviderDate === '') {
-    return latestClosedDate;
+function diagnosticProviderDate(value, now) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw codedError('KLAVIYO_DIAGNOSTIC_DATE_INVALID', 400);
   }
-  if (typeof requestedProviderDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(requestedProviderDate)) {
-    throw codedError('KLAVIYO_PROVIDER_DATE_INVALID', 409);
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw codedError('KLAVIYO_DIAGNOSTIC_DATE_INVALID', 400);
   }
-  const parsed = new Date(`${requestedProviderDate}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== requestedProviderDate) {
-    throw codedError('KLAVIYO_PROVIDER_DATE_INVALID', 409);
-  }
-  if (requestedProviderDate > latestClosedDate) {
-    throw codedError('KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 409);
-  }
-  const earliest = new Date(`${latestClosedDate}T00:00:00.000Z`);
-  earliest.setUTCDate(earliest.getUTCDate() - 31);
-  if (requestedProviderDate < earliest.toISOString().slice(0, 10)) {
-    throw codedError('KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE', 409);
-  }
-  return requestedProviderDate;
+  if (value > closedProviderDate(now)) throw codedError('KLAVIYO_DIAGNOSTIC_DATE_NOT_CLOSED', 409);
+  return value;
 }
 
 function safeFailure(error) {
   const reason = String(error?.code || error?.message || '');
-  if (['KLAVIYO_PROVIDER_DATE_INVALID', 'KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE'].includes(reason)) {
-    return codedError(reason, 409);
-  }
   if (reason === 'KLAVIYO_REAUTHORIZE') return codedError('KLAVIYO_REAUTHORIZE', 409);
   if (reason === 'CANONICAL_PROVIDER_CONNECTION_REQUIRED' || reason === 'KLAVIYO_CANONICAL_CONNECTION_REQUIRED') {
     return codedError('KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED', 409);
@@ -70,39 +56,37 @@ function createKlaviyoReadOnlyPreflight({
   }
   const runner = createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate });
 
-  async function execute(authority, requestedProviderDate = null) {
+  async function executeForDate(authority, providerDate, includeDiagnostics) {
     try {
       let connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       const currency = await settingsStore.resolveReportingCurrency(authority);
-      const providerDate = resolveProviderDate(requestedProviderDate, now());
       const operation = activeConnection => runner(Object.freeze({
           authority,
           connection: activeConnection,
           reportingCurrency: currency.reportingCurrency,
           currencyVersion: currency.currencyVersion,
-          request: Object.freeze({ provider_date: providerDate }),
+          request: Object.freeze({ provider_date: providerDate, include_diagnostics: includeDiagnostics }),
         }));
       const execution = tokenLifecycle
         ? await tokenLifecycle.run({ authority, connection, operation })
         : { value: await operation(connection), connection };
       connection = execution.connection;
       const result = execution.value;
+      if (includeDiagnostics && (!result.provider_diagnostics || result.provider_diagnostics.dataset_v2_write !== false)) {
+        throw new Error('KLAVIYO_DIAGNOSTIC_RESULT_INVALID');
+      }
       const verified = verifyProviderResult({
         provider: 'klaviyo',
         connection,
         reportingCurrency: currency.reportingCurrency,
         result,
       });
-      const campaignRowCount = verified.rows.filter(row => row.entity.root_entity_type === 'campaign').length;
-      const flowRowCount = verified.rows.filter(row => row.entity.root_entity_type === 'flow').length;
       return Object.freeze({
-        status: 'PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT',
+        status: includeDiagnostics ? 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC' : 'PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT',
         provider_result_status: verified.providerResultStatus,
         selected_account_count: verified.selectedAccountCount,
         row_count: verified.rows.length,
-        campaign_row_count: campaignRowCount,
-        flow_row_count: flowRowCount,
         empty_provider_result: verified.providerResultStatus === 'empty',
         account_api_verified: true,
         campaign_reporting_verified: true,
@@ -112,16 +96,22 @@ function createKlaviyoReadOnlyPreflight({
         production_activation: false,
         provider_date: providerDate,
         currency_version: currency.currencyVersion,
+        ...(includeDiagnostics ? { journey_diagnostics: result.provider_diagnostics } : {}),
       });
     } catch (error) {
       throw safeFailure(error);
     }
   }
 
-  return Object.freeze({ execute });
+  async function execute(authority) {
+    return executeForDate(authority, closedProviderDate(now()), false);
+  }
+
+  async function executeDiagnostic(authority, providerDateInput) {
+    return executeForDate(authority, diagnosticProviderDate(providerDateInput, now()), true);
+  }
+
+  return Object.freeze({ execute, executeDiagnostic });
 }
 
-module.exports = Object.freeze({ closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight });
-
-
-
+module.exports = Object.freeze({ closedProviderDate, diagnosticProviderDate, createKlaviyoReadOnlyPreflight });

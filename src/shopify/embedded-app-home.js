@@ -299,6 +299,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-paragraph>This separate read-only check inventories Flow status and known synthetic Event categories. Events remain diagnostic evidence and are not written as Campaign or Flow performance rows.</s-paragraph>
           <s-paragraph id="r6d5-klaviyo-flow-event-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d5-klaviyo-flow-event-run" variant="primary">Run Flow/Event read-only inventory</s-button>
+          <s-paragraph>This fixed-date read-only diagnostic compares Purchase, Added to Cart and Checkout report keys for Campaign and Flow on 2026-09-28. It returns aggregate counts only and does not write Dataset V2.</s-paragraph>
+          <s-paragraph id="r6d5-klaviyo-journey-diagnostic-message" aria-live="polite"></s-paragraph>
+          <s-button id="r6d5-klaviyo-journey-diagnostic-run" variant="primary">Run 2026-09-28 journey diagnostic</s-button>
         </s-stack>
       </s-section>
     </s-stack>
@@ -381,6 +384,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const historicalInventoryMessage = document.getElementById("r6d5-klaviyo-historical-message");
       const flowEventInventoryButton = document.getElementById("r6d5-klaviyo-flow-event-run");
       const flowEventInventoryMessage = document.getElementById("r6d5-klaviyo-flow-event-message");
+      const journeyDiagnosticButton = document.getElementById("r6d5-klaviyo-journey-diagnostic-run");
+      const journeyDiagnosticMessage = document.getElementById("r6d5-klaviyo-journey-diagnostic-message");
       const params = new URLSearchParams(location.search);
       const sessionRequest = async (path, options = {}) => {
         if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
@@ -487,6 +492,30 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             flowEventInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_FLOW_EVENT_INVENTORY_FAILED";
             flowEventInventoryButton.disabled = false;
           } finally { flowEventInventoryButton.loading = false; }
+        });
+        journeyDiagnosticButton.addEventListener("click", async () => {
+          journeyDiagnosticButton.disabled = true;
+          journeyDiagnosticButton.loading = true;
+          journeyDiagnosticMessage.textContent = "Comparing Campaign and Flow journey report keys for 2026-09-28 without writing Dataset V2…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/journey-diagnostic", {method: "POST"});
+            if (result.status !== "PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC" || result.provider_date !== "2026-09-28") {
+              throw new Error("KLAVIYO_JOURNEY_DIAGNOSTIC_FAILED");
+            }
+            const diagnostics = result.journey_diagnostics;
+            const stage = (value, branch) => value[branch].row_count + " row(s), conversions " +
+              value[branch].conversion_count + ", value " + value[branch].conversion_value +
+              ", matched " + value[branch].matched_key_count + ", unmatched " + value[branch].unmatched_key_count;
+            const summary = (label, branch) => label + ": Purchase " + stage(diagnostics.purchase, branch) +
+              "; Added to Cart " + stage(diagnostics.add_to_cart, branch) +
+              "; Checkout " + stage(diagnostics.checkout, branch) + ".";
+            journeyDiagnosticMessage.textContent = "PASS — 2026-09-28. " + summary("Campaign", "campaign") +
+              " " + summary("Flow", "flow") + " Key drift observed: " +
+              (diagnostics.journey_key_drift ? "yes" : "no") + ". Dataset V2 writes: 0.";
+          } catch (error) {
+            journeyDiagnosticMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_JOURNEY_DIAGNOSTIC_FAILED";
+            journeyDiagnosticButton.disabled = false;
+          } finally { journeyDiagnosticButton.loading = false; }
         });
       }
       if (params.get("acceptance") === "r6d2-klaviyo") {

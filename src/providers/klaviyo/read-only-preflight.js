@@ -3,6 +3,8 @@
 const { verifyProviderResult } = require('../workspace-provider-runtime');
 const { createKlaviyoWorkspaceRunner } = require('./workspace-runner');
 
+const JOURNEY_DIAGNOSTIC_DATE = '2026-09-28';
+
 function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
 }
@@ -52,6 +54,24 @@ function safeFailure(error) {
     return codedError('KLAVIYO_PREFLIGHT_METRIC_REQUIRED', 409);
   }
   return codedError('KLAVIYO_PREFLIGHT_FAILED', 503);
+}
+
+function safeDiagnosticFailure(error) {
+  const reason = String(error?.code || error?.message || '');
+  if (['KLAVIYO_PROVIDER_DATE_INVALID', 'KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE'].includes(reason)) {
+    return codedError(reason, 409);
+  }
+  if (reason === 'KLAVIYO_REAUTHORIZE') return codedError('KLAVIYO_REAUTHORIZE', 409);
+  if (reason === 'CANONICAL_PROVIDER_CONNECTION_REQUIRED' || reason === 'KLAVIYO_CANONICAL_CONNECTION_REQUIRED') {
+    return codedError('KLAVIYO_JOURNEY_DIAGNOSTIC_CONNECTION_REQUIRED', 409);
+  }
+  if (reason.startsWith('WORKSPACE_REPORTING_CURRENCY_')) {
+    return codedError('KLAVIYO_JOURNEY_DIAGNOSTIC_CURRENCY_REQUIRED', 409);
+  }
+  if (reason === 'connection.conversionMetric.id is required' || reason.startsWith('connection.journeyMetrics.')) {
+    return codedError('KLAVIYO_JOURNEY_DIAGNOSTIC_METRIC_REQUIRED', 409);
+  }
+  return codedError('KLAVIYO_JOURNEY_DIAGNOSTIC_FAILED', 503);
 }
 
 function createKlaviyoReadOnlyPreflight({
@@ -118,10 +138,51 @@ function createKlaviyoReadOnlyPreflight({
     }
   }
 
-  return Object.freeze({ execute });
+  async function executeDiagnostic(authority) {
+    try {
+      let connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
+      if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
+      const currency = await settingsStore.resolveReportingCurrency(authority);
+      const providerDate = resolveProviderDate(JOURNEY_DIAGNOSTIC_DATE, now());
+      const operation = activeConnection => runner(Object.freeze({
+        authority,
+        connection: activeConnection,
+        reportingCurrency: currency.reportingCurrency,
+        currencyVersion: currency.currencyVersion,
+        request: Object.freeze({ provider_date: providerDate, include_diagnostics: true }),
+      }));
+      const execution = tokenLifecycle
+        ? await tokenLifecycle.run({ authority, connection, operation })
+        : { value: await operation(connection), connection };
+      connection = execution.connection;
+      const result = execution.value;
+      const verified = verifyProviderResult({
+        provider: 'klaviyo',
+        connection,
+        reportingCurrency: currency.reportingCurrency,
+        result,
+      });
+      return Object.freeze({
+        status: 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC',
+        provider_date: providerDate,
+        provider_result_status: verified.providerResultStatus,
+        selected_account_count: verified.selectedAccountCount,
+        row_count: verified.rows.length,
+        campaign_row_count: verified.rows.filter(row => row.entity.root_entity_type === 'campaign').length,
+        flow_row_count: verified.rows.filter(row => row.entity.root_entity_type === 'flow').length,
+        journey_diagnostics: result.provider_diagnostics,
+        dataset_v2_write: false,
+        production_activation: false,
+      });
+    } catch (error) {
+      throw safeDiagnosticFailure(error);
+    }
+  }
+
+  return Object.freeze({ execute, executeDiagnostic });
 }
 
-module.exports = Object.freeze({ closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight });
+module.exports = Object.freeze({ JOURNEY_DIAGNOSTIC_DATE, closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight });
 
 
 

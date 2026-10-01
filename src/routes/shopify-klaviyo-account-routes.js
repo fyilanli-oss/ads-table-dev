@@ -27,7 +27,7 @@ function registerShopifyKlaviyoAccountRoutes(app, {authenticateEmbedded, selecti
   app.post("/api/shopify/providers/klaviyo/spend-history/update", handler((authority, body) => selection.updateSpend(authority, body)));
   app.post("/api/shopify/providers/klaviyo/spend-history/correct", handler((authority, body) => selection.correctSpend(authority, body)));
   if (preflight) app.post("/api/shopify/providers/klaviyo/runtime/preflight", handler((authority, body) => preflight.execute(authority, body?.provider_date)));
-  if (preflight?.executeDiagnostic) app.post("/api/shopify/providers/klaviyo/runtime/journey-diagnostic", handler(authority => preflight.executeDiagnostic(authority)));
+  if (preflight?.executeDiagnostic) app.post("/api/shopify/providers/klaviyo/runtime/journey-diagnostic", handler((authority, body) => preflight.executeDiagnostic(authority, body?.provider_date)));
   if (historicalInventory) app.post("/api/shopify/providers/klaviyo/runtime/historical-inventory", handler(authority => historicalInventory.execute(authority)));
   if (flowEventInventory) app.post("/api/shopify/providers/klaviyo/runtime/flow-event-inventory", handler(authority => flowEventInventory.execute(authority)));
   if (datasetAcceptance) app.post("/api/shopify/providers/klaviyo/runtime/acceptance", handler((authority, body) => datasetAcceptance.execute(authority, body?.confirmation, body?.provider_date)));

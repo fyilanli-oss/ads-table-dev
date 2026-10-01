@@ -128,6 +128,24 @@ function diagnosticReport(rows, baseKeys = null) {
   return Object.freeze({ campaign: byBranch('campaign'), flow: byBranch('flow') });
 }
 
+function performanceDiagnostic(rows) {
+  const byBranch = branch => {
+    const selected = rows.filter(row => row.branch === branch);
+    const total = field => selected.reduce((sum, row) => {
+      const value = finite(row.statistics?.[field], `diagnostic.${branch}.${field}`);
+      return value === null ? sum : sum + value;
+    }, 0);
+    return Object.freeze({
+      row_count: selected.length,
+      recipients: total('recipients'),
+      delivered: total('delivered'),
+      unique_opens: total('opens_unique'),
+      unique_clicks: total('clicks_unique'),
+    });
+  };
+  return Object.freeze({ campaign: byBranch('campaign'), flow: byBranch('flow') });
+}
+
 function metricPagePath(value) {
   const url = new URL(value, API_BASE);
   if (url.origin !== API_BASE || !['/api/metrics', '/api/metrics/'].includes(url.pathname)) {
@@ -507,6 +525,7 @@ function createKlaviyoProviderClient({
     if (includeDiagnostics === true) {
       result.diagnostics = Object.freeze({
         provider_date: providerDate,
+        performance: performanceDiagnostic(baseRows),
         purchase: diagnosticReport(baseRows),
         add_to_cart: diagnosticReport(stageMaps.addToCart ? [...stageMaps.addToCart.values()] : [], baseKeys),
         checkout: diagnosticReport(stageMaps.checkout ? [...stageMaps.checkout.values()] : [], baseKeys),
@@ -524,5 +543,5 @@ function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
 }
 
-module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, JOURNEY_METRIC_NAMES, EVENT_CATEGORY_BY_NAME, zonedInstant, reportRows, diagnosticReport, metricPagePath, campaignPagePath, flowPagePath, eventPagePath, campaignBusinessDate, eventBusinessDate, journeyMetricCandidate, metricCandidate, createKlaviyoProviderClient });
+module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, JOURNEY_METRIC_NAMES, EVENT_CATEGORY_BY_NAME, zonedInstant, reportRows, diagnosticReport, performanceDiagnostic, metricPagePath, campaignPagePath, flowPagePath, eventPagePath, campaignBusinessDate, eventBusinessDate, journeyMetricCandidate, metricCandidate, createKlaviyoProviderClient });
 

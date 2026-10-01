@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { JOURNEY_DIAGNOSTIC_DATE, closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight } = require('../src/providers/klaviyo/read-only-preflight');
+const { closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight } = require('../src/providers/klaviyo/read-only-preflight');
 const { registerShopifyKlaviyoAccountRoutes } = require('../src/routes/shopify-klaviyo-account-routes');
 
 const WORKSPACE = '11111111-1111-4111-8111-111111111111';
@@ -87,9 +87,14 @@ test('R6-D2 read-only preflight redacts provider failures', async () => {
   });
 });
 
-test('R6-D5 journey diagnostic is fixed to the closed date and returns aggregate counts only', async () => {
+test('R6-D5 journey diagnostic uses the requested closed send date and returns performance plus journey aggregates', async () => {
+  const diagnosticDate = '2026-09-26';
   const diagnosticReport = {
-    provider_date: JOURNEY_DIAGNOSTIC_DATE,
+    provider_date: diagnosticDate,
+    performance: {
+      campaign: { row_count: 1, recipients: 10, delivered: 10, unique_opens: 4, unique_clicks: 0 },
+      flow: { row_count: 0, recipients: 0, delivered: 0, unique_opens: 0, unique_clicks: 0 },
+    },
     purchase: {
       campaign: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 1, unmatched_key_count: 0 },
       flow: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
@@ -111,17 +116,17 @@ test('R6-D5 journey diagnostic is fixed to the closed date and returns aggregate
     providerClient: {
       fetchAccount: async () => ({ id: 'account-1', currency: 'USD', timezone: 'UTC' }),
       fetchMessageFacts: async input => {
-        assert.equal(input.providerDate, JOURNEY_DIAGNOSTIC_DATE);
+        assert.equal(input.providerDate, diagnosticDate);
         assert.equal(input.includeDiagnostics, true);
         return { rows: [], verified_empty: true, diagnostics: diagnosticReport };
       },
     },
-    resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: JOURNEY_DIAGNOSTIC_DATE, fx_provider: 'test' }),
+    resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: diagnosticDate, fx_provider: 'test' }),
     now: () => new Date('2026-10-01T12:00:00Z'),
   });
-  const result = await diagnostic.executeDiagnostic(authority);
+  const result = await diagnostic.executeDiagnostic(authority, diagnosticDate);
   assert.deepEqual(result, {
-    status: 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC', provider_date: '2026-09-28', provider_result_status: 'empty',
+    status: 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC', provider_date: diagnosticDate, provider_result_status: 'empty',
     selected_account_count: 1, row_count: 0, campaign_row_count: 0, flow_row_count: 0,
     journey_diagnostics: diagnosticReport, dataset_v2_write: false, production_activation: false,
   });
@@ -143,23 +148,23 @@ test('R6-D2 route requires Shopify authority and forwards only the validated pro
   assert.equal(res.code, 200);
 });
 
-test('R6-D5 journey diagnostic route is Shopify-session-bound and accepts no tenant or date input', async () => {
+test('R6-D5 journey diagnostic route is Shopify-session-bound and forwards only the requested provider date', async () => {
   const routes = {};
   const app = { get() {}, post: (path, handler) => { routes[path] = handler; } };
-  let receivedAuthority;
+  let received;
   registerShopifyKlaviyoAccountRoutes(app, {
     authenticateEmbedded: async ({ session_token }) => { assert.equal(session_token, 'session'); return authority; },
     selection: {},
     preflight: {
       execute: async () => ({}),
-      executeDiagnostic: async input => { receivedAuthority = input; return { status: 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC' }; },
+      executeDiagnostic: async (input, providerDate) => { received = { input, providerDate }; return { status: 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC' }; },
     },
   });
   const res = { set() {}, status(code) { this.code = code; return this; }, json(body) { this.body = body; return body; } };
   await routes['/api/shopify/providers/klaviyo/runtime/journey-diagnostic']({
     get: () => 'Bearer session', body: { workspace_id: 'attacker', provider_date: '2099-01-01' },
   }, res);
-  assert.equal(receivedAuthority, authority);
+  assert.deepEqual(received, { input: authority, providerDate: '2099-01-01' });
   assert.equal(res.code, 200);
 });
 

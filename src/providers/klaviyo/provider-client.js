@@ -110,6 +110,24 @@ function reportRows(payload, branch) {
   });
 }
 
+function diagnosticReport(rows, baseKeys = null) {
+  const byBranch = branch => {
+    const selected = rows.filter(row => row.branch === branch);
+    const total = field => selected.reduce((sum, row) => {
+      const value = finite(row.statistics?.[field], `diagnostic.${branch}.${field}`);
+      return value === null ? sum : sum + value;
+    }, 0);
+    return Object.freeze({
+      row_count: selected.length,
+      conversion_count: total('conversions'),
+      conversion_value: total('conversion_value'),
+      matched_key_count: baseKeys ? selected.filter(row => baseKeys.has(row.key)).length : selected.length,
+      unmatched_key_count: baseKeys ? selected.filter(row => !baseKeys.has(row.key)).length : 0,
+    });
+  };
+  return Object.freeze({ campaign: byBranch('campaign'), flow: byBranch('flow') });
+}
+
 function metricPagePath(value) {
   const url = new URL(value, API_BASE);
   if (url.origin !== API_BASE || !['/api/metrics', '/api/metrics/'].includes(url.pathname)) {
@@ -425,7 +443,7 @@ function createKlaviyoProviderClient({
     return reportRows(payload, branch);
   }
 
-  async function fetchMessageFacts({ accessToken, account, providerDate, conversionMetricId: conversionMetricIdInput, journeyMetricIds = null } = {}) {
+  async function fetchMessageFacts({ accessToken, account, providerDate, conversionMetricId: conversionMetricIdInput, journeyMetricIds = null, includeDiagnostics = false } = {}) {
     validateTimeZone(account?.timezone);
     const metricIds = Object.freeze({
       addToCart: typeof journeyMetricIds?.addToCart === 'string' && journeyMetricIds.addToCart.trim() ? journeyMetricIds.addToCart.trim() : null,
@@ -446,17 +464,22 @@ function createKlaviyoProviderClient({
       if (!metricIds[stage]) continue;
       const campaign = await scheduledReport('campaign', dailyWindow, metricIds[stage], ['conversions', 'conversion_value']);
       const flow = await scheduledReport('flow', dailyWindow, metricIds[stage], ['conversions', 'conversion_value']);
-      stageRows[stage] = new Map([...campaign, ...flow].map(row => [row.key, row]));
+      stageRows[stage] = Object.freeze({ campaign, flow });
     }
     const baseRows = [...dailyCampaign, ...dailyFlow];
     const baseKeys = new Set(baseRows.map(row => row.key));
-    for (const rows of Object.values(stageRows)) {
-      if ([...rows.keys()].some(key => !baseKeys.has(key))) throw new Error('KLAVIYO_JOURNEY_METRIC_KEY_DRIFT');
+    const stageMaps = Object.fromEntries(Object.entries(stageRows).map(([stage, branches]) => [
+      stage,
+      new Map([...branches.campaign, ...branches.flow].map(row => [row.key, row])),
+    ]));
+    const hasKeyDrift = Object.values(stageMaps).some(rows => [...rows.keys()].some(key => !baseKeys.has(key)));
+    if (hasKeyDrift && includeDiagnostics !== true) {
+      throw new Error('KLAVIYO_JOURNEY_METRIC_KEY_DRIFT');
     }
     const rows = baseRows.map(row => {
       const delivered = finite(row.statistics.delivered, 'statistics.delivered');
-      const addToCart = stageRows.addToCart?.get(row.key);
-      const checkout = stageRows.checkout?.get(row.key);
+      const addToCart = stageMaps.addToCart?.get(row.key);
+      const checkout = stageMaps.checkout?.get(row.key);
       return Object.freeze({
         branch: row.branch, channel: row.channel, root: row.root, message: row.message,
         metrics: {
@@ -480,7 +503,18 @@ function createKlaviyoProviderClient({
         spend_allocation: {},
       });
     });
-    return Object.freeze({ rows, verified_empty: rows.length === 0 });
+    const result = { rows, verified_empty: rows.length === 0 };
+    if (includeDiagnostics === true) {
+      result.diagnostics = Object.freeze({
+        provider_date: providerDate,
+        purchase: diagnosticReport(baseRows),
+        add_to_cart: diagnosticReport(stageMaps.addToCart ? [...stageMaps.addToCart.values()] : [], baseKeys),
+        checkout: diagnosticReport(stageMaps.checkout ? [...stageMaps.checkout.values()] : [], baseKeys),
+        journey_key_drift: hasKeyDrift,
+        dataset_v2_write: false,
+      });
+    }
+    return Object.freeze(result);
   }
 
   return Object.freeze({ fetchAccount, fetchJourneyMetricCandidates, fetchPlacedOrderMetricCandidates, fetchCampaignInventory, fetchSentCampaignDates, fetchFlowEventInventory, fetchMessageFacts });
@@ -490,5 +524,5 @@ function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
 }
 
-module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, JOURNEY_METRIC_NAMES, EVENT_CATEGORY_BY_NAME, zonedInstant, reportRows, metricPagePath, campaignPagePath, flowPagePath, eventPagePath, campaignBusinessDate, eventBusinessDate, journeyMetricCandidate, metricCandidate, createKlaviyoProviderClient });
+module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, JOURNEY_METRIC_NAMES, EVENT_CATEGORY_BY_NAME, zonedInstant, reportRows, diagnosticReport, metricPagePath, campaignPagePath, flowPagePath, eventPagePath, campaignBusinessDate, eventBusinessDate, journeyMetricCandidate, metricCandidate, createKlaviyoProviderClient });
 

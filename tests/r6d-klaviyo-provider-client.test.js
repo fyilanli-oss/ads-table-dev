@@ -165,6 +165,52 @@ test('Klaviyo full journey merges exact stage reports without message-row cost a
   assert.equal(result.rows[0].metric_support.add_to_cart, 'supported');
 });
 
+test('Klaviyo journey diagnostic reports aggregate stage-only keys while normal execution fails closed', async () => {
+  const grouping = (branch, suffix) => branch === 'campaign'
+    ? { campaign_id: `campaign-${suffix}`, campaign_message_id: `campaign-message-${suffix}`, send_channel: 'email' }
+    : { flow_id: `flow-${suffix}`, flow_name: 'Flow', flow_message_id: `flow-message-${suffix}`, flow_message_name: 'Message', send_channel: 'email' };
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    const branch = body.data.type.startsWith('campaign') ? 'campaign' : 'flow';
+    const metric = body.data.attributes.conversion_metric_id;
+    const suffixes = metric === 'purchase' ? ['base']
+      : metric === 'add' ? (branch === 'campaign' ? ['base', 'add-only'] : ['base'])
+        : (branch === 'campaign' ? ['base'] : ['checkout-only']);
+    return response({ data: { attributes: { results: suffixes.map(suffix => ({
+      groupings: grouping(branch, suffix),
+      statistics: metric === 'purchase'
+        ? { delivered: 1, clicks_unique: 0, opens_unique: 0, conversions: 1, conversion_value: 10 }
+        : { conversions: 1, conversion_value: 10 },
+    })) } } });
+  };
+  const client = createKlaviyoProviderClient({ fetchImpl });
+  const input = {
+    accessToken: 'secret', account: { id: 'account-1', currency: 'USD', timezone: 'UTC' }, providerDate: '2026-09-28',
+    journeyMetricIds: { addToCart: 'add', checkout: 'checkout', purchase: 'purchase' },
+  };
+  await assert.rejects(client.fetchMessageFacts(input), /KLAVIYO_JOURNEY_METRIC_KEY_DRIFT/);
+  const result = await client.fetchMessageFacts({ ...input, includeDiagnostics: true });
+  assert.equal(result.rows.length, 2);
+  assert.deepEqual(result.diagnostics, {
+    provider_date: '2026-09-28',
+    purchase: {
+      campaign: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 1, unmatched_key_count: 0 },
+      flow: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 1, unmatched_key_count: 0 },
+    },
+    add_to_cart: {
+      campaign: { row_count: 2, conversion_count: 2, conversion_value: 20, matched_key_count: 1, unmatched_key_count: 1 },
+      flow: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 1, unmatched_key_count: 0 },
+    },
+    checkout: {
+      campaign: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 1, unmatched_key_count: 0 },
+      flow: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 0, unmatched_key_count: 1 },
+    },
+    journey_key_drift: true,
+    dataset_v2_write: false,
+  });
+  assert.doesNotMatch(JSON.stringify(result.diagnostics), /campaign-message|flow-message|account-1/);
+});
+
 test('Klaviyo full journey spaces six alternating report calls at the configured steady-rate cadence', async () => {
   const waits = [];
   const client = createKlaviyoProviderClient({

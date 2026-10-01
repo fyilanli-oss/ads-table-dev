@@ -64,6 +64,43 @@ test('Klaviyo workspace runner accepts only provider-proven empty results and wr
   await assert.rejects(runner({ result: { rows: [], verified_empty: false } })(context()), /KLAVIYO_EMPTY_RESULT_NOT_VERIFIED/);
 });
 
+test('Klaviyo workspace runner returns validated provider diagnostics only when explicitly requested', async () => {
+  const diagnosticReport = {
+    provider_date: '2026-09-24',
+    purchase: {
+      campaign: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
+      flow: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
+    },
+    add_to_cart: {
+      campaign: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 0, unmatched_key_count: 1 },
+      flow: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
+    },
+    checkout: {
+      campaign: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
+      flow: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 0, unmatched_key_count: 1 },
+    },
+    journey_key_drift: true,
+    dataset_v2_write: false,
+  };
+  let requestedDiagnostics = null;
+  const execute = createKlaviyoWorkspaceRunner({
+    providerClient: {
+      fetchAccount: async () => ({ id: 'account-1', currency: 'USD', timezone: 'UTC' }),
+      fetchMessageFacts: async input => {
+        requestedDiagnostics = input.includeDiagnostics;
+        return { rows: [], verified_empty: true, diagnostics: diagnosticReport };
+      },
+    },
+    resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: '2026-09-24', fx_provider: 'test_fx' }),
+  });
+  const diagnostic = await execute(context({ request: { provider_date: '2026-09-24', include_diagnostics: true } }));
+  assert.equal(requestedDiagnostics, true);
+  assert.deepEqual(diagnostic.provider_diagnostics, diagnosticReport);
+  const ordinary = await execute(context());
+  assert.equal(requestedDiagnostics, false);
+  assert.equal(Object.hasOwn(ordinary, 'provider_diagnostics'), false);
+});
+
 test('Klaviyo workspace runner rejects account, currency and canonical connection drift', async () => {
   await assert.rejects(runner({ account: { id: 'other', currency: 'USD', timezone: 'UTC' } })(context()), /KLAVIYO_PROVIDER_ACCOUNT_MISMATCH/);
   await assert.rejects(runner({ account: { id: 'account-1', currency: 'EUR', timezone: 'UTC' } })(context()), /KLAVIYO_PROVIDER_CURRENCY_MISMATCH/);

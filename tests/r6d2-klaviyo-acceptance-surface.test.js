@@ -47,21 +47,26 @@ test('R6-D2 C6 controlled write stays inside the acceptance surface and is confi
   assert.doesNotMatch(acceptanceMarkup, /row\.identity|active_account_id|accessToken|account-1/);
 });
 
-test('R6-D5 journey diagnostic stays hidden, fixed-date and aggregate-only', () => {
+test('R6-D5 journey diagnostic stays hidden, date-selectable and exposes performance plus journey aggregates', () => {
   const html = renderEmbeddedPlatforms({
     clientId: 'client-id',
     providerOAuthEnabled: true,
     providerAvailability: { meta: true, google_ads: true, klaviyo: true },
   });
   assert.match(html, /id="r6d5-klaviyo-historical-inventory" display="none"/);
-  assert.match(html, /Run 2026-09-28 journey diagnostic/);
+  assert.match(html, /id="r6d5-klaviyo-journey-diagnostic-date"/);
+  assert.match(html, /Run journey diagnostic/);
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/journey-diagnostic/);
   assert.match(html, /PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC/);
+  assert.match(html, /diagnostics\.performance/);
+  assert.match(html, /unique opens/);
+  assert.match(html, /unique clicks/);
   assert.match(html, /unmatched_key_count/);
   assert.match(html, /Dataset V2 writes: 0/);
   const diagnosticMarkup = html.slice(
-    html.indexOf('This fixed-date read-only diagnostic'),
+    html.indexOf('This read-only diagnostic shows Campaign and Flow'),
     html.indexOf('<s-stack gap="large">'),
   );
-  assert.doesNotMatch(diagnosticMarkup, /s-date-field|workspace_id|account_id|campaign_id|flow_id|message_id|accessToken/);
+  assert.match(diagnosticMarkup, /s-date-field/);
+  assert.doesNotMatch(diagnosticMarkup, /workspace_id|account_id|campaign_id|flow_id|message_id|accessToken/);
 });

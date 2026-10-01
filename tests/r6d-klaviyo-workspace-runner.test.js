@@ -67,6 +67,10 @@ test('Klaviyo workspace runner accepts only provider-proven empty results and wr
 test('Klaviyo workspace runner returns validated provider diagnostics only when explicitly requested', async () => {
   const diagnosticReport = {
     provider_date: '2026-09-24',
+    performance: {
+      campaign: { row_count: 0, recipients: 0, delivered: 0, unique_opens: 0, unique_clicks: 0 },
+      flow: { row_count: 0, recipients: 0, delivered: 0, unique_opens: 0, unique_clicks: 0 },
+    },
     purchase: {
       campaign: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
       flow: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },

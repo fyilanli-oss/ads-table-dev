@@ -46,6 +46,24 @@ function safeDiagnosticReport(value, expectedProviderDate) {
     journey_key_drift: value.journey_key_drift,
     dataset_v2_write: false,
   };
+  const performance = {};
+  for (const branch of ['campaign', 'flow']) {
+    const metrics = value?.performance?.[branch];
+    if (!metrics || typeof metrics !== 'object') throw new Error('KLAVIYO_DIAGNOSTIC_REPORT_INVALID');
+    for (const field of ['row_count', 'recipients', 'delivered', 'unique_opens', 'unique_clicks']) {
+      if (!Number.isSafeInteger(metrics[field]) || metrics[field] < 0) {
+        throw new Error('KLAVIYO_DIAGNOSTIC_REPORT_INVALID');
+      }
+    }
+    performance[branch] = Object.freeze({
+      row_count: metrics.row_count,
+      recipients: metrics.recipients,
+      delivered: metrics.delivered,
+      unique_opens: metrics.unique_opens,
+      unique_clicks: metrics.unique_clicks,
+    });
+  }
+  report.performance = Object.freeze(performance);
   for (const stage of ['purchase', 'add_to_cart', 'checkout']) {
     const branches = {};
     for (const branch of ['campaign', 'flow']) {

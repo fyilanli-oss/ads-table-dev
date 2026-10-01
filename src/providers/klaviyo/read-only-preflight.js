@@ -3,8 +3,6 @@
 const { verifyProviderResult } = require('../workspace-provider-runtime');
 const { createKlaviyoWorkspaceRunner } = require('./workspace-runner');
 
-const JOURNEY_DIAGNOSTIC_DATE = '2026-09-28';
-
 function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
 }
@@ -138,12 +136,12 @@ function createKlaviyoReadOnlyPreflight({
     }
   }
 
-  async function executeDiagnostic(authority) {
+  async function executeDiagnostic(authority, requestedProviderDate = null) {
     try {
       let connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       const currency = await settingsStore.resolveReportingCurrency(authority);
-      const providerDate = resolveProviderDate(JOURNEY_DIAGNOSTIC_DATE, now());
+      const providerDate = resolveProviderDate(requestedProviderDate, now());
       const operation = activeConnection => runner(Object.freeze({
         authority,
         connection: activeConnection,
@@ -182,7 +180,7 @@ function createKlaviyoReadOnlyPreflight({
   return Object.freeze({ execute, executeDiagnostic });
 }
 
-module.exports = Object.freeze({ JOURNEY_DIAGNOSTIC_DATE, closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight });
+module.exports = Object.freeze({ closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight });
 
 
 

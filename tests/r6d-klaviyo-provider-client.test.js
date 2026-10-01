@@ -179,7 +179,7 @@ test('Klaviyo journey diagnostic reports aggregate stage-only keys while normal 
     return response({ data: { attributes: { results: suffixes.map(suffix => ({
       groupings: grouping(branch, suffix),
       statistics: metric === 'purchase'
-        ? { delivered: 1, clicks_unique: 0, opens_unique: 0, conversions: 1, conversion_value: 10 }
+        ? { recipients: 2, delivered: 1, clicks_unique: 0, opens_unique: 1, conversions: 1, conversion_value: 10 }
         : { conversions: 1, conversion_value: 10 },
     })) } } });
   };
@@ -193,6 +193,10 @@ test('Klaviyo journey diagnostic reports aggregate stage-only keys while normal 
   assert.equal(result.rows.length, 2);
   assert.deepEqual(result.diagnostics, {
     provider_date: '2026-09-28',
+    performance: {
+      campaign: { row_count: 1, recipients: 2, delivered: 1, unique_opens: 1, unique_clicks: 0 },
+      flow: { row_count: 1, recipients: 2, delivered: 1, unique_opens: 1, unique_clicks: 0 },
+    },
     purchase: {
       campaign: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 1, unmatched_key_count: 0 },
       flow: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 1, unmatched_key_count: 0 },

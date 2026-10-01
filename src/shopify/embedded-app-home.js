@@ -3,7 +3,7 @@
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 const {initializeAdAccounts} = require("./ad-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "r7b6-settings-standard-v2";
+const EMBEDDED_HOME_RELEASE = "r7b6-settings-standard-v3";
 
 function escapeAttribute(value) {
   return String(value)
@@ -273,13 +273,14 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
     <s-stack id="r6d2-klaviyo-acceptance" display="none">
       <s-section heading="Klaviyo acceptance check">
         <s-stack gap="base">
-          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs. It does not write Dataset V2.</s-paragraph>
+          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs for one closed provider date. It does not write Dataset V2.</s-paragraph>
+          <s-date-field id="r6d2-klaviyo-provider-date" label="Provider date" details="Choose the closed date when the Campaign or Flow message was sent."></s-date-field>
           <s-paragraph id="r6d2-klaviyo-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d2-klaviyo-run" variant="primary">Run read-only acceptance</s-button>
           <s-stack id="r6d2-klaviyo-c6-step" gap="base">
               <s-paragraph>This controlled acceptance may write real verified Klaviyo rows to Dataset V2. It never creates synthetic rows and does not enable scheduled production activation.</s-paragraph>
               <s-paragraph id="r6d2-klaviyo-c6-message" aria-live="polite"></s-paragraph>
-              <s-button id="r6d2-klaviyo-c6-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
+              <s-button id="r6d2-klaviyo-c6-run" tone="critical" disabled>Run controlled Dataset V2 acceptance</s-button>
           </s-stack>
           <s-stack id="r6d2-klaviyo-metric-step" display="none" gap="base">
               <s-paragraph>Confirming stores only this workspace account's verified reporting metric. It does not write Dataset V2.</s-paragraph>
@@ -368,6 +369,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const metaDatasetAcceptanceMessage = document.getElementById("r6d3-meta-dataset-message");
       const acceptancePanel = document.getElementById("r6d2-klaviyo-acceptance");
       const acceptanceButton = document.getElementById("r6d2-klaviyo-run");
+      const acceptanceProviderDate = document.getElementById("r6d2-klaviyo-provider-date");
       const acceptanceMessage = document.getElementById("r6d2-klaviyo-message");
       const metricStep = document.getElementById("r6d2-klaviyo-metric-step");
       const metricSelect = document.getElementById("r6d2-klaviyo-metric");
@@ -489,17 +491,33 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       }
       if (params.get("acceptance") === "r6d2-klaviyo") {
         acceptancePanel.display = "auto";
+        const latestClosedDate = new Date(Date.now() - (48 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+        acceptanceProviderDate.value = latestClosedDate;
+        acceptanceProviderDate.setAttribute("allow", "--" + latestClosedDate);
+        const acceptanceRequest = () => JSON.stringify({provider_date: String(acceptanceProviderDate.value || "")});
         const showAcceptanceResult = result => {
-          acceptanceMessage.textContent = result.status === "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT"
-            ? "PASS — Account, Campaign, Flow, Time and FX checks succeeded. Dataset V2 writes: 0."
-            : "The acceptance result could not be verified.";
+          if (result.status !== "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT") {
+            datasetAcceptanceButton.disabled = true;
+            acceptanceMessage.textContent = "The acceptance result could not be verified.";
+            return;
+          }
+          datasetAcceptanceButton.disabled = result.empty_provider_result === true;
+          const outcome = result.empty_provider_result ? "VERIFIED EMPTY" : "PASS";
+          acceptanceMessage.textContent = outcome + " — " + result.provider_date + ": " +
+            result.campaign_row_count + " Campaign row(s), " + result.flow_row_count +
+            " Flow row(s). Account, Time and FX checks succeeded. Dataset V2 writes: 0.";
         };
+        acceptanceProviderDate.addEventListener("change", () => {
+          datasetAcceptanceButton.disabled = true;
+          acceptanceMessage.textContent = "Run the read-only acceptance for the selected provider date.";
+          datasetAcceptanceMessage.textContent = "";
+        });
         acceptanceButton.addEventListener("click", async () => {
           acceptanceButton.disabled = true;
           acceptanceButton.loading = true;
           acceptanceMessage.textContent = "Running the read-only checks…";
           try {
-            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"});
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST", body: acceptanceRequest()});
             showAcceptanceResult(result);
           } catch (error) {
             if (error.message === "KLAVIYO_PREFLIGHT_METRIC_REQUIRED") {
@@ -531,10 +549,11 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           try {
             const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/acceptance", {
               method: "POST",
-              body: JSON.stringify({confirmation: "RUN_R6_D2_C6_KLAVIYO_WRITE"}),
+              body: JSON.stringify({confirmation: "RUN_R6_D2_C6_KLAVIYO_WRITE", provider_date: String(acceptanceProviderDate.value || "")}),
             });
             datasetAcceptanceMessage.textContent = result.status === "PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE"
-              ? "PASS — attempted: " + result.attempted + ", persisted: " + result.persisted + ", verified empty: " + result.empty_provider_result + "."
+              ? "PASS — " + result.provider_date + ": attempted " + result.attempted + ", persisted " + result.persisted +
+                "; Campaign rows " + result.campaign_row_count + ", Flow rows " + result.flow_row_count + "."
               : "The Dataset V2 acceptance result could not be verified.";
           } catch (error) {
             datasetAcceptanceMessage.textContent = (/^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_DATASET_ACCEPTANCE_FAILED") + ". Do not retry; review runtime evidence.";
@@ -548,7 +567,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             await sessionRequest("/api/shopify/providers/klaviyo/runtime/metrics/select", {method: "POST", body: JSON.stringify({metric_id: String(metricSelect.value || "")})});
             metricStep.display = "none";
             acceptanceMessage.textContent = "Metric confirmed. Running the read-only acceptance…";
-            showAcceptanceResult(await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"}));
+            showAcceptanceResult(await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST", body: acceptanceRequest()}));
           } catch (error) {
             acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
             metricConfirm.disabled = false;

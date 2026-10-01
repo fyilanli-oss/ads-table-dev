@@ -81,10 +81,16 @@ function initializeKlaviyoAccounts() {
     const entries = Array.isArray(result.entries) ? result.entries : [];
     if (spendHistoryChoice) {
       spendHistoryChoice.replaceChildren();
-      for (const entry of entries) {
+      for (const [index, entry] of entries.entries()) {
         const option = document.createElement("s-option");
         option.value = entry.effective_from;
-        option.textContent = entry.effective_from + " · " + entry.estimated_30_day_email_spend + " " + entry.currency;
+        let effectiveTo = entry.effective_to || null;
+        if (!effectiveTo && index > 0) {
+          const nextStart = new Date(entries[index - 1].effective_from + "T00:00:00.000Z");
+          nextStart.setUTCDate(nextStart.getUTCDate() - 1);
+          effectiveTo = nextStart.toISOString().slice(0, 10);
+        }
+        option.textContent = entry.effective_from + " / " + (effectiveTo || "Present") + " · " + entry.estimated_30_day_email_spend + " " + entry.currency;
         spendHistoryChoice.append(option);
       }
       if (entries.length) {
@@ -245,8 +251,12 @@ function initializeKlaviyoAccounts() {
     try {
       const result = await request("/api/shopify/providers/klaviyo/spend-history/update", {estimated_30_day_email_spend: String(spendUpdateValue.value)});
       message.textContent = "Connected · " + result.estimated_30_day_email_spend + " " + result.currency + " / 30 days";
+      const entries = await loadSpendHistory();
+      const confirmed = entries.some(entry => entry.effective_from === result.effective_from &&
+        entry.estimated_30_day_email_spend === result.estimated_30_day_email_spend && entry.currency === result.currency);
+      if (!confirmed) throw new Error("SPEND_HISTORY_UPDATE_NOT_CONFIRMED");
+      spendUpdateValue.value = "";
       spendUpdateMessage.textContent = "";
-      await loadSpendHistory();
       if (spendUpdateModal && typeof spendUpdateModal.hideOverlay === "function") spendUpdateModal.hideOverlay();
     } catch (error) { spendUpdateMessage.textContent = (showError(error), message.textContent); }
     finally { busy = false; spendUpdateSave.disabled = false; spendUpdateSave.loading = false; }

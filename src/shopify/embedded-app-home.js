@@ -3,7 +3,7 @@
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 const {initializeAdAccounts} = require("./ad-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "r7b6-settings-standard-v3";
+const EMBEDDED_HOME_RELEASE = "r7a-v2";
 
 function escapeAttribute(value) {
   return String(value)
@@ -20,16 +20,14 @@ function documentHead({clientId, title}) {
   <meta name="shopify-api-key" content="${apiKey}">
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
-  <script src="https://cdn.shopify.com/shopifycloud/polaris-2.0-rc.js"></script>
+  <script src="https://cdn.shopify.com/shopifycloud/polaris-1.js"></script>
   <title>${title}</title>`;
 }
 
 function appNavigation() {
   return `<s-app-nav>
-    <s-link href="/shopify/app" rel="home">Dashboard</s-link>
-    <s-link href="/shopify/app/funnel">Funnel</s-link>
-    <s-link href="/shopify/app/analysis">Analysis</s-link>
-    <s-link href="/shopify/app/settings">Settings</s-link>
+    <s-link href="/shopify/app" rel="home">Home</s-link>
+    <s-link href="/shopify/app/platforms">Data sources</s-link>
   </s-app-nav>`;
 }
 
@@ -38,21 +36,54 @@ function renderEmbeddedAppHome({clientId}) {
   return `<!doctype html>
 <html lang="en">
 <head>
-  ${documentHead({clientId, title: "Dashboard — AdsTable"})}
+  ${documentHead({clientId, title: "AdsTable"})}
 </head>
 <body>
   ${appNavigation()}
-  <s-page heading="Dashboard">
+  <s-page heading="AdsTable">
     <s-section heading="Store connection">
       <s-banner id="status" heading="Connecting to your store" tone="info">
         AdsTable is verifying the secure Shopify session.
       </s-banner>
     </s-section>
+    <s-section heading="Data sources">
+      <s-stack gap="base">
+        <s-paragraph>Choose your AdsTable reporting currency, then connect Meta, Google Ads, or Klaviyo.</s-paragraph>
+        <div id="setup-data-sources-container" hidden><s-button id="setup-data-sources" variant="primary" commandFor="currency-modal" command="--show">Set up data sources</s-button></div>
+        <div id="manage-data-sources-container" hidden><s-button id="manage-data-sources" variant="primary" href="/shopify/app/platforms">Manage data sources</s-button></div>
+      </s-stack>
+    </s-section>
+    <s-modal id="currency-modal" heading="Choose reporting currency" size="small-100">
+      <s-stack gap="base">
+        <s-paragraph>This is the currency AdsTable will use for reporting. It is independent from Shopify and provider account currencies.</s-paragraph>
+        <s-select id="reporting-currency" label="Reporting currency">
+          ${["TRY","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","SEK","NOK","DKK","PLN"].map(currency => `<s-option value="${currency}">${currency}</s-option>`).join("")}
+        </s-select>
+        <s-paragraph id="currency-message" aria-live="polite"></s-paragraph>
+      </s-stack>
+      <s-button slot="secondary-actions" commandFor="currency-modal" command="--hide">Cancel</s-button>
+      <s-button id="save-reporting-currency" slot="primary-action" variant="primary">Save and continue</s-button>
+    </s-modal>
   </s-page>
   <script>
     (() => {
       "use strict";
       const status = document.getElementById("status");
+      const setupDataSources = document.getElementById("setup-data-sources");
+      const manageDataSources = document.getElementById("manage-data-sources");
+      const setupDataSourcesContainer = document.getElementById("setup-data-sources-container");
+      const manageDataSourcesContainer = document.getElementById("manage-data-sources-container");
+      const reportingCurrency = document.getElementById("reporting-currency");
+      const saveReportingCurrency = document.getElementById("save-reporting-currency");
+      const currencyMessage = document.getElementById("currency-message");
+      const sessionRequest = async (path, options = {}) => {
+        if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
+        const token = await window.shopify.idToken();
+        const response = await fetch(path, {...options, credentials: "same-origin", headers: {Authorization: "Bearer " + token, ...(options.body ? {"Content-Type": "application/json"} : {})}});
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.code || "REQUEST_FAILED");
+        return body;
+      };
       const request = async (path, method, token) => {
         const response = await fetch(path, {
           method,
@@ -84,8 +115,30 @@ function renderEmbeddedAppHome({clientId}) {
         status.setAttribute("heading", "Development store connected securely");
         status.setAttribute("tone", "success");
         status.textContent = "Your verified Shopify workspace is ready.";
+        const settings = await sessionRequest("/api/shopify/workspace/settings");
+        if (settings.status === "configured") {
+          setupDataSourcesContainer.hidden = true;
+          manageDataSourcesContainer.hidden = false;
+        } else {
+          setupDataSourcesContainer.hidden = false;
+          manageDataSourcesContainer.hidden = true;
+        }
         document.documentElement.dataset.smoke = "pass";
       };
+      saveReportingCurrency.addEventListener("click", async () => {
+        saveReportingCurrency.disabled = true;
+        saveReportingCurrency.loading = true;
+        currencyMessage.textContent = "Saving…";
+        try {
+          await sessionRequest("/api/shopify/workspace/reporting-currency", {method: "POST", body: JSON.stringify({currency: String(reportingCurrency.value)})});
+          location.assign("/shopify/app/platforms");
+        } catch (error) {
+          currencyMessage.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Currency is already configured. Open Data sources again." : "Currency could not be saved. Please try again.";
+        } finally {
+          saveReportingCurrency.disabled = false;
+          saveReportingCurrency.loading = false;
+        }
+      });
       run().catch((error) => {
         const code = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "EMBEDDED_BOOTSTRAP_FAILED";
         const reference = /^[A-Za-z0-9._:-]{1,128}$/.test(error.requestId || "") ? " Reference: " + error.requestId : "";
@@ -100,61 +153,29 @@ function renderEmbeddedAppHome({clientId}) {
 </html>`;
 }
 
-function renderProviderSection({id, label, parked = false, showDivider = false}, providerOAuthEnabled, providerAvailable = providerOAuthEnabled) {
+function renderProviderSection({id, label, description, parked = false}, providerOAuthEnabled, providerAvailable = providerOAuthEnabled) {
   const disabled = providerAvailable ? "" : " disabled";
-  const connectCopy = {
-    meta: [
-      "Continue with the Facebook account that owns or can access the Meta ad accounts you intend to connect. Make sure that account is signed in on this device and browser.",
-      "Authorization alone does not complete the connection. After authorization, select between 1 and 3 verified Meta ad accounts.",
-    ],
-    google_ads: [
-      "Continue with a Google account that can access the Google Ads customer accounts you intend to connect. Google may describe the consent broadly; AdsTable uses the connection only to read approved Google Ads reporting data.",
-      "Authorization alone does not complete the connection. After authorization, select between 1 and 3 verified Google Ads accounts.",
-    ],
-    klaviyo: [
-      "Continue with a Klaviyo user that can access the account you intend to connect. AdsTable requests the read access needed for email performance reporting.",
-      "Authorization alone does not complete the connection. After authorization, select one verified Klaviyo account and enter its Estimated 30-Day Klaviyo Email Spend in the account currency.",
-    ],
-  }[id] || [`Continue to ${label} to authorize AdsTable.`];
-  const disconnectCopy = id === "google_ads"
-    ? "AdsTable will revoke this Google authorization, including the retired Google Sheets and GA4 permissions, and stop future Google Ads access and token refresh."
-    : `AdsTable will revoke this ${label} authorization and stop future provider access and token refresh for this connection.`;
-  const supportsConnection = ["meta", "google_ads", "klaviyo"].includes(id);
-  const supportsReporting = ["meta", "google_ads"].includes(id);
-  return `<s-stack id="${id}" gap="base">
-      <s-query-container>
-        <s-grid gridTemplateColumns="@container (inline-size > 700px) 1fr auto, 1fr" gap="base" alignItems="center">
-          <s-stack gap="small">
-            <s-heading>${label}</s-heading>
-            ${supportsConnection ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
-            ${supportsReporting && providerAvailable ? `<s-stack id="${id}-reporting" display="none"><s-paragraph id="${id}-reporting-summary"></s-paragraph></s-stack>` : ""}
-            ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
-          </s-stack>
-          ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="small" alignItems="center">
-            <s-stack id="${id}-connect"><s-button variant="secondary" id="${id}-connect-action" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></s-stack>
-            <s-stack id="${id}-resume" display="none"><s-button variant="secondary" id="${id}-resume-action">Resume setup</s-button></s-stack>
-            <s-stack id="${id}-connected" display="none" direction="inline" gap="small" alignItems="center">
-                 <s-badge tone="success" size="base">Connected</s-badge>
-                 ${supportsConnection ? `<s-button variant="secondary" tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : ""}
-                 ${supportsReporting && providerAvailable ? `<s-button variant="secondary" id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button>` : ""}
-                  ${id === "klaviyo" && providerAvailable ? `<s-stack id="klaviyo-spend-controls" display="none" direction="inline" gap="small"><s-button variant="secondary" commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button variant="secondary" id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show">Change value</s-button></s-stack>` : ""}
-            </s-stack>
-          </s-stack>`}
-        </s-grid>
-      </s-query-container>
-        ${showDivider ? "<s-divider></s-divider>" : ""}
+  return `<s-section id="${id}" heading="${label}">
+      <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
+        <s-stack gap="tight">
+          <s-paragraph>${description}</s-paragraph>
+          ${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
+          ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
+        </s-stack>
+        ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="tight"><div id="${id}-connect"><s-button id="${id}-connect-action" variant="primary" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></div><div id="${id}-connected" hidden>${["meta", "google_ads", "klaviyo"].includes(id) ? `<s-button tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : '<s-badge tone="success">Connected</s-badge>'}</div></s-stack>`}
+      </s-stack>
       ${parked ? "" : `<s-modal id="${id}-connect-modal" heading="Connect ${label} to AdsTable?" size="small-100">
         <s-stack gap="base">
-          ${connectCopy.map(paragraph => `<s-paragraph>${paragraph}</s-paragraph>`).join("")}
+          <s-paragraph>You will continue to ${label} to authorize AdsTable. Authorization alone does not complete the connection.</s-paragraph>
+          <s-paragraph>After authorization, you must select a verified account${id === "klaviyo" ? " and enter its Email Monthly Plan Cost" : ""}.</s-paragraph>
         </s-stack>
         <s-button slot="secondary-actions" commandFor="${id}-connect-modal" command="--hide">Cancel</s-button>
         <s-button slot="primary-action" variant="primary" data-provider="${id}" commandFor="${id}-connect-modal" command="--hide">Continue to ${label}</s-button>
       </s-modal>`}
       ${["meta", "google_ads", "klaviyo"].includes(id) && !parked ? `<s-modal id="${id}-disconnect-modal" heading="Disconnect ${label}?" size="small-100">
         <s-stack gap="base">
-          <s-paragraph>${disconnectCopy}</s-paragraph>
-          <s-paragraph>Historical analytics already stored will remain available. Other provider connections are not affected.</s-paragraph>
-          <s-paragraph>Data from the disconnected period may not be recovered automatically after reconnection.</s-paragraph>
+          <s-paragraph>AdsTable will stop new provider access and refresh activity for this connection.</s-paragraph>
+          <s-paragraph>Historical analytics will be preserved.</s-paragraph>
           <s-paragraph id="${id}-disconnect-message" aria-live="polite"></s-paragraph>
         </s-stack>
         <s-button slot="secondary-actions" commandFor="${id}-disconnect-modal" command="--hide">Cancel</s-button>
@@ -162,199 +183,135 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
       </s-modal>` : ""}
       ${id === "klaviyo" && providerAvailable ? `<s-stack id="klaviyo-accounts" gap="base">
         <s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">
-          <s-stack id="klaviyo-choice-step" display="none" gap="base">
+          <div id="klaviyo-choice-step" hidden><s-stack gap="base">
             <s-paragraph>Select the Klaviyo account AdsTable may use.</s-paragraph>
             <s-select id="klaviyo-choice" label="Klaviyo account"></s-select>
             <s-button id="klaviyo-choose" variant="primary">Continue</s-button>
-          </s-stack>
-          <s-stack id="klaviyo-cost-step" display="none" gap="base">
-            <s-paragraph>Enter your estimated Klaviyo email cost for a 30-day period. SMS costs are not included.</s-paragraph>
-            <s-paragraph>The value remains in the verified Klaviyo account currency. AdsTable reporting currency is handled separately.</s-paragraph>
-            <s-number-field id="klaviyo-cost" label="Estimated 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
+          </s-stack></div>
+          <div id="klaviyo-cost-step" hidden><s-stack gap="base">
+            <s-paragraph>The plan cost remains in the verified Klaviyo account currency. AdsTable reporting currency is handled separately.</s-paragraph>
+            <s-number-field id="klaviyo-cost" label="Email Monthly Plan Cost" min="0" max="99999999.99" step="0.01"></s-number-field>
             <s-button id="klaviyo-save" variant="primary">Save and connect</s-button>
-          </s-stack>
-          <s-stack id="klaviyo-retry-step" display="none"><s-button id="klaviyo-retry">Try again</s-button></s-stack>
+          </s-stack></div>
+          <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Try again</s-button></div>
           <s-button slot="secondary-actions" commandFor="klaviyo-account-modal" command="--hide">Cancel</s-button>
-        </s-modal>
-        <s-modal id="klaviyo-spend-update-modal" heading="Update Klaviyo email spend" size="small-100">
-          <s-stack gap="base">
-            <s-paragraph>Enter the new estimated Klaviyo email cost for the next 30-day period starting today. SMS costs are not included.</s-paragraph>
-            <s-number-field id="klaviyo-spend-update-value" label="Estimated 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
-            <s-paragraph id="klaviyo-spend-update-message" aria-live="polite"></s-paragraph>
-          </s-stack>
-          <s-button slot="secondary-actions" commandFor="klaviyo-spend-update-modal" command="--hide">Cancel</s-button>
-          <s-button id="klaviyo-spend-update-save" slot="primary-action" variant="primary">Save new value</s-button>
-        </s-modal>
-        <s-modal id="klaviyo-spend-correct-modal" heading="Change Klaviyo email spend" size="small-100">
-          <s-stack gap="base">
-            <s-paragraph>Change a previously saved amount. Its original start date will not change.</s-paragraph>
-            <s-select id="klaviyo-spend-history-choice" label="Saved period"></s-select>
-            <s-number-field id="klaviyo-spend-correct-value" label="Updated 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
-            <s-paragraph id="klaviyo-spend-correct-message" aria-live="polite"></s-paragraph>
-          </s-stack>
-          <s-button slot="secondary-actions" commandFor="klaviyo-spend-correct-modal" command="--hide">Cancel</s-button>
-          <s-button id="klaviyo-spend-correct-save" slot="primary-action" variant="primary">Save change</s-button>
         </s-modal>
       </s-stack>` : ""}
       ${["meta", "google_ads"].includes(id) && providerAvailable ? `<s-stack id="${id}-accounts" gap="base">
         <s-modal id="${id}-account-modal" heading="Select ${label} account">
           <s-stack gap="base">
             <s-paragraph>Select between 1 and 3 accounts returned by ${label}.</s-paragraph>
-            <s-paragraph>You can connect up to 3 accounts.</s-paragraph>
-            <s-stack id="${id}-choice" gap="small"></s-stack>
-            <s-paragraph id="${id}-choice-error" aria-live="polite"></s-paragraph>
-            <s-button id="${id}-save" variant="primary" disabled>Save and connect</s-button>
+            <s-choice-list id="${id}-choice" name="${id}-accounts" label="${label} accounts" details="You can connect up to 3 accounts." multiple></s-choice-list>
+            <s-button id="${id}-save" variant="primary">Save and connect</s-button>
           </s-stack>
           <s-button slot="secondary-actions" commandFor="${id}-account-modal" command="--hide">Cancel</s-button>
         </s-modal>
       </s-stack>` : ""}
-      ${["meta", "google_ads"].includes(id) && providerAvailable ? `<s-modal id="${id}-reporting-modal" heading="${label} reporting account" size="small-100">
-        <s-stack gap="base">
-          <s-paragraph>Choose the single connected account AdsTable will show in Dashboard, Funnel and Analysis.</s-paragraph>
-          <s-paragraph>Changing this preference does not reconnect ${label}, remove connected accounts or delete historical data.</s-paragraph>
-          <s-select id="${id}-reporting-choice" label="Reporting account"></s-select>
-          <s-paragraph id="${id}-reporting-message" aria-live="polite"></s-paragraph>
-        </s-stack>
-        <s-button slot="secondary-actions" commandFor="${id}-reporting-modal" command="--hide">Cancel</s-button>
-        <s-button id="${id}-reporting-save" slot="primary-action" variant="primary">Save reporting account</s-button>
-      </s-modal>` : ""}
-    </s-stack>`;
+    </s-section>`;
 }
 
 function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvailability = {}}) {
   if (typeof clientId !== "string" || !clientId.trim()) throw new TypeError("clientId is required");
   const providers = [
-    {id: "meta", label: "Meta"},
-    {id: "google_ads", label: "Google Ads"},
-    {id: "klaviyo", label: "Klaviyo"},
+    {id: "meta", label: "Meta", description: "Meta advertising performance and spend."},
+    {id: "google_ads", label: "Google Ads", description: "Google Ads performance and spend."},
+    {id: "klaviyo", label: "Klaviyo", description: "Email performance and monthly plan cost."},
+    {id: "tiktok", label: "TikTok", description: "TikTok connection is parked for a later release.", parked: true},
+    {id: "pinterest", label: "Pinterest", description: "Pinterest connection is not available in this release.", parked: true},
   ];
-  const sections = providers.map((provider, index) => renderProviderSection(
-    {...provider, showDivider: index < providers.length - 1},
-    providerOAuthEnabled,
-    providerAvailability[provider.id] ?? providerOAuthEnabled,
-  )).join("\n    ");
+  const sections = providers.map((provider) => renderProviderSection(provider, providerOAuthEnabled, provider.parked ? false : providerAvailability[provider.id] ?? providerOAuthEnabled)).join("\n    ");
   return `<!doctype html>
 <html lang="en">
 <head>
-  ${documentHead({clientId, title: "Settings — AdsTable"})}
+  ${documentHead({clientId, title: "Data sources — AdsTable"})}
 </head>
 <body>
   ${appNavigation()}
-  <s-page heading="Settings" inlineSize="base">
-    <s-banner id="status" heading="Settings" tone="info" hidden></s-banner>
-    <s-stack id="r6d4-google-acceptance" display="none">
+  <s-page heading="Data sources">
+    <s-link slot="breadcrumb-actions" href="/shopify/app">Home</s-link>
+    <s-banner id="status" heading="Data sources" tone="info" hidden></s-banner>
+    <div id="r6d4-google-acceptance" hidden>
       <s-section heading="Google Ads acceptance check">
         <s-stack gap="base">
           <s-paragraph>This one-time check reads the selected Google Ads accounts, Standard Ads and Performance Max Asset Groups through the completed E5 contract. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d4-google-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d4-google-run" variant="primary">Run read-only acceptance</s-button>
-          <s-stack id="r6d4-google-dataset-step" gap="base">
+          <div id="r6d4-google-dataset-step">
+            <s-stack gap="base">
               <s-paragraph>This controlled acceptance may write only real provider-verified Google Ads rows to Dataset V2. A verified empty result writes no synthetic rows and does not enable schedules or backfill.</s-paragraph>
               <s-paragraph id="r6d4-google-dataset-message" aria-live="polite"></s-paragraph>
               <s-button id="r6d4-google-dataset-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
-          </s-stack>
+            </s-stack>
+          </div>
         </s-stack>
       </s-section>
-    </s-stack>
-    <s-stack id="r6d3-meta-acceptance" display="none">
+    </div>
+    <div id="r6d3-meta-acceptance" hidden>
       <s-section heading="Meta acceptance check">
         <s-stack gap="base">
           <s-paragraph>This one-time check reads the selected Meta accounts and daily Insights through the completed E4 contract. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d3-meta-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d3-meta-run" variant="primary">Run read-only acceptance</s-button>
-          <s-stack id="r6d3-meta-dataset-step" gap="base">
+          <div id="r6d3-meta-dataset-step">
+            <s-stack gap="base">
               <s-paragraph>This controlled acceptance may write real provider-verified Meta rows to Dataset V2. A verified empty result writes no synthetic rows and does not enable schedules or backfill.</s-paragraph>
               <s-paragraph id="r6d3-meta-dataset-message" aria-live="polite"></s-paragraph>
               <s-button id="r6d3-meta-dataset-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
-          </s-stack>
+            </s-stack>
+          </div>
         </s-stack>
       </s-section>
-    </s-stack>
-    <s-stack id="r6d2-klaviyo-acceptance" display="none">
+    </div>
+    <div id="r6d2-klaviyo-acceptance" hidden>
       <s-section heading="Klaviyo acceptance check">
         <s-stack gap="base">
-          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs for one closed provider date. It does not write Dataset V2.</s-paragraph>
-          <s-date-field id="r6d2-klaviyo-provider-date" label="Provider date" details="Choose the closed date when the Campaign or Flow message was sent."></s-date-field>
+          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d2-klaviyo-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d2-klaviyo-run" variant="primary">Run read-only acceptance</s-button>
-          <s-stack id="r6d2-klaviyo-c6-step" gap="base">
+          <s-paragraph id="r6d5-klaviyo-diagnostic-message" aria-live="polite"></s-paragraph>
+          <s-button id="r6d5-klaviyo-diagnostic-run">Run 28 Sep journey diagnostic</s-button>
+          <div id="r6d2-klaviyo-c6-step">
+            <s-stack gap="base">
               <s-paragraph>This controlled acceptance may write real verified Klaviyo rows to Dataset V2. It never creates synthetic rows and does not enable scheduled production activation.</s-paragraph>
               <s-paragraph id="r6d2-klaviyo-c6-message" aria-live="polite"></s-paragraph>
-              <s-button id="r6d2-klaviyo-c6-run" tone="critical" disabled>Run controlled Dataset V2 acceptance</s-button>
-          </s-stack>
-          <s-stack id="r6d2-klaviyo-metric-step" display="none" gap="base">
+              <s-button id="r6d2-klaviyo-c6-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
+            </s-stack>
+          </div>
+          <div id="r6d2-klaviyo-metric-step" hidden>
+            <s-stack gap="base">
               <s-paragraph>Confirming stores only this workspace account's verified reporting metric. It does not write Dataset V2.</s-paragraph>
               <s-select id="r6d2-klaviyo-metric" label="Placed Order metric"></s-select>
               <s-button id="r6d2-klaviyo-metric-confirm" variant="primary">Confirm metric and continue</s-button>
-          </s-stack>
+            </s-stack>
+          </div>
         </s-stack>
       </s-section>
-    </s-stack>
-    <s-stack id="r6d5-klaviyo-historical-inventory" display="none">
-      <s-section heading="Klaviyo historical test-data inventory">
-        <s-stack gap="base">
-          <s-paragraph>This read-only check finds closed dates for sent Klaviyo campaigns and evaluates only the most recent date through the existing Campaign and Flow mapping. It does not write Dataset V2.</s-paragraph>
-          <s-paragraph id="r6d5-klaviyo-historical-message" aria-live="polite"></s-paragraph>
-          <s-button id="r6d5-klaviyo-historical-run" variant="primary">Run historical read-only inventory</s-button>
-          <s-paragraph>This separate read-only check inventories Flow status and known synthetic Event categories. Events remain diagnostic evidence and are not written as Campaign or Flow performance rows.</s-paragraph>
-          <s-paragraph id="r6d5-klaviyo-flow-event-message" aria-live="polite"></s-paragraph>
-          <s-button id="r6d5-klaviyo-flow-event-run" variant="primary">Run Flow/Event read-only inventory</s-button>
-        </s-stack>
+    </div>
+    <div id="currency-setup" hidden>
+      <s-section heading="Finish setup">
+        <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
       </s-section>
-    </s-stack>
-    <s-stack gap="large">
-      <s-stack gap="small">
-        <s-heading>Reporting Currency</s-heading>
-        <s-box padding="base" background="base" borderWidth="base" borderColor="base" borderRadius="base" accessibilityLabel="Reporting Currency">
-      <s-stack id="reporting-currency-summary" display="none" gap="small">
-          <s-paragraph id="reporting-currency-value"></s-paragraph>
-          <s-paragraph>This currency is fixed for the workspace and cannot be changed after confirmation.</s-paragraph>
-      </s-stack>
-      <s-stack id="currency-setup" display="none" gap="base">
-          <s-paragraph>Choose carefully. Reporting Currency cannot be changed after confirmation.</s-paragraph>
-          <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
-      </s-stack>
-        </s-box>
-      </s-stack>
+    </div>
     <s-modal id="platforms-currency-modal" heading="Choose reporting currency" size="small-100">
-      <s-stack id="currency-selection-step" gap="base">
-          <s-paragraph>This is independent from Shopify and provider account currencies.</s-paragraph>
-          <s-select id="reporting-currency" label="Reporting currency">
-            ${["TRY","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","SEK","NOK","DKK","PLN"].map(currency => `<s-option value="${currency}">${currency}</s-option>`).join("")}
-          </s-select>
-          <s-button id="review-reporting-currency" variant="primary">Review selection</s-button>
+      <s-stack gap="base">
+        <s-paragraph>This is independent from Shopify and provider account currencies.</s-paragraph>
+        <s-select id="reporting-currency" label="Reporting currency">
+          ${["TRY","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","SEK","NOK","DKK","PLN"].map(currency => `<s-option value="${currency}">${currency}</s-option>`).join("")}
+        </s-select>
+        <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
       </s-stack>
-      <s-stack id="currency-confirmation-step" display="none" gap="base">
-          <s-paragraph id="reporting-currency-confirmation"></s-paragraph>
-          <s-paragraph>This choice is permanent for this workspace. Removing the app does not delete data or reset this currency.</s-paragraph>
-          <s-button id="back-to-currency-selection">Back</s-button>
-          <s-button id="save-reporting-currency" variant="primary">Confirm reporting currency</s-button>
-      </s-stack>
-      <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
       <s-button slot="secondary-actions" commandFor="platforms-currency-modal" command="--hide">Cancel</s-button>
+      <s-button id="save-reporting-currency" slot="primary-action" variant="primary">Save and continue</s-button>
     </s-modal>
-      <s-stack gap="small">
-        <s-heading>Platforms</s-heading>
-        <s-box id="provider-sections" display="none" padding="base" background="base" borderWidth="base" borderColor="base" borderRadius="base" accessibilityLabel="Platforms">
-          <s-stack gap="base">${sections}</s-stack>
-        </s-box>
-      </s-stack>
-    </s-stack>
+    <div id="provider-sections" hidden>${sections}</div>
   </s-page>
   <script>
     (() => {
       "use strict";
       const status = document.getElementById("status");
       const currencySetup = document.getElementById("currency-setup");
-      const currencySummary = document.getElementById("reporting-currency-summary");
-      const currencyValue = document.getElementById("reporting-currency-value");
       const providerSections = document.getElementById("provider-sections");
       const currency = document.getElementById("reporting-currency");
-      const selectionStep = document.getElementById("currency-selection-step");
-      const confirmationStep = document.getElementById("currency-confirmation-step");
-      const confirmationText = document.getElementById("reporting-currency-confirmation");
-      const reviewCurrency = document.getElementById("review-reporting-currency");
-      const backToSelection = document.getElementById("back-to-currency-selection");
       const saveCurrency = document.getElementById("save-reporting-currency");
       const currencyMessage = document.getElementById("platforms-currency-message");
       const googleAcceptancePanel = document.getElementById("r6d4-google-acceptance");
@@ -369,18 +326,14 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const metaDatasetAcceptanceMessage = document.getElementById("r6d3-meta-dataset-message");
       const acceptancePanel = document.getElementById("r6d2-klaviyo-acceptance");
       const acceptanceButton = document.getElementById("r6d2-klaviyo-run");
-      const acceptanceProviderDate = document.getElementById("r6d2-klaviyo-provider-date");
       const acceptanceMessage = document.getElementById("r6d2-klaviyo-message");
       const metricStep = document.getElementById("r6d2-klaviyo-metric-step");
       const metricSelect = document.getElementById("r6d2-klaviyo-metric");
       const metricConfirm = document.getElementById("r6d2-klaviyo-metric-confirm");
       const datasetAcceptanceButton = document.getElementById("r6d2-klaviyo-c6-run");
       const datasetAcceptanceMessage = document.getElementById("r6d2-klaviyo-c6-message");
-      const historicalInventoryPanel = document.getElementById("r6d5-klaviyo-historical-inventory");
-      const historicalInventoryButton = document.getElementById("r6d5-klaviyo-historical-run");
-      const historicalInventoryMessage = document.getElementById("r6d5-klaviyo-historical-message");
-      const flowEventInventoryButton = document.getElementById("r6d5-klaviyo-flow-event-run");
-      const flowEventInventoryMessage = document.getElementById("r6d5-klaviyo-flow-event-message");
+      const journeyDiagnosticButton = document.getElementById("r6d5-klaviyo-diagnostic-run");
+      const journeyDiagnosticMessage = document.getElementById("r6d5-klaviyo-diagnostic-message");
       const params = new URLSearchParams(location.search);
       const sessionRequest = async (path, options = {}) => {
         if (!window.shopify || typeof window.shopify.idToken !== "function") throw new Error("SHOPIFY_SESSION_REQUIRED");
@@ -391,133 +344,51 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         return body;
       };
       const showProviders = reportingCurrency => {
-        currencySetup.display = "none";
-        currencySummary.display = "auto";
-        currencyValue.textContent = "Reporting Currency: " + reportingCurrency;
-        providerSections.display = "auto";
+        currencySetup.hidden = true;
+        providerSections.hidden = false;
         status.hidden = true;
-        if (providerSections.dataset.initialized !== "true") {
-          providerSections.dataset.initialized = "true";
-          (${initializeAdAccounts.toString()})();
-          (${initializeKlaviyoAccounts.toString()})();
-        }
+        (${initializeAdAccounts.toString()})();
+        (${initializeKlaviyoAccounts.toString()})();
       };
       const loadSettings = async () => {
         try {
           const settings = await sessionRequest("/api/shopify/workspace/settings");
           if (settings.status === "configured") return showProviders(settings.reporting_currency);
-          currencySetup.display = "auto";
-          currencySummary.display = "none";
-          providerSections.display = "none";
+          currencySetup.hidden = false;
+          providerSections.hidden = true;
           status.hidden = true;
         } catch {
-          currencySetup.display = "none";
-          currencySummary.display = "none";
-          providerSections.display = "none";
+          currencySetup.hidden = true;
+          providerSections.hidden = true;
           status.hidden = false;
           status.setAttribute("heading", "Open AdsTable from Shopify Admin");
           status.setAttribute("tone", "critical");
           status.textContent = "";
         }
       };
-      reviewCurrency.addEventListener("click", () => {
-        confirmationText.textContent = "Confirm " + String(currency.value) + " as the permanent Reporting Currency.";
-        selectionStep.display = "none";
-        confirmationStep.display = "auto";
-        currencyMessage.textContent = "";
-      });
-      backToSelection.addEventListener("click", () => {
-        confirmationStep.display = "none";
-        selectionStep.display = "auto";
-        currencyMessage.textContent = "";
-      });
       saveCurrency.addEventListener("click", async () => {
         saveCurrency.disabled = true;
         saveCurrency.loading = true;
         try {
           const result = await sessionRequest("/api/shopify/workspace/reporting-currency", {method: "POST", body: JSON.stringify({currency: String(currency.value)})});
           showProviders(result.reporting_currency);
-          location.assign("/shopify/app/settings");
         } catch (error) {
-          currencyMessage.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Currency is already configured. Reload Settings." : "Please choose a supported currency and try again.";
+          currencyMessage.textContent = error.message === "REPORTING_CURRENCY_ALREADY_CONFIGURED" ? "Currency is already configured. Reload Data sources." : "Please choose a supported currency and try again.";
         } finally { saveCurrency.disabled = false; saveCurrency.loading = false; }
       });
-      if (params.get("acceptance") === "r6d5-klaviyo") {
-        historicalInventoryPanel.display = "auto";
-        historicalInventoryButton.addEventListener("click", async () => {
-          historicalInventoryButton.disabled = true;
-          historicalInventoryButton.loading = true;
-          historicalInventoryMessage.textContent = "Inspecting closed sent-campaign dates without writing Dataset V2…";
-          try {
-            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/historical-inventory", {method: "POST"});
-            if (result.status !== "PASS_R6_D5_A_KLAVIYO_HISTORICAL_INVENTORY") throw new Error("KLAVIYO_HISTORICAL_INVENTORY_FAILED");
-            const campaignSummary = result.total_campaign_count + " campaign(s), " + result.sent_campaign_count + " Sent; " +
-              result.sent_with_scheduled_at_count + " with scheduled_at, " +
-              result.sent_without_scheduled_at_count + " without scheduled_at. ";
-            historicalInventoryMessage.textContent = result.checked_date_count === 0
-              ? "PASS — " + campaignSummary + "No closed sent date. Dataset V2 writes: 0."
-              : "PASS — " + campaignSummary + result.closed_sent_date_count + " closed sent date(s) found; " +
-                result.row_count + " verified row(s) mapped on " + result.provider_date + ". Dataset V2 writes: 0.";
-          } catch (error) {
-            historicalInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_HISTORICAL_INVENTORY_FAILED";
-            historicalInventoryButton.disabled = false;
-          } finally { historicalInventoryButton.loading = false; }
-        });
-        flowEventInventoryButton.addEventListener("click", async () => {
-          flowEventInventoryButton.disabled = true;
-          flowEventInventoryButton.loading = true;
-          flowEventInventoryMessage.textContent = "Inspecting Flow status and Event dates without writing Dataset V2…";
-          try {
-            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/flow-event-inventory", {method: "POST"});
-            if (result.status !== "PASS_R6_D5_A2_KLAVIYO_FLOW_EVENT_INVENTORY") throw new Error("KLAVIYO_FLOW_EVENT_INVENTORY_FAILED");
-            const counts = result.event_counts;
-            const range = result.earliest_event_date
-              ? result.earliest_event_date + " to " + result.latest_event_date
-              : "no event date";
-            flowEventInventoryMessage.textContent =
-              "PASS — " + result.flow_count + " flow(s): " + result.flow_status_counts.live + " live, " +
-              result.flow_status_counts.manual + " manual, " + result.flow_status_counts.draft + " draft, " +
-              result.flow_status_counts.other + " other. " + result.scanned_event_count + " event(s) scanned (" + range + "), " +
-              result.attributed_event_count + " attributed; Received Email " + counts.received_email +
-              ", Opened Email " + counts.opened_email + ", Clicked Email " + counts.clicked_email +
-              ", Added to Cart " + counts.added_to_cart + ", Started Checkout " + counts.started_checkout +
-              ", Placed Order " + counts.placed_order + ". Scan truncated: " + (result.event_scan_truncated ? "yes" : "no") +
-              ". Dataset V2 writes: 0.";
-          } catch (error) {
-            flowEventInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_FLOW_EVENT_INVENTORY_FAILED";
-            flowEventInventoryButton.disabled = false;
-          } finally { flowEventInventoryButton.loading = false; }
-        });
-      }
       if (params.get("acceptance") === "r6d2-klaviyo") {
-        acceptancePanel.display = "auto";
-        const latestClosedDate = new Date(Date.now() - (48 * 60 * 60 * 1000)).toISOString().slice(0, 10);
-        acceptanceProviderDate.value = latestClosedDate;
-        acceptanceProviderDate.setAttribute("allow", "--" + latestClosedDate);
-        const acceptanceRequest = () => JSON.stringify({provider_date: String(acceptanceProviderDate.value || "")});
+        acceptancePanel.hidden = false;
         const showAcceptanceResult = result => {
-          if (result.status !== "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT") {
-            datasetAcceptanceButton.disabled = true;
-            acceptanceMessage.textContent = "The acceptance result could not be verified.";
-            return;
-          }
-          datasetAcceptanceButton.disabled = result.empty_provider_result === true;
-          const outcome = result.empty_provider_result ? "VERIFIED EMPTY" : "PASS";
-          acceptanceMessage.textContent = outcome + " — " + result.provider_date + ": " +
-            result.campaign_row_count + " Campaign row(s), " + result.flow_row_count +
-            " Flow row(s). Account, Time and FX checks succeeded. Dataset V2 writes: 0.";
+          acceptanceMessage.textContent = result.status === "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT"
+            ? "PASS — Account, Campaign, Flow, Time and FX checks succeeded. Dataset V2 writes: 0."
+            : "The acceptance result could not be verified.";
         };
-        acceptanceProviderDate.addEventListener("change", () => {
-          datasetAcceptanceButton.disabled = true;
-          acceptanceMessage.textContent = "Run the read-only acceptance for the selected provider date.";
-          datasetAcceptanceMessage.textContent = "";
-        });
         acceptanceButton.addEventListener("click", async () => {
           acceptanceButton.disabled = true;
           acceptanceButton.loading = true;
           acceptanceMessage.textContent = "Running the read-only checks…";
           try {
-            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST", body: acceptanceRequest()});
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"});
             showAcceptanceResult(result);
           } catch (error) {
             if (error.message === "KLAVIYO_PREFLIGHT_METRIC_REQUIRED") {
@@ -531,7 +402,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
                   metricSelect.appendChild(option);
                 });
                 metricSelect.value = discovery.candidates[0]?.id || "";
-                metricStep.display = "auto";
+                metricStep.hidden = false;
                 acceptanceMessage.textContent = "Select the provider-verified sales source. AdsTable will bind its exact Added to Cart, Checkout and Placed Order metrics for this workspace and Klaviyo account.";
               } catch (discoveryError) {
                 acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(discoveryError.message || "") ? discoveryError.message : "KLAVIYO_METRIC_DISCOVERY_FAILED";
@@ -542,6 +413,25 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             acceptanceButton.disabled = false;
           } finally { acceptanceButton.loading = false; }
         });
+        journeyDiagnosticButton.addEventListener("click", async () => {
+          journeyDiagnosticButton.disabled = true;
+          journeyDiagnosticButton.loading = true;
+          journeyDiagnosticMessage.textContent = "Reading the 28 September Campaign and Flow journey reports…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/journey-diagnostic", {
+              method: "POST",
+              body: JSON.stringify({provider_date: "2026-09-28"}),
+            });
+            const diagnostic = result.journey_diagnostics;
+            const summary = stage => "C " + stage.campaign.row_count + "/" + stage.campaign.conversion_count + ", F " + stage.flow.row_count + "/" + stage.flow.conversion_count;
+            journeyDiagnosticMessage.textContent = result.status === "PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC"
+              ? "PASS — 2026-09-28. Rows/conversions: Placed Order " + summary(diagnostic.purchase) + "; Added to Cart " + summary(diagnostic.add_to_cart) + "; Checkout " + summary(diagnostic.checkout) + ". Unmatched message keys: ATC " + (diagnostic.add_to_cart.campaign.unmatched_key_count + diagnostic.add_to_cart.flow.unmatched_key_count) + ", Checkout " + (diagnostic.checkout.campaign.unmatched_key_count + diagnostic.checkout.flow.unmatched_key_count) + ". Dataset V2 writes: 0."
+              : "The journey diagnostic result could not be verified.";
+          } catch (error) {
+            journeyDiagnosticMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
+            journeyDiagnosticButton.disabled = false;
+          } finally { journeyDiagnosticButton.loading = false; }
+        });
         datasetAcceptanceButton.addEventListener("click", async () => {
           datasetAcceptanceButton.disabled = true;
           datasetAcceptanceButton.loading = true;
@@ -549,11 +439,10 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           try {
             const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/acceptance", {
               method: "POST",
-              body: JSON.stringify({confirmation: "RUN_R6_D2_C6_KLAVIYO_WRITE", provider_date: String(acceptanceProviderDate.value || "")}),
+              body: JSON.stringify({confirmation: "RUN_R6_D2_C6_KLAVIYO_WRITE"}),
             });
             datasetAcceptanceMessage.textContent = result.status === "PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE"
-              ? "PASS — " + result.provider_date + ": attempted " + result.attempted + ", persisted " + result.persisted +
-                "; Campaign rows " + result.campaign_row_count + ", Flow rows " + result.flow_row_count + "."
+              ? "PASS — attempted: " + result.attempted + ", persisted: " + result.persisted + ", verified empty: " + result.empty_provider_result + "."
               : "The Dataset V2 acceptance result could not be verified.";
           } catch (error) {
             datasetAcceptanceMessage.textContent = (/^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_DATASET_ACCEPTANCE_FAILED") + ". Do not retry; review runtime evidence.";
@@ -565,9 +454,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             acceptanceMessage.textContent = "Verifying and binding the Klaviyo commerce metrics…";
           try {
             await sessionRequest("/api/shopify/providers/klaviyo/runtime/metrics/select", {method: "POST", body: JSON.stringify({metric_id: String(metricSelect.value || "")})});
-            metricStep.display = "none";
+            metricStep.hidden = true;
             acceptanceMessage.textContent = "Metric confirmed. Running the read-only acceptance…";
-            showAcceptanceResult(await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST", body: acceptanceRequest()}));
+            showAcceptanceResult(await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"}));
           } catch (error) {
             acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
             metricConfirm.disabled = false;
@@ -575,7 +464,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         });
       }
       if (params.get("acceptance") === "r6d3-meta") {
-        metaAcceptancePanel.display = "auto";
+        metaAcceptancePanel.hidden = false;
         metaAcceptanceButton.addEventListener("click", async () => {
           metaAcceptanceButton.disabled = true;
           metaAcceptanceButton.loading = true;
@@ -608,7 +497,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         });
       }
       if (params.get("acceptance") === "r6d4-google") {
-        googleAcceptancePanel.display = "auto";
+        googleAcceptancePanel.hidden = false;
         googleAcceptanceButton.addEventListener("click", async () => {
           googleAcceptanceButton.disabled = true;
           googleAcceptanceButton.loading = true;
@@ -691,23 +580,6 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
 </html>`;
 }
 
-function renderEmbeddedPlaceholder({clientId, page}) {
-  if (typeof clientId !== "string" || !clientId.trim()) throw new TypeError("clientId is required");
-  if (!["Funnel", "Analysis"].includes(page)) throw new TypeError("page is required");
-  return `<!doctype html>
-<html lang="en">
-<head>
-  ${documentHead({clientId, title: page + " — AdsTable"})}
-</head>
-<body>
-  ${appNavigation()}
-  <s-page heading="${page}">
-    <s-banner heading="${page}" tone="info">This Shopify-native workspace surface is reserved for the planned ${page} package.</s-banner>
-  </s-page>
-</body>
-</html>`;
-}
-
 function setEmbeddedHeaders(res) {
   res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
   res.set("CDN-Cache-Control", "no-store");
@@ -731,18 +603,10 @@ function registerEmbeddedAppHome(app, {clientId}) {
 function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}) {
   if (!app || typeof app.get !== "function") throw new TypeError("app.get is required");
   const html = renderEmbeddedPlatforms({clientId, providerOAuthEnabled});
-  const settingsHandler = (_req, res) => {
+  app.get("/shopify/app/platforms", (_req, res) => {
     setEmbeddedHeaders(res);
     return res.type("html").send(html);
-  };
-  app.get("/shopify/app/settings", settingsHandler);
-  app.get("/shopify/app/platforms", settingsHandler);
-  for (const page of ["Funnel", "Analysis"]) {
-    app.get("/shopify/app/" + page.toLowerCase(), (_req, res) => {
-      setEmbeddedHeaders(res);
-      return res.type("html").send(renderEmbeddedPlaceholder({clientId, page}));
-    });
-  }
+  });
 }
 
-module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms, renderEmbeddedPlaceholder});
+module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms});

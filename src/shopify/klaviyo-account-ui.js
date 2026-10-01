@@ -36,6 +36,7 @@ function initializeKlaviyoAccounts() {
   const spendCorrectMessage = document.getElementById("klaviyo-spend-correct-message");
   let accounts = [];
   let selected = null;
+  let spendHistoryEntries = [];
   let busy = false;
   const setVisible = (element, visible) => {
     if (element) element.display = visible ? "auto" : "none";
@@ -79,6 +80,7 @@ function initializeKlaviyoAccounts() {
   async function loadSpendHistory() {
     const result = await request("/api/shopify/providers/klaviyo/spend-history");
     const entries = Array.isArray(result.entries) ? result.entries : [];
+    spendHistoryEntries = entries;
     if (spendHistoryChoice) {
       spendHistoryChoice.replaceChildren();
       for (const [index, entry] of entries.entries()) {
@@ -237,9 +239,8 @@ function initializeKlaviyoAccounts() {
     } catch (error) { showError(error); }
     finally { busy = false; save.disabled = false; save.loading = false; }
   });
-  if (spendHistoryChoice) spendHistoryChoice.addEventListener("change", async () => {
-    const entries = await loadSpendHistory();
-    const entry = entries.find(item => item.effective_from === spendHistoryChoice.value);
+  if (spendHistoryChoice) spendHistoryChoice.addEventListener("change", () => {
+    const entry = spendHistoryEntries.find(item => item.effective_from === spendHistoryChoice.value);
     if (entry && spendCorrectValue) spendCorrectValue.value = entry.estimated_30_day_email_spend;
   });
   if (spendUpdateSave) spendUpdateSave.addEventListener("click", async () => {

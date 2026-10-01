@@ -359,6 +359,46 @@ test("Update spend posts the new amount and confirms derived saved-period ranges
   assert.equal(elements.get("klaviyo-spend-history-choice").children[1].textContent, "2026-09-28 / 2026-09-29 · 32.00 USD");
 });
 
+test("Change value keeps the selected saved period and corrects that period only", async () => {
+  const elements = new Map();
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);},hideOverlay(){this.hidden=true;}});
+  for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-resume","klaviyo-connected","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-update-modal","klaviyo-spend-update-value","klaviyo-spend-update-save","klaviyo-spend-update-message","klaviyo-spend-correct-modal","klaviyo-spend-correct-open","klaviyo-spend-history-choice","klaviyo-spend-correct-value","klaviyo-spend-correct-save","klaviyo-spend-correct-message"]) elements.set(id, element());
+  const requests = [];
+  const entries = [
+    {effective_from:"2026-10-01",estimated_30_day_email_spend:"37.00",currency:"USD"},
+    {effective_from:"2026-09-30",estimated_30_day_email_spend:"35.00",currency:"USD"},
+    {effective_from:"2026-09-28",estimated_30_day_email_spend:"32.00",currency:"USD"},
+  ];
+  const context = {URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
+    requests.push({url,options});
+    if (url.endsWith("/accounts/status")) return response(200,{status:"connected",estimated_30_day_email_spend:"37.00",currency:"USD"});
+    if (url.endsWith("/spend-history/correct")) return response(200,{status:"corrected",estimated_30_day_email_spend:"31.00",effective_from:"2026-09-28"});
+    if (url.endsWith("/spend-history")) return response(200,{entries});
+    return response(503,{code:"KLAVIYO_UNAVAILABLE"});
+  }};
+  vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
+  for (let attempt = 0; attempt < 10 && elements.get("klaviyo-spend-history-choice").children.length < 3; attempt += 1) {
+    await new Promise(resolve=>setImmediate(resolve));
+  }
+
+  const historyRequestsBefore = requests.filter(item => item.url.endsWith("/spend-history")).length;
+  elements.get("klaviyo-spend-history-choice").value = "2026-09-28";
+  await elements.get("klaviyo-spend-history-choice").events.change();
+
+  assert.equal(elements.get("klaviyo-spend-history-choice").value, "2026-09-28");
+  assert.equal(elements.get("klaviyo-spend-correct-value").value, "32.00");
+  assert.equal(requests.filter(item => item.url.endsWith("/spend-history")).length, historyRequestsBefore);
+
+  elements.get("klaviyo-spend-correct-value").value = "31";
+  await elements.get("klaviyo-spend-correct-save").events.click();
+  const correction = requests.find(item => item.url.endsWith("/spend-history/correct"));
+  assert.equal(correction.options.method, "POST");
+  assert.deepEqual(JSON.parse(correction.options.body), {
+    effective_from:"2026-09-28",
+    estimated_30_day_email_spend:"31",
+  });
+});
+
 test("UI reads stored status on page load without requesting Klaviyo accounts", async () => {
   const elements=new Map();
   const element=()=>({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});

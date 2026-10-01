@@ -167,7 +167,7 @@ test('Google search uses the selected manager context and safely classifies unau
 
 test('Google acceptance surface is hidden unless the explicit operator parameter is used', () => {
   const html = renderEmbeddedPlatforms({clientId: 'client', providerOAuthEnabled: true, providerAvailability: {google_ads: true}});
-  assert.match(html, /id="r6d4-google-acceptance" hidden/);
+  assert.match(html, /id="r6d4-google-acceptance" display="none"/);
   assert.match(html, /params\.get\("acceptance"\) === "r6d4-google"/);
   assert.match(html, /\/api\/shopify\/providers\/google_ads\/runtime\/preflight/);
   assert.match(html, /Dataset V2 writes: 0/);
@@ -176,4 +176,5 @@ test('Google acceptance surface is hidden unless the explicit operator parameter
 test('previous-date helper selects the closed day before the provider business date', () => {
   assert.equal(previousDate('2026-03-01'), '2026-02-28');
 });
+
 

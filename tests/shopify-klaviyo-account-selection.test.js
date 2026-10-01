@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
-const {createKlaviyoAccountSelection, planCost} = require("../src/shopify/klaviyo-account-selection");
+const {createKlaviyoAccountSelection, planCost, businessDate} = require("../src/shopify/klaviyo-account-selection");
 const {createWorkspaceProviderConnectionStore} = require("../src/shopify/workspace-provider-connection-store");
 const {registerShopifyKlaviyoAccountRoutes} = require("../src/routes/shopify-klaviyo-account-routes");
 const {createEmbeddedOAuthReturn} = require("../src/shopify/embedded-oauth-return");
@@ -122,6 +122,60 @@ test("expired access token refreshes once, persists encrypted store update, and 
   assert.equal(requests, 3);
   assert.equal(calls[0].refreshToken, "new-refresh");
   assert.equal(calls[1].version, "version-2");
+});
+
+test("connected Update spend uses canonical token lifecycle before persisting the new period", async () => {
+  const connection = {
+    status: "connected",
+    active_account_id: "account-a",
+    account_currency: "USD",
+    accessToken: "expired-access",
+    refreshToken: "secret-refresh",
+    updated_at: "version-2",
+  };
+  const writes = [];
+  let lifecycleCalls = 0;
+  let providerCalls = 0;
+  const store = {
+    readKlaviyo: async auth => {
+      assert.deepEqual(auth, authority);
+      return connection;
+    },
+    updateKlaviyoSpend: async input => writes.push(input),
+    refreshKlaviyo: async () => {
+      throw new Error("pending-account refresh must not be used for a connected account");
+    },
+  };
+  const tokenLifecycle = {
+    run: async ({authority: inputAuthority, operation}) => {
+      lifecycleCalls++;
+      assert.deepEqual(inputAuthority, authority);
+      return {
+        value: await operation({accessToken: "new-access"}),
+        connection: {version: "canonical-version-3"},
+      };
+    },
+  };
+  const selection = createKlaviyoAccountSelection({
+    store,
+    tokenLifecycle,
+    fetchImpl: async (url, options) => {
+      providerCalls++;
+      assert.equal(url, "https://a.klaviyo.com/api/accounts/");
+      assert.equal(options.headers.Authorization, "Bearer new-access");
+      return response(200, payload);
+    },
+  });
+
+  const result = await selection.updateSpend(authority, {estimated_30_day_email_spend: "37"});
+
+  assert.equal(lifecycleCalls, 1);
+  assert.equal(providerCalls, 1);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].amount, "37.00");
+  assert.equal(writes[0].effectiveFrom, businessDate("UTC"));
+  assert.equal(result.estimated_30_day_email_spend, "37.00");
+  assert.equal(result.effective_from, businessDate("UTC"));
 });
 
 test("provider 401 and 429 produce recoverable errors without retry loops", async () => {
@@ -244,7 +298,7 @@ test("OAuth returns to installed Shopify shop and rejects external redirect targ
 
 test("UI requires account choice then explicit cost save and prevents duplicate submits", async () => {
   const elements=new Map();
-  const element=()=>({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element=()=>({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-correct-open","klaviyo-spend-history-choice","klaviyo-spend-correct-value"]) elements.set(id,element());
   const requests=[];
   let finishSave;
@@ -256,10 +310,10 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(elements.get("klaviyo-cost-step").hidden,true);
+  assert.equal(elements.get("klaviyo-cost-step").display,"none");
   assert.equal(elements.get("klaviyo-choice").children[0].textContent,"<script>untrusted</script> (a)");
   elements.get("klaviyo-choose").events.click();
-  assert.equal(elements.get("klaviyo-cost-step").hidden,false);
+  assert.equal(elements.get("klaviyo-cost-step").display,"auto");
   elements.get("klaviyo-cost").value="0";
   const saving=elements.get("klaviyo-save").events.click();
   await elements.get("klaviyo-save").events.click();
@@ -269,14 +323,85 @@ test("UI requires account choice then explicit cost save and prevents duplicate 
   finishSave(); await saving;
   assert.match(elements.get("klaviyo-message").textContent,/Connected: Verified/);
   assert.equal(requests.at(-1).url,"/api/shopify/providers/klaviyo/spend-history");
-  assert.equal(elements.get("klaviyo-spend-controls").hidden,false);
-  assert.equal(elements.get("klaviyo-spend-correct-open").hidden,false);
+  assert.equal(elements.get("klaviyo-spend-controls").display,"auto");
+  assert.equal(elements.get("klaviyo-spend-correct-open").display,"auto");
   assert.equal(elements.get("klaviyo-spend-history-choice").children.length,1);
+});
+
+test("Update spend posts the new amount and confirms derived saved-period ranges before closing", async () => {
+  const elements = new Map();
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);},hideOverlay(){this.hidden=true;}});
+  for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-resume","klaviyo-connected","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-update-modal","klaviyo-spend-update-value","klaviyo-spend-update-save","klaviyo-spend-update-message","klaviyo-spend-correct-modal","klaviyo-spend-correct-open","klaviyo-spend-history-choice","klaviyo-spend-correct-value","klaviyo-spend-correct-save","klaviyo-spend-correct-message"]) elements.set(id, element());
+  const requests = [];
+  let updated = false;
+  const context = {URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
+    requests.push({url,options});
+    if (url.endsWith("/accounts/status")) return response(200,{status:"connected",estimated_30_day_email_spend:updated ? "35.00" : "32.00",currency:"USD"});
+    if (url.endsWith("/spend-history/update")) {
+      updated = true;
+      return response(200,{status:"connected",estimated_30_day_email_spend:"35.00",currency:"USD",effective_from:"2026-09-30"});
+    }
+    if (url.endsWith("/spend-history")) return response(200,{entries:updated ? [
+      {effective_from:"2026-09-30",estimated_30_day_email_spend:"35.00",currency:"USD"},
+      {effective_from:"2026-09-28",estimated_30_day_email_spend:"32.00",currency:"USD"},
+    ] : [{effective_from:"2026-09-28",estimated_30_day_email_spend:"32.00",currency:"USD"}]});
+    return response(503,{code:"KLAVIYO_UNAVAILABLE"});
+  }};
+  vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
+  for (let attempt = 0; attempt < 10 && requests.length < 2; attempt += 1) await new Promise(resolve=>setImmediate(resolve));
+  elements.get("klaviyo-spend-update-value").value = "35";
+  await elements.get("klaviyo-spend-update-save").events.click();
+  const update = requests.find(item => item.url.endsWith("/spend-history/update"));
+  assert.equal(update.options.method, "POST");
+  assert.deepEqual(JSON.parse(update.options.body), {estimated_30_day_email_spend:"35"});
+  assert.equal(elements.get("klaviyo-spend-update-modal").hidden, true);
+  assert.equal(elements.get("klaviyo-spend-history-choice").children[0].textContent, "2026-09-30 / Present · 35.00 USD");
+  assert.equal(elements.get("klaviyo-spend-history-choice").children[1].textContent, "2026-09-28 / 2026-09-29 · 32.00 USD");
+});
+
+test("Change value keeps the selected saved period and corrects that period only", async () => {
+  const elements = new Map();
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);},hideOverlay(){this.hidden=true;}});
+  for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-resume","klaviyo-connected","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-update-modal","klaviyo-spend-update-value","klaviyo-spend-update-save","klaviyo-spend-update-message","klaviyo-spend-correct-modal","klaviyo-spend-correct-open","klaviyo-spend-history-choice","klaviyo-spend-correct-value","klaviyo-spend-correct-save","klaviyo-spend-correct-message"]) elements.set(id, element());
+  const requests = [];
+  const entries = [
+    {effective_from:"2026-10-01",estimated_30_day_email_spend:"37.00",currency:"USD"},
+    {effective_from:"2026-09-30",estimated_30_day_email_spend:"35.00",currency:"USD"},
+    {effective_from:"2026-09-28",estimated_30_day_email_spend:"32.00",currency:"USD"},
+  ];
+  const context = {URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
+    requests.push({url,options});
+    if (url.endsWith("/accounts/status")) return response(200,{status:"connected",estimated_30_day_email_spend:"37.00",currency:"USD"});
+    if (url.endsWith("/spend-history/correct")) return response(200,{status:"corrected",estimated_30_day_email_spend:"31.00",effective_from:"2026-09-28"});
+    if (url.endsWith("/spend-history")) return response(200,{entries});
+    return response(503,{code:"KLAVIYO_UNAVAILABLE"});
+  }};
+  vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
+  for (let attempt = 0; attempt < 10 && elements.get("klaviyo-spend-history-choice").children.length < 3; attempt += 1) {
+    await new Promise(resolve=>setImmediate(resolve));
+  }
+
+  const historyRequestsBefore = requests.filter(item => item.url.endsWith("/spend-history")).length;
+  elements.get("klaviyo-spend-history-choice").value = "2026-09-28";
+  await elements.get("klaviyo-spend-history-choice").events.change();
+
+  assert.equal(elements.get("klaviyo-spend-history-choice").value, "2026-09-28");
+  assert.equal(elements.get("klaviyo-spend-correct-value").value, "32.00");
+  assert.equal(requests.filter(item => item.url.endsWith("/spend-history")).length, historyRequestsBefore);
+
+  elements.get("klaviyo-spend-correct-value").value = "31";
+  await elements.get("klaviyo-spend-correct-save").events.click();
+  const correction = requests.find(item => item.url.endsWith("/spend-history/correct"));
+  assert.equal(correction.options.method, "POST");
+  assert.deepEqual(JSON.parse(correction.options.body), {
+    effective_from:"2026-09-28",
+    estimated_30_day_email_spend:"31",
+  });
 });
 
 test("UI reads stored status on page load without requesting Klaviyo accounts", async () => {
   const elements=new Map();
-  const element=()=>({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element=()=>({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for(const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm","klaviyo-spend-controls","klaviyo-spend-correct-open"]) elements.set(id,element());
   const requests=[];
   const context={URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
@@ -285,19 +410,19 @@ test("UI reads stored status on page load without requesting Klaviyo accounts", 
     return response(200,{status:"connected",estimated_30_day_email_spend:"5.00",currency:"USD"});
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
-  for (let attempt = 0; attempt < 10 && elements.get("klaviyo-spend-correct-open").hidden !== true; attempt += 1) {
+  for (let attempt = 0; attempt < 10 && elements.get("klaviyo-spend-correct-open").display !== "none"; attempt += 1) {
     await new Promise(resolve=>setImmediate(resolve));
   }
   assert.deepEqual(requests.map(item=>item.url),["/api/shopify/providers/klaviyo/accounts/status","/api/shopify/providers/klaviyo/spend-history"]);
-  assert.equal(elements.get("klaviyo-connect").hidden,true);
-  assert.equal(elements.get("klaviyo-spend-controls").hidden,false);
-  assert.equal(elements.get("klaviyo-spend-correct-open").hidden,true);
+  assert.equal(elements.get("klaviyo-connect").display,"none");
+  assert.equal(elements.get("klaviyo-spend-controls").display,"auto");
+  assert.equal(elements.get("klaviyo-spend-correct-open").display,"none");
   assert.equal(elements.get("klaviyo-message").textContent,"Connected · 5.00 USD / 30 days");
 });
 
 test("R5 operator parameter invokes only the no-refresh verification route", async () => {
   const elements = new Map();
-  const element = () => ({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm"]) elements.set(id,element());
   const requests = [];
   const context = {URLSearchParams,location:{search:"?r5_read_only_verify=1"},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
@@ -313,19 +438,19 @@ test("R5 operator parameter invokes only the no-refresh verification route", asy
 
 test("expired R5 verification explains clean reconnect requirement and keeps early Connect hidden", async () => {
   const elements = new Map();
-  const element = () => ({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm"]) elements.set(id,element());
   const context = {URLSearchParams,location:{search:"?r5_read_only_verify=1"},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async()=>response(409,{code:"KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED"})};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(elements.get("klaviyo-connect").hidden,true);
-  assert.equal(elements.get("klaviyo-reset-step").hidden,false);
+  assert.equal(elements.get("klaviyo-connect").display,"none");
+  assert.equal(elements.get("klaviyo-reset-step").display,"auto");
   assert.equal(elements.get("klaviyo-message").textContent,"The existing Klaviyo authorization has expired. A clean connection must be prepared before reconnecting.");
 });
 
 test("reset confirmation performs one session-bound POST and keeps reconnect closed", async () => {
   const elements = new Map();
-  const element = () => ({hidden:false,value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
+  const element = () => ({hidden:false,display:"auto",value:"",textContent:"",events:{},children:[],setAttribute(k,v){this[k]=v;},addEventListener(k,v){this.events[k]=v;},replaceChildren(){this.children=[];},append(x){this.children.push(x);}});
   for (const id of ["klaviyo-accounts","klaviyo-message","klaviyo-choice","klaviyo-choice-step","klaviyo-choose","klaviyo-cost-step","klaviyo-cost","klaviyo-save","klaviyo-retry","klaviyo-retry-step","klaviyo-connect","klaviyo-reset-step","klaviyo-reset-confirm"]) elements.set(id,element());
   const requests = [];
   const context = {URLSearchParams,location:{search:""},document:{getElementById:id=>elements.get(id),createElement:element},window:{shopify:{idToken:async()=>"session"}},fetch:async(url,options)=>{
@@ -335,7 +460,7 @@ test("reset confirmation performs one session-bound POST and keeps reconnect clo
   }};
   vm.runInNewContext(`(${initializeKlaviyoAccounts.toString()})()`,context);
   await new Promise(resolve=>setImmediate(resolve));
-  assert.equal(elements.get("klaviyo-reset-step").hidden,false);
+  assert.equal(elements.get("klaviyo-reset-step").display,"auto");
   await elements.get("klaviyo-reset-confirm").events.click();
   assert.deepEqual(requests.map(item=>item.url),[
     "/api/shopify/providers/klaviyo/accounts/status",
@@ -343,8 +468,8 @@ test("reset confirmation performs one session-bound POST and keeps reconnect clo
   ]);
   assert.equal(requests[1].options.method,"POST");
   assert.deepEqual(JSON.parse(requests[1].options.body),{confirmation:"REVOKE_KLAVIYO_AND_START_FRESH"});
-  assert.equal(elements.get("klaviyo-connect").hidden,true);
-  assert.equal(elements.get("klaviyo-reset-step").hidden,true);
+  assert.equal(elements.get("klaviyo-connect").display,"none");
+  assert.equal(elements.get("klaviyo-reset-step").display,"none");
   assert.equal(elements.get("klaviyo-message").textContent,"Old Klaviyo connection removed. Clean connection setup is not open yet.");
 });
 

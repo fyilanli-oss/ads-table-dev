@@ -30,6 +30,9 @@ function initializeAdAccounts() {
     let selectedIds = [];
     let selectionError = '';
     let busy = false;
+    const setVisible = (element, visible) => {
+      if (element) element.display = visible ? 'auto' : 'none';
+    };
     const request = async (path, body) => {
       const token = await window.shopify.idToken();
       const response = await fetch('/api/shopify/providers/' + provider + '/accounts' + path, {
@@ -51,7 +54,7 @@ function initializeAdAccounts() {
       reportingAccount = result?.reporting_account || reportingAccount;
       const available = result?.status === 'connected' && connectedAccounts.length > 0 && reportingAccount?.id;
       if (!reporting || !reportingSummary || !reportingChoice) return;
-      reporting.hidden = !available;
+      setVisible(reporting, Boolean(available));
       if (!available) return;
       const current = connectedAccounts.find(account => String(account.id) === String(reportingAccount.id));
       reportingSummary.textContent = 'Reporting Account: ' + String(current?.name || reportingAccount.name || reportingAccount.id);
@@ -108,9 +111,9 @@ function initializeAdAccounts() {
         }
         syncSelection();
         if (!accounts.length) throw new Error('PROVIDER_ACCOUNTS_UNAVAILABLE');
-        connect.hidden = true;
-        if (resume) resume.hidden = false;
-        if (connected) connected.hidden = true;
+        setVisible(connect, false);
+        if (resume) setVisible(resume, true);
+        if (connected) setVisible(connected, false);
         message.textContent = 'Authorization complete. Select the account to connect.';
         if (typeof modal.showOverlay === 'function') modal.showOverlay();
       } catch (error) { showError(error); }
@@ -127,9 +130,9 @@ function initializeAdAccounts() {
         const result = await request('/select', {account_ids: submittedIds});
         const selected = result.accounts || [];
         message.textContent = 'Connected · ' + selected.length + ' account' + (selected.length === 1 ? '' : 's');
-        connect.hidden = true;
-        if (resume) resume.hidden = true;
-        if (connected) connected.hidden = false;
+        setVisible(connect, false);
+        if (resume) setVisible(resume, false);
+        if (connected) setVisible(connected, true);
         renderReporting({status: 'connected', accounts: selected, reporting_account: selected[0] ? {id: selected[0].id, name: selected[0].name} : null});
         selectedIds = [];
         selectionError = '';
@@ -148,10 +151,10 @@ function initializeAdAccounts() {
         try {
           await request('/disconnect', {confirmation: provider === 'meta' ? 'DISCONNECT_META' : 'DISCONNECT_GOOGLE_ADS'});
           message.textContent = 'Not connected';
-          connect.hidden = false;
-          if (resume) resume.hidden = true;
-          connected.hidden = true;
-          if (reporting) reporting.hidden = true;
+          setVisible(connect, true);
+          if (resume) setVisible(resume, false);
+          setVisible(connected, false);
+          if (reporting) setVisible(reporting, false);
           disconnectMessage.textContent = '';
           if (typeof disconnectModal.hideOverlay === 'function') disconnectModal.hideOverlay();
         } catch (error) {
@@ -202,22 +205,22 @@ function initializeAdAccounts() {
     if (resumeAction) resumeAction.addEventListener('click', loadAccounts);
     request('/status').then(result => {
       if (result.status === 'pending_account_selection') {
-        connect.hidden = true;
-        if (resume) resume.hidden = false;
+        setVisible(connect, false);
+        if (resume) setVisible(resume, true);
         return loadAccounts();
       }
       if (result.status === 'connected') {
-        connect.hidden = true;
-        if (resume) resume.hidden = true;
-        if (connected) connected.hidden = false;
+        setVisible(connect, false);
+        if (resume) setVisible(resume, false);
+        if (connected) setVisible(connected, true);
         const count = Array.isArray(result.accounts) ? result.accounts.length : 0;
         message.textContent = 'Connected' + (count ? ' · ' + count + ' account' + (count === 1 ? '' : 's') : '');
         renderReporting(result);
       } else {
-        connect.hidden = false;
-        if (resume) resume.hidden = true;
-        if (connected) connected.hidden = true;
-        if (reporting) reporting.hidden = true;
+        setVisible(connect, true);
+        if (resume) setVisible(resume, false);
+        if (connected) setVisible(connected, false);
+        if (reporting) setVisible(reporting, false);
         if (reauthorizationRequired) {
           if (connectAction) connectAction.textContent = 'Reconnect Meta';
           message.textContent = 'Meta authorization must be renewed before account selection.';
@@ -228,3 +231,4 @@ function initializeAdAccounts() {
 }
 
 module.exports = Object.freeze({initializeAdAccounts});
+

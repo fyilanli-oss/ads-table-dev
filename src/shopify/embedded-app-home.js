@@ -3,7 +3,7 @@
 const {initializeKlaviyoAccounts} = require("./klaviyo-account-ui");
 const {initializeAdAccounts} = require("./ad-account-ui");
 
-const EMBEDDED_HOME_RELEASE = "r7b6-settings-standard-v1";
+const EMBEDDED_HOME_RELEASE = "r7b6-settings-standard-v3";
 
 function escapeAttribute(value) {
   return String(value)
@@ -20,7 +20,7 @@ function documentHead({clientId, title}) {
   <meta name="shopify-api-key" content="${apiKey}">
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
   <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
-  <script src="https://cdn.shopify.com/shopifycloud/polaris-1.js"></script>
+  <script src="https://cdn.shopify.com/shopifycloud/polaris-2.0-rc.js"></script>
   <title>${title}</title>`;
 }
 
@@ -121,30 +121,28 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
     : `AdsTable will revoke this ${label} authorization and stop future provider access and token refresh for this connection.`;
   const supportsConnection = ["meta", "google_ads", "klaviyo"].includes(id);
   const supportsReporting = ["meta", "google_ads"].includes(id);
-  return `<div id="${id}">
-      <s-stack gap="base">
-        <s-stack direction="inline" gap="base" justify-content="space-between" align-items="center">
-          <s-stack gap="tight">
+  return `<s-stack id="${id}" gap="base">
+      <s-query-container>
+        <s-grid gridTemplateColumns="@container (inline-size > 700px) 1fr auto, 1fr" gap="base" alignItems="center">
+          <s-stack gap="small">
             <s-heading>${label}</s-heading>
             ${supportsConnection ? `<s-paragraph id="${id}-message" aria-live="polite">${providerAvailable ? "Checking connection status…" : "Connection setup unavailable"}</s-paragraph>` : ""}
-            ${supportsReporting && providerAvailable ? `<div id="${id}-reporting" hidden><s-paragraph id="${id}-reporting-summary"></s-paragraph></div>` : ""}
+            ${supportsReporting && providerAvailable ? `<s-stack id="${id}-reporting" display="none"><s-paragraph id="${id}-reporting-summary"></s-paragraph></s-stack>` : ""}
             ${parked ? '<s-paragraph>Parked</s-paragraph>' : ""}
           </s-stack>
-          ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="base">
-            <div id="${id}-connect"><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" id="${id}-connect-action" commandFor="${id}-connect-modal" command="--show"${disabled}><s-text fontWeight="medium">Connect</s-text></s-clickable></div>
-            <div id="${id}-resume" hidden><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" id="${id}-resume-action"><s-text fontWeight="medium">Resume setup</s-text></s-clickable></div>
-            <div id="${id}-connected" hidden>
-              <s-stack direction="inline" gap="base" align-items="center">
-                <s-badge tone="success" size="large-100">Connected</s-badge>
-                ${supportsConnection ? `<s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto;background:#FDE8E7" commandFor="${id}-disconnect-modal" command="--show"><s-text tone="critical" fontWeight="medium">Disconnect</s-text></s-clickable>` : ""}
-                ${supportsReporting && providerAvailable ? `<s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show"><s-text fontWeight="medium">Reporting account</s-text></s-clickable>` : ""}
-                ${id === "klaviyo" && providerAvailable ? `<div id="klaviyo-spend-controls" hidden><s-stack direction="inline" gap="base"><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" commandFor="klaviyo-spend-update-modal" command="--show"><s-text fontWeight="medium">Update spend</s-text></s-clickable><s-clickable background="subdued" borderRadius="large-200" minBlockSize="32px" paddingBlock="small-300" paddingInline="base" accessibilityRole="button" style="display:inline-flex;inline-size:auto" id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show"><s-text fontWeight="medium">Change value</s-text></s-clickable></s-stack></div>` : ""}
-              </s-stack>
-            </div>
+          ${parked ? '<s-button disabled>Unavailable</s-button>' : `<s-stack direction="inline" gap="small" alignItems="center">
+            <s-stack id="${id}-connect"><s-button variant="secondary" id="${id}-connect-action" commandFor="${id}-connect-modal" command="--show"${disabled}>Connect</s-button></s-stack>
+            <s-stack id="${id}-resume" display="none"><s-button variant="secondary" id="${id}-resume-action">Resume setup</s-button></s-stack>
+            <s-stack id="${id}-connected" display="none" direction="inline" gap="small" alignItems="center">
+                 <s-badge tone="success" size="base">Connected</s-badge>
+                 ${supportsConnection ? `<s-button variant="secondary" tone="critical" commandFor="${id}-disconnect-modal" command="--show">Disconnect</s-button>` : ""}
+                 ${supportsReporting && providerAvailable ? `<s-button variant="secondary" id="${id}-reporting-action" commandFor="${id}-reporting-modal" command="--show">Reporting account</s-button>` : ""}
+                  ${id === "klaviyo" && providerAvailable ? `<s-stack id="klaviyo-spend-controls" display="none" direction="inline" gap="small"><s-button variant="secondary" commandFor="klaviyo-spend-update-modal" command="--show">Update spend</s-button><s-button variant="secondary" id="klaviyo-spend-correct-open" commandFor="klaviyo-spend-correct-modal" command="--show">Change value</s-button></s-stack>` : ""}
+            </s-stack>
           </s-stack>`}
-        </s-stack>
+        </s-grid>
+      </s-query-container>
         ${showDivider ? "<s-divider></s-divider>" : ""}
-      </s-stack>
       ${parked ? "" : `<s-modal id="${id}-connect-modal" heading="Connect ${label} to AdsTable?" size="small-100">
         <s-stack gap="base">
           ${connectCopy.map(paragraph => `<s-paragraph>${paragraph}</s-paragraph>`).join("")}
@@ -164,18 +162,18 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
       </s-modal>` : ""}
       ${id === "klaviyo" && providerAvailable ? `<s-stack id="klaviyo-accounts" gap="base">
         <s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">
-          <div id="klaviyo-choice-step" hidden><s-stack gap="base">
+          <s-stack id="klaviyo-choice-step" display="none" gap="base">
             <s-paragraph>Select the Klaviyo account AdsTable may use.</s-paragraph>
             <s-select id="klaviyo-choice" label="Klaviyo account"></s-select>
             <s-button id="klaviyo-choose" variant="primary">Continue</s-button>
-          </s-stack></div>
-          <div id="klaviyo-cost-step" hidden><s-stack gap="base">
+          </s-stack>
+          <s-stack id="klaviyo-cost-step" display="none" gap="base">
             <s-paragraph>Enter your estimated Klaviyo email cost for a 30-day period. SMS costs are not included.</s-paragraph>
             <s-paragraph>The value remains in the verified Klaviyo account currency. AdsTable reporting currency is handled separately.</s-paragraph>
             <s-number-field id="klaviyo-cost" label="Estimated 30-Day Klaviyo Email Spend" min="0" max="99999999.99" step="0.01"></s-number-field>
             <s-button id="klaviyo-save" variant="primary">Save and connect</s-button>
-          </s-stack></div>
-          <div id="klaviyo-retry-step" hidden><s-button id="klaviyo-retry">Try again</s-button></div>
+          </s-stack>
+          <s-stack id="klaviyo-retry-step" display="none"><s-button id="klaviyo-retry">Try again</s-button></s-stack>
           <s-button slot="secondary-actions" commandFor="klaviyo-account-modal" command="--hide">Cancel</s-button>
         </s-modal>
         <s-modal id="klaviyo-spend-update-modal" heading="Update Klaviyo email spend" size="small-100">
@@ -220,7 +218,7 @@ function renderProviderSection({id, label, parked = false, showDivider = false},
         <s-button slot="secondary-actions" commandFor="${id}-reporting-modal" command="--hide">Cancel</s-button>
         <s-button id="${id}-reporting-save" slot="primary-action" variant="primary">Save reporting account</s-button>
       </s-modal>` : ""}
-    </s-section>`;
+    </s-stack>`;
 }
 
 function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvailability = {}}) {
@@ -242,64 +240,57 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
 </head>
 <body>
   ${appNavigation()}
-  <s-page heading="Settings">
+  <s-page heading="Settings" inlineSize="base">
     <s-banner id="status" heading="Settings" tone="info" hidden></s-banner>
-    <div id="r6d4-google-acceptance" hidden>
+    <s-stack id="r6d4-google-acceptance" display="none">
       <s-section heading="Google Ads acceptance check">
         <s-stack gap="base">
           <s-paragraph>This one-time check reads the selected Google Ads accounts, Standard Ads and Performance Max Asset Groups through the completed E5 contract. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d4-google-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d4-google-run" variant="primary">Run read-only acceptance</s-button>
-          <div id="r6d4-google-dataset-step">
-            <s-stack gap="base">
+          <s-stack id="r6d4-google-dataset-step" gap="base">
               <s-paragraph>This controlled acceptance may write only real provider-verified Google Ads rows to Dataset V2. A verified empty result writes no synthetic rows and does not enable schedules or backfill.</s-paragraph>
               <s-paragraph id="r6d4-google-dataset-message" aria-live="polite"></s-paragraph>
               <s-button id="r6d4-google-dataset-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
-            </s-stack>
-          </div>
+          </s-stack>
         </s-stack>
       </s-section>
-    </div>
-    <div id="r6d3-meta-acceptance" hidden>
+    </s-stack>
+    <s-stack id="r6d3-meta-acceptance" display="none">
       <s-section heading="Meta acceptance check">
         <s-stack gap="base">
           <s-paragraph>This one-time check reads the selected Meta accounts and daily Insights through the completed E4 contract. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d3-meta-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d3-meta-run" variant="primary">Run read-only acceptance</s-button>
-          <div id="r6d3-meta-dataset-step">
-            <s-stack gap="base">
+          <s-stack id="r6d3-meta-dataset-step" gap="base">
               <s-paragraph>This controlled acceptance may write real provider-verified Meta rows to Dataset V2. A verified empty result writes no synthetic rows and does not enable schedules or backfill.</s-paragraph>
               <s-paragraph id="r6d3-meta-dataset-message" aria-live="polite"></s-paragraph>
               <s-button id="r6d3-meta-dataset-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
-            </s-stack>
-          </div>
+          </s-stack>
         </s-stack>
       </s-section>
-    </div>
-    <div id="r6d2-klaviyo-acceptance" hidden>
+    </s-stack>
+    <s-stack id="r6d2-klaviyo-acceptance" display="none">
       <s-section heading="Klaviyo acceptance check">
         <s-stack gap="base">
-          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs. It does not write Dataset V2.</s-paragraph>
+          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs for one closed provider date. It does not write Dataset V2.</s-paragraph>
+          <s-date-field id="r6d2-klaviyo-provider-date" label="Provider date" details="Choose the closed date when the Campaign or Flow message was sent."></s-date-field>
           <s-paragraph id="r6d2-klaviyo-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d2-klaviyo-run" variant="primary">Run read-only acceptance</s-button>
-          <div id="r6d2-klaviyo-c6-step">
-            <s-stack gap="base">
+          <s-stack id="r6d2-klaviyo-c6-step" gap="base">
               <s-paragraph>This controlled acceptance may write real verified Klaviyo rows to Dataset V2. It never creates synthetic rows and does not enable scheduled production activation.</s-paragraph>
               <s-paragraph id="r6d2-klaviyo-c6-message" aria-live="polite"></s-paragraph>
-              <s-button id="r6d2-klaviyo-c6-run" tone="critical">Run controlled Dataset V2 acceptance</s-button>
-            </s-stack>
-          </div>
-          <div id="r6d2-klaviyo-metric-step" hidden>
-            <s-stack gap="base">
+              <s-button id="r6d2-klaviyo-c6-run" tone="critical" disabled>Run controlled Dataset V2 acceptance</s-button>
+          </s-stack>
+          <s-stack id="r6d2-klaviyo-metric-step" display="none" gap="base">
               <s-paragraph>Confirming stores only this workspace account's verified reporting metric. It does not write Dataset V2.</s-paragraph>
               <s-select id="r6d2-klaviyo-metric" label="Placed Order metric"></s-select>
               <s-button id="r6d2-klaviyo-metric-confirm" variant="primary">Confirm metric and continue</s-button>
-            </s-stack>
-          </div>
+          </s-stack>
         </s-stack>
       </s-section>
-    </div>
-    <div id="r6d5-klaviyo-historical-inventory" hidden>
+    </s-stack>
+    <s-stack id="r6d5-klaviyo-historical-inventory" display="none">
       <s-section heading="Klaviyo historical test-data inventory">
         <s-stack gap="base">
           <s-paragraph>This read-only check finds closed dates for sent Klaviyo campaigns and evaluates only the most recent date through the existing Campaign and Flow mapping. It does not write Dataset V2.</s-paragraph>
@@ -310,50 +301,44 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-button id="r6d5-klaviyo-flow-event-run" variant="primary">Run Flow/Event read-only inventory</s-button>
         </s-stack>
       </s-section>
-    </div>
-    <s-stack gap="small">
-      <s-heading>Reporting Currency</s-heading>
-      <s-section>
-      <div id="reporting-currency-summary" hidden>
-        <s-stack gap="tight">
+    </s-stack>
+    <s-stack gap="large">
+      <s-stack gap="small">
+        <s-heading>Reporting Currency</s-heading>
+        <s-box padding="base" background="base" borderWidth="base" borderColor="base" borderRadius="base" accessibilityLabel="Reporting Currency">
+      <s-stack id="reporting-currency-summary" display="none" gap="small">
           <s-paragraph id="reporting-currency-value"></s-paragraph>
           <s-paragraph>This currency is fixed for the workspace and cannot be changed after confirmation.</s-paragraph>
-        </s-stack>
-      </div>
-      <div id="currency-setup" hidden>
-        <s-stack gap="base">
+      </s-stack>
+      <s-stack id="currency-setup" display="none" gap="base">
           <s-paragraph>Choose carefully. Reporting Currency cannot be changed after confirmation.</s-paragraph>
           <s-button variant="primary" commandFor="platforms-currency-modal" command="--show">Choose reporting currency</s-button>
-        </s-stack>
-      </div>
-      </s-section>
-    </s-stack>
+      </s-stack>
+        </s-box>
+      </s-stack>
     <s-modal id="platforms-currency-modal" heading="Choose reporting currency" size="small-100">
-      <div id="currency-selection-step">
-        <s-stack gap="base">
+      <s-stack id="currency-selection-step" gap="base">
           <s-paragraph>This is independent from Shopify and provider account currencies.</s-paragraph>
           <s-select id="reporting-currency" label="Reporting currency">
             ${["TRY","USD","EUR","GBP","JPY","CNY","AUD","CAD","CHF","SEK","NOK","DKK","PLN"].map(currency => `<s-option value="${currency}">${currency}</s-option>`).join("")}
           </s-select>
           <s-button id="review-reporting-currency" variant="primary">Review selection</s-button>
-        </s-stack>
-      </div>
-      <div id="currency-confirmation-step" hidden>
-        <s-stack gap="base">
+      </s-stack>
+      <s-stack id="currency-confirmation-step" display="none" gap="base">
           <s-paragraph id="reporting-currency-confirmation"></s-paragraph>
           <s-paragraph>This choice is permanent for this workspace. Removing the app does not delete data or reset this currency.</s-paragraph>
           <s-button id="back-to-currency-selection">Back</s-button>
           <s-button id="save-reporting-currency" variant="primary">Confirm reporting currency</s-button>
-        </s-stack>
-      </div>
+      </s-stack>
       <s-paragraph id="platforms-currency-message" aria-live="polite"></s-paragraph>
       <s-button slot="secondary-actions" commandFor="platforms-currency-modal" command="--hide">Cancel</s-button>
     </s-modal>
-    <s-stack gap="small">
-      <s-heading>Platforms</s-heading>
-      <s-section>
-        <div id="provider-sections" hidden><s-stack gap="base">${sections}</s-stack></div>
-      </s-section>
+      <s-stack gap="small">
+        <s-heading>Platforms</s-heading>
+        <s-box id="provider-sections" display="none" padding="base" background="base" borderWidth="base" borderColor="base" borderRadius="base" accessibilityLabel="Platforms">
+          <s-stack gap="base">${sections}</s-stack>
+        </s-box>
+      </s-stack>
     </s-stack>
   </s-page>
   <script>
@@ -384,6 +369,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const metaDatasetAcceptanceMessage = document.getElementById("r6d3-meta-dataset-message");
       const acceptancePanel = document.getElementById("r6d2-klaviyo-acceptance");
       const acceptanceButton = document.getElementById("r6d2-klaviyo-run");
+      const acceptanceProviderDate = document.getElementById("r6d2-klaviyo-provider-date");
       const acceptanceMessage = document.getElementById("r6d2-klaviyo-message");
       const metricStep = document.getElementById("r6d2-klaviyo-metric-step");
       const metricSelect = document.getElementById("r6d2-klaviyo-metric");
@@ -405,10 +391,10 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         return body;
       };
       const showProviders = reportingCurrency => {
-        currencySetup.hidden = true;
-        currencySummary.hidden = false;
+        currencySetup.display = "none";
+        currencySummary.display = "auto";
         currencyValue.textContent = "Reporting Currency: " + reportingCurrency;
-        providerSections.hidden = false;
+        providerSections.display = "auto";
         status.hidden = true;
         if (providerSections.dataset.initialized !== "true") {
           providerSections.dataset.initialized = "true";
@@ -420,14 +406,14 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         try {
           const settings = await sessionRequest("/api/shopify/workspace/settings");
           if (settings.status === "configured") return showProviders(settings.reporting_currency);
-          currencySetup.hidden = false;
-          currencySummary.hidden = true;
-          providerSections.hidden = true;
+          currencySetup.display = "auto";
+          currencySummary.display = "none";
+          providerSections.display = "none";
           status.hidden = true;
         } catch {
-          currencySetup.hidden = true;
-          currencySummary.hidden = true;
-          providerSections.hidden = true;
+          currencySetup.display = "none";
+          currencySummary.display = "none";
+          providerSections.display = "none";
           status.hidden = false;
           status.setAttribute("heading", "Open AdsTable from Shopify Admin");
           status.setAttribute("tone", "critical");
@@ -436,13 +422,13 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       };
       reviewCurrency.addEventListener("click", () => {
         confirmationText.textContent = "Confirm " + String(currency.value) + " as the permanent Reporting Currency.";
-        selectionStep.hidden = true;
-        confirmationStep.hidden = false;
+        selectionStep.display = "none";
+        confirmationStep.display = "auto";
         currencyMessage.textContent = "";
       });
       backToSelection.addEventListener("click", () => {
-        confirmationStep.hidden = true;
-        selectionStep.hidden = false;
+        confirmationStep.display = "none";
+        selectionStep.display = "auto";
         currencyMessage.textContent = "";
       });
       saveCurrency.addEventListener("click", async () => {
@@ -457,7 +443,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         } finally { saveCurrency.disabled = false; saveCurrency.loading = false; }
       });
       if (params.get("acceptance") === "r6d5-klaviyo") {
-        historicalInventoryPanel.hidden = false;
+        historicalInventoryPanel.display = "auto";
         historicalInventoryButton.addEventListener("click", async () => {
           historicalInventoryButton.disabled = true;
           historicalInventoryButton.loading = true;
@@ -504,18 +490,34 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         });
       }
       if (params.get("acceptance") === "r6d2-klaviyo") {
-        acceptancePanel.hidden = false;
+        acceptancePanel.display = "auto";
+        const latestClosedDate = new Date(Date.now() - (48 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+        acceptanceProviderDate.value = latestClosedDate;
+        acceptanceProviderDate.setAttribute("allow", "--" + latestClosedDate);
+        const acceptanceRequest = () => JSON.stringify({provider_date: String(acceptanceProviderDate.value || "")});
         const showAcceptanceResult = result => {
-          acceptanceMessage.textContent = result.status === "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT"
-            ? "PASS — Account, Campaign, Flow, Time and FX checks succeeded. Dataset V2 writes: 0."
-            : "The acceptance result could not be verified.";
+          if (result.status !== "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT") {
+            datasetAcceptanceButton.disabled = true;
+            acceptanceMessage.textContent = "The acceptance result could not be verified.";
+            return;
+          }
+          datasetAcceptanceButton.disabled = result.empty_provider_result === true;
+          const outcome = result.empty_provider_result ? "VERIFIED EMPTY" : "PASS";
+          acceptanceMessage.textContent = outcome + " — " + result.provider_date + ": " +
+            result.campaign_row_count + " Campaign row(s), " + result.flow_row_count +
+            " Flow row(s). Account, Time and FX checks succeeded. Dataset V2 writes: 0.";
         };
+        acceptanceProviderDate.addEventListener("change", () => {
+          datasetAcceptanceButton.disabled = true;
+          acceptanceMessage.textContent = "Run the read-only acceptance for the selected provider date.";
+          datasetAcceptanceMessage.textContent = "";
+        });
         acceptanceButton.addEventListener("click", async () => {
           acceptanceButton.disabled = true;
           acceptanceButton.loading = true;
           acceptanceMessage.textContent = "Running the read-only checks…";
           try {
-            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"});
+            const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST", body: acceptanceRequest()});
             showAcceptanceResult(result);
           } catch (error) {
             if (error.message === "KLAVIYO_PREFLIGHT_METRIC_REQUIRED") {
@@ -529,7 +531,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
                   metricSelect.appendChild(option);
                 });
                 metricSelect.value = discovery.candidates[0]?.id || "";
-                metricStep.hidden = false;
+                metricStep.display = "auto";
                 acceptanceMessage.textContent = "Select the provider-verified sales source. AdsTable will bind its exact Added to Cart, Checkout and Placed Order metrics for this workspace and Klaviyo account.";
               } catch (discoveryError) {
                 acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(discoveryError.message || "") ? discoveryError.message : "KLAVIYO_METRIC_DISCOVERY_FAILED";
@@ -547,10 +549,11 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           try {
             const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/acceptance", {
               method: "POST",
-              body: JSON.stringify({confirmation: "RUN_R6_D2_C6_KLAVIYO_WRITE"}),
+              body: JSON.stringify({confirmation: "RUN_R6_D2_C6_KLAVIYO_WRITE", provider_date: String(acceptanceProviderDate.value || "")}),
             });
             datasetAcceptanceMessage.textContent = result.status === "PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE"
-              ? "PASS — attempted: " + result.attempted + ", persisted: " + result.persisted + ", verified empty: " + result.empty_provider_result + "."
+              ? "PASS — " + result.provider_date + ": attempted " + result.attempted + ", persisted " + result.persisted +
+                "; Campaign rows " + result.campaign_row_count + ", Flow rows " + result.flow_row_count + "."
               : "The Dataset V2 acceptance result could not be verified.";
           } catch (error) {
             datasetAcceptanceMessage.textContent = (/^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_DATASET_ACCEPTANCE_FAILED") + ". Do not retry; review runtime evidence.";
@@ -562,9 +565,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             acceptanceMessage.textContent = "Verifying and binding the Klaviyo commerce metrics…";
           try {
             await sessionRequest("/api/shopify/providers/klaviyo/runtime/metrics/select", {method: "POST", body: JSON.stringify({metric_id: String(metricSelect.value || "")})});
-            metricStep.hidden = true;
+            metricStep.display = "none";
             acceptanceMessage.textContent = "Metric confirmed. Running the read-only acceptance…";
-            showAcceptanceResult(await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST"}));
+            showAcceptanceResult(await sessionRequest("/api/shopify/providers/klaviyo/runtime/preflight", {method: "POST", body: acceptanceRequest()}));
           } catch (error) {
             acceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_PREFLIGHT_FAILED";
             metricConfirm.disabled = false;
@@ -572,7 +575,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         });
       }
       if (params.get("acceptance") === "r6d3-meta") {
-        metaAcceptancePanel.hidden = false;
+        metaAcceptancePanel.display = "auto";
         metaAcceptanceButton.addEventListener("click", async () => {
           metaAcceptanceButton.disabled = true;
           metaAcceptanceButton.loading = true;
@@ -605,7 +608,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
         });
       }
       if (params.get("acceptance") === "r6d4-google") {
-        googleAcceptancePanel.hidden = false;
+        googleAcceptancePanel.display = "auto";
         googleAcceptanceButton.addEventListener("click", async () => {
           googleAcceptanceButton.disabled = true;
           googleAcceptanceButton.loading = true;
@@ -743,6 +746,3 @@ function registerEmbeddedPlatforms(app, {clientId, providerOAuthEnabled = false}
 }
 
 module.exports = Object.freeze({EMBEDDED_HOME_RELEASE, registerEmbeddedAppHome, renderEmbeddedAppHome, registerEmbeddedPlatforms, renderEmbeddedPlatforms, renderEmbeddedPlaceholder});
-
-
-

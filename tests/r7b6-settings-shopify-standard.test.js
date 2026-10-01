@@ -5,38 +5,50 @@ const test = require("node:test");
 
 const {renderEmbeddedPlatforms} = require("../src/shopify/embedded-app-home");
 
-test("R7-B6 Settings uses Shopify-native grouped cards and provider rows", () => {
+test("R7-B6 Settings uses two durable Shopify-native cards and separated provider rows", () => {
   const html = renderEmbeddedPlatforms({
     clientId: "test-client",
     providerOAuthEnabled: true,
     providerAvailability: {meta: true, google_ads: true, klaviyo: true},
   });
 
-  assert.match(html, /<s-stack gap="small">\s*<s-heading>Reporting Currency<\/s-heading>\s*<s-section>/);
-  assert.match(html, /<s-stack gap="small">\s*<s-heading>Platforms<\/s-heading>\s*<s-section>/);
+  assert.match(html, /<s-page heading="Settings" inlineSize="base">/);
+  assert.match(html, /<s-heading>Reporting Currency<\/s-heading>\s*<s-box[^>]+accessibilityLabel="Reporting Currency">/);
+  assert.match(html, /<s-heading>Platforms<\/s-heading>\s*<s-box id="provider-sections"[^>]+accessibilityLabel="Platforms">/);
+  assert.doesNotMatch(html, /<s-section heading="Reporting Currency">|<s-section heading="Platforms">/);
+  assert.equal((html.match(/accessibilityLabel="(?:Reporting Currency|Platforms)"/g) || []).length, 2);
+  assert.equal((html.match(/background="base" borderWidth="base" borderColor="base" borderRadius="base"/g) || []).length, 2);
   assert.equal((html.match(/<s-divider><\/s-divider>/g) || []).length, 2);
   assert.match(html, /<s-heading>Meta<\/s-heading>/);
   assert.match(html, /<s-heading>Google Ads<\/s-heading>/);
   assert.match(html, /<s-heading>Klaviyo<\/s-heading>/);
   assert.doesNotMatch(html, /advertising performance and spend|Email performance and estimated 30-day spend/);
+  assert.equal((html.match(/<s-query-container>/g) || []).length, 3);
+  assert.equal((html.match(/gridTemplateColumns="@container \(inline-size > 700px\) 1fr auto, 1fr"/g) || []).length, 3);
+  assert.doesNotMatch(html, /<s-(?:stack|box)[^>]*\shidden(?:\s|>)/i);
+  assert.match(html, /<s-stack id="r6d4-google-acceptance" display="none">/);
+  assert.match(html, /<s-stack id="reporting-currency-summary" display="none"/);
+  assert.match(html, /<s-box id="provider-sections" display="none"/);
+  assert.match(html, /providerSections\.display = "auto"/);
+  assert.match(html, /acceptancePanel\.display = "auto"/);
 });
 
-test("R7-B6 provider actions use neutral, success and critical Shopify semantics", () => {
+test("R7-B6 provider actions use only official Shopify action and status semantics", () => {
   const html = renderEmbeddedPlatforms({
     clientId: "test-client",
     providerOAuthEnabled: true,
     providerAvailability: {meta: true, google_ads: true, klaviyo: true},
   });
 
-  assert.match(html, /<s-clickable background="subdued"[^>]*minBlockSize="32px"[^>]*id="meta-connect-action"[^>]*commandFor="meta-connect-modal"/);
-  assert.doesNotMatch(html, /id="meta-connect-action" variant="primary"/);
-  assert.match(html, /<s-clickable background="subdued"[^>]*minBlockSize="32px"[^>]*id="meta-resume-action"[^>]*>.*Resume setup.*<\/s-clickable>/);
-  assert.match(html, /<s-badge tone="success" size="large-100">Connected<\/s-badge>/);
-  assert.match(html, /style="display:inline-flex;inline-size:auto" id="meta-reporting-action"/);
-  assert.match(html, /<s-clickable[^>]*style="display:inline-flex;inline-size:auto;background:#FDE8E7"[^>]*commandFor="meta-disconnect-modal"/);
-  assert.match(html, /<s-clickable background="subdued"[^>]*id="meta-reporting-action"[^>]*>.*Reporting account.*<\/s-clickable>/);
-  assert.match(html, />Update spend<\/s-text><\/s-clickable>/);
-  assert.match(html, />Change value<\/s-text><\/s-clickable>/);
+  assert.match(html, /<s-button variant="secondary" id="meta-connect-action"[^>]*>Connect<\/s-button>/);
+  assert.match(html, /<s-button variant="secondary" id="meta-resume-action">Resume setup<\/s-button>/);
+  assert.match(html, /<s-badge tone="success" size="base">Connected<\/s-badge>/);
+  assert.match(html, /<s-button variant="secondary" tone="critical"[^>]*>Disconnect<\/s-button>/);
+  assert.match(html, /<s-button variant="secondary" id="meta-reporting-action"[^>]*>Reporting account<\/s-button>/);
+  assert.match(html, /<s-button variant="secondary"[^>]*>Update spend<\/s-button>/);
+  assert.match(html, /<s-button variant="secondary" id="klaviyo-spend-correct-open"[^>]*>Change value<\/s-button>/);
+  assert.doesNotMatch(html, /<s-clickable\b|style\s*=|#[0-9a-f]{3,8}\b/i);
+  assert.doesNotMatch(html, /class(?:Name)?\s*=/i);
   assert.doesNotMatch(html, />Correct value<\//);
   assert.doesNotMatch(html, /slot="breadcrumb-actions"[^>]*>Dashboard<\/s-link>/);
 });

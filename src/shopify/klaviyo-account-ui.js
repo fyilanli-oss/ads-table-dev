@@ -36,7 +36,11 @@ function initializeKlaviyoAccounts() {
   const spendCorrectMessage = document.getElementById("klaviyo-spend-correct-message");
   let accounts = [];
   let selected = null;
+  let spendHistoryEntries = [];
   let busy = false;
+  const setVisible = (element, visible) => {
+    if (element) element.display = visible ? "auto" : "none";
+  };
   let retryAction = null;
 
   async function request(path, body) {
@@ -68,20 +72,27 @@ function initializeKlaviyoAccounts() {
       SPEND_HISTORY_ENTRY_NOT_FOUND: "The selected saved value could not be found. Reload and try again.",
     };
     message.textContent = messages[error.message] || "Klaviyo could not be reached. Please try again shortly.";
-    retryStep.hidden = false;
-    if (error.message === "KLAVIYO_REAUTHORIZE") connect.hidden = false;
-    if (error.message === "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED" && resetStep) resetStep.hidden = false;
+    setVisible(retryStep, true);
+    if (error.message === "KLAVIYO_REAUTHORIZE") setVisible(connect, true);
+    if (error.message === "KLAVIYO_READ_ONLY_VERIFICATION_EXPIRED" && resetStep) setVisible(resetStep, true);
   }
 
   async function loadSpendHistory() {
     const result = await request("/api/shopify/providers/klaviyo/spend-history");
     const entries = Array.isArray(result.entries) ? result.entries : [];
+    spendHistoryEntries = entries;
     if (spendHistoryChoice) {
       spendHistoryChoice.replaceChildren();
-      for (const entry of entries) {
+      for (const [index, entry] of entries.entries()) {
         const option = document.createElement("s-option");
         option.value = entry.effective_from;
-        option.textContent = entry.effective_from + " · " + entry.estimated_30_day_email_spend + " " + entry.currency;
+        let effectiveTo = entry.effective_to || null;
+        if (!effectiveTo && index > 0) {
+          const nextStart = new Date(entries[index - 1].effective_from + "T00:00:00.000Z");
+          nextStart.setUTCDate(nextStart.getUTCDate() - 1);
+          effectiveTo = nextStart.toISOString().slice(0, 10);
+        }
+        option.textContent = entry.effective_from + " / " + (effectiveTo || "Present") + " · " + entry.estimated_30_day_email_spend + " " + entry.currency;
         spendHistoryChoice.append(option);
       }
       if (entries.length) {
@@ -89,8 +100,8 @@ function initializeKlaviyoAccounts() {
         if (spendCorrectValue) spendCorrectValue.value = entries[0].estimated_30_day_email_spend;
       }
     }
-    if (spendControls) spendControls.hidden = false;
-    if (spendCorrectOpen) spendCorrectOpen.hidden = entries.length === 0;
+    if (spendControls) setVisible(spendControls, true);
+    setVisible(spendCorrectOpen, entries.length > 0);
     return entries;
   }
 
@@ -99,39 +110,39 @@ function initializeKlaviyoAccounts() {
     let loadPendingAccounts = false;
     busy = true;
     retryAction = loadStatus;
-    retryStep.hidden = true;
+    setVisible(retryStep, false);
     try {
       const result = await request("/status");
       if (result.status === "connected") {
-        connect.hidden = true;
-        if (resume) resume.hidden = true;
-        if (connected) connected.hidden = false;
-        if (resetStep) resetStep.hidden = false;
-        if (spendControls) spendControls.hidden = false;
+        setVisible(connect, false);
+        if (resume) setVisible(resume, false);
+        if (connected) setVisible(connected, true);
+        if (resetStep) setVisible(resetStep, true);
+        if (spendControls) setVisible(spendControls, true);
         const amount = result.estimated_30_day_email_spend == null ? "" : " · " + result.estimated_30_day_email_spend + " " + result.currency + " / 30 days";
         message.textContent = "Connected" + amount;
         if (spendControls) await loadSpendHistory();
       } else if (result.status === "account_selection_required") {
-        connect.hidden = true;
-        if (resume) resume.hidden = false;
-        if (connected) connected.hidden = true;
+        setVisible(connect, false);
+        if (resume) setVisible(resume, true);
+        if (connected) setVisible(connected, false);
         message.textContent = "Account selection required";
         loadPendingAccounts = true;
       } else if (result.status === "not_connected") {
-        connect.hidden = false;
-        if (resume) resume.hidden = true;
-        if (connected) connected.hidden = true;
+        setVisible(connect, true);
+        if (resume) setVisible(resume, false);
+        if (connected) setVisible(connected, false);
         message.textContent = "Not connected";
       } else if (result.status === "reset_complete") {
-        connect.hidden = false;
-        if (resume) resume.hidden = true;
-        if (connected) connected.hidden = true;
-        if (resetStep) resetStep.hidden = true;
+        setVisible(connect, true);
+        if (resume) setVisible(resume, false);
+        if (connected) setVisible(connected, false);
+        if (resetStep) setVisible(resetStep, false);
         message.textContent = "Not connected";
       } else {
-        connect.hidden = true;
-        if (resume) resume.hidden = true;
-        if (connected) connected.hidden = true;
+        setVisible(connect, false);
+        if (resume) setVisible(resume, false);
+        if (connected) setVisible(connected, false);
         message.textContent = "Temporarily unavailable";
       }
     } catch (error) {
@@ -144,9 +155,9 @@ function initializeKlaviyoAccounts() {
     if (busy) return;
     busy = true;
     retryAction = loadAccounts;
-    retryStep.hidden = true;
-    choiceStep.hidden = true;
-    costStep.hidden = true;
+    setVisible(retryStep, false);
+    setVisible(choiceStep, false);
+    setVisible(costStep, false);
     selected = null;
     message.textContent = "Checking Klaviyo connection…";
     try {
@@ -154,15 +165,15 @@ function initializeKlaviyoAccounts() {
       accounts = result.accounts;
       if (result.status === "not_connected") {
         message.textContent = "Select Connect to authorize Klaviyo.";
-        connect.hidden = false;
-        if (resume) resume.hidden = true;
+        setVisible(connect, true);
+        if (resume) setVisible(resume, false);
         return;
       }
-      connect.hidden = true;
-      if (resume) resume.hidden = false;
-      if (connected) connected.hidden = true;
+      setVisible(connect, false);
+      if (resume) setVisible(resume, true);
+      if (connected) setVisible(connected, false);
       if (result.status === "connected" && accounts.some(account => account.id === result.active_account_id)) {
-        if (resume) resume.hidden = true;
+        if (resume) setVisible(resume, false);
         const account = accounts.find(account => account.id === result.active_account_id);
         message.textContent = "Connected: " + account.name + ". Estimated 30-Day Klaviyo Email Spend: " + result.estimated_30_day_email_spend + " " + account.currency + ".";
         return;
@@ -176,7 +187,7 @@ function initializeKlaviyoAccounts() {
       }
       if (!accounts.length) throw new Error("KLAVIYO_UNAVAILABLE");
       choices.value = accounts[0].id;
-      choiceStep.hidden = false;
+      setVisible(choiceStep, true);
       if (accountModal && typeof accountModal.showOverlay === "function") accountModal.showOverlay();
       message.textContent = "Klaviyo is authorized. Select the account to connect.";
     } catch (error) { showError(error); }
@@ -187,13 +198,13 @@ function initializeKlaviyoAccounts() {
     if (busy) return;
     busy = true;
     retryAction = verifyR5ReadOnly;
-    retryStep.hidden = true;
-    connect.hidden = true;
+    setVisible(retryStep, false);
+    setVisible(connect, false);
     message.textContent = "Verifying the existing Klaviyo account…";
     try {
       const result = await request("/verify");
       if (result.status !== "verified" || result.active_account_verified !== true) throw new Error("KLAVIYO_UNAVAILABLE");
-      connect.hidden = true;
+      setVisible(connect, false);
       message.textContent = "Connected · Klaviyo account verified · " + result.currency;
     } catch (error) { showError(error); }
     finally { busy = false; }
@@ -202,8 +213,8 @@ function initializeKlaviyoAccounts() {
   choose.addEventListener("click", () => {
     selected = accounts.find(account => account.id === choices.value);
     if (!selected?.currency) return showError(new Error("INVALID_ACCOUNT"));
-    choiceStep.hidden = true;
-    costStep.hidden = false;
+    setVisible(choiceStep, false);
+    setVisible(costStep, true);
     cost.value = "";
     cost.setAttribute("label", "Estimated 30-Day Klaviyo Email Spend (" + selected.currency + ")");
     message.textContent = "Selected: " + selected.name + ". Save your estimated 30-day email spend to complete the connection. Enter 0 for no email cost.";
@@ -215,22 +226,21 @@ function initializeKlaviyoAccounts() {
     save.loading = true;
     try {
       const result = await request("/select", {account_id: selected.id, estimated_30_day_email_spend: String(cost.value)});
-      costStep.hidden = true;
-      retryStep.hidden = true;
+      setVisible(costStep, false);
+      setVisible(retryStep, false);
       message.textContent = "Connected: " + result.account_name + ". Estimated 30-Day Klaviyo Email Spend: " + result.estimated_30_day_email_spend + " " + result.currency + ".";
-      if (resume) resume.hidden = true;
-      if (connected) connected.hidden = false;
+      if (resume) setVisible(resume, false);
+      if (connected) setVisible(connected, true);
       if (spendControls) {
-        spendControls.hidden = false;
+        setVisible(spendControls, true);
         await loadSpendHistory();
       }
       if (accountModal && typeof accountModal.hideOverlay === "function") accountModal.hideOverlay();
     } catch (error) { showError(error); }
     finally { busy = false; save.disabled = false; save.loading = false; }
   });
-  if (spendHistoryChoice) spendHistoryChoice.addEventListener("change", async () => {
-    const entries = await loadSpendHistory();
-    const entry = entries.find(item => item.effective_from === spendHistoryChoice.value);
+  if (spendHistoryChoice) spendHistoryChoice.addEventListener("change", () => {
+    const entry = spendHistoryEntries.find(item => item.effective_from === spendHistoryChoice.value);
     if (entry && spendCorrectValue) spendCorrectValue.value = entry.estimated_30_day_email_spend;
   });
   if (spendUpdateSave) spendUpdateSave.addEventListener("click", async () => {
@@ -242,8 +252,12 @@ function initializeKlaviyoAccounts() {
     try {
       const result = await request("/api/shopify/providers/klaviyo/spend-history/update", {estimated_30_day_email_spend: String(spendUpdateValue.value)});
       message.textContent = "Connected · " + result.estimated_30_day_email_spend + " " + result.currency + " / 30 days";
+      const entries = await loadSpendHistory();
+      const confirmed = entries.some(entry => entry.effective_from === result.effective_from &&
+        entry.estimated_30_day_email_spend === result.estimated_30_day_email_spend && entry.currency === result.currency);
+      if (!confirmed) throw new Error("SPEND_HISTORY_UPDATE_NOT_CONFIRMED");
+      spendUpdateValue.value = "";
       spendUpdateMessage.textContent = "";
-      await loadSpendHistory();
       if (spendUpdateModal && typeof spendUpdateModal.hideOverlay === "function") spendUpdateModal.hideOverlay();
     } catch (error) { spendUpdateMessage.textContent = (showError(error), message.textContent); }
     finally { busy = false; spendUpdateSave.disabled = false; spendUpdateSave.loading = false; }
@@ -277,9 +291,9 @@ function initializeKlaviyoAccounts() {
     try {
       const result = await request("/disconnect", {confirmation: "DISCONNECT_KLAVIYO"});
       if (result.status !== "not_connected") throw new Error("KLAVIYO_UNAVAILABLE");
-      connect.hidden = false;
-      if (resume) resume.hidden = true;
-      if (connected) connected.hidden = true;
+      setVisible(connect, true);
+      if (resume) setVisible(resume, false);
+      if (connected) setVisible(connected, false);
       message.textContent = "Not connected";
       disconnectMessage.textContent = "";
       if (typeof disconnectModal.hideOverlay === "function") disconnectModal.hideOverlay();
@@ -298,13 +312,13 @@ function initializeKlaviyoAccounts() {
     busy = true;
     resetConfirm.disabled = true;
     resetConfirm.loading = true;
-    retryStep.hidden = true;
+    setVisible(retryStep, false);
     try {
       const result = await request("/reset", {confirmation: "REVOKE_KLAVIYO_AND_START_FRESH"});
       if (result.status !== "revoked" && result.status !== "already_revoked") throw new Error("KLAVIYO_REVOKE_FAILED");
-      connect.hidden = true;
-      if (resume) resume.hidden = true;
-      resetStep.hidden = true;
+      setVisible(connect, false);
+      if (resume) setVisible(resume, false);
+      setVisible(resetStep, false);
       message.textContent = "Old Klaviyo connection removed. Clean connection setup is not open yet.";
     } catch (error) { showError(error); }
     finally { busy = false; resetConfirm.disabled = false; resetConfirm.loading = false; }

@@ -15,6 +15,8 @@ const plan = read("codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md");
 const agentRules = read("AGENTS.md");
 const taskTemplate = read("docs/templates/SHOPIFY_EMBEDDED_UI_TASK_TEMPLATE.md");
 const settingsSource = read("src/shopify/embedded-app-home.js");
+const adAccountSource = read("src/shopify/ad-account-ui.js");
+const klaviyoAccountSource = read("src/shopify/klaviyo-account-ui.js");
 
 test("the Shopify embedded UI constitution is binding across plan and task instructions", () => {
   assert.equal(contract.status, "binding");
@@ -22,7 +24,13 @@ test("the Shopify embedded UI constitution is binding across plan and task instr
   assert.match(agentRules, /SHOPIFY_EMBEDDED_UI_CONSTITUTION\.md/);
   assert.match(agentRules, /Kanıtlanmamış aşama tamamlanmış kabul edilmez/);
   assert.match(taskTemplate, /Exact Shopify component/);
-  assert.match(constitution, /yalnız Shopify App Bridge ve güncel stabil App Home Polaris web componentleri/);
+  assert.match(constitution, /yalnız Shopify App Bridge ve ürün sahibi tarafından açıkça onaylanmış güncel App Home Polaris web component sürümü/);
+  assert.equal(
+    contract.approved_runtime.polaris_script,
+    "https://cdn.shopify.com/shopifycloud/polaris-2.0-rc.js",
+  );
+  assert.match(settingsSource, /shopifycloud\/polaris-2\.0-rc\.js/);
+  assert.doesNotMatch(settingsSource, /shopifycloud\/polaris-(?:1|1\.\d+)\.js/);
 });
 
 test("every frozen Shopify UI contract points to the constitution", () => {
@@ -52,6 +60,7 @@ test("standard controls cannot be replaced by raw HTML or custom visual CSS", ()
     /<select\b/i,
     /<form\b/i,
     /<dialog\b/i,
+    /<div\b/i,
     /<style\b/i,
     /class(?:Name)?\s*=/i,
   ]) {
@@ -59,34 +68,25 @@ test("standard controls cannot be replaced by raw HTML or custom visual CSS", ()
   }
 });
 
-test("known Settings visual debt can only decrease and cannot gain new colors", () => {
-  const debt = contract.known_noncompliance.find(
-    (item) => item.id === "R7-B6-SETTINGS-VISUAL-001",
-  );
-  assert.ok(debt, "the current Settings visual debt must stay explicit until removed");
-
+test("Settings corrective implementation has zero custom visual debt", () => {
   const inlineStyles = settingsSource.match(/style\s*=/gi) || [];
   const colors = settingsSource.match(/#[0-9a-f]{3,8}\b/gi) || [];
   const clickableActions = settingsSource.match(/<s-clickable\b/gi) || [];
-  const allowedColors = new Set(
-    debt.temporary_literal_color_allowlist.map((value) => value.toUpperCase()),
-  );
 
-  assert.ok(
-    inlineStyles.length <= debt.maximum_until_removed.inline_style_count,
-    "inline style debt increased",
-  );
-  assert.ok(
-    colors.length <= debt.maximum_until_removed.literal_color_count,
-    "literal color debt increased",
-  );
-  assert.ok(
-    clickableActions.length <= debt.maximum_until_removed.clickable_action_count,
-    "s-clickable button-imitation debt increased",
-  );
-  for (const color of colors) {
-    assert.ok(allowedColors.has(color.toUpperCase()), `new literal color ${color} is forbidden`);
-  }
+  assert.deepEqual(contract.known_noncompliance, []);
+  assert.equal(inlineStyles.length, 0, "inline style debt must be fully removed");
+  assert.equal(colors.length, 0, "literal color debt must be fully removed");
+  assert.equal(clickableActions.length, 0, "s-clickable button imitation must be fully removed");
+});
+
+test("Shopify layout components use the supported display property for conditional visibility", () => {
+  assert.doesNotMatch(settingsSource, /<s-(?:stack|box)[^>]*\shidden(?:\s|>)/i);
+  assert.doesNotMatch(settingsSource, /(?:currencySetup|currencySummary|providerSections|selectionStep|confirmationStep|acceptancePanel|metricStep|metaAcceptancePanel|googleAcceptancePanel)\.hidden\s*=/);
+  assert.doesNotMatch(adAccountSource, /\.hidden\s*=/);
+  assert.doesNotMatch(klaviyoAccountSource, /\.hidden\s*=/);
+  assert.match(settingsSource, /display="none"/);
+  assert.match(adAccountSource, /element\.display = visible \? 'auto' : 'none'/);
+  assert.match(klaviyoAccountSource, /element\.display = visible \? "auto" : "none"/);
 });
 
 test("the constitution requires both desktop and real mobile merchant acceptance", () => {

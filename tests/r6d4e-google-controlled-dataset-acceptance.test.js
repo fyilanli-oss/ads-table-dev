@@ -157,9 +157,10 @@ test('Google controlled acceptance route is Shopify-session-bound and forwards o
 
 test('Google controlled Dataset acceptance stays inside the explicit hidden operator surface', () => {
   const html = renderEmbeddedPlatforms({clientId: 'client', providerOAuthEnabled: true, providerAvailability: {google_ads: true}});
-  assert.match(html, /id="r6d4-google-acceptance" hidden/);
+  assert.match(html, /id="r6d4-google-acceptance" display="none"/);
   assert.match(html, /id="r6d4-google-dataset-run"/);
   assert.match(html, /RUN_R6_D4_E_GOOGLE_WRITE/);
   assert.match(html, /\/api\/shopify\/providers\/google_ads\/runtime\/acceptance/);
 });
+
 

@@ -13,8 +13,34 @@ function closedProviderDate(now) {
   return new Date(instant.getTime() - (48 * 60 * 60 * 1000)).toISOString().slice(0, 10);
 }
 
+function resolveProviderDate(requestedProviderDate, now) {
+  const latestClosedDate = closedProviderDate(now);
+  if (requestedProviderDate === undefined || requestedProviderDate === null || requestedProviderDate === '') {
+    return latestClosedDate;
+  }
+  if (typeof requestedProviderDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(requestedProviderDate)) {
+    throw codedError('KLAVIYO_PROVIDER_DATE_INVALID', 409);
+  }
+  const parsed = new Date(`${requestedProviderDate}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== requestedProviderDate) {
+    throw codedError('KLAVIYO_PROVIDER_DATE_INVALID', 409);
+  }
+  if (requestedProviderDate > latestClosedDate) {
+    throw codedError('KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 409);
+  }
+  const earliest = new Date(`${latestClosedDate}T00:00:00.000Z`);
+  earliest.setUTCDate(earliest.getUTCDate() - 31);
+  if (requestedProviderDate < earliest.toISOString().slice(0, 10)) {
+    throw codedError('KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE', 409);
+  }
+  return requestedProviderDate;
+}
+
 function safeFailure(error) {
   const reason = String(error?.code || error?.message || '');
+  if (['KLAVIYO_PROVIDER_DATE_INVALID', 'KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE'].includes(reason)) {
+    return codedError(reason, 409);
+  }
   if (reason === 'KLAVIYO_REAUTHORIZE') return codedError('KLAVIYO_REAUTHORIZE', 409);
   if (reason === 'CANONICAL_PROVIDER_CONNECTION_REQUIRED' || reason === 'KLAVIYO_CANONICAL_CONNECTION_REQUIRED') {
     return codedError('KLAVIYO_PREFLIGHT_CONNECTION_REQUIRED', 409);
@@ -44,12 +70,12 @@ function createKlaviyoReadOnlyPreflight({
   }
   const runner = createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate });
 
-  async function execute(authority) {
+  async function execute(authority, requestedProviderDate = null) {
     try {
       let connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       const currency = await settingsStore.resolveReportingCurrency(authority);
-      const providerDate = closedProviderDate(now());
+      const providerDate = resolveProviderDate(requestedProviderDate, now());
       const operation = activeConnection => runner(Object.freeze({
           authority,
           connection: activeConnection,
@@ -68,11 +94,15 @@ function createKlaviyoReadOnlyPreflight({
         reportingCurrency: currency.reportingCurrency,
         result,
       });
+      const campaignRowCount = verified.rows.filter(row => row.entity.root_entity_type === 'campaign').length;
+      const flowRowCount = verified.rows.filter(row => row.entity.root_entity_type === 'flow').length;
       return Object.freeze({
         status: 'PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT',
         provider_result_status: verified.providerResultStatus,
         selected_account_count: verified.selectedAccountCount,
         row_count: verified.rows.length,
+        campaign_row_count: campaignRowCount,
+        flow_row_count: flowRowCount,
         empty_provider_result: verified.providerResultStatus === 'empty',
         account_api_verified: true,
         campaign_reporting_verified: true,
@@ -91,7 +121,7 @@ function createKlaviyoReadOnlyPreflight({
   return Object.freeze({ execute });
 }
 
-module.exports = Object.freeze({ closedProviderDate, createKlaviyoReadOnlyPreflight });
+module.exports = Object.freeze({ closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight });
 
 
 

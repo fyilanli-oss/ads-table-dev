@@ -15,6 +15,11 @@ test('R6-D2 acceptance control is hidden from the normal Data Sources experience
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/preflight/);
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/metrics/);
   assert.match(html, /Confirm metric and continue/);
+  assert.match(html, /<s-date-field id="r6d2-klaviyo-provider-date"/);
+  assert.match(html, /provider_date: String\(acceptanceProviderDate\.value/);
+  assert.match(html, /campaign_row_count/);
+  assert.match(html, /flow_row_count/);
+  assert.match(html, /VERIFIED EMPTY/);
   assert.match(html, /Dataset V2 writes: 0/);
   const acceptanceMarkup = html.slice(
     html.indexOf('<s-stack id="r6d2-klaviyo-acceptance"'),
@@ -33,6 +38,7 @@ test('R6-D2 C6 controlled write stays inside the acceptance surface and is confi
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/acceptance/);
   assert.match(html, /RUN_R6_D2_C6_KLAVIYO_WRITE/);
   assert.match(html, /Do not retry; review runtime evidence/);
+  assert.match(html, /id="r6d2-klaviyo-c6-run" tone="critical" disabled/);
   const acceptanceMarkup = html.slice(
     html.indexOf('<s-stack id="r6d2-klaviyo-acceptance"'),
     html.indexOf('<s-stack id="currency-setup"'),

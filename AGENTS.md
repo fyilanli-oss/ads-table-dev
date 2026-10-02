@@ -34,3 +34,33 @@ Bağlayıcı kurallar:
 - Kanıtlanmamış aşama tamamlanmış kabul edilmez.
 
 Mevcut geçici ihlaller yalnız constitution contract'ındaki açık borç listesinde tutulabilir. Bu liste yeni ihlal eklemek için emsal değildir; sayı yalnız azalabilir.
+
+## Yerel Git yazma kapısı ve GitHub connector fallback politikası
+
+Yerel Git normal ve birincil execution yoludur. Aşağıdaki fallback yalnız yerel Git metadata yazımı sandbox/ACL nedeniyle engellendiğinde kullanılabilir; yerel repository içeriğini, test çalıştırmayı veya kullanıcıya ait değişiklikleri atlamak için kullanılamaz.
+
+1. Başlangıç kapısında `git status`, HEAD/branch, `git rev-parse --git-common-dir`, staged, tracked-modified ve untracked dosyalar salt okunur olarak envanterlenir.
+2. Hata katmanı ayrı sınıflandırılır: GitHub ağı/API'si, yerel repository bütünlüğü ve Codex sandbox/ACL üç ayrı durumdur. Yerel `.git`/worktree metadata yazma hatası “GitHub çalışmıyor” diye raporlanmaz.
+3. Yalnız metadata yazımı engelliyse bilinmeyen sonuçlu ACL, sahiplik, process sonlandırma, servis/VM yeniden başlatma veya sistem mutation işlemi otomatik yapılmaz.
+4. Fallback'ten önce bütün staged, tracked-modified ve untracked proje dosyaları güncel GitHub hedef dalıyla içerik hash'i veya exact content üzerinden karşılaştırılır. Stash'ler, bağlı worktree'ler ve upstream'siz/ahead yerel branch uçları ayrıca envanterlenir.
+5. GitHub'da bulunmayan veya eşdeğerliği kanıtlanmamış yerel içerik varsa otomatik uzak yazım, reset, checkout, stash apply/drop veya overwrite yapılmaz. Dosya/branch/stash korunur; kapsam ve risk kullanıcıya bildirilir ve açık yön beklenir.
+6. Yerel-only içerik bulunmadığı kanıtlanır ve GitHub bağlantısı ayrı olarak doğrulanırsa, kullanıcının açık onayıyla GitHub connector fallback kullanılabilir.
+7. Fallback her zaman güncel hedef daldan yeni `codex/` branch oluşturur. Mevcut dosya güncellemesinden hemen önce güncel blob SHA yeniden okunur; Contents API yazımları aynı path için seri yapılır.
+8. Fallback yalnız açıkça istenen dosyaları değiştirir. Ignored dosyalar, secret'lar, build çıktıları ve unrelated yerel değişiklikler uzak repository'ye taşınmaz.
+9. Uzak içerik yazımdan sonra tekrar okunarak doğrulanır; PR açılır ve repository'nin zorunlu CI/testleri PASS olmadan iş tamamlandı veya merge-ready sayılmaz.
+10. Kullanıcı ayrıca açıkça istemeden PR merge edilmez. Connector başarısı yerel checkout'ı temiz, güncel veya senkron kabul ettirmez; kalan yerel durum teslim özetinde ayrıca raporlanır.
+
+## Zorunlu iş bitiş kapısı: local-only iş sıfır
+
+Tamamlanmış, onay bekleyen veya yeniden üretilemeyecek hiçbir proje işi yalnız yerel diskte bırakılamaz. Bir iş paketi aşağıdaki kapılar geçmeden tamamlandı, güvende, teslim edildi veya merge-ready sayılamaz:
+
+1. İş sonunda staged, tracked-modified, untracked proje dosyaları, stash'ler, worktree'ler ve upstream'siz/ahead yerel branch uçları yeniden envanterlenir.
+2. Anlamlı kod, test, sözleşme, Execution Plan kararı, migration ve yeniden üretilemeyecek kabul/kanıt dosyaları GitHub üzerinde doğrulanabilir bir branch, PR veya commit'e aktarılmış olmalıdır. Tamamlanmış iş için doğrulanmamış local-only proje içeriği sıfır olmalıdır.
+3. Uzak dosyalar GitHub'dan tekrar okunur; beklenen commit SHA ve exact content/hash doğrulanır. Zorunlu CI/testler PASS olmadan uzak kopya güvenli teslim sayılmaz.
+4. Merge ayrı bir kapıdır ve açık kullanıcı onayı gerektirir; fakat merge bekleyen çalışma dahi GitHub branch/PR üzerinde dayanıklı olmalıdır.
+5. Yerel stash, reflog, worktree veya makine yedeği tek başına dayanıklı teslim ya da uzak yedek sayılmaz. Eşdeğerliği kanıtlanmamış local-only içerik varsa iş açık risk olarak raporlanır ve kapanmaz.
+6. Secret, ignored cache, dependency/build çıktısı ve yeniden üretilebilir geçici dosyalar GitHub'a yüklenmez. Bunların proje işi olmadığı açıkça sınıflandırılır; secret'lar uygun secret manager veya provider sisteminde tutulur.
+7. Yerel dosya, branch veya stash; uzak eşdeğeri ve kurtarılabilirliği doğrulanmadan silinmez, drop edilmez veya overwrite edilmez.
+8. Teslim özetinde GitHub URL/PR/commit, CI sonucu ve varsa bilinçli yerel istisnalar açıkça yazılır. “GitHub güncel” ifadesi yalnız bu kanıtlarla kullanılabilir.
+9. Repository ZIP veya günlük makine yedeği ikincil kurtarma katmanıdır; Git commit geçmişi, branch/tag, PR/issue ve diğer GitHub metadata'sının yerine geçmez ve bu bitiş kapısını kaldırmaz.
+

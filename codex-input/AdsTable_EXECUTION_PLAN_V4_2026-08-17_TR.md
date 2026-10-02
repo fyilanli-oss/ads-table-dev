@@ -3816,3 +3816,19 @@ Bu V4 plan ile:
 - Desktop gerçek Shopify Admin ve en az 320 px gerçek mobil Shopify Admin kanıtı, bütün loading/empty/error/cancel/success durumları ve açık ürün sahibi kabulü olmadan iş `Done`, `PASS` veya `Accepted` sayılamaz ve merge edilemez.
 - Root `AGENTS.md`, task şablonu, PR checklist'i ve `tests/shopify-embedded-ui-constitution.test.js` bu kapıyı gelecek tasklara taşır. Bütün dondurulmuş Shopify UI contract'ları merkezî anayasayı referans eder.
 - `e9cd2490f1e9a9c70213baf3f47feba8c264380f` Settings sunumu `s-clickable`, inline style ve literal renk kullandığı; mobil/desktop görsel kabulü geçmediği için R7-B6 açısından **FAIL / corrective work required** durumundadır. Bu governance paketi UI kodunu değiştirmez ve mevcut görünümü tamamlandı saymaz.
+
+## Codex Windows repository delivery governance — PASS
+
+**Yürürlük tarihi:** 2 Ekim 2026  
+**Executable contract:** `contracts/repository-delivery-workflow-v1.json`
+
+- GitHub `main` ürün kaynağı ve başlangıç otoritesidir.
+- Ana Local checkout repository anchor'ı ve salt-okunur envanter kaynağıdır; aktif geliştirme alanı değildir.
+- Kodlama ve test görev bazlı Codex-managed worktree'de yapılır; yerel çalışma dosyası geçicidir ve teslim sayılmaz.
+- GitHub branch/commit/PR/CI/merge işlemlerinin birincil uzak yolu GitHub Connector'dır.
+- Connector erişimi veya güncel uzak `main` kanıtı yoksa iş implementasyondan önce fail-closed durur.
+- GitHub web editörü, yerel Git/GCM/ACL onarımı ve server/VM yeniden başlatma otomatik fallback değildir.
+- Her görev `local-only sıfır`, uzak exact-content/hash doğrulaması ve zorunlu CI PASS kapısından geçer.
+- Merge açık kullanıcı onayı gerektirir; merge sonrası managed worktree geri alınabilir biçimde arşivlenir.
+- Ana Local klasör veya ortak `.git`, bağlı worktree'ler kapanmadan silinemez.
+

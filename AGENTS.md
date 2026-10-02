@@ -35,20 +35,22 @@ Bağlayıcı kurallar:
 
 Mevcut geçici ihlaller yalnız constitution contract'ındaki açık borç listesinde tutulabilir. Bu liste yeni ihlal eklemek için emsal değildir; sayı yalnız azalabilir.
 
-## Yerel Git yazma kapısı ve GitHub connector fallback politikası
+## Zorunlu Codex Windows çalışma ve GitHub teslim modeli
 
-Yerel Git normal ve birincil execution yoludur. Aşağıdaki fallback yalnız yerel Git metadata yazımı sandbox/ACL nedeniyle engellendiğinde kullanılabilir; yerel repository içeriğini, test çalıştırmayı veya kullanıcıya ait değişiklikleri atlamak için kullanılamaz.
+Bu repository için Windows Codex çalışma modeli `contracts/repository-delivery-workflow-v1.json` ile bağlayıcıdır. Amaç yerel geliştirmeyi yasaklamak değil, hiçbir anlamlı işi yalnız yerel diskte bırakmamaktır.
 
-1. Başlangıç kapısında `git status`, HEAD/branch, `git rev-parse --git-common-dir`, staged, tracked-modified ve untracked dosyalar salt okunur olarak envanterlenir.
-2. Hata katmanı ayrı sınıflandırılır: GitHub ağı/API'si, yerel repository bütünlüğü ve Codex sandbox/ACL üç ayrı durumdur. Yerel `.git`/worktree metadata yazma hatası “GitHub çalışmıyor” diye raporlanmaz.
-3. Yalnız metadata yazımı engelliyse bilinmeyen sonuçlu ACL, sahiplik, process sonlandırma, servis/VM yeniden başlatma veya sistem mutation işlemi otomatik yapılmaz.
-4. Fallback'ten önce bütün staged, tracked-modified ve untracked proje dosyaları güncel GitHub hedef dalıyla içerik hash'i veya exact content üzerinden karşılaştırılır. Stash'ler, bağlı worktree'ler ve upstream'siz/ahead yerel branch uçları ayrıca envanterlenir.
-5. GitHub'da bulunmayan veya eşdeğerliği kanıtlanmamış yerel içerik varsa otomatik uzak yazım, reset, checkout, stash apply/drop veya overwrite yapılmaz. Dosya/branch/stash korunur; kapsam ve risk kullanıcıya bildirilir ve açık yön beklenir.
-6. Yerel-only içerik bulunmadığı kanıtlanır ve GitHub bağlantısı ayrı olarak doğrulanırsa, kullanıcının açık onayıyla GitHub connector fallback kullanılabilir.
-7. Fallback her zaman güncel hedef daldan yeni `codex/` branch oluşturur. Mevcut dosya güncellemesinden hemen önce güncel blob SHA yeniden okunur; Contents API yazımları aynı path için seri yapılır.
-8. Fallback yalnız açıkça istenen dosyaları değiştirir. Ignored dosyalar, secret'lar, build çıktıları ve unrelated yerel değişiklikler uzak repository'ye taşınmaz.
-9. Uzak içerik yazımdan sonra tekrar okunarak doğrulanır; PR açılır ve repository'nin zorunlu CI/testleri PASS olmadan iş tamamlandı veya merge-ready sayılmaz.
-10. Kullanıcı ayrıca açıkça istemeden PR merge edilmez. Connector başarısı yerel checkout'ı temiz, güncel veya senkron kabul ettirmez; kalan yerel durum teslim özetinde ayrıca raporlanır.
+1. GitHub `main` ürün kaynağı ve başlangıç otoritesidir. Yeni iş güncel uzak `main` commit'i doğrulanmadan başlatılmaz.
+2. Ana Local checkout `C:\\Users\\dev\\Documents\\Codex\\ads-table-dev` aktif geliştirme alanı değildir; repository anchor'ı ve salt-okunur envanter kaynağıdır. Kullanıcı açıkça istemeden burada kod, test, sözleşme, migration veya Execution Plan değişikliği üretilmez.
+3. Kodlama, test ve build işlemleri görev bazlı Codex-managed worktree'de yapılır. Yerel çalışma dosyaları geçici execution materyalidir; kalıcı teslim sayılmaz.
+4. GitHub branch, blob/tree, commit, PR, CI okuma ve merge işlemlerinde birincil uzak yol GitHub Connector'dır. Windows sandbox içindeki yerel `.git` yazımı teslim için zorunlu bağımlılık yapılamaz.
+5. GitHub web editörü veya tarayıcı üzerinden repository mutation yalnız kullanıcı bunu açıkça isterse kullanılabilir. Connector fallback'i olarak kendiliğinden web arayüzüne geçilmez.
+6. Başlangıçta worktree durumu, HEAD/branch, `git-common-dir`, staged/tracked/untracked içerik ve GitHub Connector erişimi ayrı kapılar olarak doğrulanır.
+7. Connector erişimi veya güncel uzak `main` kanıtı yoksa implementasyona başlanmaz. Yerel Git/GCM/ACL, elevated/unelevated işlem, process sonlandırma, servis/VM/server yeniden başlatma veya bilinmeyen sonuçlu sistem mutation'ı denenmez; engel ilk kapıda raporlanır.
+8. Uzak teslim her zaman güncel `main`den açılan `codex/` branch üzerinde, yalnız görev kapsamındaki explicit dosyalarla yapılır. Güncel blob SHA/content yeniden okunur; yazım sonrası uzak içerik tekrar doğrulanır.
+9. PR ve zorunlu CI PASS olmadan iş merge-ready sayılmaz. Merge ayrıca açık kullanıcı onayı gerektirir.
+10. Merge sonrası görev worktree'si, local-only sıfır doğrulamasından sonra Codex'in geri alınabilir arşiv mekanizmasıyla kapatılır. Cache, dependency ve build çıktıları kaynak teslim değildir.
+11. Ana Local klasör veya ortak `.git`, ona bağlı worktree'ler kapanmadan silinmez, taşınmaz veya yeniden kurulmaz.
+12. Connector kullanılamıyorsa web editörü, yerel Git onarımı veya server müdahalesine geçilmez; iş güvenli biçimde durur ve kullanıcıya tek engel bildirilir.
 
 ## Zorunlu iş bitiş kapısı: local-only iş sıfır
 
@@ -63,4 +65,4 @@ Tamamlanmış, onay bekleyen veya yeniden üretilemeyecek hiçbir proje işi yal
 7. Yerel dosya, branch veya stash; uzak eşdeğeri ve kurtarılabilirliği doğrulanmadan silinmez, drop edilmez veya overwrite edilmez.
 8. Teslim özetinde GitHub URL/PR/commit, CI sonucu ve varsa bilinçli yerel istisnalar açıkça yazılır. “GitHub güncel” ifadesi yalnız bu kanıtlarla kullanılabilir.
 9. Repository ZIP veya günlük makine yedeği ikincil kurtarma katmanıdır; Git commit geçmişi, branch/tag, PR/issue ve diğer GitHub metadata'sının yerine geçmez ve bu bitiş kapısını kaldırmaz.
-
+10. Merge sonrası görev worktree'si arşivlenir; arşiv sonucu ve bilinçli bırakılan yerel istisnalar teslim özetinde yazılır.

@@ -7,29 +7,30 @@ const path = require("node:path");
 
 const agents = fs.readFileSync(path.join(__dirname, "..", "AGENTS.md"), "utf8");
 
-test("AGENTS defines a fail-closed GitHub connector fallback for local Git metadata failures", () => {
+test("AGENTS defines the Connector-first managed-worktree delivery model", () => {
   for (const requiredText of [
-    "## Yerel Git yazma kapısı ve GitHub connector fallback politikası",
-    "GitHub ağı/API'si, yerel repository bütünlüğü ve Codex sandbox/ACL",
-    "Stash'ler, bağlı worktree'ler ve upstream'siz/ahead yerel branch uçları ayrıca envanterlenir.",
-    "GitHub'da bulunmayan veya eşdeğerliği kanıtlanmamış yerel içerik varsa otomatik uzak yazım",
-    "kullanıcının açık onayıyla GitHub connector fallback kullanılabilir",
-    "güncel blob SHA yeniden okunur",
-    "Contents API yazımları aynı path için seri yapılır",
-    "zorunlu CI/testleri PASS olmadan",
-    "Kullanıcı ayrıca açıkça istemeden PR merge edilmez.",
+    "## Zorunlu Codex Windows çalışma ve GitHub teslim modeli",
+    "GitHub `main` ürün kaynağı ve başlangıç otoritesidir.",
+    "aktif geliştirme alanı değildir",
+    "görev bazlı Codex-managed worktree'de yapılır",
+    "birincil uzak yol GitHub Connector'dır",
+    "güncel uzak `main` kanıtı yoksa implementasyona başlanmaz",
+    "Güncel blob SHA/content yeniden okunur",
+    "PR ve zorunlu CI PASS olmadan iş merge-ready sayılmaz",
+    "Merge ayrıca açık kullanıcı onayı gerektirir.",
   ]) {
-    assert.ok(agents.includes(requiredText), `Missing fallback control: ${requiredText}`);
+    assert.ok(agents.includes(requiredText), `Missing delivery control: ${requiredText}`);
   }
 });
 
-test("fallback policy forbids destructive local recovery and unrelated uploads", () => {
-  for (const forbiddenAction of [
-    "ACL, sahiplik, process sonlandırma, servis/VM yeniden başlatma",
-    "reset, checkout, stash apply/drop veya overwrite yapılmaz",
-    "Ignored dosyalar, secret'lar, build çıktıları ve unrelated yerel değişiklikler uzak repository'ye taşınmaz.",
+test("Connector-first policy fails closed without web, local Git repair, or system mutation", () => {
+  for (const safetyBoundary of [
+    "GitHub web editörü veya tarayıcı üzerinden repository mutation yalnız kullanıcı bunu açıkça isterse kullanılabilir.",
+    "Yerel Git/GCM/ACL, elevated/unelevated işlem, process sonlandırma, servis/VM/server yeniden başlatma",
+    "Connector kullanılamıyorsa web editörü, yerel Git onarımı veya server müdahalesine geçilmez",
+    "Ana Local klasör veya ortak `.git`, ona bağlı worktree'ler kapanmadan silinmez",
   ]) {
-    assert.ok(agents.includes(forbiddenAction), `Missing safety boundary: ${forbiddenAction}`);
+    assert.ok(agents.includes(safetyBoundary), `Missing safety boundary: ${safetyBoundary}`);
   }
 });
 
@@ -42,9 +43,8 @@ test("AGENTS enforces a zero local-only work finish gate", () => {
     "Yerel stash, reflog, worktree veya makine yedeği tek başına dayanıklı teslim ya da uzak yedek sayılmaz",
     "uzak eşdeğeri ve kurtarılabilirliği doğrulanmadan silinmez",
     "Repository ZIP veya günlük makine yedeği ikincil kurtarma katmanıdır",
-    "Git commit geçmişi, branch/tag, PR/issue ve diğer GitHub metadata'sının yerine geçmez",
+    "Merge sonrası görev worktree'si arşivlenir",
   ]) {
     assert.ok(agents.includes(requiredText), `Missing finish-gate control: ${requiredText}`);
   }
 });
-

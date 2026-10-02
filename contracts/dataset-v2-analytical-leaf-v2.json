@@ -1,0 +1,164 @@
+{
+  "contract_id": "dataset-v2-analytical-leaf-v2",
+  "version": "2.0.0",
+  "status": "decision_frozen_implementation_pending",
+  "effective_decision_date": "2026-10-02",
+  "replaces_unpublished_local_draft": {
+    "contract_id": "dataset-v2-analytical-leaf-v1",
+    "publication_status": "never_published_to_repository",
+    "reason": "The local draft mixed valid Meta, Google and Performance Max leaf decisions with obsolete monthly/sent email-cost allocation and an unsupported Flow Variation hierarchy.",
+    "preserved_decisions_only": [
+      "Meta leaf is Ad.",
+      "Google Ads standard leaf is Ad.",
+      "Google Performance Max leaf is Asset Group.",
+      "Klaviyo Audience is targeting metadata, not a performance leaf."
+    ]
+  },
+  "authoritative_sources": {
+    "checked_at": "2026-10-02",
+    "klaviyo_campaign_variations_beta": "https://developers.klaviyo.com/en/reference/get_variations_for_campaign_message_beta",
+    "klaviyo_reporting_api": "https://developers.klaviyo.com/en/reference/reporting_api_overview",
+    "klaviyo_campaigns_api": "https://developers.klaviyo.com/en/v2026-04-15/reference/campaigns_api_overview"
+  },
+  "scope": {
+    "included": [
+      "Dataset V2 analytical leaf decisions",
+      "Ad Analysis provider hierarchy decisions",
+      "Klaviyo Campaign Variation GA activation gate",
+      "Delegation to the authoritative Klaviyo email cost allocation contract"
+    ],
+    "excluded": [
+      "Dataset V2 schema migration",
+      "runtime implementation",
+      "provider mutation",
+      "production activation",
+      "historical backfill",
+      "modification of the Klaviyo email cost allocation formula"
+    ],
+    "contract_only_package": true
+  },
+  "cost_contract_delegation": {
+    "modifies_cost_contract": false,
+    "authoritative_contract_id": "r7b5-klaviyo-email-cost-allocation-v2",
+    "authoritative_contract_path": "contracts/r7b5-klaviyo-email-cost-allocation-v2.json",
+    "rule": "This analytical-leaf contract consumes allocated_spend and may not restate, replace or override the authoritative cost formula.",
+    "current_email_allocation_grain": [
+      "campaign_message",
+      "flow_message"
+    ],
+    "campaign_variation_allocation": "May begin only after the GA gate proves identity mapping and prevents Campaign Message and Campaign Variation double counting.",
+    "excluded_channels": [
+      "sms",
+      "mms",
+      "whatsapp"
+    ]
+  },
+  "provider_hierarchies": {
+    "meta": {
+      "hierarchy": [
+        "campaign",
+        "ad_set",
+        "ad"
+      ],
+      "analytical_leaf": "ad",
+      "synthetic_leaf_forbidden": true
+    },
+    "google_ads_standard": {
+      "hierarchy": [
+        "campaign",
+        "ad_group",
+        "ad"
+      ],
+      "analytical_leaf": "ad",
+      "synthetic_leaf_forbidden": true
+    },
+    "google_ads_performance_max": {
+      "hierarchy": [
+        "campaign",
+        "asset_group"
+      ],
+      "analytical_leaf": "asset_group",
+      "display_label": "Asset Group",
+      "forbidden_complete_financial_leaves": [
+        "synthetic_ad_group",
+        "synthetic_ad",
+        "individual_asset"
+      ],
+      "synthetic_entity_forbidden": true
+    },
+    "klaviyo_campaign": {
+      "current_hierarchy": [
+        "campaign",
+        "campaign_message"
+      ],
+      "current_analytical_leaf": "campaign_message",
+      "target_hierarchy_after_gate": [
+        "campaign",
+        "campaign_message",
+        "campaign_variation"
+      ],
+      "target_analytical_leaf_after_gate": "campaign_variation",
+      "activation_requires_campaign_variation_ga_gate": true
+    },
+    "klaviyo_flow": {
+      "current_hierarchy": [
+        "flow",
+        "flow_message"
+      ],
+      "current_analytical_leaf": "flow_message",
+      "target_hierarchy": [
+        "flow",
+        "flow_message"
+      ],
+      "target_analytical_leaf": "flow_message",
+      "flow_variation_assumption_forbidden": true,
+      "hierarchy_change_requires_current_official_evidence": true
+    },
+    "klaviyo_audience": {
+      "role": "targeting_metadata",
+      "performance_leaf": false,
+      "allocated_spend_owner": false
+    }
+  },
+  "dataset_v2_and_formula_engine": {
+    "schema_change_in_this_package": false,
+    "runtime_activation_in_this_package": false,
+    "persist_raw_facts_only": true,
+    "derived_metrics_owner": "Formula Engine",
+    "aggregate_raw_facts_before_formula": true,
+    "unsupported_or_zero_denominator_result": null,
+    "synthetic_entities_forbidden": true,
+    "source_fact_contributes_once_per_aggregate": true,
+    "allocated_spend_contributes_once_per_aggregate": true
+  },
+  "campaign_variation_ga_gate": {
+    "target_revision_date": "2026-10-15",
+    "date_alone_activates_nothing": true,
+    "automatic_activation_on_date": false,
+    "reporting_variation_equals_resource_id_assumption_forbidden": true,
+    "required_steps": [
+      "Read the current official Klaviyo 2026-10-15 GA documentation.",
+      "Prove the identity mapping between Reporting API variation grouping and Campaign Variation API resource identity; labels and names are insufficient.",
+      "Version Dataset V2 entity keys, mapper, query and aggregation contracts.",
+      "Allocate Campaign Message email cost to real Campaign Variations without duplicating parent cost and preserve account-day totals.",
+      "Keep Flow at Flow Message unless current official evidence introduces a stable lower resource and identity mapping.",
+      "Run read-only preflight, repository tests and controlled non-empty live acceptance under separate approval gates."
+    ],
+    "production_backfill_requires_separate_approval": true
+  },
+  "invariants": [
+    "Meta financial performance terminates at Ad.",
+    "Google Ads standard financial performance terminates at Ad.",
+    "Google Performance Max financial performance terminates at Asset Group; no fake Ad Group or Ad is created.",
+    "Klaviyo Campaign performance currently terminates at Campaign Message.",
+    "Klaviyo Flow performance terminates at Flow Message and no Flow Variation is inferred.",
+    "Klaviyo Audience remains targeting metadata and never owns performance or allocated spend.",
+    "The analytical-leaf contract cannot change the daily email cost or its current recipient-weighted allocation.",
+    "Campaign Variation activation cannot double count Campaign Message facts or allocated spend.",
+    "No schema write, runtime activation, provider mutation or backfill occurs in this contract-only package."
+  ],
+  "rollback": {
+    "before_runtime_activation": "Supersede this contract with a new versioned decision; do not delete historical evidence.",
+    "after_runtime_activation": "Disable the versioned leaf feature flag, retain raw facts and allocated-spend auditability, and restore the last accepted hierarchy without deleting evidence."
+  }
+}

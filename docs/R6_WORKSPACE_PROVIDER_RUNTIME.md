@@ -210,6 +210,23 @@ Shopify-native warning modalı, non-destructive Cancel, session-bound exact-conf
 
 Repository kapsamı ve ilgili regresyonlar PASS'tir. Merchant Cancel, Disconnect, `Not connected`, temiz OAuth, doğrulanmış 1–3 hesap seçimi ve yeniden `Connected` zincirini; ayrıca cleanup ve reconnect sonrası iki salt-okunur Supabase postcheck'i tamamlamadan R6-D4-F production PASS sayılmaz. Contract `contracts/r6d4f-google-independent-disconnect-v1.json`, analist kaydı `docs/R6D4F_GOOGLE_INDEPENDENT_DISCONNECT.md` içindedir.
 
+## R6 reporting completeness kapısı — Meta, Google Ads ve Klaviyo
+
+**Karar tarihi:** 2026-10-02. Provider bağlantısı için alınan Connect → Connected → Disconnect → temiz Reconnect `PASS` sonucu, hierarchy ve metriklerin Dataset V2'ye eksiksiz taşındığı anlamına gelmez. Provider verisinin bulunmaması da gözlenmiş sayısal `0` kanıtı değildir. Non-empty veri varsa gerçek hierarchy/metrik kabulü; canlı veri üretilemiyorsa capability, mapper ve provider-doğrulanmış empty kabulü yapılır. Unsupported, ölçülemeyen veya provider tarafından döndürülmeyen metrikler `0`a çevrilmez; `unsupported`, `not_observed` veya `null` durumlarından uygun olanı korur.
+
+Meta için mevcut Instagram → Amazon test kampanyası Campaign → Ad Set → Ad hierarchy'siyle incelenir. Canlı kabul en az impressions, clicks, spend, account/currency/business-date, leaf-parent roll-up, duplicate engeli ve canonical Dataset V2 entity anahtarlarını kanıtlar. Pixel bulunmadığı için Added to Cart, Started Checkout, Purchase, Purchase Value ve bunlardan türeyen ROAS/CPS/Revenue alanları ölçülemiyorsa gözlenmiş sıfır sayılmaz. Meta lifecycle PASS korunur; non-empty metrik/hierarchy kabulü ayrıca tamamlanana kadar reporting completeness açık kalır.
+
+Google Ads test ortamında kampanya üretilemediği sürece kabul; account ve `login_customer_id` bağlamı, currency/timezone, Standard Campaign → Ad Group → Ad, Performance Max Campaign → Asset Group, impressions/clicks/cost/conversion alan eşlemesi ve sentetik satır üretmeyen verified-empty davranışını kapsar. Performance Max için provider'ın vermediği bireysel Ad seviyesi uydurulmaz. Google Ads segmentli raporlamada bütün seçili metrikleri sıfır olan satırları döndürmeyebildiğinden boş sonuç, gözlenmiş sıfır metrik gibi yorumlanmaz. Capability + verified-empty PASS korunur; gerçek provider verisi oluşana kadar non-empty metrik kabulü `pending` kalır.
+
+Klaviyo için Campaign non-empty persistence kanıtı korunur; Flow Message ve provider-attributed Added to Cart, Started Checkout ve Placed Order count/value kabulü R6-D5-K3 ile tamamlanır. R7-B7 bütünleşik kabulü bu üç provider satırını aynı matriste göstermeden ve lifecycle PASS ile reporting completeness PASS'i ayrı durumlar olarak sunmadan kapanamaz.
+
+2026-10-02 tarihinde kontrol edilen resmî kaynaklar:
+
+- Meta official Facebook Marketing API Postman collection — Ad Insights örnekleri Campaign/Ad Set/Ad kimlikleriyle `impressions`, `clicks` ve `spend` alanlarını taşır: https://www.postman.com/meta/facebook-marketing-api/overview
+- Google Ads API — Zero metrics: https://developers.google.com/google-ads/api/docs/reporting/zero-metrics
+- Google Ads API — Performance Max Asset Group reporting: https://developers.google.com/google-ads/api/performance-max/asset-group-reporting
+- Google Ads API — Conversion reporting: https://developers.google.com/google-ads/api/docs/conversions/reporting
+
 ## Fail-closed kurallar
 
 - Currency yoksa provider çalışmaz.

@@ -440,5 +440,42 @@
       "live_postcheck_result": "PENDING"
     }
   },
+  "reporting_completeness_gate": {
+    "status": "OPEN",
+    "lifecycle_pass_is_reporting_completeness_pass": false,
+    "absence_of_provider_rows_is_zero_metric_evidence": false,
+    "unsupported_or_unobservable_metrics_must_not_be_coerced_to_zero": true,
+    "providers": {
+      "meta": {
+        "current_evidence": "connected_disconnect_reconnect_lifecycle_pass_and_earlier_verified_empty_dataset_acceptance",
+        "required_live_follow_up": "non_empty_instagram_to_amazon_campaign_reporting_acceptance",
+        "required_hierarchy": ["campaign", "ad_set", "ad"],
+        "required_observed_metrics": ["impressions", "clicks", "spend"],
+        "pixel_dependent_conversion_metrics": "unsupported_or_not_observed_or_null_when_not_measurable_never_invented_zero",
+        "dataset_v2_non_empty_metric_acceptance": "PENDING"
+      },
+      "google_ads": {
+        "current_evidence": "capability_and_verified_empty_pass_without_creatable_test_campaign",
+        "required_hierarchies": {
+          "standard": ["campaign", "ad_group", "ad"],
+          "performance_max": ["campaign", "asset_group"]
+        },
+        "required_contract_checks": [
+          "account_and_login_customer_context",
+          "currency_timezone_and_business_date",
+          "impressions_clicks_cost_and_conversion_field_mapping",
+          "verified_empty_without_synthetic_rows",
+          "no_invented_ad_level_for_performance_max"
+        ],
+        "zero_metric_row_omission_must_not_be_interpreted_as_observed_zero": true,
+        "dataset_v2_non_empty_metric_acceptance": "PENDING_UNTIL_REAL_PROVIDER_DATA_EXISTS"
+      },
+      "klaviyo": {
+        "current_evidence": "campaign_non_empty_persistence_pass",
+        "remaining_live_follow_up": "flow_message_and_journey_count_value_acceptance"
+      }
+    },
+    "r7_b7_requires_all_provider_rows": true
+  },
   "next_gate": "R6-D4-F_GOOGLE_DISCONNECT_CLEAN_RECONNECT_PRODUCTION_ACCEPTANCE"
 }

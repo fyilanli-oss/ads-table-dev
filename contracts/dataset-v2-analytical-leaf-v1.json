@@ -1,0 +1,86 @@
+{
+  "contract": "dataset-v2-analytical-leaf-v1",
+  "decision_date": "2026-09-29",
+  "status": "approved_target_contract_runtime_implementation_pending",
+  "purpose": "Define the comparable analytical leaf for Ad Analysis without inventing provider entities, and define estimated Klaviyo Email spend semantics without changing the frozen ten-metric Dataset V2 shape.",
+  "dataset_v2_schema_change": false,
+  "analytical_leaves": {
+    "meta": {
+      "hierarchy": ["campaign", "adset", "ad"],
+      "leaf": "ad",
+      "status": "existing_contract"
+    },
+    "google_standard": {
+      "hierarchy": ["campaign", "adgroup", "ad"],
+      "leaf": "ad",
+      "status": "existing_contract"
+    },
+    "google_performance_max": {
+      "hierarchy": ["campaign", "asset_group"],
+      "leaf": "asset_group",
+      "ad_analysis_role": "ad_level_analytical_equivalent",
+      "display_name": "Asset Group",
+      "forbidden": [
+        "synthetic_adgroup",
+        "synthetic_ad",
+        "treat_individual_asset_as_complete_financial_leaf"
+      ],
+      "status": "existing_contract"
+    },
+    "klaviyo_campaign": {
+      "target_hierarchy": ["campaign", "campaign_message", "campaign_variation"],
+      "target_leaf": "campaign_variation",
+      "current_runtime_leaf": "campaign_message",
+      "channel_scope": ["email", "sms", "whatsapp"],
+      "activation_gate": "Klaviyo GA documentation and real API response verification on or after 2026-10-15",
+      "status": "approved_target_pending_ga_verification"
+    },
+    "klaviyo_flow": {
+      "target_hierarchy": ["flow", "flow_message", "flow_variation"],
+      "target_leaf": "flow_variation",
+      "current_runtime_leaf": "flow_message",
+      "channel_scope": ["email", "sms", "whatsapp"],
+      "activation_gate": "Klaviyo GA documentation and real API response verification on or after 2026-10-15",
+      "status": "approved_target_pending_ga_verification"
+    }
+  },
+  "klaviyo_audience": {
+    "role": "targeting_metadata",
+    "analytical_leaf": false,
+    "performance_hierarchy_level": false
+  },
+  "allocated_estimated_email_spend": {
+    "canonical_metric": "spend_value",
+    "source": "user_supplied_estimated_30_day_email_spend",
+    "source_scope": "connected_klaviyo_account",
+    "allocation_grain": "verified_email_variation_and_business_date",
+    "allocation_driver": "provider_verified_sent_email",
+    "formula": "estimated_30_day_email_spend_source * leaf_sent_email_in_period / account_total_sent_email_in_same_period",
+    "display_label": "Allocated Estimated Email Spend",
+    "spend_kind": "allocated_estimate",
+    "open_period_status": "provisional",
+    "closed_period_status": "finalized",
+    "is_provider_actual_spend": false,
+    "requires_complete_period_denominator": true,
+    "missing_denominator_behavior": "unknown_null",
+    "forbidden": [
+      "copy_full_account_estimate_to_each_leaf",
+      "allocate_by_delivered_email",
+      "allocate_by_calendar_day",
+      "present_as_provider_actual_spend",
+      "combine_with_provider_actual_spend_for_the_same_channel_leaf_and_period"
+    ]
+  },
+  "channel_spend_precedence": {
+    "email": "allocated_estimated_email_spend",
+    "sms": "provider_actual_text_message_spend_when_verified",
+    "whatsapp": "unknown_until_ga_documentation_and_real_response_verification"
+  },
+  "acceptance_rules": [
+    "Every analytical leaf keeps provider-verifiable root and parent lineage.",
+    "All leaves use the frozen ten raw Dataset V2 facts and support-aware null semantics.",
+    "Google conversion totals are split by verified journey category before Purchase and Revenue are populated.",
+    "Klaviyo Variation activation requires versioned hierarchy, entity-key, mapper, query, aggregation and non-empty evidence updates.",
+    "No target decision in this contract is marked runtime complete without provider and Dataset V2 evidence."
+  ]
+}

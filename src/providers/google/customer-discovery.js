@@ -89,4 +89,3 @@ async function discoverGoogleCustomers({ resourceNames, search } = {}) {
 }
 
 module.exports = Object.freeze({ CUSTOMER_CLIENT_QUERY, discoverGoogleCustomers });
-

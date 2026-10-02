@@ -146,13 +146,10 @@ test('Meta and Google account selection and approved disconnect actions are Shop
   assert.match(html, /id="meta-account-modal" heading="Select Meta account"/);
   assert.match(html, /id="google_ads-account-modal" heading="Select Google Ads account"/);
   assert.match(html, /Select between 1 and 3 accounts returned by Meta/);
-  assert.match(html, /id="meta-choice" gap="small"/);
-  assert.match(html, /document\.createElement\('s-checkbox'\)/);
-  assert.match(html, /id="meta-save" variant="primary" disabled/);
+  assert.match(html, /id="meta-choice"[^>]+multiple/);
   assert.doesNotMatch(html, /Open setup|Close setup/);
   assert.match(html, /id="meta-disconnect-modal"/);
   assert.match(html, /id="google_ads-disconnect-modal"/);
   assert.match(html, /id="klaviyo-disconnect-modal"/);
   assert.doesNotMatch(html, /data-provider="tiktok"|data-provider="pinterest"/);
 });
-

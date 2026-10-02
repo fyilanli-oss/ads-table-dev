@@ -111,4 +111,3 @@ function createEmbeddedProviderTokenExchanges({fetchImpl = fetch, metaGraphVersi
 }
 
 module.exports = Object.freeze({createEmbeddedProviderTokenExchanges, normalize, exchangeAndValidateMetaToken, exchangeAndValidateGoogleToken, GOOGLE_ADS_SCOPE});
-

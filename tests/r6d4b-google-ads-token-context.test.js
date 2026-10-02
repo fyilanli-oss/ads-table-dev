@@ -177,4 +177,3 @@ test('R6-D4-B contract keeps production and completed-data gates closed', () => 
   assert.equal(contract.preserved_boundaries.E5_redevelopment, false);
   assert.ok(contract.excluded.includes('disconnect_or_provider_revoke'));
 });
-

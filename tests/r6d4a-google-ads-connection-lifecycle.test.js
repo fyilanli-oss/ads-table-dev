@@ -64,4 +64,3 @@ test('R6-D4-A remains contract-only and cannot activate production data paths', 
   assert.ok(contract.excluded_from_r6_d4_a.includes('schedule_or_backfill_activation'));
   assert.ok(contract.excluded_from_r6_d4_a.includes('E5_adapter_mapper_time_fx_or_writer_redevelopment'));
 });
-

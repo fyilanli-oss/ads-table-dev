@@ -6,48 +6,33 @@ const {renderEmbeddedPlatforms} = require("../src/shopify/embedded-app-home");
 const {enabled, providerRuntimeReady, registerShopifyRuntime} = require("../src/shopify/runtime");
 const {createEmbeddedProviderTokenExchanges, normalize} = require("../src/shopify/embedded-provider-token-exchange");
 
-test("embedded Settings renders immutable currency setup and only three active providers", () => {
+test("embedded Platforms renders the R7-A currency gate, three active providers, and two parked providers", () => {
   const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: true});
   for (const provider of ["meta", "google_ads", "klaviyo"]) {
     assert.match(html, new RegExp(`data-provider="${provider}"`));
   }
   assert.doesNotMatch(html, /data-provider="tiktok"/);
   assert.doesNotMatch(html, /data-provider="pinterest"/);
-  assert.doesNotMatch(html, /TikTok|Pinterest|Parked|Unavailable/);
+  assert.match(html, /TikTok connection is parked for a later release/);
+  assert.match(html, /Pinterest connection is not available in this release/);
+  assert.match(html, /<s-paragraph>Parked<\/s-paragraph>/);
   assert.doesNotMatch(html, /Connect (?:Meta|Google Ads|Klaviyo|TikTok|Pinterest) to this Shopify workspace/);
   assert.match(html, /fetch\("\/api\/shopify\/providers\/klaviyo\/accounts" \+ path/);
   assert.match(html, /request\("\/status"\)/);
   assert.match(html, /window\.shopify\.idToken/);
-  assert.match(html, /<s-heading>Reporting Currency<\/s-heading>\s*<s-box[^>]+accessibilityLabel="Reporting Currency">/);
-  assert.match(html, /id="reporting-currency-summary" display="none"/);
-  assert.match(html, /cannot be changed after confirmation/);
-  assert.match(html, /id="review-reporting-currency"[^>]*>Review selection/);
-  assert.match(html, /id="save-reporting-currency"[^>]*>Confirm reporting currency/);
-  assert.match(html, /Removing the app does not delete data or reset this currency/);
-  assert.match(html, /currencySetup\.display = "none";[\s\S]*providerSections\.display = "none";[\s\S]*Open AdsTable from Shopify Admin/);
+  assert.match(html, /<div id="currency-setup" hidden>[\s\S]*heading="Finish setup"/);
+  assert.match(html, /currencySetup\.hidden = true;[\s\S]*providerSections\.hidden = true;[\s\S]*Open AdsTable from Shopify Admin/);
+  assert.doesNotMatch(html, /id="reporting-currency-summary"/);
   assert.match(html, /id="platforms-currency-modal" heading="Choose reporting currency" size="small-100"/);
   assert.match(html, /\/api\/shopify\/workspace\/reporting-currency/);
   assert.match(html, /<s-modal id="klaviyo-connect-modal" heading="Connect Klaviyo to AdsTable\?" size="small-100">/);
   assert.match(html, /<s-modal id="klaviyo-account-modal" heading="Finish Klaviyo setup">/);
   assert.match(html, /commandFor="klaviyo-connect-modal" command="--show"/);
-  for (const provider of ["meta", "google_ads", "klaviyo"]) {
-    assert.match(html, new RegExp(`id="${provider}-resume" display="none"`));
-    assert.match(html, new RegExp(`<s-button variant="secondary" id="${provider}-resume-action">Resume setup<\\/s-button>`));
-  }
-  assert.match(html, /Facebook account that owns or can access the Meta ad accounts/);
-  assert.match(html, /Google may describe the consent broadly/);
-  assert.match(html, /select one verified Klaviyo account and enter its Estimated 30-Day Klaviyo Email Spend/);
-  assert.match(html, /SMS costs are not included/);
-  assert.match(html, /id="klaviyo-spend-update-modal"/);
-  assert.match(html, /id="klaviyo-spend-correct-modal"/);
-  assert.match(html, /Other provider connections are not affected/);
-  assert.match(html, /disconnected period may not be recovered automatically/);
   assert.match(html, /\/api\/shopify\/providers\//);
   assert.match(html, /open\(body\.authorization_url, "_top"\)/);
-  assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-2\.0-rc\.js/);
+  assert.match(html, /cdn\.shopify\.com\/shopifycloud\/polaris-1\.js/);
   assert.match(html, /<s-app-nav>/);
-  assert.match(html, /<s-page heading="Settings" inlineSize="base">/);
-  assert.match(html, /<s-heading>Platforms<\/s-heading>\s*<s-box id="provider-sections"[^>]+accessibilityLabel="Platforms">/);
+  assert.match(html, /<s-page heading="Data sources">/);
   assert.equal((html.match(/data-provider=/g) || []).length, 3);
   assert.doesNotMatch(html, /<style>|<iframe/i);
   assert.doesNotMatch(html, /workspace[_-]id|shop[_-]id|user[_-]id/i);
@@ -55,7 +40,7 @@ test("embedded Settings renders immutable currency setup and only three active p
 
 test("embedded Platforms keeps Connect actions disabled until runtime activation", () => {
   const html = renderEmbeddedPlatforms({clientId: "client-id", providerOAuthEnabled: false});
-  assert.equal((html.match(/id="(?:meta|google_ads|klaviyo)-connect-action"[^>]* disabled/g) || []).length, 3);
+  assert.equal((html.match(/ disabled/g) || []).length, 5);
   assert.match(html, /Connection setup unavailable/);
   assert.doesNotMatch(html, /Checking connection status/);
 });
@@ -177,9 +162,6 @@ test("incomplete provider activation stays isolated without crashing Shopify App
   });
   assert.deepEqual(result, {enabled: true, providerOAuthEnabled: false, providerOAuthRequested: true, providerAvailability: {meta: false, google_ads: false, klaviyo: false}});
   assert.equal(typeof routes["GET /"], "function");
-  assert.equal(typeof routes["GET /shopify/app/settings"], "function");
   assert.equal(typeof routes["GET /shopify/app/platforms"], "function");
-  assert.equal(typeof routes["GET /shopify/app/funnel"], "function");
-  assert.equal(typeof routes["GET /shopify/app/analysis"], "function");
   assert.equal(routes["POST /api/shopify/providers/meta/oauth/start"], undefined);
 });

@@ -159,4 +159,3 @@ function createGoogleAdsTokenLifecycle({
 }
 
 module.exports = Object.freeze({TOKEN_URL, GOOGLE_ADS_SCOPE, DEFAULT_EXPIRY_SKEW_MS, tokenExpiresSoon, createGoogleAdsTokenLifecycle});
-

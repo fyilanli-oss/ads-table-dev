@@ -70,7 +70,7 @@ test('C6 controlled acceptance persists only verified workspace rows and returns
   assert.deepEqual(result, {
     status: 'PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE',
     attempted: 1, persisted: 1, empty_provider_result: false, provider_result_status: 'non_empty',
-    selected_account_count: 1, provider_date: '2026-09-23', campaign_row_count: 1, flow_row_count: 0, production_activation: false, currency_version: 2,
+    selected_account_count: 1, provider_date: '2026-09-23', production_activation: false, currency_version: 2,
   });
   const write = calls.find(([name]) => name === 'write')[1];
   assert.equal(write.length, 1);
@@ -83,19 +83,13 @@ test('C6 controlled acceptance persists only verified workspace rows and returns
   assert.equal(JSON.stringify(result).includes('secret'), false);
 });
 
-test('C6 controlled acceptance rejects verified-empty and never reports a write PASS', async () => {
+test('C6 controlled acceptance preserves verified-empty without synthetic rows', async () => {
   const { calls, service } = acceptance({ result: { rows: [], verified_empty: true } });
-  await assert.rejects(service.execute(authority, CONFIRMATION), error =>
-    error.code === 'KLAVIYO_DATASET_ACCEPTANCE_EMPTY_PROVIDER_RESULT' && error.status === 409);
-  assert.equal(calls.some(([name]) => name === 'write'), false);
-});
-
-test('C6 controlled acceptance uses an explicitly selected closed provider date', async () => {
-  const { calls, service } = acceptance();
-  const result = await service.execute(authority, CONFIRMATION, '2026-09-22');
-  assert.equal(result.provider_date, '2026-09-22');
-  assert.equal(calls.find(([name]) => name === 'read')[1].from, '2026-09-22');
-  assert.equal(calls.find(([name]) => name === 'facts')[1].providerDate, '2026-09-22');
+  const result = await service.execute(authority, CONFIRMATION);
+  assert.equal(result.attempted, 0);
+  assert.equal(result.persisted, 0);
+  assert.equal(result.empty_provider_result, true);
+  assert.deepEqual(calls.find(([name]) => name === 'write')[1], []);
 });
 
 test('C6 controlled acceptance blocks an already persisted workspace/account/date before provider contact', async () => {
@@ -139,6 +133,3 @@ test('C6-D requires reauthorization without contacting the provider or writing D
   assert.equal(calls.some(([name]) => name === 'facts'), false);
   assert.equal(calls.some(([name]) => name === 'write'), false);
 });
-
-
-

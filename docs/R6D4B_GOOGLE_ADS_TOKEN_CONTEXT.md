@@ -45,4 +45,3 @@ R6-D4-C merchant acceptance: deploy sonrasında gerçek Shopify session ile `Con
 ## Durum
 
 `Repository PASS — R6-D4-C merchant acceptance gate`
-

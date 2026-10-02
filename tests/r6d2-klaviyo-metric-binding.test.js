@@ -145,6 +145,3 @@ test('canonical store binds a metric only to the same connected account and conn
   assert.equal(update.checkout_metric_id, 'checkout-shopify');
   assert.equal(update.connection_version, 8);
 });
-
-
-

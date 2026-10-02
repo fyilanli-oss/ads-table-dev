@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d4f-google-independent-disconnect-v1",
-  "status": "LIVE_PASS",
+  "status": "REPOSITORY_IMPLEMENTATION_PENDING_PRODUCTION_ACCEPTANCE",
   "provider": "google_ads",
   "business_outcome": "The merchant can independently disconnect and cleanly reconnect Google Ads without affecting Meta, Klaviyo, parked Google services, reporting currency, or historical analytics.",
   "entry_state": "connected_with_1_to_3_verified_accounts",
@@ -49,16 +49,5 @@
     "ga4_activation",
     "global_google_grant_revoke"
   ],
-  "production_acceptance_required": false,
-  "production_acceptance": {
-    "result": "PASS",
-    "merchant_flow_observed": [
-      "Connected · 3 accounts",
-      "Cancel preserved Connected · 3 accounts",
-      "Disconnect produced Not connected",
-      "clean OAuth and provider-verified selection restored Connected · 3 accounts"
-    ],
-    "final_postcheck_reference": "docs/security/evidence/R6D4G_GOOGLE_LEGACY_RETIREMENT_LIVE_2026-09-26.json",
-    "dedicated_evidence": "docs/security/evidence/R6D4F_GOOGLE_DISCONNECT_RECONNECT_LIVE_2026-09-26.json"
-  }
+  "production_acceptance_required": true
 }

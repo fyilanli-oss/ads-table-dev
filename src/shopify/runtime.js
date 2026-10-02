@@ -26,8 +26,6 @@ const {createAdAccountSelection, createMetaAccountDiscovery, createGoogleAdsAcco
 const {createEmbeddedOAuthReturn} = require("./embedded-oauth-return");
 const {createKlaviyoProviderClient} = require("../providers/klaviyo/provider-client");
 const {createKlaviyoReadOnlyPreflight} = require("../providers/klaviyo/read-only-preflight");
-const {createKlaviyoHistoricalInventory} = require("../providers/klaviyo/historical-inventory");
-const {createKlaviyoFlowEventInventory} = require("../providers/klaviyo/flow-event-inventory");
 const {createKlaviyoMetricBinding} = require("../providers/klaviyo/metric-binding");
 const {createKlaviyoControlledDatasetAcceptance} = require("../providers/klaviyo/controlled-dataset-acceptance");
 const {createKlaviyoTokenLifecycle} = require("../providers/klaviyo/token-lifecycle");
@@ -124,7 +122,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         await settingsStore.resolveReportingCurrency(serverWorkspaceAuthority(verified));
         return verified;
       },
-      createEmbeddedTransaction: (authority, provider, redirectUri, pkceVerifier) => oauthTransactionStore.createEmbedded({authority, provider, redirectUri, pkceVerifier, surface: "shopify_embedded", returnTarget: "/shopify/app/settings"}),
+      createEmbeddedTransaction: (authority, provider, redirectUri, pkceVerifier) => oauthTransactionStore.createEmbedded({authority, provider, redirectUri, pkceVerifier, surface: "shopify_embedded", returnTarget: "/shopify/app/platforms"}),
       consumeTransaction: (state, provider, redirectUri) => oauthTransactionStore.consume({state, provider, redirectUri}),
       connectionStore,
       resolveReturnTarget: createEmbeddedOAuthReturn({client: supabaseAdmin, clientId: config.clientId}),
@@ -138,6 +136,8 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
     });
     registerShopifyProviderOAuthRoutes(app, {adapters});
     if (adapters.klaviyo) {
+      // Campaign and Flow report endpoints each allow two steady requests per minute.
+      // Alternating branches every 15 seconds keeps each endpoint at a 30-second cadence.
       const providerClient = createKlaviyoProviderClient({fetchImpl, reportSpacingMs: 15000});
       const tokenLifecycle = createKlaviyoTokenLifecycle({
         connectionStore,
@@ -154,20 +154,6 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
           resolveFxRate,
         })
         : {execute: async () => {throw Object.assign(new Error("KLAVIYO_PREFLIGHT_NOT_CONFIGURED"), {code: "KLAVIYO_PREFLIGHT_NOT_CONFIGURED", status: 503});}};
-      const historicalInventory = typeof resolveFxRate === "function"
-        ? createKlaviyoHistoricalInventory({
-          connectionStore,
-          settingsStore,
-          providerClient,
-          tokenLifecycle,
-          resolveFxRate,
-        })
-        : null;
-      const flowEventInventory = createKlaviyoFlowEventInventory({
-        connectionStore,
-        providerClient,
-        tokenLifecycle,
-      });
       const datasetAcceptance = typeof resolveFxRate === "function"
         ? createKlaviyoControlledDatasetAcceptance({
           connectionStore,
@@ -181,18 +167,12 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
       registerShopifyKlaviyoAccountRoutes(app, {
       authenticateEmbedded: async input => serverWorkspaceAuthority(await authenticateEmbedded(input)),
       selection: createKlaviyoAccountSelection({
-        store: connectionStore,
-        fetchImpl,
-        clientId: env.KLAVIYO_CLIENT_ID,
-        clientSecret: env.KLAVIYO_CLIENT_SECRET,
-        tokenLifecycle,
+        store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
       }),
       disconnect: createKlaviyoDisconnect({
         store: connectionStore, fetchImpl, clientId: env.KLAVIYO_CLIENT_ID, clientSecret: env.KLAVIYO_CLIENT_SECRET,
       }),
       preflight,
-      historicalInventory,
-      flowEventInventory,
       datasetAcceptance,
       metricBinding: createKlaviyoMetricBinding({connectionStore, providerClient, tokenLifecycle}),
       });
@@ -276,7 +256,7 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         })
         : null,
       googleDisconnect: adapters.google_ads
-        ? createGoogleDisconnect({store: connectionStore, fetchImpl})
+        ? createGoogleDisconnect({store: connectionStore})
         : null,
       });
     }
@@ -285,5 +265,3 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
 }
 
 module.exports = Object.freeze({registerShopifyRuntime, enabled, providerRuntimeReady});
-
-

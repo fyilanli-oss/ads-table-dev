@@ -30,13 +30,3 @@ Repository PASS tek başına paketi kapatmaz. Canlı kabul sırası şöyledir:
 6. Son salt-okunur postcheck canonical reconnect'i doğrular.
 
 Bu gözlemler ve postcheck'ler tamamlanmadan R6-D4-F production PASS sayılmaz.
-
-## Gerçekleşen production kabulü — PASS
-
-Merchant akışı canlıda tamamlandı: `Connected · 3 accounts` durumunda açılan uyarı modalındaki `Cancel` bağlantıyı değiştirmedi; açık Disconnect sonrasında `Not connected` görüldü; temiz OAuth ve provider-doğrulanmış üç hesap seçimi sonrasında yeniden `Connected · 3 accounts` görüldü.
-
-Son salt-okunur Supabase doğrulaması Google Ads canonical bağlantısını `connected`, connection version'ı `13`, access/refresh envelope ve expiry alanlarını mevcut, seçilmiş hesap sayısını `3` olarak doğruladı. Meta, Klaviyo ve reporting currency korundu. Migration, Dataset V2 yazımı, schedule veya backfill aktivasyonu yapılmadı.
-
-Daha sonra ayrı açık onayla yürütülen R6-D4-G, legacy Google Sheets/GA4 erişimini emekli edip gerçek provider grant revoke ve temiz Google Ads reconnect gerçekleştirdi. Bu sonraki işlem, R6-D4-F'te kanıtlanan bağımsız Cancel/Disconnect/Reconnect davranışını geçersiz kılmaz.
-
-Kanıt: `docs/security/evidence/R6D4F_GOOGLE_DISCONNECT_RECONNECT_LIVE_2026-09-26.json`.

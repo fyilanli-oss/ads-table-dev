@@ -98,6 +98,3 @@ function createKlaviyoMetricBinding({ connectionStore, providerClient, tokenLife
 }
 
 module.exports = Object.freeze({ createKlaviyoMetricBinding });
-
-
-

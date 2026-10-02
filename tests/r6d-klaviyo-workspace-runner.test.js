@@ -52,8 +52,7 @@ test('Klaviyo workspace runner maps only verified provider facts into workspace 
   assert.equal(row.identity.user_id, null);
   assert.equal(row.currency.source_currency, 'USD');
   assert.equal(row.currency.target_currency, 'TRY');
-  assert.equal(row.raw_metrics.spend_value, null);
-  assert.equal(row.metric_support.spend_value, 'unsupported');
+  assert.equal(row.raw_metrics.spend_value, 200);
   assert.equal(Object.hasOwn(result, 'accessToken'), false);
 });
 
@@ -64,45 +63,13 @@ test('Klaviyo workspace runner accepts only provider-proven empty results and wr
   await assert.rejects(runner({ result: { rows: [], verified_empty: false } })(context()), /KLAVIYO_EMPTY_RESULT_NOT_VERIFIED/);
 });
 
-test('Klaviyo workspace runner returns validated provider diagnostics only when explicitly requested', async () => {
-  const diagnosticReport = {
-    provider_date: '2026-09-24',
-    performance: {
-      campaign: { row_count: 0, recipients: 0, delivered: 0, unique_opens: 0, unique_clicks: 0 },
-      flow: { row_count: 0, recipients: 0, delivered: 0, unique_opens: 0, unique_clicks: 0 },
-    },
-    purchase: {
-      campaign: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
-      flow: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
-    },
-    add_to_cart: {
-      campaign: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 0, unmatched_key_count: 1 },
-      flow: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
-    },
-    checkout: {
-      campaign: { row_count: 0, conversion_count: 0, conversion_value: 0, matched_key_count: 0, unmatched_key_count: 0 },
-      flow: { row_count: 1, conversion_count: 1, conversion_value: 10, matched_key_count: 0, unmatched_key_count: 1 },
-    },
-    journey_key_drift: true,
-    dataset_v2_write: false,
-  };
-  let requestedDiagnostics = null;
-  const execute = createKlaviyoWorkspaceRunner({
-    providerClient: {
-      fetchAccount: async () => ({ id: 'account-1', currency: 'USD', timezone: 'UTC' }),
-      fetchMessageFacts: async input => {
-        requestedDiagnostics = input.includeDiagnostics;
-        return { rows: [], verified_empty: true, diagnostics: diagnosticReport };
-      },
-    },
-    resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: '2026-09-24', fx_provider: 'test_fx' }),
-  });
-  const diagnostic = await execute(context({ request: { provider_date: '2026-09-24', include_diagnostics: true } }));
-  assert.equal(requestedDiagnostics, true);
-  assert.deepEqual(diagnostic.provider_diagnostics, diagnosticReport);
-  const ordinary = await execute(context());
-  assert.equal(requestedDiagnostics, false);
-  assert.equal(Object.hasOwn(ordinary, 'provider_diagnostics'), false);
+test('Klaviyo workspace runner exposes only requested aggregate journey diagnostics', async () => {
+  const diagnostics = { provider_date: '2026-09-24', purchase: { campaign: { row_count: 1 } }, dataset_v2_write: false };
+  const result = await runner({ result: { rows: [fact], verified_empty: false, diagnostics } })(context({
+    request: { provider_date: '2026-09-24', include_diagnostics: true },
+  }));
+  assert.deepEqual(result.provider_diagnostics, diagnostics);
+  assert.equal(Object.hasOwn(result, 'accessToken'), false);
 });
 
 test('Klaviyo workspace runner rejects account, currency and canonical connection drift', async () => {
@@ -111,11 +78,10 @@ test('Klaviyo workspace runner rejects account, currency and canonical connectio
   await assert.rejects(runner()(context({ connection: { ...context().connection, selectedAccounts: [] } })), /KLAVIYO_SINGLE_SELECTED_ACCOUNT_REQUIRED/);
 });
 
-test('Klaviyo workspace runner never duplicates account-day cost on message rows', async () => {
-  const poisoned = { ...fact, metrics: { ...fact.metrics, provider_spend: 9999 }, spend_allocation: { monthlyPlanCost: 9999 } };
+test('Klaviyo workspace runner uses canonical monthly plan cost, not caller or provider cost', async () => {
+  const poisoned = { ...fact, spend_allocation: { ...fact.spend_allocation, monthlyPlanCost: 9999 } };
   const result = await runner({ result: { rows: [poisoned], verified_empty: false } })(context());
-  assert.equal(result.rows[0].raw_metrics.spend_value, null);
-  assert.equal(result.rows[0].metric_support.spend_value, 'unsupported');
+  assert.equal(result.rows[0].raw_metrics.spend_value, 200);
 });
 
 test('Klaviyo workspace runner requires a canonical account-scoped conversion metric', async () => {
@@ -148,6 +114,3 @@ test('workspace runner tags provider and FX failures without exposing upstream e
     });
   }
 });
-
-
-

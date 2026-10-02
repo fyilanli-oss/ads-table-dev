@@ -29,4 +29,3 @@ function mapGoogleStandardAd(input,{userId,workspaceId,customer,sourceJobId=null
   if(workspaceMode)validateWorkspaceCanonicalRow(row);else validateCanonicalRow(row);validateEntityHierarchy(identity,entity);return Object.freeze({row:Object.freeze(row),entityKey:buildEntityKey(identity,entity)});
 }
 module.exports=Object.freeze({GOOGLE_STANDARD_ADAPTER_VERSION,mapGoogleStandardAd});
-

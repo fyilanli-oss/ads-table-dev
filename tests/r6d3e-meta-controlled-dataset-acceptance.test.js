@@ -135,9 +135,8 @@ test('Meta controlled acceptance route is Shopify-session-bound and forwards onl
 
 test('Meta controlled Dataset acceptance stays inside the explicit hidden operator surface', () => {
   const html = renderEmbeddedPlatforms({ clientId: 'client', providerOAuthEnabled: true, providerAvailability: { meta: true } });
-  assert.match(html, /id="r6d3-meta-acceptance" display="none"/);
+  assert.match(html, /id="r6d3-meta-acceptance" hidden/);
   assert.match(html, /id="r6d3-meta-dataset-run"/);
   assert.match(html, /RUN_R6_D3_E_META_WRITE/);
   assert.match(html, /\/api\/shopify\/providers\/meta\/runtime\/acceptance/);
 });
-

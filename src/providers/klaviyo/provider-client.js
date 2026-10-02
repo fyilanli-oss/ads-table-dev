@@ -6,7 +6,7 @@ const { normalizeCurrencyCode } = require('../../../funnel-core/fx-service');
 const API_BASE = 'https://a.klaviyo.com';
 const REVISION = '2026-07-15';
 const STATISTICS = Object.freeze([
-  'recipients', 'delivered', 'clicks_unique', 'opens_unique', 'conversions', 'conversion_value'
+  'recipients', 'delivered', 'clicks_unique', 'opens_unique', 'conversions', 'conversion_value', 'text_message_spend'
 ]);
 const JOURNEY_METRIC_NAMES = Object.freeze({
   addToCart: Object.freeze(['added to cart']),
@@ -16,32 +16,6 @@ const JOURNEY_METRIC_NAMES = Object.freeze({
 const MAX_RATE_LIMIT_RETRIES = 2;
 const MAX_RATE_LIMIT_WAIT_MS = 10000;
 const RATE_LIMIT_JITTER_MS = 250;
-const MAX_DIAGNOSTIC_EVENT_PAGES = 20;
-const EVENT_CATEGORY_BY_NAME = Object.freeze({
-  'Received Email': 'received_email',
-  'Opened Email': 'opened_email',
-  'Clicked Email': 'clicked_email',
-  'Bounced Email': 'bounced_email',
-  'Dropped Email': 'dropped_email',
-  'Marked Email as Spam': 'marked_email_as_spam',
-  'Unsubscribed': 'unsubscribed',
-  'Consented to Receive SMS': 'consented_to_receive_sms',
-  'Received SMS': 'received_sms',
-  'Sent SMS': 'sent_sms',
-  'Clicked SMS': 'clicked_sms',
-  'Failed to Deliver SMS': 'failed_to_deliver_sms',
-  'Received Automated Response SMS': 'received_automated_response_sms',
-  'Failed to Deliver Automated Response SMS': 'failed_to_deliver_automated_response_sms',
-  'Active on Site': 'active_on_site',
-  'Viewed Product': 'viewed_product',
-  'Added to Cart': 'added_to_cart',
-  'Started Checkout': 'started_checkout',
-  'Placed Order': 'placed_order',
-  'Ordered Product': 'ordered_product',
-  'Fulfilled Order': 'fulfilled_order',
-  'Cancelled Order': 'cancelled_order',
-  'Refunded Order': 'refunded_order',
-});
 
 function required(value, field) {
   if (typeof value !== 'string' || value.trim() === '') throw new TypeError(`${field} is required`);
@@ -128,68 +102,12 @@ function diagnosticReport(rows, baseKeys = null) {
   return Object.freeze({ campaign: byBranch('campaign'), flow: byBranch('flow') });
 }
 
-function performanceDiagnostic(rows) {
-  const byBranch = branch => {
-    const selected = rows.filter(row => row.branch === branch);
-    const total = field => selected.reduce((sum, row) => {
-      const value = finite(row.statistics?.[field], `diagnostic.${branch}.${field}`);
-      return value === null ? sum : sum + value;
-    }, 0);
-    return Object.freeze({
-      row_count: selected.length,
-      recipients: total('recipients'),
-      delivered: total('delivered'),
-      unique_opens: total('opens_unique'),
-      unique_clicks: total('clicks_unique'),
-    });
-  };
-  return Object.freeze({ campaign: byBranch('campaign'), flow: byBranch('flow') });
-}
-
 function metricPagePath(value) {
   const url = new URL(value, API_BASE);
   if (url.origin !== API_BASE || !['/api/metrics', '/api/metrics/'].includes(url.pathname)) {
     throw new Error('KLAVIYO_METRIC_PAGINATION_INVALID');
   }
   return `${url.pathname}${url.search}`;
-}
-
-function campaignPagePath(value) {
-  const url = new URL(value, API_BASE);
-  if (url.origin !== API_BASE || !['/api/campaigns', '/api/campaigns/'].includes(url.pathname)) {
-    throw new Error('KLAVIYO_CAMPAIGN_PAGINATION_INVALID');
-  }
-  return `${url.pathname}${url.search}`;
-}
-
-function flowPagePath(value) {
-  const url = new URL(value, API_BASE);
-  if (url.origin !== API_BASE || !['/api/flows', '/api/flows/'].includes(url.pathname)) {
-    throw new Error('KLAVIYO_FLOW_PAGINATION_INVALID');
-  }
-  return `${url.pathname}${url.search}`;
-}
-
-function eventPagePath(value) {
-  const url = new URL(value, API_BASE);
-  if (url.origin !== API_BASE || !['/api/events', '/api/events/'].includes(url.pathname)) {
-    throw new Error('KLAVIYO_EVENT_PAGINATION_INVALID');
-  }
-  return `${url.pathname}${url.search}`;
-}
-
-function eventBusinessDate(value, timeZone) {
-  const instant = new Date(required(value, 'event.datetime'));
-  if (Number.isNaN(instant.getTime())) throw new Error('KLAVIYO_EVENT_DATETIME_INVALID');
-  return businessDateFromTimestamp(instant, validateTimeZone(timeZone));
-}
-
-function campaignBusinessDate(item, timeZone) {
-  const scheduledAt = item?.attributes?.scheduled_at;
-  if (scheduledAt === null || scheduledAt === undefined || scheduledAt === '') return null;
-  const instant = new Date(scheduledAt);
-  if (Number.isNaN(instant.getTime())) throw new Error('KLAVIYO_CAMPAIGN_SCHEDULE_INVALID');
-  return businessDateFromTimestamp(instant, validateTimeZone(timeZone));
 }
 
 function journeyMetricCandidate(item) {
@@ -209,13 +127,6 @@ function journeyMetricCandidate(item) {
   });
 }
 
-function metricCandidate(item) {
-  const candidate = journeyMetricCandidate(item);
-  if (!candidate || candidate.kind !== 'purchase') return null;
-  const { kind: ignored, ...purchase } = candidate;
-  return Object.freeze(purchase);
-}
-
 function createKlaviyoProviderClient({
   fetchImpl = fetch,
   conversionMetricId = null,
@@ -226,10 +137,6 @@ function createKlaviyoProviderClient({
 } = {}) {
   const defaultMetricId = typeof conversionMetricId === 'string' && conversionMetricId.trim()
     ? conversionMetricId.trim() : null;
-
-  if (!Number.isInteger(reportSpacingMs) || reportSpacingMs < 0) {
-    throw new TypeError('reportSpacingMs must be a non-negative integer');
-  }
 
   async function request(accessToken, path, options = {}) {
     for (let attempt = 0; attempt <= MAX_RATE_LIMIT_RETRIES; attempt += 1) {
@@ -286,6 +193,10 @@ function createKlaviyoProviderClient({
     });
   }
 
+  if (!Number.isInteger(reportSpacingMs) || reportSpacingMs < 0) {
+    throw new TypeError('reportSpacingMs must be a non-negative integer');
+  }
+
   async function fetchJourneyMetricCandidates({ accessToken } = {}) {
     let path = '/api/metrics/?fields[metric]=name,integration';
     const candidates = Object.fromEntries(Object.keys(JOURNEY_METRIC_NAMES).map(kind => [kind, new Map()]));
@@ -311,141 +222,6 @@ function createKlaviyoProviderClient({
     return (await fetchJourneyMetricCandidates({ accessToken })).purchase;
   }
 
-  async function fetchCampaignInventory({ accessToken, timeZone } = {}) {
-    validateTimeZone(timeZone);
-    const dates = new Set();
-    let totalCampaignCount = 0;
-    let sentCampaignCount = 0;
-    let sentWithScheduledAtCount = 0;
-    let sentWithoutScheduledAtCount = 0;
-    for (const channel of ['email', 'sms']) {
-      const params = new URLSearchParams({
-        filter: `equals(messages.channel,'${channel}')`,
-        'fields[campaign]': 'status,scheduled_at',
-        'page[size]': '100',
-      });
-      let path = `/api/campaigns/?${params.toString()}`;
-      for (let page = 0; page < 100 && path; page += 1) {
-        const payload = await request(accessToken, path);
-        if (!Array.isArray(payload?.data)) throw new Error('KLAVIYO_CAMPAIGN_RESPONSE_INVALID');
-        for (const item of payload.data) {
-          totalCampaignCount += 1;
-          const status = required(item?.attributes?.status, 'campaign.status');
-          if (status !== 'Sent') continue;
-          sentCampaignCount += 1;
-          const date = campaignBusinessDate(item, timeZone);
-          if (date) {
-            sentWithScheduledAtCount += 1;
-            dates.add(date);
-          } else {
-            sentWithoutScheduledAtCount += 1;
-          }
-        }
-        const next = payload?.links?.next;
-        path = next ? campaignPagePath(next) : null;
-        if (page === 99 && path) throw new Error('KLAVIYO_CAMPAIGN_PAGINATION_LIMIT');
-      }
-    }
-    return Object.freeze({
-      total_campaign_count: totalCampaignCount,
-      sent_campaign_count: sentCampaignCount,
-      sent_with_scheduled_at_count: sentWithScheduledAtCount,
-      sent_without_scheduled_at_count: sentWithoutScheduledAtCount,
-      sent_dates: Object.freeze([...dates].sort((left, right) => right.localeCompare(left))),
-    });
-  }
-
-  async function fetchSentCampaignDates({ accessToken, timeZone } = {}) {
-    validateTimeZone(timeZone);
-    const dates = new Set();
-    for (const channel of ['email', 'sms']) {
-      const params = new URLSearchParams({
-        filter: `and(equals(messages.channel,'${channel}'),equals(status,'Sent'))`,
-        'fields[campaign]': 'scheduled_at',
-        'page[size]': '100',
-        sort: '-scheduled_at',
-      });
-      let path = `/api/campaigns/?${params.toString()}`;
-      for (let page = 0; page < 100 && path; page += 1) {
-        const payload = await request(accessToken, path);
-        if (!Array.isArray(payload?.data)) throw new Error('KLAVIYO_CAMPAIGN_RESPONSE_INVALID');
-        for (const item of payload.data) {
-          const date = campaignBusinessDate(item, timeZone);
-          if (date) dates.add(date);
-        }
-        const next = payload?.links?.next;
-        path = next ? campaignPagePath(next) : null;
-        if (page === 99 && path) throw new Error('KLAVIYO_CAMPAIGN_PAGINATION_LIMIT');
-      }
-    }
-    return Object.freeze([...dates].sort((left, right) => right.localeCompare(left)));
-  }
-
-  async function fetchFlowEventInventory({ accessToken, timeZone } = {}) {
-    validateTimeZone(timeZone);
-    const flowStatusCounts = { live: 0, manual: 0, draft: 0, other: 0 };
-    let flowCount = 0;
-    let flowPath = '/api/flows/?fields[flow]=status&page[size]=50';
-    for (let page = 0; page < 100 && flowPath; page += 1) {
-      const payload = await request(accessToken, flowPath);
-      if (!Array.isArray(payload?.data)) throw new Error('KLAVIYO_FLOW_RESPONSE_INVALID');
-      for (const item of payload.data) {
-        flowCount += 1;
-        const status = required(item?.attributes?.status, 'flow.status').toLowerCase();
-        if (Object.prototype.hasOwnProperty.call(flowStatusCounts, status) && status !== 'other') {
-          flowStatusCounts[status] += 1;
-        } else {
-          flowStatusCounts.other += 1;
-        }
-      }
-      const next = payload?.links?.next;
-      flowPath = next ? flowPagePath(next) : null;
-      if (page === 99 && flowPath) throw new Error('KLAVIYO_FLOW_PAGINATION_LIMIT');
-    }
-
-    const eventCounts = Object.fromEntries(Object.values(EVENT_CATEGORY_BY_NAME).map(key => [key, 0]));
-    eventCounts.other = 0;
-    let eventCount = 0;
-    let attributedEventCount = 0;
-    let earliestEventDate = null;
-    let latestEventDate = null;
-    let eventScanTruncated = false;
-    let eventPath = '/api/events/?fields[event]=datetime&fields[metric]=name,integration&fields[attribution]=id&include=metric,attributions&page[size]=200&sort=datetime';
-    for (let page = 0; page < MAX_DIAGNOSTIC_EVENT_PAGES && eventPath; page += 1) {
-      const payload = await request(accessToken, eventPath);
-      if (!Array.isArray(payload?.data) || (payload?.included !== undefined && !Array.isArray(payload.included))) {
-        throw new Error('KLAVIYO_EVENT_RESPONSE_INVALID');
-      }
-      const metrics = new Map((payload.included || [])
-        .filter(item => item?.type === 'metric')
-        .map(item => [required(item?.id, 'metric.id'), required(item?.attributes?.name, 'metric.name')]));
-      for (const item of payload.data) {
-        eventCount += 1;
-        const date = eventBusinessDate(item?.attributes?.datetime, timeZone);
-        earliestEventDate = !earliestEventDate || date < earliestEventDate ? date : earliestEventDate;
-        latestEventDate = !latestEventDate || date > latestEventDate ? date : latestEventDate;
-        const metricId = required(item?.relationships?.metric?.data?.id, 'event.metric.id');
-        const category = EVENT_CATEGORY_BY_NAME[metrics.get(metricId)] || 'other';
-        eventCounts[category] += 1;
-        const attributions = item?.relationships?.attributions?.data;
-        if (Array.isArray(attributions) && attributions.length > 0) attributedEventCount += 1;
-      }
-      const next = payload?.links?.next;
-      eventPath = next ? eventPagePath(next) : null;
-      if (page === MAX_DIAGNOSTIC_EVENT_PAGES - 1 && eventPath) eventScanTruncated = true;
-    }
-    return Object.freeze({
-      flow_count: flowCount,
-      flow_status_counts: Object.freeze({ ...flowStatusCounts }),
-      scanned_event_count: eventCount,
-      event_counts: Object.freeze({ ...eventCounts }),
-      attributed_event_count: attributedEventCount,
-      earliest_event_date: earliestEventDate,
-      latest_event_date: latestEventDate,
-      event_scan_truncated: eventScanTruncated,
-    });
-  }
-
   async function report(accessToken, branch, timeframe, conversionMetricIdInput, statistics = STATISTICS) {
     const metricId = required(conversionMetricIdInput || defaultMetricId, 'Klaviyo conversion metric id');
     const type = `${branch}-values-report`;
@@ -469,6 +245,7 @@ function createKlaviyoProviderClient({
       purchase: required(journeyMetricIds?.purchase || conversionMetricIdInput || defaultMetricId, 'Klaviyo purchase metric id'),
     });
     const dailyWindow = { start: zonedInstant(providerDate, account.timezone), end: zonedInstant(providerDate, account.timezone, true) };
+    const monthlyWindow = { start: zonedInstant(monthStart(providerDate), account.timezone), end: dailyWindow.end };
     let reportCount = 0;
     const scheduledReport = async (branch, timeframe, metricId, statistics = STATISTICS) => {
       if (reportCount > 0 && reportSpacingMs > 0) await sleepImpl(reportSpacingMs);
@@ -477,34 +254,49 @@ function createKlaviyoProviderClient({
     };
     const dailyCampaign = await scheduledReport('campaign', dailyWindow, metricIds.purchase);
     const dailyFlow = await scheduledReport('flow', dailyWindow, metricIds.purchase);
+    const monthlyCampaign = await scheduledReport('campaign', monthlyWindow, metricIds.purchase);
+    const monthlyFlow = await scheduledReport('flow', monthlyWindow, metricIds.purchase);
     const stageRows = {};
     for (const stage of ['addToCart', 'checkout']) {
       if (!metricIds[stage]) continue;
       const campaign = await scheduledReport('campaign', dailyWindow, metricIds[stage], ['conversions', 'conversion_value']);
       const flow = await scheduledReport('flow', dailyWindow, metricIds[stage], ['conversions', 'conversion_value']);
-      stageRows[stage] = Object.freeze({ campaign, flow });
+      stageRows[stage] = new Map([...campaign, ...flow].map(row => [row.key, row]));
     }
     const baseRows = [...dailyCampaign, ...dailyFlow];
     const baseKeys = new Set(baseRows.map(row => row.key));
-    const stageMaps = Object.fromEntries(Object.entries(stageRows).map(([stage, branches]) => [
-      stage,
-      new Map([...branches.campaign, ...branches.flow].map(row => [row.key, row])),
-    ]));
-    const hasKeyDrift = Object.values(stageMaps).some(rows => [...rows.keys()].some(key => !baseKeys.has(key)));
-    if (hasKeyDrift && includeDiagnostics !== true) {
+    const journeyDrift = Object.values(stageRows)
+      .some(rows => [...rows.keys()].some(key => !baseKeys.has(key)));
+    if (journeyDrift && !includeDiagnostics) {
       throw new Error('KLAVIYO_JOURNEY_METRIC_KEY_DRIFT');
     }
+    const diagnostics = includeDiagnostics ? Object.freeze({
+      provider_date: providerDate,
+      purchase: diagnosticReport(baseRows),
+      add_to_cart: diagnosticReport(stageRows.addToCart ? [...stageRows.addToCart.values()] : [], baseKeys),
+      checkout: diagnosticReport(stageRows.checkout ? [...stageRows.checkout.values()] : [], baseKeys),
+      journey_key_drift: journeyDrift,
+      dataset_v2_write: false,
+    }) : null;
+    const monthlyEmailRows = [...monthlyCampaign, ...monthlyFlow].filter(row => row.channel === 'email');
+    const monthlyEmailRecipients = monthlyEmailRows.length === 0 ? 0 : monthlyEmailRows.reduce((total, row) => {
+      const recipients = finite(row.statistics.recipients, 'monthly.statistics.recipients');
+      return total === null || recipients === null ? null : total + recipients;
+    }, 0);
+    const periodClosed = providerDate.slice(0, 7) < businessDateFromTimestamp(now(), account.timezone).slice(0, 7);
     const rows = baseRows.map(row => {
       const delivered = finite(row.statistics.delivered, 'statistics.delivered');
-      const addToCart = stageMaps.addToCart?.get(row.key);
-      const checkout = stageMaps.checkout?.get(row.key);
+      const recipients = finite(row.statistics.recipients, 'statistics.recipients');
+      const addToCart = stageRows.addToCart?.get(row.key);
+      const checkout = stageRows.checkout?.get(row.key);
       return Object.freeze({
         branch: row.branch, channel: row.channel, root: row.root, message: row.message,
         metrics: {
           delivered,
           unique_clicks: finite(row.statistics.clicks_unique, 'statistics.clicks_unique'),
           unique_opens: finite(row.statistics.opens_unique, 'statistics.opens_unique'),
-          provider_spend: null,
+          provider_spend: row.channel === 'sms' && normalizeCurrencyCode(account.currency, 'account.currency') === 'USD'
+            ? finite(row.statistics.text_message_spend, 'statistics.text_message_spend') : null,
           add_to_cart: addToCart ? finite(addToCart.statistics.conversions, 'add_to_cart.conversions') : null,
           add_to_cart_value: addToCart ? finite(addToCart.statistics.conversion_value, 'add_to_cart.conversion_value') : null,
           checkout: checkout ? finite(checkout.statistics.conversions, 'checkout.conversions') : null,
@@ -518,30 +310,25 @@ function createKlaviyoProviderClient({
           checkout: checkout ? 'supported' : 'unknown',
           checkout_value: checkout ? 'supported' : 'unknown',
         },
-        spend_allocation: {},
+        spend_allocation: {
+          dailySentCount: recipients,
+          monthlySentCount: row.channel === 'email' ? monthlyEmailRecipients : null,
+          periodClosed,
+        },
       });
     });
-    const result = { rows, verified_empty: rows.length === 0 };
-    if (includeDiagnostics === true) {
-      result.diagnostics = Object.freeze({
-        provider_date: providerDate,
-        performance: performanceDiagnostic(baseRows),
-        purchase: diagnosticReport(baseRows),
-        add_to_cart: diagnosticReport(stageMaps.addToCart ? [...stageMaps.addToCart.values()] : [], baseKeys),
-        checkout: diagnosticReport(stageMaps.checkout ? [...stageMaps.checkout.values()] : [], baseKeys),
-        journey_key_drift: hasKeyDrift,
-        dataset_v2_write: false,
-      });
-    }
-    return Object.freeze(result);
+    return Object.freeze({
+      rows,
+      verified_empty: rows.length === 0,
+      ...(diagnostics ? { diagnostics } : {}),
+    });
   }
 
-  return Object.freeze({ fetchAccount, fetchJourneyMetricCandidates, fetchPlacedOrderMetricCandidates, fetchCampaignInventory, fetchSentCampaignDates, fetchFlowEventInventory, fetchMessageFacts });
+  return Object.freeze({ fetchAccount, fetchJourneyMetricCandidates, fetchPlacedOrderMetricCandidates, fetchMessageFacts });
 }
 
 function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
 }
 
-module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, JOURNEY_METRIC_NAMES, EVENT_CATEGORY_BY_NAME, zonedInstant, reportRows, diagnosticReport, performanceDiagnostic, metricPagePath, campaignPagePath, flowPagePath, eventPagePath, campaignBusinessDate, eventBusinessDate, journeyMetricCandidate, metricCandidate, createKlaviyoProviderClient });
-
+module.exports = Object.freeze({ API_BASE, REVISION, STATISTICS, JOURNEY_METRIC_NAMES, zonedInstant, reportRows, diagnosticReport, metricPagePath, journeyMetricCandidate, createKlaviyoProviderClient });

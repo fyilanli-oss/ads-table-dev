@@ -88,4 +88,3 @@ function createGoogleWorkspaceRunner({search, resolveFxRate, now = () => new Dat
 }
 
 module.exports = Object.freeze({createGoogleWorkspaceRunner, previousDate, selectedAccounts});
-

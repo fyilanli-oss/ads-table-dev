@@ -25,4 +25,3 @@
   "advisor_result": "No finding introduced by this additive column-and-constraint migration; existing project-wide advisor backlog remains out of scope.",
   "next_gate": "application deployment"
 }
-

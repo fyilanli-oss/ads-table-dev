@@ -76,4 +76,3 @@ select
     and browser_grants.grant_count = 0
   ) as pass
 from table_state, target_columns, target_constraints, browser_grants, aggregate_state, dataset_state;
-

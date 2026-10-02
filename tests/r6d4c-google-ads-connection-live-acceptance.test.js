@@ -11,6 +11,7 @@ const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 test('R6-D4-C records a redacted three-account production acceptance without data activation', () => {
   const evidenceText = read('docs/security/evidence/R6D4C_GOOGLE_ADS_CONNECTION_LIVE_ACCEPTANCE_2026-09-26.json');
   const evidence = JSON.parse(evidenceText);
+
   assert.equal(evidence.production_release.pull_request, 276);
   assert.equal(evidence.production_release.deployment_status, 'READY');
   assert.equal(evidence.merchant_acceptance.selected_account_count, 3);
@@ -33,6 +34,7 @@ test('Execution Plan and runtime record R6-D4-C as connection-only PASS with R6-
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
   const runtime = read('docs/R6_WORKSPACE_PROVIDER_RUNTIME.md');
   const decision = read('docs/R6D4A_GOOGLE_ADS_CONNECTION_LIFECYCLE_DECISION.md');
+
   assert.match(plan, /R6-D4-C Google Ads bağlantı ve hesap seçimi — Production merchant acceptance PASS/);
   assert.match(plan, /Connected · 3 accounts/);
   assert.match(plan, /Dataset V2 Google Ads satırı `0`/);

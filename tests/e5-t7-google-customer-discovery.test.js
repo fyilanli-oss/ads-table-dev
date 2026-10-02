@@ -82,4 +82,3 @@ test('OAuth token without completed account selection is not shown as connected'
   assert.match(source, /selectionRequired=r\?\.metadata\?\.accountSelectionRequired===true/);
   assert.match(source, /refresh_token\)&&!selectionRequired/);
 });
-

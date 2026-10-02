@@ -8,6 +8,12 @@ function required(value, field) {
   return value.trim();
 }
 
+function positiveCost(value) {
+  const cost = Number(value);
+  if (!Number.isFinite(cost) || cost < 0) throw new Error('KLAVIYO_MONTHLY_PLAN_COST_REQUIRED');
+  return cost;
+}
+
 function onlySelectedAccount(connection) {
   const accounts = Array.isArray(connection?.selectedAccounts) ? connection.selectedAccounts : [];
   if (accounts.length !== 1) throw new Error('KLAVIYO_SINGLE_SELECTED_ACCOUNT_REQUIRED');
@@ -34,61 +40,6 @@ function syncStage(stage, action) {
 async function asyncStage(stage, action) {
   try { return await action(); }
   catch (error) { throw stageFailure(stage, error, false); }
-}
-
-function safeDiagnosticReport(value, expectedProviderDate) {
-  if (!value || value.provider_date !== expectedProviderDate || value.dataset_v2_write !== false ||
-    typeof value.journey_key_drift !== 'boolean') {
-    throw new Error('KLAVIYO_DIAGNOSTIC_REPORT_INVALID');
-  }
-  const report = {
-    provider_date: value.provider_date,
-    journey_key_drift: value.journey_key_drift,
-    dataset_v2_write: false,
-  };
-  const performance = {};
-  for (const branch of ['campaign', 'flow']) {
-    const metrics = value?.performance?.[branch];
-    if (!metrics || typeof metrics !== 'object') throw new Error('KLAVIYO_DIAGNOSTIC_REPORT_INVALID');
-    for (const field of ['row_count', 'recipients', 'delivered', 'unique_opens', 'unique_clicks']) {
-      if (!Number.isSafeInteger(metrics[field]) || metrics[field] < 0) {
-        throw new Error('KLAVIYO_DIAGNOSTIC_REPORT_INVALID');
-      }
-    }
-    performance[branch] = Object.freeze({
-      row_count: metrics.row_count,
-      recipients: metrics.recipients,
-      delivered: metrics.delivered,
-      unique_opens: metrics.unique_opens,
-      unique_clicks: metrics.unique_clicks,
-    });
-  }
-  report.performance = Object.freeze(performance);
-  for (const stage of ['purchase', 'add_to_cart', 'checkout']) {
-    const branches = {};
-    for (const branch of ['campaign', 'flow']) {
-      const metrics = value?.[stage]?.[branch];
-      if (!metrics || typeof metrics !== 'object') throw new Error('KLAVIYO_DIAGNOSTIC_REPORT_INVALID');
-      const counts = ['row_count', 'matched_key_count', 'unmatched_key_count'];
-      for (const field of counts) {
-        if (!Number.isSafeInteger(metrics[field]) || metrics[field] < 0) throw new Error('KLAVIYO_DIAGNOSTIC_REPORT_INVALID');
-      }
-      if (metrics.matched_key_count + metrics.unmatched_key_count !== metrics.row_count ||
-        !Number.isFinite(metrics.conversion_count) || metrics.conversion_count < 0 ||
-        !Number.isFinite(metrics.conversion_value) || metrics.conversion_value < 0) {
-        throw new Error('KLAVIYO_DIAGNOSTIC_REPORT_INVALID');
-      }
-      branches[branch] = Object.freeze({
-        row_count: metrics.row_count,
-        conversion_count: metrics.conversion_count,
-        conversion_value: metrics.conversion_value,
-        matched_key_count: metrics.matched_key_count,
-        unmatched_key_count: metrics.unmatched_key_count,
-      });
-    }
-    report[stage] = Object.freeze(branches);
-  }
-  return Object.freeze(report);
 }
 
 function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
@@ -119,7 +70,7 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
         providerDate: required(context?.request?.provider_date, 'request.provider_date'),
         reportingCurrency: normalizeCurrencyCode(context.reportingCurrency, 'reportingCurrency'),
         accessToken: required(connection.accessToken, 'connection.accessToken'),
-        includeDiagnostics: context?.request?.include_diagnostics === true,
+        monthlyPlanCost: positiveCost(connection.monthlyPlanCost),
       });
     });
     const account = await asyncStage('PROVIDER_ACCOUNT', () => providerClient.fetchAccount({
@@ -142,18 +93,20 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
       providerDate: runtime.providerDate,
       conversionMetricId: runtime.journeyMetricIds.purchase,
       journeyMetricIds: runtime.journeyMetricIds,
-      includeDiagnostics: runtime.includeDiagnostics,
+      includeDiagnostics: context?.request?.include_diagnostics === true,
     }));
     syncStage('PROVIDER_RESULT_VALIDATION', () => {
       if (!providerResult || !Array.isArray(providerResult.rows)) throw new Error('KLAVIYO_PROVIDER_RESULT_INVALID');
       if (providerResult.rows.length === 0 && providerResult.verified_empty !== true) throw new Error('KLAVIYO_EMPTY_RESULT_NOT_VERIFIED');
-      if (runtime.includeDiagnostics) safeDiagnosticReport(providerResult.diagnostics, runtime.providerDate);
     });
     const fx = await asyncStage('FX_RESOLUTION', () => resolveFxRate(verifiedAccount.sourceCurrency, runtime.reportingCurrency, { rateDate: runtime.providerDate }));
     const rows = syncStage('ROW_NORMALIZATION', () => {
       const keys = new Set();
       return providerResult.rows.map(input => {
-        const normalized = normalizeKlaviyoTimeFxMessage(input, {
+        const spendAllocation = input.channel === 'email'
+          ? { ...(input.spend_allocation || {}), monthlyPlanCost: runtime.monthlyPlanCost }
+          : { ...(input.spend_allocation || {}) };
+        const normalized = normalizeKlaviyoTimeFxMessage({ ...input, spend_allocation: spendAllocation }, {
           workspaceId: runtime.workspaceId,
           accountId: runtime.selected.id,
           account: { id: runtime.selected.id, currency: verifiedAccount.sourceCurrency, timezone: verifiedAccount.timezone },
@@ -169,13 +122,13 @@ function createKlaviyoWorkspaceRunner({ providerClient, resolveFxRate } = {}) {
         return normalized.row;
       });
     });
-    const result = { rows, checked_account_ids: [runtime.selected.id], provider_result_status: rows.length === 0 ? 'empty' : 'non_empty' };
-    if (runtime.includeDiagnostics) result.provider_diagnostics = safeDiagnosticReport(providerResult.diagnostics, runtime.providerDate);
-    return Object.freeze(result);
+    return Object.freeze({
+      rows,
+      checked_account_ids: [runtime.selected.id],
+      provider_result_status: rows.length === 0 ? 'empty' : 'non_empty',
+      ...(providerResult.diagnostics ? { provider_diagnostics: providerResult.diagnostics } : {}),
+    });
   };
 }
 
-module.exports = Object.freeze({ safeDiagnosticReport, createKlaviyoWorkspaceRunner });
-
-
-
+module.exports = Object.freeze({ createKlaviyoWorkspaceRunner });

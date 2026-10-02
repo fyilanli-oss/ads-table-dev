@@ -4,7 +4,6 @@ const { requireServerWorkspaceAuthority } = require('../../funnel-core/workspace
 
 const TABLE = 'workspace_provider_connections';
 const ACTIVE_PROVIDERS = new Set(['meta', 'google_ads', 'klaviyo']);
-const EMBEDDED_RETURN_TARGETS = new Set(['/shopify/app/settings', '/shopify/app/platforms']);
 
 function required(value, field) {
   if (typeof value !== 'string' || value.trim() === '') throw new TypeError(`${field} is required`);
@@ -94,7 +93,7 @@ function metricUpdate(prefix, metricInput, timestamp) {
 
 function authorityFromEmbeddedTransaction(transaction) {
   if (!transaction || transaction.surface !== 'shopify_embedded' || transaction.user_id !== null ||
-    !EMBEDDED_RETURN_TARGETS.has(transaction.return_target)) throw new Error('EMBEDDED_OAUTH_TRANSACTION_REQUIRED');
+    transaction.return_target !== '/shopify/app/platforms') throw new Error('EMBEDDED_OAUTH_TRANSACTION_REQUIRED');
   required(transaction.workspace_id, 'transaction.workspace_id');
   required(transaction.shop_id, 'transaction.shop_id');
   providerName(transaction.provider);
@@ -171,7 +170,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('provider,status,active_account_id,active_account_name,source_currency,monthly_plan_cost,selected_accounts,reporting_account_id,reporting_account_name,reporting_account_selected_at,connection_version,updated_at')
+      .select('provider,status,active_account_id,active_account_name,source_currency,monthly_plan_cost,selected_accounts,connection_version,updated_at')
       .eq('workspace_id', workspace.workspace_id)
       .eq('provider', provider)
       .maybeSingle();
@@ -183,7 +182,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const workspace = requireServerWorkspaceAuthority(authority);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,reporting_account_id,reporting_account_name,reporting_account_selected_at,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at,add_to_cart_metric_id,add_to_cart_metric_name,add_to_cart_metric_integration_name,add_to_cart_metric_integration_category,add_to_cart_metric_verified_at,checkout_metric_id,checkout_metric_name,checkout_metric_integration_name,checkout_metric_integration_category,checkout_metric_verified_at')
+      .select('status,active_account_id,source_currency,monthly_plan_cost,selected_accounts,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes,connection_version,conversion_metric_id,conversion_metric_name,conversion_metric_integration_name,conversion_metric_integration_category,conversion_metric_verified_at,add_to_cart_metric_id,add_to_cart_metric_name,add_to_cart_metric_integration_name,add_to_cart_metric_integration_category,add_to_cart_metric_verified_at,checkout_metric_id,checkout_metric_name,checkout_metric_integration_name,checkout_metric_integration_category,checkout_metric_verified_at')
       .eq('workspace_id', workspace.workspace_id)
       .eq('provider', provider)
       .eq('status', 'connected')
@@ -196,9 +195,6 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       activeAccountId: data.active_account_id,
       sourceCurrency: data.source_currency,
       selectedAccounts: Array.isArray(data.selected_accounts) ? data.selected_accounts : [],
-      reportingAccountId: data.reporting_account_id,
-      reportingAccountName: data.reporting_account_name,
-      reportingAccountSelectedAt: data.reporting_account_selected_at,
       monthlyPlanCost: data.monthly_plan_cost,
       conversionMetric: data.conversion_metric_id ? Object.freeze({
         id: data.conversion_metric_id,
@@ -238,7 +234,6 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     if (!data) return null;
     return Object.freeze({
       ...data,
-      estimated_30_day_email_spend: data.monthly_plan_cost,
       email_monthly_plan_cost: data.monthly_plan_cost,
       account_currency: data.source_currency,
       updated_at: data.connection_version,
@@ -251,7 +246,7 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     const authority = requireServerWorkspaceAuthority(authorityInput);
     const provider = providerName(providerInput);
     const { data, error } = await client.from(TABLE)
-      .select('status,active_account_id,active_account_name,source_currency,selected_accounts,reporting_account_id,reporting_account_name,reporting_account_selected_at,connection_version,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes')
+      .select('status,active_account_id,active_account_name,source_currency,selected_accounts,connection_version,access_token_envelope,refresh_token_envelope,access_token_expires_at,refresh_token_expires_at,granted_scopes')
       .eq('workspace_id', authority.workspace_id).eq('provider', provider).maybeSingle();
     if (error) throw new Error('CONNECTION_READ_FAILED');
     if (!data) return null;
@@ -287,15 +282,12 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     return data;
   }
 
-  async function completeAccountSelection({ authority: authorityInput, provider: providerInput, version, accounts, previousReportingAccountId = null } = {}) {
+  async function completeAccountSelection({ authority: authorityInput, provider: providerInput, version, accounts } = {}) {
     const authority = requireServerWorkspaceAuthority(authorityInput);
     const provider = providerName(providerInput);
     if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
     const verifiedAccounts = selectedAccounts(provider, accounts);
     const primary = verifiedAccounts[0];
-    const reporting = provider === 'klaviyo'
-      ? null
-      : verifiedAccounts.find(account => account.id === previousReportingAccountId) || primary;
     const timestamp = now().toISOString();
     const { data, error } = await client.from(TABLE).update({
       status: 'connected',
@@ -303,9 +295,6 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       active_account_name: primary.name,
       source_currency: primary.currency,
       selected_accounts: verifiedAccounts,
-      reporting_account_id: reporting?.id || null,
-      reporting_account_name: reporting?.name || null,
-      reporting_account_selected_at: reporting ? timestamp : null,
       monthly_plan_cost: null,
       conversion_metric_id: null,
       conversion_metric_name: null,
@@ -325,36 +314,10 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
   }
 
-  async function updateReportingAccount({ authority: authorityInput, provider: providerInput, version, account: accountInput } = {}) {
-    const authority = requireServerWorkspaceAuthority(authorityInput);
-    const provider = providerName(providerInput);
-    if (!['meta', 'google_ads'].includes(provider)) throw new Error('REPORTING_ACCOUNT_NOT_SUPPORTED');
-    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
-    const [account] = selectedAccounts(provider, [accountInput]);
-    const timestamp = now().toISOString();
-    const { data, error } = await client.from(TABLE).update({
-      reporting_account_id: account.id,
-      reporting_account_name: account.name,
-      reporting_account_selected_at: timestamp,
-      connection_version: version + 1,
-      updated_at: timestamp,
-    }).eq('workspace_id', authority.workspace_id).eq('provider', provider)
-      .eq('connection_version', version).eq('status', 'connected')
-      .select('reporting_account_id,reporting_account_name,reporting_account_selected_at,connection_version').maybeSingle();
-    if (error) throw new Error('CONNECTION_WRITE_FAILED');
-    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
-    return data;
-  }
-
   async function readKlaviyoStatus(authorityInput) {
     const row = await readStatus({ authority: authorityInput, provider: 'klaviyo' });
     if (!row) return null;
-    return Object.freeze({
-      status: row.status,
-      estimated_30_day_email_spend: row.monthly_plan_cost,
-      email_monthly_plan_cost: row.monthly_plan_cost,
-      account_currency: row.source_currency,
-    });
+    return Object.freeze({ status: row.status, email_monthly_plan_cost: row.monthly_plan_cost, account_currency: row.source_currency });
   }
 
   async function refreshKlaviyo({ authority: authorityInput, version, accessToken, refreshToken }) {
@@ -389,87 +352,6 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
       .select('connection_version').maybeSingle();
     if (error) throw new Error('CONNECTION_WRITE_FAILED');
     if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
-    return data;
-  }
-
-  async function completeKlaviyoWithSpendHistory({
-    authority: authorityInput,
-    version,
-    account,
-    estimated30DayEmailSpend: amount,
-    effectiveFrom,
-  } = {}) {
-    const authority = requireServerWorkspaceAuthority(authorityInput);
-    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
-    const [verifiedAccount] = selectedAccounts('klaviyo', [account]);
-    required(String(amount), 'estimated30DayEmailSpend');
-    required(effectiveFrom, 'effectiveFrom');
-    const { data, error } = await client.rpc('complete_klaviyo_connection_with_spend_history', {
-      p_workspace_id: authority.workspace_id,
-      p_expected_version: version,
-      p_account_id: verifiedAccount.id,
-      p_account_name: verifiedAccount.name,
-      p_source_currency: verifiedAccount.currency,
-      p_estimated_30_day_email_spend: amount,
-      p_effective_from: effectiveFrom,
-    });
-    if (error) {
-      if (/CONNECTION_CHANGED/.test(error.message || '')) {
-        throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
-      }
-      throw new Error('CONNECTION_WRITE_FAILED');
-    }
-    return data;
-  }
-
-  async function listKlaviyoSpendHistory(authorityInput) {
-    const authority = requireServerWorkspaceAuthority(authorityInput);
-    const status = await readStatus({ authority, provider: 'klaviyo' });
-    if (!status || status.status !== 'connected' || !status.active_account_id) return [];
-    const { data, error } = await client.from('workspace_provider_email_spend_history')
-      .select('provider_account_id,source_currency,estimated_30_day_email_spend,effective_from,provenance,correction_version,created_at,updated_at')
-      .eq('workspace_id', authority.workspace_id)
-      .eq('provider', 'klaviyo')
-      .eq('provider_account_id', status.active_account_id)
-      .order('effective_from', { ascending: false });
-    if (error) throw new Error('CONNECTION_READ_FAILED');
-    return Array.isArray(data) ? data : [];
-  }
-
-  async function updateKlaviyoSpend({ authority: authorityInput, amount, effectiveFrom } = {}) {
-    const authority = requireServerWorkspaceAuthority(authorityInput);
-    const connection = await readStatus({ authority, provider: 'klaviyo' });
-    if (!connection || connection.status !== 'connected') throw new Error('CONNECTION_CHANGED');
-    const { data, error } = await client.rpc('update_klaviyo_estimated_30_day_email_spend', {
-      p_workspace_id: authority.workspace_id,
-      p_expected_version: connection.connection_version,
-      p_account_id: connection.active_account_id,
-      p_source_currency: connection.source_currency,
-      p_estimated_30_day_email_spend: amount,
-      p_effective_from: effectiveFrom,
-    });
-    if (error) {
-      const code = /DUPLICATE_EFFECTIVE_START/.test(error.message || '') ? 'DUPLICATE_EFFECTIVE_START' : 'CONNECTION_CHANGED';
-      throw Object.assign(new Error(code), { code, status: 409 });
-    }
-    return data;
-  }
-
-  async function correctKlaviyoSpend({ authority: authorityInput, amount, effectiveFrom } = {}) {
-    const authority = requireServerWorkspaceAuthority(authorityInput);
-    const connection = await readStatus({ authority, provider: 'klaviyo' });
-    if (!connection || connection.status !== 'connected') throw new Error('CONNECTION_CHANGED');
-    const { data, error } = await client.rpc('correct_klaviyo_estimated_30_day_email_spend', {
-      p_workspace_id: authority.workspace_id,
-      p_expected_version: connection.connection_version,
-      p_account_id: connection.active_account_id,
-      p_effective_from: effectiveFrom,
-      p_estimated_30_day_email_spend: amount,
-    });
-    if (error) {
-      const code = /SPEND_HISTORY_ENTRY_NOT_FOUND/.test(error.message || '') ? 'SPEND_HISTORY_ENTRY_NOT_FOUND' : 'CONNECTION_CHANGED';
-      throw Object.assign(new Error(code), { code, status: 409 });
-    }
     return data;
   }
 
@@ -563,113 +445,244 @@ function createCanonicalWorkspaceProviderConnectionStore({ client, vault, now = 
     }).eq('workspace_id', authority.workspace_id).eq('provider', 'meta')
       .eq('connection_version', version).eq('status', 'connected')
       .select('status,connection_version').maybeSingle();
-    if (error) throw new Error('CONNECTION_WRITE_FAILED');
-    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), {code: 'CONNECTION_CHANGED', status: 409});
-    return data;
-  }
+    if (error) throw new!ÛˆYHšÛ]š^[Ë\™]žH•žHYØZ[ÜËX]ÛÙ]‚ˆËX]ÛˆÛÝHœÙXÛÛ™\žKXXÝ[ÛœÈˆÛÛ[X[™›ÜHšÛ]š^[ËXXØÛÝ[[[Ù[ˆÛÛ[X[™H‹KZYHØ[˜Ù[ÜËX]Û‚ˆÜË[[Ù[‚ˆÜË\ÝXÚÏ˜ˆˆŸBˆ	ÖÈ›Y]H‹™ÛÛÙÛWØYÈ—Kš[˜ÛY\ÊY
+H	‰ˆ›ÝšY\]˜Z[X›HÈË\ÝXÚÈYH‰ÚYKXXØÛÝ[ÈˆØ\H˜˜\ÙH‚ˆË[[Ù[YH‰ÚYKXXØÛÝ[[[Ù[ˆXY[™ÏH”Ù[XÝ	ÛX™[HXØÛÝ[‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\”Ù[XÝ™]ÙY[ˆH[™ÈXØÛÝ[È™]\›™YžH	ÛX™[KÜË\\˜YÜ˜\‚ˆËXÚÚXÙK[\ÝYH‰ÚYKXÚÚXÙHˆ˜[YOH‰ÚYKXXØÛÝ[ÈˆX™[H‰ÛX™[HXØÛÝ[Èˆ]Z[ÏH–[ÝHØ[ˆÛÛ›™XÝ\ÈÈXØÛÝ[Ëˆˆ][\OÜËXÚÚXÙK[\Ý‚ˆËX]ÛˆYH‰ÚYK\Ø]™Hˆ˜\šX[Hœš[X\žH”Ø]™H[™ÛÛ›™XÝÜËX]Û‚ˆÜË\ÝXÚÏ‚ˆËX]ÛˆÛÝHœÙXÛÛ™\žKXXÝ[ÛœÈˆÛÛ[X[™›ÜH‰ÚYKXXØÛÝ[[[Ù[ˆÛÛ[X[™H‹KZYHØ[˜Ù[ÜËX]Û‚ˆÜË[[Ù[‚ˆÜË\ÝXÚÏ˜ˆˆŸBˆÜË\ÙXÝ[Û˜ÂŸB‚™[˜Ý[Ûˆ™[™\‘[X™YY]›Ü›\ÊØÛY[Y›ÝšY\“Ð]][˜X›Y›ÝšY\]˜Z[Xš[]HHß_JHÂˆYˆ
+\[ÙˆÛY[YOOHœÝš[™ÈˆXÛY[Yš[J
+JH›ÝÈ™]È\Q\œ›ÜŠ˜ÛY[Y\È™\]Z\™YŠNÂˆÛÛœÝ›ÝšY\œÈHÂˆÚYˆ›Y]H‹X™[ˆ“Y]H‹\ØÜš\[ÛŽˆ“Y]HY™\\Ú[™È\™›Ü›X[˜ÙH[™Ü[™ˆŸKˆÚYˆ™ÛÛÙÛWØYÈ‹X™[ˆ‘ÛÛÙÛHYÈ‹\ØÜš\[ÛŽˆ‘ÛÛÙÛHYÈ\™›Ü›X[˜ÙH[™Ü[™ˆŸKˆÚYˆšÛ]š^[È‹X™[ˆ’Û]š^[È‹\ØÜš\[ÛŽˆ‘[XZ[\™›Ü›X[˜ÙH[™[ÛH[ˆÛÜÝˆŸKˆÚYˆZÝÚÈ‹X™[ˆ•ZÕÚÈ‹\ØÜš\[ÛŽˆ•ZÕÚÈÛÛ›™XÝ[Ûˆ\È\šÙY›ÜˆH]\ˆ™[X\ÙKˆ‹\šÙYˆY_KˆÚYˆœ[\™\Ý‹X™[ˆ”[\™\Ý‹\ØÜš\[ÛŽˆ”[\™\ÝÛÛ›™XÝ[Ûˆ\È›Ý]˜Z[X›H[ˆ\È™[X\ÙKˆ‹\šÙYˆY_KˆNÂˆÛÛœÝÙXÝ[ÛœÈH›ÝšY\œË›X\
 
-  async function disconnectGoogle({ authority: authorityInput, version }) {
-    const authority = requireServerWorkspaceAuthority(authorityInput);
-    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
-    const timestamp = now().toISOString();
-    const { data, error } = await client.from(TABLE).update({
-      status: 'disconnected',
-      active_account_id: null,
-      active_account_name: null,
-      source_currency: null,
-      monthly_plan_cost: null,
-      selected_accounts: [],
-      conversion_metric_id: null,
-      conversion_metric_name: null,
-      conversion_metric_integration_name: null,
-      conversion_metric_integration_category: null,
-      conversion_metric_verified_at: null,
-      access_token_envelope: null,
-      refresh_token_envelope: null,
-      access_token_expires_at: null,
-      refresh_token_expires_at: null,
-      granted_scopes: [],
-      account_verified_at: null,
-      disconnected_at: timestamp,
-      connection_version: version + 1,
-      updated_at: timestamp,
-    }).eq('workspace_id', authority.workspace_id).eq('provider', 'google_ads')
-      .eq('connection_version', version).eq('status', 'connected')
-      .select('status,connection_version').maybeSingle();
-    if (error) throw new Error('CONNECTION_WRITE_FAILED');
-    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), {code: 'CONNECTION_CHANGED', status: 409});
-    return data;
-  }
-
-  async function bindKlaviyoConversionMetric({ authority: authorityInput, version, accountId, metric: metricInput } = {}) {
-    return bindKlaviyoJourneyMetrics({
-      authority: authorityInput,
-      version,
-      accountId,
-      metrics: { purchase: metricInput },
-    });
-  }
-
-  async function bindKlaviyoJourneyMetrics({ authority: authorityInput, version, accountId, metrics = {} } = {}) {
-    const authority = requireServerWorkspaceAuthority(authorityInput);
-    if (!Number.isInteger(version) || version < 1) throw new Error('CONNECTION_CHANGED');
-    const verifiedAccountId = required(accountId, 'accountId');
-    const purchase = conversionMetric(metrics.purchase);
-    const timestamp = now().toISOString();
-    const { data, error } = await client.from(TABLE).update({
-      conversion_metric_id: purchase.id,
-      conversion_metric_name: purchase.name,
-      conversion_metric_integration_name: purchase.integrationName,
-      conversion_metric_integration_category: purchase.integrationCategory,
-      conversion_metric_verified_at: timestamp,
-      ...metricUpdate('add_to_cart', metrics.addToCart, timestamp),
-      ...metricUpdate('checkout', metrics.checkout, timestamp),
-      connection_version: version + 1,
-      updated_at: timestamp,
-    }).eq('workspace_id', authority.workspace_id).eq('provider', 'klaviyo')
-      .eq('status', 'connected').eq('active_account_id', verifiedAccountId)
-      .eq('connection_version', version)
-      .select('connection_version').maybeSingle();
-    if (error) throw new Error('CONNECTION_WRITE_FAILED');
-    if (!data) throw Object.assign(new Error('CONNECTION_CHANGED'), { code: 'CONNECTION_CHANGED', status: 409 });
-    return data;
-  }
-
-  return Object.freeze({
-    beginAccountSelection,
-    writeFromOAuthTransaction,
-    readStatus,
-    resolveConnected,
-    readPendingProvider,
-    refreshGoogle,
-    completeAccountSelection,
-    updateReportingAccount,
-    readKlaviyo,
-    readKlaviyoStatus,
-    refreshKlaviyo,
-    refreshConnectedKlaviyo,
-    completeKlaviyoWithSpendHistory,
-    listKlaviyoSpendHistory,
-    updateKlaviyoSpend,
-    correctKlaviyoSpend,
-    completeKlaviyo,
-    disconnectKlaviyo,
-    disconnectMeta,
-    disconnectGoogle,
-    bindKlaviyoConversionMetric,
-    bindKlaviyoJourneyMetrics,
-  });
-}
-
-module.exports = Object.freeze({
-  TABLE,
-  ACTIVE_PROVIDERS,
-  selectedAccounts,
-  conversionMetric,
-  emptyKlaviyoJourneyMetricBindings,
-  authorityFromEmbeddedTransaction,
-  createCanonicalWorkspaceProviderConnectionStore
-});
+›ÝšY\ŠHOˆ™[™\”›ÝšY\”ÙXÝ[ÛŠ›ÝšY\‹›ÝšY\“Ð]][˜X›Y›ÝšY\‹œ\šÙYÈ˜[ÙHˆ›ÝšY\]˜Z[Xš[]VÜ›ÝšY\‹šYHÏÈ›ÝšY\“Ð]][˜X›Y
+JKš›Ú[Š—ˆŠNÂˆ™]\›ˆYØÝ\H[‚[[™ÏH™[ˆ‚XY‚ˆ	ÙØÝ[Y[XY
+ØÛY[Y]Nˆ‘]HÛÝ\˜Ù\È8 %YÕX›HŸJ_BÚXY‚›ÙO‚ˆ	Ø\˜]šYØ][ÛŠ
+_BˆË\YÙHXY[™ÏH‘]HÛÝ\˜Ù\È‚ˆË[[šÈÛÝH˜œ™XYÜ[X‹XXÝ[ÛœÈˆ™YH‹ÜÚÜYžKØ\’ÛYOÜË[[šÏ‚ˆËX˜[›™\ˆYHœÝ]\ÈˆXY[™ÏH‘]HÛÝ\˜Ù\ÈˆÛ™OHš[™›ÈˆY[ÜËX˜[›™\‚ˆ]ˆYHœ™YÛÛÙÛKXXØÙ\[˜ÙHˆY[‚ˆË\ÙXÝ[ÛˆXY[™ÏH‘ÛÛÙÛHYÈXØÙ\[˜ÙHÚXÚÈ‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\•\ÈÛ™K][YHÚXÚÈ™XYÈHÙ[XÝYÛÛÙÛHYÈXØÛÝ[ËÝ[™\™YÈ[™\™›Ü›X[˜ÙHX^\ÜÙ]Ü›Ý\È›ÝYÚHÛÛ\]YMHÛÛ˜XÝˆ]Ù\È›ÝÜš]H]\Ù]Œ‹ÜË\\˜YÜ˜\‚ˆË\\˜YÜ˜\YHœ™YÛÛÙÛK[Y\ÜØYÙHˆ\šXK[]™OHœÛ]HÜË\\˜YÜ˜\‚ˆËX]ÛˆYHœ™YÛÛÙÛK\[ˆˆ˜\šX[Hœš[X\žH”[ˆ™XY[Û›HXØÙ\[˜ÙOÜËX]Û‚ˆ]ˆYHœ™YÛÛÙÛKY]\Ù]\Ý\‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\•\ÈÛÛ›ÛYXØÙ\[˜ÙHX^HÜš]HÛ›H™X[›ÝšY\‹]™\šYšYYÛÛÙÛHYÈ›ÝÜÈÈ]\Ù]Œ‹ˆH™\šYšYY[\H™\Ý[Üš]\È›ÈÞ[]XÈ›ÝÜÈ[™Ù\È›Ý[˜X›HØÚY[\ÈÜˆ˜XÚÙš[ÜË\\˜YÜ˜\‚ˆË\\˜YÜ˜\YHœ™YÛÛÙÛKY]\Ù][Y\ÜØYÙHˆ\šXK[]™OHœÛ]HÜË\\˜YÜ˜\‚ˆËX]ÛˆYHœ™YÛÛÙÛKY]\Ù]\[ˆˆÛ™OH˜Üš]XØ[”[ˆÛÛ›ÛY]\Ù]ŒˆXØÙ\[˜ÙOÜËX]Û‚ˆÜË\ÝXÚÏ‚ˆÙ]‚ˆÜË\ÝXÚÏ‚ˆÜË\ÙXÝ[Û‚ˆÙ]‚ˆ]ˆYHœ™Ë[Y]KXXØÙ\[˜ÙHˆY[‚ˆË\ÙXÝ[ÛˆXY[™ÏH“Y]HXØÙ\[˜ÙHÚXÚÈ‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\•\ÈÛ™K][YHÚXÚÈ™XYÈHÙ[XÝYY]HXØÛÝ[È[™Z[H[œÚYÚÈ›ÝYÚHÛÛ\]YMÛÛ˜XÝˆ]Ù\È›ÝÜš]H]\Ù]Œ‹ÜË\\˜YÜ˜\‚ˆË\\˜YÜ˜\YHœ™Ë[Y]K[Y\ÜØYÙHˆ\šXK[]™OHœÛ]HÜË\\˜YÜ˜\‚ˆËX]ÛˆYHœ™Ë[Y]K\[ˆˆ˜\šX[Hœš[X\žH”[ˆ™XY[Û›HXØÙ\[˜ÙOÜËX]Û‚ˆ]ˆYHœ™Ë[Y]KY]\Ù]\Ý\‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\•\ÈÛÛ›ÛYXØÙ\[˜ÙHX^HÜš]H™X[›ÝšY\‹]™\šYšYYY]H›ÝÜÈÈ]\Ù]Œ‹ˆH™\šYšYY[\H™\Ý[Üš]\È›ÈÞ[]XÈ›ÝÜÈ[™Ù\È›Ý[˜X›HØÚY[\ÈÜˆ˜XÚÙš[ÜË\\˜YÜ˜\‚ˆË\\˜YÜ˜\YHœ™Ë[Y]KY]\Ù][Y\ÜØYÙHˆ\šXK[]™OHœÛ]HÜË\\˜YÜ˜\‚ˆËX]ÛˆYHœ™Ë[Y]KY]\Ù]\[ˆˆÛ™OH˜Üš]XØ[”[ˆÛÛ›ÛY]\Ù]ŒˆXØÙ\[˜ÙOÜËX]Û‚ˆÜË\ÝXÚÏ‚ˆÙ]‚ˆÜË\ÝXÚÏ‚ˆÜË\ÙXÝ[Û‚ˆÙ]‚ˆ]ˆYHœ™‹ZÛ]š^[ËXXØÙ\[˜ÙHˆY[‚ˆË\ÙXÝ[ÛˆXY[™ÏH’Û]š^[ÈXØÙ\[˜ÙHÚXÚÈ‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\•\ÈÛ™K][YHÚXÚÈ™XYÈH™\šYšYYÛ]š^[ÈXØÛÝ[Ø[\ZYÛˆ[™›ÝÈ™\Ü[™ÈT\Ëˆ]Ù\È›ÝÜš]H]\Ù]Œ‹ÜË\\˜YÜ˜\‚ˆË\\˜YÜ˜\YHœ™‹ZÛ]š^[Ë[Y\ÜØYÙHˆ\šXK[]™OHœÛ]HÜË\\˜YÜ˜\‚ˆËX]ÛˆYHœ™‹ZÛ]š^[Ë\[ˆˆ˜\šX[Hœš[X\žH”[ˆ™XY[Û›HXØÙ\[˜ÙOÜËX]Û‚ˆË\\˜YÜ˜\YHœ™KZÛ]š^[ËYXYÛ›ÜÝXË[Y\ÜØYÙHˆ\šXK[]™OHœÛ]HÜË\\˜YÜ˜\‚ˆËX]ÛˆYHœ™KZÛ]š^[ËYXYÛ›ÜÝXË\[ˆ”[ˆŽÙ\›Ý\›™^HXYÛ›ÜÝXÏÜËX]Û‚ˆ]ˆYHœ™‹ZÛ]š^[ËXÍ‹\Ý\‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\•\ÈÛÛ›ÛYXØÙ\[˜ÙHX^HÜš]H™X[™\šYšYYÛ]š^[È›ÝÜÈÈ]\Ù]Œ‹ˆ]™]™\ˆÜ™X]\ÈÞ[]XÈ›ÝÜÈ[™Ù\È›Ý[˜X›HØÚY[Y›ÙXÝ[ÛˆXÝ]˜][Û‹ÜË\\˜YÜ˜\‚ˆË\\˜YÜ˜\YHœ™‹ZÛ]š^[ËXÍ‹[Y\ÜØYÙHˆ\šXK[]™OHœÛ]HÜË\\˜YÜ˜\‚ˆËX]ÛˆYHœ™‹ZÛ]š^[ËXÍ‹\[ˆˆÛ™OH˜Üš]XØ[”[ˆÛÛ›ÛY]\Ù]ŒˆXØÙ\[˜ÙOÜËX]Û‚ˆÜË\ÝXÚÏ‚ˆÙ]‚ˆ]ˆYHœ™‹ZÛ]š^[Ë[Y]šXË\Ý\ˆY[‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\ÛÛ™š\›Z[™ÈÝÜ™\ÈÛ›H\ÈÛÜšÜÜXÙHXØÛÝ[	ÜÈ™\šYšYY™\Ü[™ÈY]šXËˆ]Ù\È›ÝÜš]H]\Ù]Œ‹ÜË\\˜YÜ˜\‚ˆË\Ù[XÝYHœ™‹ZÛ]š^[Ë[Y]šXÈˆX™[H”XÙYÜ™\ˆY]šXÈÜË\Ù[XÝ‚ˆËX]ÛˆYHœ™‹ZÛ]š^[Ë[Y]šXËXÛÛ™š\›Hˆ˜\šX[Hœš[X\žHÛÛ™š\›HY]šXÈ[™ÛÛ[YOÜËX]Û‚ˆÜË\ÝXÚÏ‚ˆÙ]‚ˆÜË\ÝXÚÏ‚ˆÜË\ÙXÝ[Û‚ˆÙ]‚ˆ]ˆYH˜Ý\œ™[˜ÞK\Ù]\ˆY[‚ˆË\ÙXÝ[ÛˆXY[™ÏH‘š[š\ÚÙ]\‚ˆËX]Ûˆ˜\šX[Hœš[X\žHˆÛÛ[X[™›ÜHœ]›Ü›\ËXÝ\œ™[˜ÞK[[Ù[ˆÛÛ[X[™H‹K\ÚÝÈÚÛÜÙH™\Ü[™ÈÝ\œ™[˜ÞOÜËX]Û‚ˆÜË\ÙXÝ[Û‚ˆÙ]‚ˆË[[Ù[YHœ]›Ü›\ËXÝ\œ™[˜ÞK[[Ù[ˆXY[™ÏHÚÛÜÙH™\Ü[™ÈÝ\œ™[˜ÞHˆÚ^™OHœÛX[LL‚ˆË\ÝXÚÈØ\H˜˜\ÙH‚ˆË\\˜YÜ˜\•\È\È[™\[™[œ›ÛHÚÜYžH[™›ÝšY\ˆXØÛÝ[Ý\œ™[˜ÚY\ËÜË\\˜YÜ˜\‚ˆË\Ù[XÝYHœ™\Ü[™ËXÝ\œ™[˜ÞHˆX™[H”™\Ü[™ÈÝ\œ™[˜ÞH‚ˆ	ÖÈ•–H‹•TÑ‹‘UTˆ‹‘Ð”‹’”H‹Ó–H‹UQ‹ÐQ‹Òˆ‹”ÑRÈ‹““ÒÈ‹‘ÒÈ‹”ˆ—K›X\
+Ý\œ™[˜ÞHOˆË[Ü[Ûˆ˜[YOH‰ØÝ\œ™[˜Þ_H‰ØÝ\œ™[˜Þ_OÜË[Ü[Û˜
+Kš›Ú[ŠˆŠ_BˆÜË\Ù[XÝ‚ˆË\\˜YÜ˜\YHœ]›Ü›\ËXÝ\œ™[˜ÞK[Y\ÜØYÙHˆ\šXK[]™OHœÛ]HÜË\\˜YÜ˜\‚ˆÜË\ÝXÚÏ‚ˆËX]ÛˆÛÝHœÙXÛÛ™\žKXXÝ[ÛœÈˆÛÛ[X[™›ÜHœ]›Ü›\ËXÝ\œ™[˜ÞK[[Ù[ˆÛÛ[X[™H‹KZYHØ[˜Ù[ÜËX]Û‚ˆËX]ÛˆYHœØ]™K\™\Ü[™ËXÝ\œ™[˜ÞHˆÛÝHœš[X\žKXXÝ[Ûˆˆ˜\šX[Hœš[X\žH”Ø]™H[™ÛÛ[YOÜËX]Û‚ˆÜË[[Ù[‚ˆ]ˆYHœ›ÝšY\‹\ÙXÝ[ÛœÈˆY[‰ÜÙXÝ[ÛœßOÙ]‚ˆÜË\YÙO‚ˆØÜš\‚ˆ
 
 
+HOˆÂˆ\ÙHÝšXÝŽÂˆÛÛœÝÝ]\ÈHØÝ[Y[™Ù][[Y[žRY
+œÝ]\ÈŠNÂˆÛÛœÝÝ\œ™[˜ÞTÙ]\HØÝ[Y[™Ù][[Y[žRY
+˜Ý\œ™[˜ÞK\Ù]\ŠNÂˆÛÛœÝ›ÝšY\”ÙXÝ[ÛœÈHØÝ[Y[™Ù][[Y[žRY
+œ›ÝšY\‹\ÙXÝ[ÛœÈŠNÂˆÛÛœÝÝ\œ™[˜ÞHHØÝ[Y[™Ù][[Y[žRY
+œ™\Ü[™ËXÝ\œ™[˜ÞHŠNÂˆÛÛœÝØ]™PÝ\œ™[˜ÞHHØÝ[Y[™Ù][[Y[žRY
+œØ]™K\™\Ü[™ËXÝ\œ™[˜ÞHŠNÂˆÛÛœÝÝ\œ™[˜ÞSY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+œ]›Ü›\ËXÝ\œ™[˜ÞK[Y\ÜØYÙHŠNÂˆÛÛœÝÛÛÙÛPXØÙ\[˜ÙT[™[HØÝ[Y[™Ù][[Y[žRY
+œ™YÛÛÙÛKXXØÙ\[˜ÙHŠNÂˆÛÛœÝÛÛÙÛPXØÙ\[˜ÙP]ÛˆHØÝ[Y[™Ù][[Y[žRY
+œ™YÛÛÙÛK\[ˆŠNÂˆÛÛœÝÛÛÙÛPXØÙ\[˜ÙSY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+œ™YÛÛÙÛK[Y\ÜØYÙHŠNÂˆÛÛœÝÛÛÙÛQ]\Ù]XØÙ\[˜ÙP]ÛˆHØÝ[Y[™Ù][[Y[žRY
+œ™YÛÛÙÛKY]\Ù]\[ˆŠNÂˆÛÛœÝÛÛÙÛQ]\Ù]XØÙ\[˜ÙSY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+œ™YÛÛÙÛKY]\Ù][Y\ÜØYÙHŠNÂˆÛÛœÝY]PXØÙ\[˜ÙT[™[HØÝ[Y[™Ù][[Y[žRY
+œ™Ë[Y]KXXØÙ\[˜ÙHŠNÂˆÛÛœÝY]PXØÙ\[˜ÙP]ÛˆHØÝ[Y[™Ù][[Y[žRY
+œ™Ë[Y]K\[ˆŠNÂˆÛÛœÝY]PXØÙ\[˜ÙSY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+œ™Ë[Y]K[Y\ÜØYÙHŠNÂˆÛÛœÝY]Q]\Ù]XØÙ\[˜ÙP]ÛˆHØÝ[Y[™Ù][[Y[žRY
+œ™Ë[Y]KY]\Ù]\[ˆŠNÂˆÛÛœÝY]Q]\Ù]XØÙ\[˜ÙSY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+œ™Ë[Y]KY]\Ù][Y\ÜØYÙHŠNÂˆÛÛœÝXØÙ\[˜ÙT[™[HØÝ[Y[™Ù][[Y[žRY
+œ™‹ZÛ]š^[ËXXØÙ\[˜ÙHŠNÂˆÛÛœÝXØÙ\[˜ÙP]ÛˆHØÝ[Y[™Ù][[Y[žRY
+œ™‹ZÛ]š^[Ë\[ˆŠNÂˆÛÛœÝXØÙ\[˜ÙSY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+œ™‹ZÛ]š^[Ë[Y\ÜØYÙHŠNÂˆÛÛœÝY]šXÔÝ\HØÝ[Y[™Ù][[Y[žRY
+œ™‹ZÛ]š^[Ë[Y]šXË\Ý\ŠNÂˆÛÛœÝY]šXÔÙ[XÝHØÝ[Y[™Ù][[Y[žRY
+œ™‹ZÛ]š^[Ë[Y]šXÈŠNÂˆÛÛœÝY]šXÐÛÛ™š\›HHØÝ[Y[™Ù][[Y[žRY
+œ™‹ZÛ]š^[Ë[Y]šXËXÛÛ™š\›HŠNÂˆÛÛœÝ]\Ù]XØÙ\[˜ÙP]ÛˆHØÝ[Y[™Ù][[Y[žRY
+œ™‹ZÛ]š^[ËXÍ‹\[ˆŠNÂˆÛÛœÝ]\Ù]XØÙ\[˜ÙSY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+œ™‹ZÛ]š^[ËXÍ‹[Y\ÜØYÙHŠNÂˆÛÛœÝ›Ý\›™^QXYÛ›ÜÝXÐ]ÛˆHØÝ[Y[™Ù][[Y[žRY
+œ™KZÛ]š^[ËYXYÛ›ÜÝXË\[ˆŠNÂˆÛÛœÝ›Ý\›™^QXYÛ›ÜÝXÓY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+œ™KZÛ]š^[ËYXYÛ›ÜÝXË[Y\ÜØYÙHŠNÂˆÛÛœÝ\˜[\ÈH™]ÈT“ÙX\˜Ú\˜[\ÊØØ][Û‹œÙX\˜Ú
+NÂˆÛÛœÝÙ\ÜÚ[Û”™\]Y\ÝH\Þ[˜È
+]Ü[ÛœÈHßJHOˆÂˆYˆ
+]Ú[™ÝËœÚÜYžH\[ÙˆÚ[™ÝËœÚÜYžKšYÚÙ[ˆOOH™[˜Ý[ÛˆŠH›ÝÈ™]È\œ›ÜŠ”ÒÔQ–WÔÑTÔÒSÓ—Ô‘TURT‘QŠNÂˆÛÛœÝÚÙ[ˆH]ØZ]Ú[™ÝËœÚÜYžKšYÚÙ[Š
+NÂˆÛÛœÝ™\ÜÛœÙHH]ØZ]™]Ú
+]Ë‹‹›Ü[ÛœËXY\œÎˆÐ]]Üš^˜][ÛŽˆ™X\™\ˆˆ
+ÈÚÙ[‹‹‹ŠÜ[ÛœË˜›ÙHÈÈÛÛ[U\HŽˆ˜\XØ][Û‹ÚœÛÛˆŸHˆßJ__JNÂˆÛÛœÝ›ÙHH]ØZ]™\ÜÛœÙKšœÛÛŠ
+K˜Ø]Ú
 
+
+HOˆ
+ßJJNÂˆYˆ
+\™\ÜÛœÙK›ÚÊH›ÝÈ™]È\œ›ÜŠ›ÙK˜ÛÙH”‘TUQTÕÑRSQŠNÂˆ™]\›ˆ›ÙNÂˆNÂˆÛÛœÝÚÝÔ›ÝšY\œÈH™\Ü[™ÐÝ\œ™[˜ÞHOˆÂˆÝ\œ™[˜ÞTÙ]\šY[ˆHYNÂˆ›ÝšY\”ÙXÝ[ÛœËšY[ˆH˜[ÙNÂˆÝ]\ËšY[ˆHYNÂˆ
+	Ú[š]X[^™PYXØÛÝ[ËÔÝš[™Ê
+_JJ
+NÂˆ
+	Ú[š]X[^™RÛ]š^[ÐXØÛÝ[ËÔÝš[™Ê
+_JJ
+NÂˆNÂˆÛÛœÝØYÙ][™ÜÈH\Þ[˜È
+
+HOˆÂˆžHÂˆÛÛœÝÙ][™ÜÈH]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÝÛÜšÜÜXÙKÜÙ][™ÜÈŠNÂˆYˆ
+Ù][™ÜËœÝ]\ÈOOH˜ÛÛ™šYÝ\™YŠH™]\›ˆÚÝÔ›ÝšY\œÊÙ][™ÜËœ™\Ü[™×ØÝ\œ™[˜ÞJNÂˆÝ\œ™[˜ÞTÙ]\šY[ˆH˜[ÙNÂˆ›ÝšY\”ÙXÝ[ÛœËšY[ˆHYNÂˆÝ]\ËšY[ˆHYNÂˆHØ]ÚÂˆÝ\œ™[˜ÞTÙ]\šY[ˆHYNÂˆ›ÝšY\”ÙXÝ[ÛœËšY[ˆHYNÂˆÝ]\ËšY[ˆH˜[ÙNÂˆÝ]\ËœÙ]]šX]JšXY[™È‹“Ü[ˆYÕX›Hœ›ÛHÚÜYžHYZ[ˆŠNÂˆÝ]\ËœÙ]]šX]JÛ™H‹˜Üš]XØ[ŠNÂˆÝ]\Ë^ÛÛ[HˆŽÂˆBˆNÂˆØ]™PÝ\œ™[˜ÞK˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆØ]™PÝ\œ™[˜ÞK™\ØX›YHYNÂˆØ]™PÝ\œ™[˜ÞK›ØY[™ÈHYNÂˆžHÂˆÛÛœÝ™\Ý[H]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÝÛÜšÜÜXÙKÜ™\Ü[™ËXÝ\œ™[˜ÞH‹ÛY]Ùˆ”ÔÕ‹›ÙNˆ”ÓÓ‹œÝš[™ÚYžJØÝ\œ™[˜ÞNˆÝš[™ÊÝ\œ™[˜ÞK˜[YJ_J_JNÂˆÚÝÔ›ÝšY\œÊ™\Ý[œ™\Ü[™×ØÝ\œ™[˜ÞJNÂˆHØ]Ú
+\œ›ÜŠHÂˆÝ\œ™[˜ÞSY\ÜØYÙK^ÛÛ[H\œ›Ü‹›Y\ÜØYÙHOOH”‘TÔ•S‘×ÐÕT”‘SÖWÐS‘PQWÐÓÓ‘’QÕT‘QˆÈÝ\œ™[˜ÞH\È[™XYHÛÛ™šYÝ\™Yˆ™[ØY]HÛÝ\˜Ù\Ëˆˆˆ”X\ÙHÚÛÜÙHHÝ\ÜYÝ\œ™[˜ÞH[™žHYØZ[‹ˆŽÂˆHš[˜[HÈØ]™PÝ\œ™[˜ÞK™\ØX›YH˜[ÙNÈØ]™PÝ\œ™[˜ÞK›ØY[™ÈH˜[ÙNÈBˆJNÂˆYˆ
+\˜[\Ë™Ù]
+˜XØÙ\[˜ÙHŠHOOHœ™‹ZÛ]š^[ÈŠHÂˆXØÙ\[˜ÙT[™[šY[ˆH˜[ÙNÂˆÛÛœÝÚÝÐXØÙ\[˜ÙT™\Ý[H™\Ý[OˆÂˆXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H™\Ý[œÝ]\ÈOOH”TÔ×Ô—Ñ—ÒÓU’VS×Ô‘PQÓÓ“WÔ‘Q“QÒ‚ˆÈ”TÔÈ8 %XØÛÝ[Ø[\ZYÛ‹›ÝË[YH[™–ÚXÚÜÈÝXØÙYYYˆ]\Ù]ŒˆÜš]\Îˆˆ‚ˆˆ•HXØÙ\[˜ÙH™\Ý[ÛÝ[›Ý™H™\šYšYYˆŽÂˆNÂˆXØÙ\[˜ÙP]Û‹˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆXØÙ\[˜ÙP]Û‹™\ØX›YHYNÂˆXØÙ\[˜ÙP]Û‹›ØY[™ÈHYNÂˆXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H”[›š[™ÈH™XY[Û›HÚXÚÜø )ˆŽÂˆžHÂˆÛÛœÝ™\Ý[H]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÚÛ]š^[ËÜ[[YKÜ™Y›YÚ‹ÛY]Ùˆ”ÔÕŸJNÂˆÚÝÐXØÙ\[˜ÙT™\Ý[
+™\Ý[
+NÂˆHØ]Ú
+\œ›ÜŠHÂˆYˆ
+\œ›Ü‹›Y\ÜØYÙHOOH’ÓU’VS×Ô‘Q“QÒÓQU’P×Ô‘TURT‘QŠHÂˆžHÂˆÛÛœÝ\ØÛÝ™\žHH]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÚÛ]š^[ËÜ[[YKÛY]šXÜÈŠNÂˆY]šXÔÙ[XÝœ™\XÙPÚ[™[Š
+NÂˆ\ØÛÝ™\žK˜Ø[™Y]\Ë™›Ü‘XXÚ
+Ø[™Y]HOˆÂˆÛÛœÝÜ[ÛˆHØÝ[Y[˜Ü™X]Q[[Y[
+œË[Ü[ÛˆŠNÂˆÜ[Û‹˜[YHHØ[™Y]KšYÂˆÜ[Û‹^ÛÛ[HØ[™Y]K›˜[YH
+Èˆ8 %ˆ
+ÈØ[™Y]Kš[YÜ˜][Û—Û˜[YH
+È
+Ø[™Y]Kš[YÜ˜][Û—ØØ]YÛÜžHÈˆ
+ˆ
+ÈØ[™Y]Kš[YÜ˜][Û—ØØ]YÛÜžH
+ÈŠHˆˆˆŠNÂˆY]šXÔÙ[XÝ˜\[™Ú[
+Ü[ÛŠNÂˆJNÂˆY]šXÔÙ[XÝ˜[YHH\ØÛÝ™\žK˜Ø[™Y]\ÖÌOËšYˆŽÂˆY]šXÔÝ\šY[ˆH˜[ÙNÂˆXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H”Ù[XÝH›ÝšY\‹]™\šYšYYØ[\ÈÛÝ\˜ÙKˆYÕX›HÚ[š[™]È^XÝYYÈØ\ÚXÚÛÝ][™XÙYÜ™\ˆY]šXÜÈ›Üˆ\ÈÛÜšÜÜXÙH[™Û]š^[ÈXØÛÝ[ˆŽÂˆHØ]Ú
+\ØÛÝ™\žQ\œ›ÜŠHÂˆXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H×–ÐKVŒNW×^ÌKIË\Ý
+\ØÛÝ™\žQ\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\ØÛÝ™\žQ\œ›Ü‹›Y\ÜØYÙHˆ’ÓU’VS×ÓQU’P×ÑTÐÓÕ‘T–WÑRSQŽÂˆBˆH[ÙHÂˆXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆ’ÓU’VS×Ô‘Q“QÒÑRSQŽÂˆBˆXØÙ\[˜ÙP]Û‹™\ØX›YH˜[ÙNÂˆHš[˜[HÈXØÙ\[˜ÙP]Û‹›ØY[™ÈH˜[ÙNÈBˆJNÂˆ›Ý\›™^QXYÛ›ÜÝXÐ]Û‹˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆ›Ý\›™^QXYÛ›ÜÝXÐ]Û‹™\ØX›YHYNÂˆ›Ý\›™^QXYÛ›ÜÝXÐ]Û‹›ØY[™ÈHYNÂˆ›Ý\›™^QXYÛ›ÜÝXÓY\ÜØYÙK^ÛÛ[H”™XY[™ÈHŽÙ\[X™\ˆØ[\ZYÛˆ[™›ÝÈ›Ý\›™^H™\Üø )ˆŽÂˆžHÂˆÛÛœÝ™\Ý[H]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÚÛ]š^[ËÜ[[YKÚ›Ý\›™^KYXYÛ›ÜÝXÈ‹ÂˆY]Ùˆ”ÔÕ‹ˆ›ÙNˆ”ÓÓ‹œÝš[™ÚYžJÜ›ÝšY\—Ù]NˆŒŒ‹LKLŽŸJKˆJNÂˆÛÛœÝXYÛ›ÜÝXÈH™\Ý[š›Ý\›™^WÙXYÛ›ÜÝXÜÎÂˆÛÛœÝÝ[[X\žHHÝYÙHOˆÈˆ
+ÈÝYÙK˜Ø[\ZYÛ‹œ›Ý×ØÛÝ[
+È‹Èˆ
+ÈÝYÙK˜Ø[\ZYÛ‹˜ÛÛ™\œÚ[Û—ØÛÝ[
+È‹ˆˆ
+ÈÝYÙK™›ÝËœ›Ý×ØÛÝ[
+È‹Èˆ
+ÈÝYÙK™›ÝË˜ÛÛ™\œÚ[Û—ØÛÝ[Âˆ›Ý\›™^QXYÛ›ÜÝXÓY\ÜØYÙK^ÛÛ[H™\Ý[œÝ]\ÈOOH”TÔ×Ô—ÑWÒÓU’VS×Ò“ÕT“‘VWÑPQÓ“ÔÕPÈ‚ˆÈ”TÔÈ8 %Œ‹LKLŽˆ›ÝÜËØÛÛ™\œÚ[ÛœÎˆXÙYÜ™\ˆˆ
+ÈÝ[[X\žJXYÛ›ÜÝXËœ\˜Ú\ÙJH
+ÈŽÈYYÈØ\ˆ
+ÈÝ[[X\žJXYÛ›ÜÝXË˜YÝ×ØØ\
+H
+ÈŽÈÚXÚÛÝ]ˆ
+ÈÝ[[X\žJXYÛ›ÜÝXË˜ÚXÚÛÝ]
+H
+È‹ˆ[›X]ÚYY\ÜØYÙHÙ^\ÎˆUÈˆ
+È
+XYÛ›ÜÝXË˜YÝ×ØØ\˜Ø[\ZYÛ‹[›X]ÚYÚÙ^WØÛÝ[
+ÈXYÛ›ÜÝXË˜YÝ×ØØ\™›ÝË[›X]ÚYÚÙ^WØÛÝ[
+H
+È‹ÚXÚÛÝ]ˆ
+È
+XYÛ›ÜÝXË˜ÚXÚÛÝ]˜Ø[\ZYÛ‹[›X]ÚYÚÙ^WØÛÝ[
+ÈXYÛ›ÜÝXË˜ÚXÚÛÝ]™›ÝË[›X]ÚYÚÙ^WØÛÝ[
+H
+È‹ˆ]\Ù]ŒˆÜš]\Îˆˆ‚ˆˆ•H›Ý\›™^HXYÛ›ÜÝXÈ™\Ý[ÛÝ[›Ý™H™\šYšYYˆŽÂˆHØ]Ú
+\œ›ÜŠHÂˆ›Ý\›™^QXYÛ›ÜÝXÓY\ÜØYÙK^ÛÛ[H×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆ’ÓU’VS×Ô‘Q“QÒÑRSQŽÂˆ›Ý\›™^QXYÛ›ÜÝXÐ]Û‹™\ØX›YH˜[ÙNÂˆHš[˜[HÈ›Ý\›™^QXYÛ›ÜÝXÐ]Û‹›ØY[™ÈH˜[ÙNÈBˆJNÂˆ]\Ù]XØÙ\[˜ÙP]Û‹˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆ]\Ù]XØÙ\[˜ÙP]Û‹™\ØX›YHYNÂˆ]\Ù]XØÙ\[˜ÙP]Û‹›ØY[™ÈHYNÂˆ]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H”[›š[™ÈÛ™HÛÛ›ÛY]\Ù]ŒˆXØÙ\[˜Ùx )ˆŽÂˆžHÂˆÛÛœÝ™\Ý[H]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÚÛ]š^[ËÜ[[YKØXØÙ\[˜ÙH‹ÂˆY]Ùˆ”ÔÕ‹ˆ›ÙNˆ”ÓÓ‹œÝš[™ÚYžJØÛÛ™š\›X][ÛŽˆ”•S—Ô—Ñ—ÐÍ—ÒÓU’VS×ÕÔ’UHŸJKˆJNÂˆ]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H™\Ý[œÝ]\ÈOOH”TÔ×Ô—Ñ—ÐÍ—ÒÓU’VS×ÑUTÑUÕÔ’UH‚ˆÈ”TÔÈ8 %][\Yˆˆ
+È™\Ý[˜][\Y
+È‹\œÚ\ÝYˆˆ
+È™\Ý[œ\œÚ\ÝY
+È‹™\šYšYY[\Nˆˆ
+È™\Ý[™[\WÜ›ÝšY\—Ü™\Ý[
+È‹ˆ‚ˆˆ•H]\Ù]ŒˆXØÙ\[˜ÙH™\Ý[ÛÝ[›Ý™H™\šYšYYˆŽÂˆHØ]Ú
+\œ›ÜŠHÂˆ]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H
+×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆ’ÓU’VS×ÑUTÑUÐPÐÑTSÑWÑRSQŠH
+È‹ˆÈ›Ý™]žNÈ™]šY]È[[YH]šY[˜ÙKˆŽÂˆHš[˜[HÈ]\Ù]XØÙ\[˜ÙP]Û‹›ØY[™ÈH˜[ÙNÈBˆJNÂˆY]šXÐÛÛ™š\›K˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆY]šXÐÛÛ™š\›K™\ØX›YHYNÂˆY]šXÐÛÛ™š\›K›ØY[™ÈHYNÂˆXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H•™\šYžZ[™È[™š[™[™ÈHÛ]š^[ÈÛÛ[Y\˜ÙHY]šXÜø )ˆŽÂˆžHÂˆ]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÚÛ]š^[ËÜ[[YKÛY]šXÜËÜÙ[XÝ‹ÛY]Ùˆ”ÔÕ‹›ÙNˆ”ÓÓ‹œÝš[™ÚYžJÛY]šX×ÚYˆÝš[™ÊY]šXÔÙ[XÝ˜[YHˆŠ_J_JNÂˆY]šXÔÝ\šY[ˆHYNÂˆXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H“Y]šXÈÛÛ™š\›YYˆ[›š[™ÈH™XY[Û›HXØÙ\[˜Ùx )ˆŽÂˆÚÝÐXØÙ\[˜ÙT™\Ý[
+]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÚÛ]š^[ËÜ[[YKÜ™Y›YÚ‹ÛY]Ùˆ”ÔÕŸJJNÂˆHØ]Ú
+\œ›ÜŠHÂˆXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆ’ÓU’VS×Ô‘Q“QÒÑRSQŽÂˆY]šXÐÛÛ™š\›K™\ØX›YH˜[ÙNÂˆHš[˜[HÈY]šXÐÛÛ™š\›K›ØY[™ÈH˜[ÙNÈBˆJNÂˆBˆYˆ
+\˜[\Ë™Ù]
+˜XØÙ\[˜ÙHŠHOOHœ™Ë[Y]HŠHÂˆY]PXØÙ\[˜ÙT[™[šY[ˆH˜[ÙNÂˆY]PXØÙ\[˜ÙP]Û‹˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆY]PXØÙ\[˜ÙP]Û‹™\ØX›YHYNÂˆY]PXØÙ\[˜ÙP]Û‹›ØY[™ÈHYNÂˆY]PXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H”[›š[™ÈH™XY[Û›HÚXÚÜø )ˆŽÂˆžHÂˆÛÛœÝ™\Ý[H]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÛY]KÜ[[YKÜ™Y›YÚ‹ÛY]Ùˆ”ÔÕŸJNÂˆY]PXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H™\Ý[œÝ]\ÈOOH”TÔ×Ô—Ñ×ÑÓQUWÔ‘PQÓÓ“WÔ‘Q“QÒ‚ˆÈ”TÔÈ8 %ˆ
+È™\Ý[œÙ[XÝYØXØÛÝ[ØÛÝ[
+ÈˆXØÛÝ[
+ÊKˆ
+È™\Ý[œ›Ý×ØÛÝ[
+Èˆ™\šYšYY›ÝÊÊK[YH[™–ÚXÚÜÈÝXØÙYYYˆ]\Ù]ŒˆÜš]\Îˆˆ‚ˆˆ•HXØÙ\[˜ÙH™\Ý[ÛÝ[›Ý™H™\šYšYYˆŽÂˆHØ]Ú
+\œ›ÜŠHÂˆY]PXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆ“QUWÔ‘Q“QÒÑRSQŽÂˆY]PXØÙ\[˜ÙP]Û‹™\ØX›YH˜[ÙNÂˆHš[˜[HÈY]PXØÙ\[˜ÙP]Û‹›ØY[™ÈH˜[ÙNÈBˆJNÂˆY]Q]\Ù]XØÙ\[˜ÙP]Û‹˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆY]Q]\Ù]XØÙ\[˜ÙP]Û‹™\ØX›YHYNÂˆY]Q]\Ù]XØÙ\[˜ÙP]Û‹›ØY[™ÈHYNÂˆY]Q]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H”[›š[™ÈÛ™HÛÛ›ÛY]\Ù]ŒˆXØÙ\[˜Ùx )ˆŽÂˆžHÂˆÛÛœÝ™\Ý[H]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÛY]KÜ[[YKØXØÙ\[˜ÙH‹ÂˆY]Ùˆ”ÔÕ‹ˆ›ÙNˆ”ÓÓ‹œÝš[™ÚYžJØÛÛ™š\›X][ÛŽˆ”•S—Ô—Ñ×ÑWÓQUWÕÔ’UHŸJKˆJNÂˆY]Q]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H™\Ý[œÝ]\ÈOOH”TÔ×Ô—Ñ×ÑWÓQUWÑUTÑUÕÔ’UH‚ˆÈ”TÔÈ8 %][\Yˆˆ
+È™\Ý[˜][\Y
+È‹\œÚ\ÝYˆˆ
+È™\Ý[œ\œÚ\ÝY
+È‹™\šYšYY[\Nˆˆ
+È™\Ý[™[\WÜ›ÝšY\—Ü™\Ý[
+È‹ˆ‚ˆˆ•H]\Ù]ŒˆXØÙ\[˜ÙH™\Ý[ÛÝ[›Ý™H™\šYšYYˆŽÂˆHØ]Ú
+\œ›ÜŠHÂˆY]Q]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H
+×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆ“QUWÑUTÑUÐPÐÑTSÑWÑRSQŠH
+È‹ˆÈ›Ý™]žNÈ™]šY]È[[YH]šY[˜ÙKˆŽÂˆHš[˜[HÈY]Q]\Ù]XØÙ\[˜ÙP]Û‹›ØY[™ÈH˜[ÙNÈBˆJNÂˆBˆYˆ
+\˜[\Ë™Ù]
+˜XØÙ\[˜ÙHŠHOOHœ™YÛÛÙÛHŠHÂˆÛÛÙÛPXØÙ\[˜ÙT[™[šY[ˆH˜[ÙNÂˆÛÛÙÛPXØÙ\[˜ÙP]Û‹˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆÛÛÙÛPXØÙ\[˜ÙP]Û‹™\ØX›YHYNÂˆÛÛÙÛPXØÙ\[˜ÙP]Û‹›ØY[™ÈHYNÂˆÛÛÙÛPXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H”[›š[™ÈH™XY[Û›HÚXÚÜø )ˆŽÂˆžHÂˆÛÛœÝ™\Ý[H]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÙÛÛÙÛWØYËÜ[[YKÜ™Y›YÚ‹ÛY]Ùˆ”ÔÕŸJNÂˆÛÛÙÛPXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H™\Ý[œÝ]\ÈOOH”TÔ×Ô—ÑÑÑÓÓÑÓWÔ‘PQÓÓ“WÔ‘Q“QÒ‚ˆÈ”TÔÈ8 %ˆ
+È™\Ý[œÙ[XÝYØXØÛÝ[ØÛÝ[
+ÈˆXØÛÝ[
+ÊKˆ
+È™\Ý[œ›Ý×ØÛÝ[
+Èˆ™\šYšYY›ÝÊÊHXÜ›ÜÜÈÝ[™\™[™\™›Ü›X[˜ÙHX^ˆ[YH[™–ÚXÚÜÈÝXØÙYYYˆ]\Ù]ŒˆÜš]\Îˆˆ‚ˆˆ•HXØÙ\[˜ÙH™\Ý[ÛÝ[›Ý™H™\šYšYYˆŽÂˆHØ]Ú
+\œ›ÜŠHÂˆÛÛÙÛPXØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆ‘ÓÓÑÓWÔ‘Q“QÒÑRSQŽÂˆÛÛÙÛPXØÙ\[˜ÙP]Û‹™\ØX›YH˜[ÙNÂˆHš[˜[HÈÛÛÙÛPXØÙ\[˜ÙP]Û‹›ØY[™ÈH˜[ÙNÈBˆJNÂˆÛÛÙÛQ]\Ù]XØÙ\[˜ÙP]Û‹˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆÛÛÙÛQ]\Ù]XØÙ\[˜ÙP]Û‹™\ØX›YHYNÂˆÛÛÙÛQ]\Ù]XØÙ\[˜ÙP]Û‹›ØY[™ÈHYNÂˆÛÛÙÛQ]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H”[›š[™ÈÛ™HÛÛ›ÛY]\Ù]ŒˆXØÙ\[˜Ùx )ˆŽÂˆžHÂˆÛÛœÝ™\Ý[H]ØZ]Ù\ÜÚ[Û”™\]Y\Ý
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÙÛÛÙÛWØYËÜ[[YKØXØÙ\[˜ÙH‹ÂˆY]Ùˆ”ÔÕ‹ˆ›ÙNˆ”ÓÓ‹œÝš[™ÚYžJØÛÛ™š\›X][ÛŽˆ”•S—Ô—ÑÑWÑÓÓÑÓWÕÔ’UHŸJKˆJNÂˆÛÛÙÛQ]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H™\Ý[œÝ]\ÈOOH”TÔ×Ô—ÑÑWÑÓÓÑÓWÑUTÑUÕÔ’UH‚ˆÈ”TÔÈ8 %][\Yˆˆ
+È™\Ý[˜][\Y
+È‹\œÚ\ÝYˆˆ
+È™\Ý[œ\œÚ\ÝY
+È‹™\šYšYY[\Nˆˆ
+È™\Ý[™[\WÜ›ÝšY\—Ü™\Ý[
+È‹ˆ‚ˆˆ•H]\Ù]ŒˆXØÙ\[˜ÙH™\Ý[ÛÝ[›Ý™H™\šYšYYˆŽÂˆHØ]Ú
+\œ›ÜŠHÂˆÛÛÙÛQ]\Ù]XØÙ\[˜ÙSY\ÜØYÙK^ÛÛ[H
+×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆ‘ÓÓÑÓWÑUTÑUÐPÐÑTSÑWÑRSQŠH
+È‹ˆÈ›Ý™]žNÈ™]šY]È[[YH]šY[˜ÙKˆŽÂˆHš[˜[HÈÛÛÙÛQ]\Ù]XØÙ\[˜ÙP]Û‹›ØY[™ÈH˜[ÙNÈBˆJNÂˆBˆØÝ[Y[œ]Y\žTÙ[XÝÜ[
+œËX]Û–Ù]K\›ÝšY\—HŠK™›Ü‘XXÚ
+
+]ÛŠHOˆ]Û‹˜Y]™[\Ý[™\Š˜ÛXÚÈ‹\Þ[˜È
+
+HOˆÂˆ]Û‹™\ØX›YHYNÂˆ]Û‹›ØY[™ÈHYNÂˆÝ]\ËœÙ]]šX]JšXY[™È‹“Ü[š[™ÈÙXÝ\™HÛÛ›™XÝ[ÛˆŠNÂˆÝ]\ËœÙ]]šX]JÛ™H‹š[™›ÈŠNÂˆÝ]\Ë^ÛÛ[H–[ÝHÚ[ÛÛ[YHÛˆH›ÝšY\‰ÜÈ]]Üš^˜][ÛˆYÙKˆŽÂˆžHÂˆYˆ
+]Ú[™ÝËœÚÜYžH\[ÙˆÚ[™ÝËœÚÜYžKšYÚÙ[ˆOOH™[˜Ý[ÛˆŠH›ÝÈ™]È\œ›ÜŠ
+NÂˆÛÛœÝÚÙ[ˆH]ØZ]Ú[™ÝËœÚÜYžKšYÚÙ[Š
+NÂˆÛÛœÝ™\ÜÛœÙHH]ØZ]™]Ú
+‹Ø\KÜÚÜYžKÜ›ÝšY\œËÈˆ
+È[˜ÛÙUT’PÛÛ\Û™[
+]Û‹™]\Ù]œ›ÝšY\ŠH
+È‹ÛØ]]ÜÝ\‹ÂˆY]Ùˆ”ÔÕ‹ˆXY\œÎˆÐ]]Üš^˜][ÛŽˆ™X\™\ˆˆ
+ÈÚÙ[ŸKˆJNÂˆÛÛœÝ›ÙHH]ØZ]™\ÜÛœÙKšœÛÛŠ
+K˜Ø]Ú
+
+
+HOˆ
+ßJJNÂˆYˆ
+\™\ÜÛœÙK›ÚÊH›ÝÈ™]È\œ›ÜŠ›ÙK˜ÛÙHÓÓ“‘PÕSÓ—ÔÕT•ÑRSQŠNÂˆYˆ
+›ÙK›˜]šYØ][ÛˆOOHÜÛ]™[ˆ\[Ùˆ›ÙK˜]]Üš^˜][Û—Ý\›OOHœÝš[™ÈŠH›ÝÈ™]È\œ›ÜŠ’S•SQÓÐUUÔ‘TÔÓ”ÑHŠNÂˆÜ[Š›ÙK˜]]Üš^˜][Û—Ý\›—ÝÜŠNÂˆHØ]Ú
+\œ›ÜŠHÂˆÝ]\ËœÙ]]šX]JšXY[™È‹ÛÛ›™XÝ[ÛˆÛÝ[›Ý™HÝ\YŠNÂˆÝ]\ËœÙ]]šX]JÛ™H‹˜Üš]XØ[ŠNÂˆÝ]\ËšY[ˆH˜[ÙNÂˆÝ]\Ë^ÛÛ[H×–ÐKVŒNW×^ÌKIË\Ý
+\œ›Ü‹›Y\ÜØYÙHˆŠHÈ\œ›Ü‹›Y\ÜØYÙHˆÓÓ“‘PÕSÓ—ÔÕT•ÑRSQŽÂˆ]Û‹™\ØX›YH˜[ÙNÂˆ]Û‹›ØY[™ÈH˜[ÙNÂˆBˆJJNÂˆØYÙ][™ÜÊ
+NÂˆYˆ
+\˜[\Ë™Ù]
+›Ø]]Ù\œ›ÜˆŠHOOHœ™X]]Üš^˜][Û—Ü™\]Z\™Yˆ	‰ˆ\˜[\Ë™Ù]
+œ›ÝšY\ˆŠHOOH›Y]HŠHÂˆÛÛœÝ™XÛÛ›™XÝHØÝ[Y[™Ù][[Y[žRY
+›Y]KXÛÛ›™XÝXXÝ[ÛˆŠNÂˆÛÛœÝY\ÜØYÙHHØÝ[Y[™Ù][[Y[žRY
+›Y]K[Y\ÜØYÙHŠNÂˆYˆ
+™XÛÛ›™XÝ
+H™XÛÛ›™XÝ^ÛÛ[H”™XÛÛ›™XÝY]HŽÂˆYˆ
+Y\ÜØYÙJHY\ÜØYÙK^ÛÛ[H“Y]H]]Üš^˜][Ûˆ]\Ý™H™[™]ÙY™Y›Ü™HXØÛÝ[Ù[XÝ[Û‹ˆŽÂˆÝ]\ËœÙ]]šX]JšXY[™È‹”™XÛÛ›™XÝY]HŠNÂˆÝ]\ËœÙ]]šX]JÛ™H‹˜Üš]XØ[ŠNÂˆÝ]\Ë^ÛÛ[HYÕX›HÛÝ[›Ý™\šYžHH˜[YY]H]]Üš^˜][Û‹ˆŽÂˆÝ]\ËšY[ˆH˜[ÙNÂˆH[ÙHYˆ
+\˜[\Ëš\Ê›Ø]]ØÛÛ›™XÝYŠJHÂˆÝ]\ËœÙ]]šX]JšXY[™È‹”›ÝšY\ˆ]]Üš^™YŠNÂˆÝ]\ËœÙ]]šX]JÛ™H‹œÝXØÙ\ÜÈŠNÂˆÝ]\Ë^ÛÛ[HXØÛÝ[Ù[XÝ[Ûˆ\È™^ˆŽÂˆH[ÙHYˆ
+\˜[\Ëš\Ê›Ø]]Ù\œ›ÜˆŠJHÂˆÝ]\ËœÙ]]šX]JšXY[™È‹ÛÛ›™XÝ[ÛˆØ\È›ÝÛÛ\]YŠNÂˆÝ]\ËœÙ]]šX]JÛ™H‹˜Üš]XØ[ŠNÂˆÝ]\Ë^ÛÛ[H”X\ÙHžHYØZ[‹ˆŽÂˆBˆJJ
+NÂˆÜØÜš\‚Ø›ÙO‚Ú[˜ÂŸB‚™[˜Ý[ÛˆÙ][X™YYXY\œÊ™\ÊHÂˆ™\ËœÙ]
+ØXÚKPÛÛ›Û‹››Ë\ÝÜ™K›ËXØXÚK]\Ý\™]˜[Y]K›ÞK\™]˜[Y]KX^XYÙOLŠNÂˆ™\ËœÙ]
+Ñ‹PØXÚKPÛÛ›Û‹››Ë\ÝÜ™HŠNÂˆ™\ËœÙ]
+•™\˜Ù[PÑ‹PØXÚKPÛÛ›Û‹››Ë\ÝÜ™HŠNÂˆ™\ËœÙ]
+”Ý\œ›ÙØ]KPÛÛ›Û‹››Ë\ÝÜ™HŠNÂˆ™\ËœÙ]
+–PYÕX›KT™[X\ÙH‹SP‘QQÒÓQWÔ‘SPTÑJNÂˆ™\ËœÙ]
+ÛÛ[TÙXÝ\š]KTÛXÞH‹™œ˜[YKX[˜Ù\ÝÜœÈÎ‹ËØYZ[‹œÚÜYžK˜ÛÛHÎ‹ËÊ‹›^\ÚÜYžK˜ÛÛHŠNÂŸB‚™[˜Ý[Ûˆ™YÚ\Ý\‘[X™YY\ÛYJ\ØÛY[YJHÂˆYˆ
+X\\[Ùˆ\™Ù]OOH™[˜Ý[ÛˆŠH›ÝÈ™]È\Q\œ›ÜŠ˜\™Ù]\È™\]Z\™YŠNÂˆÛÛœÝ[H™[™\‘[X™YY\ÛYJØÛY[YJNÂˆÛÛœÝ[™\ˆH
+Ü™\K™\ÊHOˆÂˆÙ][X™YYXY\œÊ™\ÊNÂˆ™]\›ˆ™\Ë\Jš[ŠKœÙ[™
+[
+NÂˆNÂˆ\™Ù]
+‹È‹[™\ŠNÂˆ\™Ù]
+‹ÜÚÜYžKØ\‹[™\ŠNÂŸB‚™[˜Ý[Ûˆ™YÚ\Ý\‘[X™YY]›Ü›\Ê\ØÛY[Y›ÝšY\“Ð]][˜X›YH˜[Ù_JHÂˆYˆ
+X\\[Ùˆ\™Ù]OOH™[˜Ý[ÛˆŠH›ÝÈ™]È\Q\œ›ÜŠ˜\™Ù]\È™\]Z\™YŠNÂˆÛÛœÝ[H™[™\‘[X™YY]›Ü›\ÊØÛY[Y›ÝšY\“Ð]][˜X›YJNÂˆ\™Ù]
+‹ÜÚÜYžKØ\Ü]›Ü›\È‹
+Ü™\K™\ÊHOˆÂˆÙ][X™YYXY\œÊ™\ÊNÂˆ™]\›ˆ™\Ë\Jš[ŠKœÙ[™
+[
+NÂˆJNÂŸB‚›[Ù[K™^ÜÈHØš™XÝ™œ™Y^™JÑSP‘QQÒÓQWÔ‘SPTÑK™YÚ\Ý\‘[X™YY\ÛYK™[™\‘[X™YY\ÛYK™YÚ\Ý\‘[X™YY]›Ü›\Ë™[™\‘[X™YY]›Ü›\ßJNÂ

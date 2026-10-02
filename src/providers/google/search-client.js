@@ -41,4 +41,3 @@ function createGoogleAdsSearchClient({fetchImpl = fetch, developerToken, apiVers
 }
 
 module.exports = Object.freeze({createGoogleAdsSearchClient});
-

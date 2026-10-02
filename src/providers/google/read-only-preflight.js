@@ -59,4 +59,3 @@ function createGoogleReadOnlyPreflight({connectionStore, settingsStore, tokenLif
 }
 
 module.exports = Object.freeze({createGoogleReadOnlyPreflight, preserveDiagnostics, safeFailure});
-

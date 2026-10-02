@@ -66,4 +66,3 @@ comment on column public.workspace_provider_connections.add_to_cart_metric_id is
   'Provider-verified Klaviyo Added to Cart metric bound to this workspace/provider account.';
 comment on column public.workspace_provider_connections.checkout_metric_id is
   'Provider-verified Klaviyo checkout metric bound to this workspace/provider account; exact provider name is Checkout Started or Started Checkout.';
-

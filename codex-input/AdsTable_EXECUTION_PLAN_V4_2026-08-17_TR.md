@@ -1,7 +1,7 @@
 # AdsTable — V4 Execution Plan
 
 **Sürüm:** V4.1 — Workspace-first execution amendment
-**Tarih:** 17 Ağustos 2026; son karar revizyonu 29 Eylül 2026
+**Tarih:** 17 Ağustos 2026; son karar revizyonu 2 Ekim 2026
 **Belge türü:** Güncel uygulama, kabul ve takip planı  
 **Durum:** Mutabık kalınan execution baseline  
 
@@ -192,7 +192,7 @@ Bu bölüm, Shopify Embedded kararından önceki standalone kullanıcı/OAuth mo
 - **R7-B5-B rolling 30-day davranışı — Decision frozen / repository implementation prepared:** İlk kayıt server-authoritative Klaviyo account business date'te başlar; kullanıcı başlangıç/bitiş tarihi girmez. Girilen değer 30 günlük normalize maliyettir ve değiştirilmezse ardışık 30 günlük pencerelerde aynı değer otomatik devam eder. `Update spend` kayıt gününde yeni değeri başlatır; `Change value` seçili tarihsel kaydın yanlış tutarını effective date'i değiştirmeden düzeltir. Aynı workspace/account/currency tarihinde duplicate effective start yasaktır.
 - **R7-B5-C1 effective-history foundation — Repository prepared / production pending:** Additive `workspace_provider_email_spend_history` migration'ı, forced RLS, yalnız `service_role` grant'leri ve account selection ile atomik ilk kayıt hazırlanmıştır. Değişiklik satırları saklanır; 30 günlük pencereler fiziksel olarak çoğaltılmaz. Mevcut `monthly_plan_cost` yalnız compatibility mirror'dır. Migration production'a uygulanmadı ve canlı mevcut Klaviyo/Dataset V2 kaydı değiştirilmedi.
 - **R7-B5-C2 Settings management — Repository prepared / merchant acceptance pending:** Aktif kullanıcı metni `Estimated 30-Day Klaviyo Email Spend`dır; SMS hariçtir. Connected Klaviyo kartında `Update spend` ve `Change value` eylemleri hazırlanmıştır. Tarih kullanıcıdan alınmaz; update server business date'te yeni değişiklik satırı açar, correction seçili tarihsel tutarı aynı effective date üzerinde sürümleyerek düzeltir.
-- **R7-B5-C3 Dataset cost boundary — Repository checks PASS / live acceptance pending:** Campaign/Flow ve Email/SMS mesaj satırlarında `spend_value` artık account maliyetinden üretilmez ve `unsupported` kalır. Eski recipient/monthly-recipient dağıtım çağrıları kaldırılmıştır. 30 günlük tahminin günlük maliyeti `estimated_30_day_email_spend / 30` olarak ayrı account-day aggregation katmanında bir kez join edilmelidir; bu PR account-day fact yazımını veya mevcut canlı satırların yeniden hesaplanmasını açmaz. PR #305 Security + Full Regression PASS; production migration/deployment ve gerçek Shopify kabulü tamamlanmadan R7-B5 Done değildir.
+- **R7-B5-D Email cost allocation v2 — Decision frozen / implementation pending:** Sabit account-day Email toplamı, aynı provider business date içindeki gerçek Campaign Message ve Flow Message Email satırlarına Reporting API `recipients` payıyla dağıtılır; hacim toplam maliyeti değiştirmez. Leaf toplamı yuvarlama sonrası account-day toplamına eşit olmalıdır. Uygun recipient yoksa sahte leaf yazılmaz; maliyet account-day katmanında bir kez `unallocated` tutulur. Dataset V2 yalnız ham gerçekleri ve allocated spend'i saklar; derived KPI'lar Formula Engine'e aittir. Bu contract-only paket runtime, database, provider çağrısı, canlı Dataset write veya backfill açmaz; implementation ve production acceptance ayrı pakettir.
 - **R7-B6 Settings Shopify görsel standardı — Repository prepared / merchant acceptance pending:** Reporting Currency ve Platforms, resmi Shopify bileşenleriyle iki ayrı kart olarak sunulur. Meta, Google Ads ve Klaviyo tek Platforms kartı içinde ayraçlarla ayrılır; tekrar eden provider açıklama cümleleri kaldırılır. Bağlantı kurulmamış ve bekleyen kurulum eylemleri nötr Shopify butonudur; kurulu bağlantı `Connected` success badge, `Disconnect` critical action, Reporting account / Update spend / Change value ise nötr ikincil eylemlerle gösterilir. Meta ve Google Ads Reporting Account özeti durum satırının altında kalır; Klaviyo için Correct value kullanıcı etiketi `Change value` olarak değiştirilir fakat correction backend davranışı, endpoint ve kayıt semantiği değişmez. Connect/Disconnect modal metinleri, OAuth/callback, hesap seçimi, token lifecycle, database ve Dataset V2 bu paketin kapsamı dışındadır. Resmi `s-app-nav` link sözleşmesi yalnız metin çocuk kabul ettiği için Funnel/Analysis/Settings alt menülerine özel ikon veya CSS taklidi eklenmez. Gerçek Shopify desktop ve mobil merchant kabulü tamamlanmadan bu paket `Done` sayılmaz.
 - **R8:** V1 satırları doğrudan SQL copy ile V2'ye taşınmaz. Provider re-fetch tercih edilir; mümkün değilse yalnız canonical validation/provenance geçen legacy fact yazılır. Direct/Others, sentetik fallback ve belirsiz Organic otomatik taşınmaz. Backfill resumable/idempotent ve provider bazlı coverage ölçümlüdür.
 - **R9:** Read cutover provider/workspace canary ile ilerler. Error, lag, partial, FX rejection, currency consistency ve duplicate identity gözlenir. V2 read rollback'i V1 verisini değiştirmez.
@@ -448,8 +448,8 @@ ctr             = funnel_click / impressions * 100
 cpc             = spend / funnel_click
 roas            = sales / spend
 cps             = spend / purchase
-profit          = sales - spend
-margin          = profit / sales * 100
+revenue         = sales - spend
+revenue_margin  = revenue / sales * 100
 ```
 
 Intent Paid-only oranları:
@@ -466,7 +466,7 @@ purchase_rate    = paid_purchase / paid_checkout * 100
 - Oranlar toplanmaz veya satır oranlarının ortalaması alınmaz: `SUM(raw numerator) / SUM(raw denominator)` kullanılır.
 - Denominator `0`, unsupported veya hesaplanamazsa derived sonuç `null` olur.
 - Unsupported/unknown additive input kısmi toplamı sessizce gerçek toplam gibi sunulmaz; support sonucu propagate edilir.
-- `sales - spend` canonical adı `profit`tir; `revenue` olarak kalıcılaştırılmaz.
+- `sales - spend` canonical adı `revenue`; `revenue / sales * 100` canonical adı `revenue_margin`dır. Eski `profit` ve `margin` adları yalnız versionlı compatibility alias olabilir; Dataset V2'ye derived KPI yazılmaz.
 - Campaign ve child facts aynı total içinde double-count edilmez.
 - Compare iki period için aynı Formula Engine'i kullanır: `(current - previous) / abs(previous) * 100`; previous `0` ise change `null`dır.
 - Different-length period normalization gerekiyorsa tek versionlı backend policy olur.
@@ -476,7 +476,7 @@ purchase_rate    = paid_purchase / paid_checkout * 100
 
 - Aynı aggregate fixture Formula, API, Compare, Intent, Export ve UI'da aynı sonucu verir.
 - Blend aggregate-first sonucu ile yanlış KPI-average sonucu arasındaki negatif test bulunur.
-- Zero denominator, unsupported propagation, abandoned floor, profit naming ve hierarchy double-count testleri zorunludur.
+- Zero denominator, unsupported propagation, abandoned floor, revenue/revenue_margin naming ve hierarchy double-count testleri zorunludur.
 - Formula değişikliği `formula_engine_version`, golden parity, decision log ve önceki versiona read rollback gerektirir.
 - Frontend veya adapter'da duplicate formula tespit edilirse production acceptance verilmez.
 
@@ -501,18 +501,19 @@ Dataset V2 bütün platformlar için aynı on normalize ham gerçeği saklar: `i
 
 Provider bir ham gerçeği ölçmüşse değer `supported` ve finite number olarak taşınır; ölçülmüş gerçek `0` korunur. Provider açıkça desteklemiyorsa `unsupported/null`, capability veya account binding henüz kesinleşmemişse `unknown/null` kullanılır. Eksik ham gerçek sentetik `0`, başka bir event adı veya derived KPI ile doldurulamaz. Klaviyo teknik metric ID'leri kullanıcıya analiz metriği olarak seçtirilmez; canonical Add to Cart, Checkout ve Purchase aşamalarına account + integration/store provenance ile bağlanır. Tek doğrulanmış aday otomatik bağlanabilir; çoklu aday anlamlı kaynak özetiyle açık seçim ister; sıfır aday ilgili aşamayı fail-closed `unknown/null` bırakır. Reconnect veya account değişimi binding'i yeniden doğrular.
 
-Klaviyo Email maliyeti provider'ın günlük faturası veya API'den alınan gerçek harcama değildir. Kullanıcının account source currency'sinde girdiği `Estimated 30-Day Klaviyo Email Spend`, standart 30 günlük döneme eşit sabit günlük gider olarak dağıtılır:
+Klaviyo Email maliyeti provider'ın günlük faturası veya API'den alınan gerçek harcama değildir. Kullanıcının account source currency'sinde girdiği `Estimated 30-Day Klaviyo Email Spend`, her kapalı provider business date için sabit günlük toplam üretir. Bu toplam yalnız aynı tarihteki gerçek Email Campaign Message ve Flow Message satırlarına, Klaviyo Reporting API `recipients` paylarıyla dağıtılır:
 
 ```text
-estimated_daily_email_spend_source = estimated_30_day_email_spend_source / 30
-row_email_spend_source             = estimated_daily_email_spend_source
+daily_email_cost = estimated_30_day_email_spend / 30
+row_spend = daily_email_cost * row_recipients / sum(eligible_row_recipients)
+sum(row_spend) = daily_email_cost
 ```
 
-Gönderilen, teslim edilen, açılan, tıklanan veya dönüşüm üreten e-posta sayısı maliyet dağıtımını değiştirmez. Bu sayılar yalnız `cost_per_sent`, `cost_per_open`, `cost_per_click` ve `cost_per_conversion` gibi Formula Engine tarafından sonradan üretilecek performans oranlarının paydası olabilir; Dataset V2'de maliyet allocation driver'ı olamaz. Günlük gider Campaign veya Flow hacmine paylaştırılmaz ve birden fazla hiyerarşi satırına kopyalanarak çoğaltılmaz; tek günlük account/platform gider gerçeğinin canonical leaf sunumu implementation paketinde double-count yasağıyla dondurulur. Provenance `user_estimated` olur; `provider_actual` veya fatura tutarı gibi gösterilemez. SMS bütünüyle bu modelin dışındadır: SMS gönderimleri paydaya girmez, Email tahmini SMS satırına yazılmaz ve `text_message_spend` bu sözleşmede kullanılmaz.
+Recipient hacmi günlük toplamı değiştirmez; yalnız leaf paylarını belirler. Tam günlük maliyet her satıra kopyalanmaz, keyfî tek owner seçilmez ve sentetik leaf üretilmez. Persist edilen para hassasiyetindeki yuvarlama artığı canonical leaf identity sırasındaki son uygun satıra verilir; böylece leaf toplamı account-day maliyetine tam eşit kalır. Aynı tarihte uygun `recipients > 0` satırı yoksa leaf spend `null` kalır; maliyet `KLAVIYO_EMAIL_COST_UNALLOCATED_NO_RECIPIENTS` provenance'ıyla account-day/platform katmanında tam bir kez korunur. SMS, MMS ve WhatsApp bu Email dağıtımının bütünüyle dışındadır; `text_message_spend` bu sözleşmede Email maliyeti olarak kullanılmaz. Bağlayıcı executable karar `contracts/r7b5-klaviyo-email-cost-allocation-v2.json` dosyasıdır; v1 tarihsel karar olarak korunur.
 
 Provider mapping ve maliyet dağıtımı source currency'de tamamlandıktan sonra dört parasal gerçek — `spend_value`, `add_to_cart_value`, `checkout_value`, `purchase_value` — aynı canonical satırda aynı `fx_rate`, `fx_rate_date`, `fx_provider` ve `fx_engine_version` ile workspace reporting currency'ye tam bir kez çevrilir. Count alanlarına FX uygulanmaz. Rate bulunamazsa sentetik `1` kullanılmaz ve production fact yazılmaz.
 
-Dataset V2'ye derived KPI yazılmaz. Aynı scope/grain içindeki ham gerçekler önce support-aware toplanır; `sales`, `abandoned`, `abandoned_value`, `ctr`, `cpc`, `roas`, `cps`, `profit`, `margin`, `add_to_cart_rate`, `checkout_rate`, `abandoned_rate` ve `purchase_rate` yalnız §2.3 Formula Engine tarafından üretilir. Mixed `supported/unknown/unsupported` girdiler sessiz kısmi toplam üretmez; gereken derived sonuç `null` kalır.
+Dataset V2'ye derived KPI yazılmaz. Aynı scope/grain içindeki ham gerçekler önce support-aware toplanır; `sales`, `abandoned`, `abandoned_value`, `ctr`, `cpc`, `roas`, `cps`, `revenue`, `revenue_margin`, `add_to_cart_rate`, `checkout_rate`, `abandoned_rate` ve `purchase_rate` yalnız §2.3 Formula Engine tarafından üretilir. Mixed `supported/unknown/unsupported` girdiler sessiz kısmi toplam üretmez; gereken derived sonuç `null` kalır.
 
 **Aktivasyon kapısı:** Bir provider için bilinen bir canonical journey alanı yalnız eksik production wiring nedeniyle sürekli `unknown/null` kalıyorsa, maliyet allocation driver'ı sözleşmedeki kavramdan farklıysa veya dört monetary fact aynı FX zincirinden geçmiyorsa verified-empty kabul tek başına production aktivasyonu için yeterli değildir. Non-empty kanıt, provider-source mapping, support semantiği, maliyet/FX ve aggregate-first Formula sorumluluğunu birlikte doğrulamalıdır.
 
@@ -544,7 +545,7 @@ user_id
 
 - Aynı key ile refresh yeni satır üretmez; idempotent UPSERT yapar.
 - `snapshot_id` canonical identity'ye girmez.
-- CTR, CPC, ROAS, CPS, abandoned, profit, margin ve rate'ler raw Dataset V2 facts değildir.
+- CTR, CPC, ROAS, CPS, abandoned, revenue, revenue_margin ve rate'ler raw Dataset V2 facts değildir.
 - Derived cache gerekirse Dataset V2'den ayrı olur ve `formula_engine_version` taşır.
 - Direct/Others final analytical Dataset grain'ine girmez.
 
@@ -3782,6 +3783,17 @@ Bu V4 plan ile:
 > **2026-09-07 — Pinterest Paket 1 ID-only discovery corrective:** `time_zone` düzeltmesi sonrasında canlı picker yine boş kaldı. Resmi Pinterest V5 OpenAPI yeniden incelendi: list endpoint'indeki `AdAccount` şemasında yalnız `id` zorunlu; `name`, `currency`, `time_zone` opsiyoneldir. Dolayısıyla list row'unun tam profil olduğu varsayımı kaldırıldı. Runtime accessible ID listesini alıp her ID'yi resmi `/ad_accounts/{id}` ile, mevcut üç hesap sınırı içinde zenginleştirir; eksik alan uydurmadan fail-closed kalır. Canlı account-selection kanıtına kadar Paket 1 `Verification` durumundadır.
 
 > **2026-09-07 — Pinterest ürün kararı / PARKED:** Kullanıcı Pinterest entegrasyonundan vazgeçti. Paket 1 `Stopped/Parked`; Paket 2–3 `Not started/Parked` durumuna alındı. Yeni OAuth start/callback, provider token değişimi ve account discovery kapatıldı; dashboard `Parked` gösterir. Mevcut encrypted connection/token, ownership ve tarihsel snapshot kayıtları destructive olarak silinmez. Yeniden başlatma yalnız yeni açık kullanıcı iş kararıyla mümkündür.
+
+### 2 Ekim 2026 — Klaviyo email maliyet dağıtımı v2 ve 15 Ekim GA kapısı
+
+- Bağlayıcı executable karar `contracts/r7b5-klaviyo-email-cost-allocation-v2.json` dosyasıdır; `r7b5-klaviyo-estimated-30-day-email-spend-v1` silinmez, tarihsel karar olarak korunur.
+- Günlük Email toplamı `estimated_30_day_email_spend / 30` formülüyle sabittir. Aynı kapalı provider business date içindeki gerçek Campaign Message ve Flow Message Email leaf'lerine Klaviyo Reporting API `recipients` oranında dağıtılır: `row_spend = daily_email_cost * row_recipients / sum(eligible_row_recipients)`.
+- Recipient hacmi yalnız ağırlığı değiştirir; günlük toplamı değiştirmez. Tam maliyet her leaf'e kopyalanamaz, keyfî owner veya sentetik leaf üretilemez. Uygun recipient yoksa leaf spend `null`, account-day Email maliyeti ise tam bir kez `unallocated` kalır.
+- Dataset V2 ham facts ve allocated spend saklar; derived KPI saklamaz. Aynı scope'ta `ctr`, `abandoned` ve `abandoned_value` ham facts'ten yeniden hesaplanır fakat maliyete bağlı değildir. `cpc`, `roas`, `cps`, `revenue` ve `revenue_margin` allocated spend'i doğrudan kullanır.
+- Canonical formüller `revenue = sales - spend` ve `revenue_margin = revenue / sales * 100`tır. Eski `profit/margin` adları yalnız versionlı compatibility alias olabilir. Denominator sıfır veya input unsupported ise sonuç `null` kalır.
+- Allocation source currency'de tamamlanır; spend ve diğer parasal facts aynı canonical FX rate/date/provider provenance ile reporting currency'ye tam bir kez çevrilir. SMS, MMS ve WhatsApp Email maliyet dağıtımına girmez.
+- 15 Ekim 2026 tarihi yalnız resmî Klaviyo GA sözleşmesini yeniden okuma kapısıdır; otomatik production activation veya backfill başlatmaz. Hedef Campaign hiyerarşisi `Campaign → Campaign Message → Campaign Variation`dır; Flow `Flow → Flow Message` olarak kalır, aksi yalnız güncel resmî kanıtla değişir.
+- Reporting API variation grouping kimliği ile Campaign Variation API resource ID eşit varsayılamaz. Eşleme kanıtlanmadan Dataset V2 identity, Ad Analysis leaf grain veya variation-level allocation devreye alınmaz. Sonrasında no-double-count testleri, read-only preflight, repository testleri ve ayrı onaylı non-empty canlı kabul zorunludur.
 
 ### 30 Eylül 2026 — Bağlayıcı Shopify Embedded UI anayasası ve R7-B6 corrective kapısı
 

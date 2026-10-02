@@ -3003,4 +3003,791 @@ Bu V4 plan ile:
 
 **GerÃ§ekleÅŸen:** Repository implementasyonu ve test entegrasyonu PR #49 ile review edilmiÅŸ, bÃ¼tÃ¼n kontrolleri geÃ§miÅŸ ve `main` Ã¼zerine merge edilmiÅŸtir.
 
-**Sapmalar:** Shared Supabase/provider client construction E3-T4 kapsamÄ± olark<KìKâó¶ÆLKIüKìK|;g7FW&F’â6æöæ–6Âv÷&·76RÖWF&IöÆçLK<KLK"â'RæVFVæÆRÆVv7’¶œKBF&–‡6VÂ¶ìKBöÆ&²¶÷'VçW#²6–Æ–æÖW¢Â6æöæ–6Âv÷&·76RvRFYüKæÖ¢fR66W72Fö¶Vâ|K–Væ–FVâ·VÆÆìKÆÖ¢à ¥–Væ’ÖWF&IöÆçLK<KFVÖ—¢6†÷–g’VÖ&VFFVBôWF‚–ÆR&YöÆ"âWF†÷&—¦F–öâ6öFR6W'fW"×6–FRFö¶Vâv:vWg&–ÆF–·FVâ6öç&7W÷'FVBÆöærÖÆ—fVB66W72×Fö¶VâW†6†ævRW–wVÆìK#²Fö¶VâfÆ–F—G’Â6öæf–wW&VBÖWFÂ&WV—&VB66÷RfRvVÆV6V·FV¶’W‡—'’6æöæ–6Â6fR;fæ6W6–æFRFüI÷'VÆìK"âÖWFvìKâÖWf7WBôWF‚<;g¦Æ\YöÖW6–æFR'VÇVæÖ–â&—"&Vg&W6‚Fö¶Vâ¼KYüKW–GW'VÆÖ¢â–Væ–ÆVÖRFW7FV¶ÆVæÖ—–÷"fW–FüI÷'VÆÖv\:vÖ—–÷'6·VÆÆìK<K¶öçG&öÆÌ;Â&V6öææV7BÖWFGW'V×VæÌKìK"à ¤6ÆÆ&6²–ÆìK¢VæF–æuö66÷VçE÷6VÆV7F–öæ;Ç&WF—"â&IöÆçLKÂ6W'fW"ÖWFvFâ†W6Æ—7FW6–æ’–Væ–FVâÆLK·FâfR·VÆÆìK<KVâ¢ÂVâf¦Æ6FüI÷'VÆæÜKYò&V¶ÆÒ†W6,KìK6\:wF–·FVâ6öç&6öææV7FVFöÇW"â#bÔC2Ô–ÆìK¢ÆâfR<;g¦Æ\YöÖR¶&,KLK#²&÷f–FW"FVÖ<KÂ&öGV7F–öâôWF‚ÂFF6WBc"–¬K<KÂ66†VGVÆRö&6¶f–ÆÂÂF—66öææV7B÷&Wfö¶RfRFÖÖÆæÜKYòSBfW&’Ö÷F÷'VçVâ–Væ–FVâvVÆœY÷F—&–ÆÖW6’–ö·GW"âfW'6–öæÌK¶&"6öçG&7G2÷#fC6ÖÖWFÖ6öææV7F–öâÖÆ–fV7–6ÆR×cæ§6öæÂæÆ—7B&VÆvW6’Fö72õ#dC4ôÔUDô4ôääT5D”ôåôÄ”dT5”4ÄUôDT4•4”ôâæÖFœ:v–æFVF—"à ¢222#bÔC2Ô"ÖWFFö¶VâFüI÷'VÆÖ(	B&W÷6—F÷'’52ò#bÔC2Ô266÷VçB×6VÆV7F–öâ66WFæ6RvFP ¤VÖ&VFFVBÖWF6ÆÆ&6²wFR6W'fW"×6–FR6†÷'BÖÆ—fVB(i"ÆöærÖÆ—fVBW6W"Fö¶VâW†6†ævRfRFö¶VâFV'VvvW"FüI÷'VÆÖ<KW–wVÆæÜKY÷LK"â—5÷fÆ–FÂ6öæf–wW&VB”BÂG5÷&VFfRvVÆV6V·FV¶’W‡—'’¶üY÷VÆÆ,KæFâ&—&’v\:vÖW§6R6æöæ–6Â6öææV7F–öâ7F÷&R:vI÷,KÆÖ¢âÖWFœ:v–â&Vg&W6‚Fö¶Vâ&V¶ÆVæÖW£²–ÆìK¢FüI÷'VÆæÜKYòÆöærÖÆ—fVB66W72Fö¶VâÂFV'VvvW"¶–æ¶ÌK66÷RfRW‡—'’ÖWf7WBVæ7'—FVB7F÷&R<KìK,Kæ|;fæFW&–Æ—"à ¥fÆ–FF–öâ¶–æ¶ÌK|;ÇfVæÆ’†FÆ"ÖWFw–&IöÌK&V6öææV7BÖWFGW'V×R;Ç&WF—#²Fö¶VâÂ6V7&WBfR&÷f–FW"&W7öç6R·VÆÆìK<K–fW–Æöv:|K¶Ö¢â&Yö,KÌK6ÆÆ&6²VæF–æuö66÷VçE÷6VÆV7F–öæöÆ&²¶ÌK"fR(	32&÷f–FW"ÖFüI÷'VÆæÜKYò†W66\:v–ÆÖVFVâ6öææV7FVFöÆÖ¢â#bÔC2Ô"&öGV7F–öâvFWÆ÷’VF–ÆÖVÖœYòÂ&÷f–FW"v:vI÷,K–ÖÜKYòfRFF6WBc"÷66†VGVÆRö&6¶f–ÆÂ:vÖÜKY÷LK"âfW'6–öæÌK6öç\:r6öçG&7G2÷#fC6"ÖÖWF×Fö¶Vâ×fÆ–FF–öâ×cæ§6öæÂæÆ—7B¶–LKFö72õ#dC4%ôÔUDõDô´TåõdÄ”DD”ôâæÖFœ:v–æFVF—"à ¢222#bÔC2Ô2ÖWF†W66\:v–Ö’(	B&öGV7F–öâÖW&6†çB66WFæ6R52òFF'VçF–ÖRvFP ¥#rÔ"vFRFÖÖÆæâ6æöæ–6Â†W66\:v–Ö’'VçF–ÖR|K–Væ–FVâ–æ6VÆVæF’fR#bÔC2Ô2œ:v–â–Væ–FVâvVÆœY÷F—&–ÆÖW6–æRvW&V²öÆÖLKIüKFüI÷'VÆæLKâW6¶’6W'fW"æ§2²F6†&ö&Bæ‡FÖÆ¼KYüKìKâ·6–æR'&÷w6W"FÒ†W6æW6æW6’fW–FVæçB&–Æv—6’6IöÆ–Ö£²–ÆìK¢6\:v–ÆVâ”BvÆW&’|;fæFW&—"â6W'fW"6fR<K&<KæFÖWFöÖRöF66÷VçG6Æ—7FW6–æ’–Væ–FVâÌK"fR–ÆìK¢&÷f–FW"ÖFüI÷'VÆæÜKYò(	32†W6,K÷F–Ö—7F–26öææV7F–öâfW'6–öâ<KìK,K–Æ6æöæ–6Â¶–F–¦"à ¥6†÷–g’ÖæF—fR2Ö6†ö–6RÖÆ—7F:vö¶ÇR6\:v–ÒfR2ÖÖöFÆ&öw&ÖF–²:vÖ·VÆÆìKÜK|;Ææ6VÂ&W6Ö’6†÷–g’†öÖR<;g¦Æ\YöÖW6—–ÆRFüI÷'VÆæLKâ7W&6R6VÆV7FVEö66÷VçG6ÆìKVæF–ærGW'VÖF&üYòÂ6öææV7FVBÖWFGW'V×VæF(	32†W6öÆ6²YöV¶–ÆFRfÆ–FFVB6öç7G&–çB–ÆR¶÷'VæÖ·FLK"â¶WB×7W6–f–²\:wFâV6&W÷6—F÷'’FW7FÆW&’6W76–öâWF†÷&—G’Â&÷f–FW"&RÖfWF6‚Â'&÷w6W"ÆæÆ,KìKâ&VFF’Â(	32<KìK,KÂGWÆ–6FR÷–&æ<K†W6&VFF’fR6öææV7FVFv\:vœYö–æ’FüI÷'VÆ"à ¥&W÷6—F÷'’†¬K&ÌKIüK"3#c–ÆR&öGV7F–öâvFIüKLKÆÜKY÷LK"âvW,:vV²6†÷–g’ÖW&6†çB÷GW'V×VæFFVÖ—¢ÖWFôWF‚FÖÖÆæÜKYòÂ†W66\:v–ÒÖöFÌK:|KÆÜKYòÂ&—"&÷f–FW"ÖFüI÷'VÆæÜKYò†W6¶–FVF–ÆÖœYòfR&VÆöB6öç&<KæF6öææV7FVB+r66÷VçF¶÷'Væ×\Y÷GW"â6ÇBÖö·VçW"÷7F6†V6²6æöæ–6ÂÖWF¶–LKìKv\:vW&Æ’fR'&÷w6W"w&çB6œK<KìKöÆ&²FüI÷'VÆÜKY÷LK#²ÆVv7’ÖWF¶–LK(i"ÂFF6WBc"÷66†VGVÆRö¦ö"6œKÆ,K¶ÆÜKY÷LK"âfW'6–öæÌK6öç\:r6öçG&7G2÷#fC62ÖÖWFÖ66÷VçB×6VÆV7F–öâÖ66WFæ6R×cæ§6öæÂæÆ—7B¶–LKFö72õ#dC45ôÔUDô44õTåEõ4TÄT5D”ôåô44UDä4RæÖFÂ&VF7FVBvw&VvFR¶ìKBFö72÷6V7W&—G’öWf–FVæ6Rõ#dC45ôÔUDô44õTåEõ4TÄT5D”ôåôÄ•dUô44UDä4Uó##bÓ’Ó#Ræ§6öæœ:v–æFVF—"à ¥#bÔC2Ô2&öGV7F–öâ¶'VÌ;Â–ÆìK¢&IöÆçLKfR†W66\:v–Ö’¶6ÜK–ÆfW&–ÆÖœY÷F—"âÖWF–ç6–v‡G2÷W&f÷&Öæ6Rö·VÖÂF–ÖRôe‚fR¶öçG&öÆÌ;ÂFF6WBc"6öçV7R—,K6æÆ—¢VF–Æ—¶ìKFÆæÖFâ#bÔC2,;ÇL;Æì;ÂFöæV6œKÆÖ£²&öGV7F–öâfW&’†&V¶WF’†ÆVâ¶ÌKLK"à ¢222#bÔC2ÔBÖWFv÷&·76R6ÇBÖö·VçW"&VfÆ–v‡B(	B&öGV7F–öâ&VBÖöæÇ’66WFæ6R50 ¥FÖÖÆæÜKYòSBÖWF6Æ–VçBÂ6×–vî(i$E6WN(i$BÖW"Â6&—BÖWG&–²<;g¦Æ\YöÖW6’fRF–ÖRôe‚¶FÖìK¶÷'Væ×\Y÷GW"â–Væ’–æ6Rv÷&·76R'VææW"–ÆìK¢6†÷–g’6W76–öâvFâ:|;g¬;ÆÆVâWF†÷&—G’Â6æöæ–6Â6öææV7FVFÖWF&IöÆçLK<KfRÖW&6†çB×6VÆV7FVB&W÷'F–ær7W'&Væ7’–ÆR'R¶FÖæÆ,K6ö×÷6RVFW"â6\:v–Æ’(	32†W6,KâFÖÜKÖWF66÷VçB’vFVâ–Væ–FVâFüI÷'VÆìK#²†W"†W6¶VæF’7W'&Væ7’fRF–ÖW¦öæR&–Æv—6—–ÆR;fæ6V¶’¶æÜKYò'W6–æW72FFRœ:v–â|;ÆæÌ;Æ²B–ç6–v‡G2ö·W"à ¥6öç\:r–ÆìK¢vw&VvFR†W6÷6LK"6œK<KÂfW&–f–VBV×G’öæöâÖV×G’ÂF–ÖRôe‚fR–¦ÖGW'V×VçRLKYö,KfW&—"âFö¶VâÂ†W6öVçF—G’¶–ÖÆœIö’fR†ÒÖWG&–²&W7öç6Rv:|K¶Ö¢âFF6WBc"õc–¬K<KÂ66†VGVÆRÂ&6¶f–ÆÂfR&öGV7F–öâ7F—fF–öâ–KÆÖ¢âæ÷&ÖÂFF6÷W&6W2|;g,;Æì;ÆÜ;ÂF\IöœYöÖW£²6ÇBÖö·VçW"¶'VÂœ;Ç¦W–’–ÆìK¢ö66WFæ6S×#fC2ÖÖWF÷W&L;g"&ÖWG&W6—–ÆR:|KÌK"à ¥"3#c2&öGV7F–öâvFIüKLKÆLK·Fâ6öç&vW,:vV²ÖW&6†çB÷GW'V×VæF¶’¶'VÂ52(	B66÷VçB‡2’ÂfW&–f–VB&÷r‡2’ÂF–ÖRæBe‚6†V6·27V66VVFVBâFF6WBc"w&—FW3¢æfW&F’â'RÂ&÷f–FW"F&lKæFâFüI÷'VÆæÜKYò&üYò6öç\:wGW#²†FfW–6VçFWF–²6LK"F\Iö–ÆF—"â7W&6R÷7F6†V6²6æöæ–6ÂÖWF&IöÆçLK<KìK6öææV7FVB+r66÷VçFÂVæF–ærö–çfÆ–B²FF6WBc"ÖWF÷66†VGVÆRö¦ö"fR'&÷w6W"w&çB6œKÆ,KìKöÆ&²FüI÷'VÆLKâfW'6–öæÌK6öç\:r6öçG&7G2÷#fC6BÖÖWF×&VBÖöæÇ’×&VfÆ–v‡B×cæ§6öæÂæÆ—7B¶–LKFö72õ#dC4EôÔUDõ$TEôôäÅ•õ$TdÄ”t…BæÖFÂ&VF7FVB¶ìKBFö72÷6V7W&—G’öWf–FVæ6Rõ#dC4EôÔUDõ$TEôôäÅ•ôÄ•dUô44UDä4Uó##bÓ’Ó#Ræ§6öæœ:v–æFVF—"à ¢222#bÔC2ÔRÖWF¶öçG&öÆÌ;ÂFF6WBc"¶'VÌ;Â(	B&W÷6—F÷'’52ò&öGV7F–öâ66WFæ6RvFP ¤ÖWf7WBÖWFv÷&·76R'VææW"Â÷'F²&÷f–FW"×&W7VÇBFüI÷'VÆÖ<KÂv÷&·76R6æöæ–6Âw&—FR&÷VæF'’fRv÷&·76R7W&6RFF6WBc"&W÷6—F÷'’FV²&—"¶öçG&öÆÌ;Â¶'VÂœYöÆVÖ–æFR6ö×÷6RVF–ÆÖœY÷F—"âKYöÆVÒW†7B7F–öâ×F–ÖR6öæf—&ÖF–öâ—7FW#²6æöæ–6Â&IöÆçLKfR&W÷'F–ær7W'&Væ7’–ÆìK¢6W'fW"WF†÷&—G’vFVâvVÆ—"â6\:v–ÆÖœYò(	32†W6œ:v–â–¼Kâ'W6–æW72ÖFFRVæ6W&W6–æFRÖWf7WB6LK"f'6&÷f–FW"FVÖ<KæFâ;fæ6Rf–ÂÖ6Æ÷6VBGW'W"à ¤vW,:vV²&÷f–FW"6LK,Kf'6–ÆìK¢FüI÷'VÆæÜKYòv÷&·76R6æöæ–6Â6LK&Æ,KU4U%BVF–Æ—"fRGFV×FVBÓÒW'6—7FVF¦÷'VæÇVGW"â&÷f–FW"FüI÷'VÆæÜKYò&üYò6öç\:rL;fæL;Ç,;Ç'6RóÂf¶RÖg&VR&Yö,K¶'VÂVF–Æ—#²æöâÖV×G’f—¦–·6VÂU4U%Bv–â|;g¦ÆVæÖVFœIö’¶ìKGF—,K6&VÆ—'F–Æ—"âæ÷&ÖÂFF6÷W&6W2|;g,;Æì;ÆÜ;ÂF\IöœYöÖW£²v—¦Æ’÷W&L;g"œ;Ç¦W–’ö66WFæ6S×#fC2ÖÖWFÇLKæF¶ÌK"â66†VGVÆRÂ&6¶f–ÆÂÂcw&—FRfR&öGV7F–öâ7F—fF–öâ–ö·GW"à ¥"3#cR&öGV7F–öâvFIüKLKÆLK·Fâ6öç&:|K²öæ–ÌKFV²¶öçG&öÆÌ;Â¶'VÂGFV×FVBÂW'6—7FVBÂfW&–f–VBV×G’G'VV6öçV7RfW&F’â7W&6R÷7F6†V6²FF6WBc"F÷ÆÒôÖWFÂ·F–bÖWF66†VGVÆRÂ:|K²ÖWF¦ö"fR'&÷w6W"w&çB6œKÆ,KìKöÆ&²FüI÷'VÆLK²6æöæ–6Â6öææV7FVB+r66÷VçFfRÆVv7’ÖWF¶÷'VæGRâ6‡FR6LK";Ç&WF–ÆÖVF’âæöâÖV×G’f—¦–·6VÂU4U%B†Vì;Ç¢|;g¦ÆVæÖVÖœY÷F—"â<;g¦Æ\YöÖR6öçG&7G2÷#fC6RÖÖWFÖ6öçG&öÆÆVBÖFF6WBÖ66WFæ6R×cæ§6öæÂæÆ—7B¶–LKFö72õ#dC4UôÔUDô4ôåE$ôÄÄTEôDD4UEô44UDä4RæÖFÂ&VF7FVB¶ìKBFö72÷6V7W&—G’öWf–FVæ6Rõ#dC4UôÔUDô4ôåE$ôÄÄTEôDD4UEôÄ•dUô44UDä4Uó##bÓ’Ó#Ræ§6öæœ:v–æFVF—"â#bÔC2ÔRfW&’¶'VÌ;Â¶æÜKY÷LK#²FÒÖWF–YöÒL;fæ|;Ç<;Â#bÔC2Ôb&IüK×<K¢F—66öææV7BfRFVÖ—¢&V6öææV7B¶'VÌ;ÆæR¶F":|K·LK"à ¢222#bÔC2ÔbÖWF&IüK×<K¢F—66öææV7B(	B&öGV7F–öâF—66öææV7BæB6ÆVâ&V6öææV7B50 ¤W6¶’6W'fW"æ§2²F6†&ö&Bæ‡FÖÆ&VfW&ç<KæF'VÇVæâÖWFF—66öææV7B–YöÒL;fæ|;Ç<;Æì;Æâ–Væ’VÖ&VFFVBœ;Ç¦W–RFYüKæÖLKIüKFüI÷'VÆæÜKY÷LK#¢VÖ&VFFVBÖWF¶'LK–ÆìK¢6öææV7FVB&÷¦WF’|;g7FW&—"Â6W76–öâÖ&÷VæBF—66öææV7B&÷WFRwRfR6æöæ–6ÂÖWF6ÆVçW÷W&7–öçR–ö·GW"âÖWf7WBv÷&·76U÷&÷f–FW%ö6öææV7F–öç6YöVÖ<KF—66öææV7FVFÂF—66öææV7FVEöFfR6öææV7F–öå÷fW'6–öæÆæÆ,K–Æ†VFVbGW'V×RFW7FV¶ÆW#²–Væ’Ö–w&F–öâvW&V¶ÖW¢à ¤†W"&÷f–FW"|Kâ6öææV7B(i"6öææV7FVB(i"F—66öææV7B(i"FVÖ—¢&V6öææV7B¦–æ6—&’¶VæF’#bÔB¶'VÌ;ÆæFRFÖÖÆæ6·LK"âÖWFœ:v–â6†÷–g’ÖæF—fRv&æ–ærÖöFÌKÂ6W76–öâÖ&÷VæBVæGö–çBÂ&Wfö¶RÖf—'7B6W'f–6RfR÷F–Ö—7F–26æöæ–6Â6ÆVçWW–wVÆæLKâ"3#c‚&öGV7F–öâFWÆ÷–ÖVçB|K$TE’fRFWbæG7F&ÆRæÆ–2\YöÆ\YöÖW6’52wF—"âÖW&6†çB6öææV7FVB+r66÷VçF(i"6æ6VÂ–ÆRF\IöœYöÖW–Vâ&IöÆçLK(i"F—66öææV7B(i"æ÷B6öææV7FVF(i"FVÖ—¢ôWF‚÷FV²fW&–f–VB†W6(i"–Væ–FVâ6öææV7FVB+r66÷VçF¦–æ6—&–æ’FÖÖÆLKâK¶’6ÇBÖö·VçW"7W&6R÷7F6†V6²ÖWF6ÆVçWfR&V6öææV7Bv’FüI÷'VÆ&¶Vâ¶Æf—–òÂE%–&W÷'F–ær7W'&Væ7’ÂÆVv7’v\:vÖœYòfR<KlK"FF6WB÷66†VGVÆRö¦ö"GW'V×VçR¶÷'VGRâ&VF7FVB¶ìKBFö72÷6V7W&—G’öWf–FVæ6Rõ#dC4eôÔUDôD•44ôääT5Eõ$T4ôääT5EôÄ•dUô44UDä4Uó##bÓ’Ó#bæ§6öæœ:v–æFVF—"â#bÔC2ÖWFFÒ–YöÒL;fæ|;Ç<;Â53²<K&F¶’¶K#bÔCBvöövÆRG2æÆ—7B'&–Vbv–F—"à ¢222#bÔCBÔ2vöövÆRG2&IöÆçLKfR;Ì:r†W66\:v–Ö’(	B&öGV7F–öâ50 ¤ÖW&6†çB&öGV7F–öâ¼KYüKæF;Ì:r&÷f–FW"ÖFüI÷'VÆæÜKYòvöövÆRG2†W6,KìK6\:v—¶–FWGF“²&VÆöB6öç&<KæF6öææV7FVB+r266÷VçG6GW'V×R¶÷'VæGRâ66÷VçG2tUBfR6VÆV7F–öâõ5B'VçF–ÖRvF#fW&F’â6ÇBÖö·VçW"7W&6R÷7F6†V6²FV²6æöæ–6Â&IöÆçLKœK6öææV7FVFÂ†W66œK<KìK6Â†W6YöV¶Æ’fR7&VFVçF–ÂVçfVÆ÷RvÆ,KìKv\:vW&Æ’ÂWF†÷&—G’FFW"|KìK6†÷–g•÷fW&–f–VE÷6W76–öæöÆ&²FüI÷'VÆLKâFF6WBc"vöövÆRG26LK,K¶ÆLKâ'R6öç\:r–ÆìK¢&IöÆçLKö†W66\:v–Ö’¶K<KìK¶LK#²<K&F¶’—,K¶K#bÔCBÔB6ÇBÖö·VçW"vöövÆRG2&VfÆ–v‡BwLK"â&VF7FVB¶ìKBFö72÷6V7W&—G’öWf–FVæ6Rõ#dCD5ôtôôtÄUôE5ô4ôääT5D”ôåôÄ•dUô44UDä4Uó##bÓ’Ó#bæ§6öæœ:v–æFVF—"à ¢222#bÔCBÔBvöövÆRG26ÇBÖö·VçW"'VçF–ÖR&VfÆ–v‡B(	B&öGV7F–öâ50 ¤'R¶WB–Væ’vöövÆRG2æÆ—FœIö’vVÆœY÷F—&ÖW¢â#bÔCBÔ2vFR6\:v–ÆVâ;Ì:r6æöæ–6Â†W6,KâÆöv–åö7W7FöÖW%ö–FÖævW"&IöÆÜKìKÂFÖÖÆæÜKYòSRÜ;ÌY÷FW&’ÖWFFFÂ7FæF&BG2ÂW&f÷&Öæ6RÖ‚Â6öçfW'6–öâÖ–ærfRF–ÖRôe‚Ö÷F÷'VæFYüK"â†W"†W6,Kâ&÷f–FW"¶–ÖÆœIö’Â6÷W&6R7W'&Væ7’w6’fRF–ÖW¦öæRwR–Væ–FVâFüI÷'VÆìK#²;fæ6V¶’¶æÜKYò'W6–æW72FFRœ:v–â–¶’SRFÌKF:vÌKYüK"âæ÷&ÖÂFF6÷W&6W2V·&ìKF\IöœYöÖW£²–ÆìK¢ö66WFæ6S×#fCBÖvöövÆV÷W&L;g"œ;Ç¦W–’F÷ÇRfR&VF7FVB6öç\:r|;g7FW&—"à ¤FF6WBc"õcw&—FRÂ66†VGVÆRÂ&6¶f–ÆÂÂ–Væ’ÖWG&–²<;g¦Æ\YöÖW6’ÂvöövÆR6†VWG2ôtB·F—f7–öçRfRF—66öææV7B'R¶6ÖF–ö·GW"âÖWf7WB#bÔCBÔ"Fö¶Vâ–YöÒL;fæ|;Ç<;Â–ÆìK¢66W72Fö¶Vâ<;Ç&W6’FöÆ×\Y÷6fW–&—"¶W¢–WF¶—6—¢–ìKBÌKìK'67&VFVçF–ÂVçfVÆ÷RwR–Væ–ÆW–V&–Æ—"â&öGV7F–öâ6ÇBÖö·VçW"¶'VÂ;Ì:r6\:v–Æ’†W6F56fW&ÖœY÷F—#¢7FæF&BõÖ‚6öçV7RFüI÷'VÆæÜKYò&üYòÂF–ÖRôe‚&Yö,KÌKfRFF6WBc"–¬K<K¶ÆÜKY÷LK"â7W&6R6öâ¶öçG&öÌ;Â6æöæ–6Â6öææV7F–öâÂ;Ì:r6\:v–Æ’†W6ÂFö¶VâVçfVÆ÷RvÆ,KfR&W÷'F–ær7W'&Væ7’w–’FüI÷'VÆÜKY÷LK"â6öçG&7B6öçG&7G2÷#fCFBÖvöövÆR×&VBÖöæÇ’×&VfÆ–v‡B×cæ§6öæÂ—,KçLKÌKæÆ—7B¶–LKFö72õ#dCDEôtôôtÄUõ$TEôôäÅ•õ$TdÄ”t…BæÖFœ:v–æFVF—"à ¢222#bÔCBÔRvöövÆRG2¶öçG&öÆÌ;ÂFF6WBc"¶'VÌ;Â(	B&öGV7F–öâfW&–f–VBÖV×G’50 ¤'R¶WB–Væ’vöövÆRÖWG&œIö’fW–FFW"vVÆœY÷F—&ÖW¢âFÖÖÆæÜKYòSR7FæF&BõÖ‚ö6öçfW'6–öâõF–ÖRôe‚fR#bÔCBÔBv÷&·76R'VææW"–Væ–FVâ·VÆÆìKÌK"âW†7B7F–öâ×F–ÖR6öæf—&ÖF–öâöÆÖFâ&÷f–FW"fW–FF6WBW&œYö–Ö’&YöÆÖ¢â–¼KâF&–†Æ’ÖWf7WB6æöæ–6ÂvöövÆV6LK,K–Væ–FVâ:vÌKYöÖœKGW&GW'W"â–ÆìK¢&÷f–FW"ÖFüI÷'VÆæÜKYò6LK&Æ"v÷&·76R6æöæ–6Âw&—FR&÷VæF'’;Ç¦W&–æFVâ–¬KÆ&–Æ—#²FüI÷'VÆæÜKYò&üYò6öç\:rGFV×FVC¢òW'6—7FVC¢öÇW"fR6VçFWF–²6LK";Ç&WF–ÆÖW¢à ¥"3#ƒ&öGV7F–öâvFIüKLKÆLK·Fâ6öç&ÖW&6†çBW†7BÖ6öæf—&ÖF–öâ¶öçG&öÆÌ;Â¶'VÌ;Â&—"¶W¢:vÌKY÷LK&ÜKYòfRGFV×FVC¢òW'6—7FVC¢òfW&–f–VBV×G“¢G'VV6öçV7RÆÜKY÷LK"â7W&6R6ÇBÖö·VçW"6öâ¶öçG&öÌ;Â6æöæ–6ÂvöövÆR&IöÆçLK<KìK6öææV7FVFÂ;Ì:r†W6,KFüI÷'VÆæÜKYòÆöv–åö7W7FöÖW%ö–F&IöÆÜK–ÆÂFö¶Vâ¦&fÆ,Kö66W72W‡—'’fR&W÷'F–ær7W'&Væ7’¶–LKìKÖWf7WC²FF6WBc"F÷ÆÒ÷v÷&·76RôvöövÆR÷6VçFWF–²vöövÆR6LK&Æ,K–ÆR'&÷w6W"w&çB6œK<KìKFüI÷'VÆÜKY÷LK"âæ÷&ÖÂFF6÷W&6W2V·&ìKF\IöœYöÖVÖœY÷F—"â66†VGVÆRÂ&6¶f–ÆÂÂFF6WBcÂvöövÆR6†VWG2ÂtBÂ–Væ’ÖWG&–²ÂF—66öææV7BfR&öGV7F–öâ·F—f7–öçR:|KÆÖÜKY÷LK"â6öçG&7B6öçG&7G2÷#fCFRÖvöövÆRÖ6öçG&öÆÆVBÖFF6WBÖ66WFæ6R×cæ§6öæÂ—,KçLKÌKæÆ—7B¶–LKFö72õ#dCDUôtôôtÄUô4ôåE$ôÄÄTEôDD4UEô44UDä4RæÖFÂ&VF7FVB¶ìKBFö72÷6V7W&—G’öWf–FVæ6Rõ#dCDUôtôôtÄUô4ôåE$ôÄÄTEôDD4UEôÄ•dUô44UDä4Uó##bÓ’Ó#bæ§6öæœ:v–æFVF—"â#bÔCBÔRfW&’¶K<KFÖÖÆæÜKY÷LK#²<K&F¶’—,K¶&"#bÔCBÔbvöövÆR&IüK×<K¢F—66öææV7BæÆ—7B'&–Vbv–F—"à ¢222#bÔCBÔbvöövÆRG2&IüK×<K¢F—66öææV7B(	B&W÷6—F÷'’52ò&öGV7F–öâ66WFæ6RVæF–æp ¥6†÷–g’ÖæF—fRv&æ–ærÖöFÌKÂæöâÖFW7G'V7F—fR6æ6VÂÂ6W76–öâÖ&÷VæBW†7BÖ6öæf—&ÖF–öâVæGö–çBv’fR÷F–Ö—7F–26æöæ–6Â6ÆVçW†¬K&ÆæÜKY÷LK"â6†&VBvöövÆRôWF‚6Æ–VçB&—6¶’æVFVæ—–ÆR&÷f–FW"vÆö&Â&Wfö¶R–KÆÖ£²–ÆìK¢6æöæ–6ÂvöövÆUöG6&IöÆçLK<KìKâ–W&VÂ7&VFVçF–ÂÂW‡—'’Â66÷RfR6\:v–ÆÖœYò†W6ÆæÆ,KFVÖ—¦ÆVæ—"â&W÷'F–ær7W'&Væ7’ÂÖWFÂ¶Æf—–òÂF&–‡6VÂæÇ—F–72fR&¶VBvöövÆR6W'f—6ÆW&’¶÷'VçW"âÖ–w&F–öâvW&V¶ÖW¢à ¥&W÷6—F÷'’¶6ÜKfR–Æv–Æ’&Vw&W7–öæÆ"52wF—"âÖW&6†çB6æ6VÂÂF—66öææV7BÂæ÷B6öææV7FVFÂFVÖ—¢ôWF‚ÂFüI÷'VÆæÜKYò(	32†W66\:v–Ö’fR–Væ–FVâ6öææV7FVF¦–æ6—&–æ“²—,K66ÆVçWfR&V6öææV7B6öç&<K–¶’6ÇBÖö·VçW"7W&6R÷7F6†V6²v’FÖÖÆÖFâ#bÔCBÔb&öGV7F–öâ526œKÆÖ¢â6öçG&7B6öçG&7G2÷#fCFbÖvöövÆRÖ–æFWVæFVçBÖF—66öææV7B×cæ§6öæÂæÆ—7B¶–LKFö72õ#dCDeôtôôtÄUô”äDUTäDTåEôD•44ôääT5BæÖFœ:v–æFVF—"à ¢22#b&W÷'F–ær6ö×ÆWFVæW72¶K<K(	BÖWFÂvöövÆRG2fR¶Æf—–ğ ¢¢¤¶&"F&–†“¢¢¢##bÓÓ"â&÷f–FW"&IöÆçLK<Kœ:v–âÌKæâ6öææV7B(i"6öææV7FVB(i"F—66öææV7B(i"FVÖ—¢&V6öææV7B566öçV7RÂ†–W&&6‡’fRÖWG&–¶ÆW&–âFF6WBc"w–RV·6–·6—¢FYüKæLKIüKæÆÜKævVÆÖW¢â&÷f–FW"fW&—6–æ–â'VÇVæÖÖ<KF|;g¦ÆVæÖœYò6œK6Â¶ìKLKF\Iö–ÆF—"âæöâÖV×G’fW&’f'6vW,:vV²†–W&&6‡’öÖWG&–²¶'VÌ;Ã²6æÌKfW&’;Ç&WF–ÆVÖ—–÷'66&–Æ—G’ÂÖW"fR&÷f–FW"ÖFüI÷'VÆæÜKYòV×G’¶'VÌ;Â–KÌK"âVç7W÷'FVBÂ;fÌ:|;ÆÆVÖW–VâfW–&÷f–FW"F&lKæFâL;fæL;Ç,;ÆÆÖW–VâÖWG&–¶ÆW":vWg&–ÆÖW£²Vç7W÷'FVFÂæ÷Eöö'6W'fVFfW–çVÆÆGW'VÖÆ,KæFâW–wVâöÆìK¶÷'W"à ¤ÖWFœ:v–âÖWf7WB–ç7Fw&Ò(i"Ö¦öâFW7B¶×ç–<K6×–vâ(i"B6WB(i"B†–W&&6‡’w6—–ÆR–æ6VÆVæ—"â6æÌK¶'VÂVâ¢–×&W76–öç2Â6Æ–6·2Â7VæBÂ66÷VçBö7W'&Væ7’ö'W6–æW72ÖFFRÂÆVb×&VçB&öÆÂ×WÂGWÆ–6FRVævVÆ’fR6æöæ–6ÂFF6WBc"VçF—G’æ‡F&Æ,KìK¶ìKFÆ"â—†VÂ'VÇVæÖLKIüKœ:v–âFFVBFò6'BÂ7F'FVB6†V6¶÷WBÂW&6†6RÂW&6†6RfÇVRfR'VæÆ&FâL;Ç&W–Vâ$ô2ô52õ&WfVçVRÆæÆ,K;fÌ:|;ÆÆVÖ—–÷'6|;g¦ÆVæÖœYò<KlK"6œKÆÖ¢âÖWFÆ–fV7–6ÆR52¶÷'VçW#²æöâÖV×G’ÖWG&–²ö†–W&&6‡’¶'VÌ;Â—,K6FÖÖÆææ¶F"&W÷'F–ær6ö×ÆWFVæW72:|K²¶ÌK"à ¤vöövÆRG2FW7B÷'FÜKæF¶×ç–;Ç&WF–ÆVÖVFœIö’<;Ç&V6R¶'VÃ²66÷VçBfRÆöv–åö7W7FöÖW%ö–F&IöÆÜKÂ7W'&Væ7’÷F–ÖW¦öæRÂ7FæF&B6×–vâ(i"Bw&÷W(i"BÂW&f÷&Öæ6RÖ‚6×–vâ(i"76WBw&÷WÂ–×&W76–öç2ö6Æ–6·2ö6÷7Bö6öçfW'6–öâÆâ\YöÆVÖW6’fR6VçFWF–²6LK";Ç&WFÖW–VâfW&–f–VBÖV×G’Fg&ìKYüKìK¶6"âW&f÷&Öæ6RÖ‚œ:v–â&÷f–FW"|KâfW&ÖVFœIö’&—&W—6VÂB6Wf—–W6’W–GW'VÆÖ¢âvöövÆRG26VvÖVçFÆ’&÷&ÆÖF,;ÇL;Æâ6\:v–Æ’ÖWG&–¶ÆW&’<KlK"öÆâ6LK&Æ,KL;fæL;Ç&ÖW–V&–ÆFœIö–æFVâ&üYò6öç\:rÂ|;g¦ÆVæÖœYò<KlK"ÖWG&–²v–&’–÷'VÖÆæÖ¢â6&–Æ—G’²fW&–f–VBÖV×G’52¶÷'VçW#²vW,:vV²&÷f–FW"fW&—6’öÇ\Yöæ¶F"æöâÖV×G’ÖWG&–²¶'VÌ;ÂVæF–æv¶ÌK"à ¤¶Æf—–òœ:v–â6×–vâæöâÖV×G’W'6—7FVæ6R¶ìKLK¶÷'VçW#²fÆ÷rÖW76vRfR&÷f–FW"ÖGG&–'WFVBFFVBFò6'BÂ7F'FVB6†V6¶÷WBfRÆ6VB÷&FW"6÷VçB÷fÇVR¶'VÌ;Â#bÔCRÔ³2–ÆRFÖÖÆìK"â#rÔ#r,;ÇL;ÆæÆ\Yö–²¶'VÌ;Â'R;Ì:r&÷f–FW"6LK,KìK–ìKÖG&—7FR|;g7FW&ÖVFVâfRÆ–fV7–6ÆR52–ÆR&W÷'F–ær6ö×ÆWFVæW7252v’—,KGW'VÖÆ"öÆ&²7VæÖFâ¶æÖ¢à £##bÓÓ"F&–†–æFR¶öçG&öÂVF–ÆVâ&W6Ü:â¶–æ¶Æ#  ¢ÒÖWFöff–6–Âf6V&öö²Ö&¶WF–ær’÷7FÖâ6öÆÆV7F–öâ(	BB–ç6–v‡G2;g&æV¶ÆW&’6×–vâôB6WBôB¶–ÖÆ–¶ÆW&—–ÆR–×&W76–öç6Â6Æ–6·6fR7VæFÆæÆ,KìKFYüK#¢‡GG3¢ò÷wwrç÷7FÖâæ6öÒöÖWFöf6V&öö²ÖÖ&¶WF–ærÖ’ö÷fW'f–Wp¢ÒvöövÆRG2’(	B¦W&òÖWG&–73¢‡GG3¢òöFWfVÆ÷W'2ævöövÆRæ6öÒövöövÆRÖG2ö’öFö72÷&W÷'F–ær÷¦W&òÖÖWG&–70¢ÒvöövÆRG2’(	BW&f÷&Öæ6RÖ‚76WBw&÷W&W÷'F–æs¢‡GG3¢òöFWfVÆ÷W'2ævöövÆRæ6öÒövöövÆRÖG2ö’÷W&f÷&Öæ6RÖÖ‚ö76WBÖw&÷W×&W÷'F–æp¢ÒvöövÆRG2’(	B6öçfW'6–öâ&W÷'F–æs¢‡GG3¢òöFWfVÆ÷W'2ævöövÆRæ6öÒövöövÆRÖG2ö’öFö72ö6öçfW'6–öç2÷&W÷'F–æp ¢22f–ÂÖ6Æ÷6VB·W&ÆÆ  ¢Ò7W'&Væ7’–ö·6&÷f–FW":vÌKYöÖ¢à¢Ò6æöæ–6Â6öææV7FVF¶œKB–ö·6&÷f–FW":vÌKYöÖ¢à¢Ò†W6¶–ÖÆœIö’6æöæ–6Â¶œKFÆ\YöÆ\YöÖ—–÷'6&÷f–FW":vÌKYöÖ¢à¢Ò&Yö¶v÷&·76RvR—B6LK"–¬KÆÖ¢fW–ö·VæÖ¢à¢Òc"†F<KcvR6W76—¢L;fì;ÌYò–Ö¢à¢ÒF–µFö²fR–çFW&W7B&öGV7F–öâ'VçF–ÖRv¶–FVF–ÆÖW¢à¢Ò'&÷w6W"6W'f–6R×&öÆRfW–v÷&·76R¶–ÖÆœIö’6IöÆ–Ö¢à ¢22'R¶WGFR–KÆÖ–æÆ  ¢Ò&öGV7F–öâÖ–w&F–öâW–wVÆæÖLKà¢Ò&÷f–FW"’:vI÷,K<K–KÆÖLKà¢ÒôWF‚fW–6öææV7B:|KÆÖLKà¢ÒFF6WBc"w–RfW&’–¬KÆÖLKà¢ÒÖWFÂvöövÆRG2fW–¶Æf—–ò&–Ö'’'VçF–ÖR–KÆÖLKà¢ÒF–µFö²õ–çFW&W7B&²GW'V×RF\IöœY÷F—&–ÆÖVF’à Ğ 
+**Sapmalar:** Shared Supabase/provider client construction E3-T4 kapsamÄ± olarak yerinde bÄ±rakÄ±ldÄ±; E3-T2 route/business logic taÅŸÄ±madÄ±.
+
+**Evidence:** `src/app.js`, `tests/e3-t2-composition-root.test.js`, E3-T1/full/security test Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #49 merge commit `ea4f6f8233dfb6aabe7d082881c15d7c74cf19d9`; composition-root, characterization, full/security CI ve review kapÄ±larÄ± tamamlandÄ±.
+
+### E3-T3 task aynasÄ± â€” runtime config boundary
+
+**AmaÃ§:** App boot iÃ§in gereken environment/configuration deÄŸerlerini tek, immutable ve fail-closed runtime sÄ±nÄ±rÄ±nda toplamak.
+
+**Mevcut durum:** E3-T1/T2 `Done`. Port, public path ve production security flags kÃ¶k `server.js` iÃ§inde ayrÄ± ayrÄ± kuruluyordu; production gÃ¼venlik doÄŸrulamasÄ± zaten `security/production-config.js` iÃ§inde korunuyordu.
+
+**Planlanan durum:** `src/config/runtime-config.js` port, public directory ve mevcut production security contract'Ä±nÄ± tek typed/immutable nesne olarak Ã¼retir; kÃ¶k entrypoint yalnÄ±z bu nesneyi tÃ¼ketir.
+
+**Kapsam:** PORT default/normalization/range validation, absolute root/public path, production config delegation, immutable runtime object ve root composition delegation.
+
+**Kapsam dÄ±ÅŸÄ±:** Provider credential okumalarÄ±nÄ±n tamamÄ±nÄ± taÅŸÄ±ma, shared client creation, feature flag redesign, route/OAuth/job extraction, environment/deployment veya production deÄŸiÅŸikliÄŸi.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T2 composition root ve E1 fail-closed production config contract'Ä±.
+
+**Uygulama adÄ±mlarÄ±:** Runtime config loader ve port parser eklendi; server boot yeni immutable config'e geÃ§irildi; default/valid/invalid/unsafe-production testleri full/security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Runtime config immutable; default port deterministik; malformed/out-of-range port ve invalid dependency fail-closed; absolute public path deterministik; E1 unsafe-production rejection korunur; E3-T1/T2 ve full/security CI PASS.
+
+**Test planÄ±:** Dedicated E3-T3 config testi, production-config regression, E3-T1/T2 testleri, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Runtime config delegation commit'i revert edilerek E3-T2 sonrasÄ± server boot kurulumu geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** YalnÄ±z gÃ¼venli config error code/variable name ve test sonucu; environment value, credential veya identity loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Fail-closed startup doÄŸrulamasÄ±nÄ± merkezileÅŸtirir; production request, database/provider, data/schema/policy/grant/token veya deployment etkisi yoktur.
+
+**Planlanan:** E3-T3 immutable runtime config ve executable validation evidence.
+
+**GerÃ§ekleÅŸen:** Repository implementasyonu ve test entegrasyonu PR #50 ile review edilmiÅŸ, bÃ¼tÃ¼n kontrolleri geÃ§miÅŸ ve `main` Ã¼zerine merge edilmiÅŸtir.
+
+**Sapmalar:** Provider-specific URL/version/account deÄŸerleri bu kÃ¼Ã§Ã¼k extraction'da taÅŸÄ±nmadÄ±; shared/provider config kapsamÄ± sonraki kontrollÃ¼ tasklarda ele alÄ±nacaktÄ±r.
+
+**Evidence:** `src/config/runtime-config.js`, `tests/e3-t3-runtime-config.test.js`, production-config/E3/full/security test Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #50 merge commit `38a70cab16d3d5bddbb9a9b0f368e1d0bda44e10`; runtime config, characterization, full/security CI ve review kapÄ±larÄ± tamamlandÄ±.
+
+### E3-T4 task aynasÄ± â€” shared clients
+
+**AmaÃ§:** Supabase admin, OAuth transaction store ve provider-token vault/store creation'Ä±nÄ± kÃ¶k monolitten tek test edilebilir dependency graph sÄ±nÄ±rÄ±na taÅŸÄ±mak.
+
+**Mevcut durum:** E3-T1/T2/T3 `Done`. Shared server-side client ve store nesneleri kÃ¶k `server.js` iÃ§inde doÄŸrudan ve birbirine baÄŸlÄ± ifadelerle kuruluyordu.
+
+**Planlanan durum:** `src/clients/shared-clients.js` bÃ¼tÃ¼n shared client/store nesnelerini explicit factory dependency'leriyle bir kez Ã¼retir; kÃ¶k entrypoint yalnÄ±z immutable graph sonucunu tÃ¼ketir.
+
+**Kapsam:** Supabase service-role client options, OAuth transaction store, provider-token vault/store composition, optional dependency davranÄ±ÅŸÄ±, factory validation ve immutable graph.
+
+**Kapsam dÄ±ÅŸÄ±:** Provider API client extraction, credential veya feature-flag redesign, route/OAuth/job business logic taÅŸÄ±ma, schema/data/policy/grant ve production iÅŸlemi.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T3 runtime config boundary ve E1 OAuth/provider-token gÃ¼venlik contract'larÄ±.
+
+**Uygulama adÄ±mlarÄ±:** Shared client factory eklendi; kÃ¶k doÄŸrudan constructor import/Ã§aÄŸrÄ±larÄ± kaldÄ±rÄ±ldÄ±; enabled/disabled, wiring ve invalid dependency testleri full/security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Client graph immutable; Supabase yalnÄ±z tam service-role credential Ã§iftiyle ve session persistence kapalÄ± kurulur; baÄŸlÄ± store'lar aynÄ± client/vault instance'larÄ±nÄ± alÄ±r; disabled optional yÃ¼zey factory Ã§aÄŸÄ±rmaz; invalid composition dependency fail-closed; full/security CI PASS.
+
+**Test planÄ±:** Dedicated E3-T4 dependency graph testi, E3-T1/T2/T3 regresyonlarÄ±, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Shared client delegation commit'i revert edilerek E3-T3 sonrasÄ± kÃ¶k construction geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** YalnÄ±z composition/test sonucu; credential, keyring, token, identity veya provider payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Mevcut server-only construction seÃ§eneklerini koruyan repository refactor'Ä±dÄ±r; production request, database/provider Ã§aÄŸrÄ±sÄ±, data/schema/policy/grant/token veya deployment etkisi yoktur.
+
+**Planlanan:** E3-T4 immutable shared dependency graph ve executable wiring evidence.
+
+**GerÃ§ekleÅŸen:** Repository implementasyonu PR #51 ile review edilmiÅŸ, PR ve merge sonrasÄ± security/Vercel kontrolleri geÃ§miÅŸ ve `main` Ã¼zerine merge edilmiÅŸtir. Public entrypoint incident dÃ¼zeltmesi aynÄ± PR Ã¼zerinde tamamlanmÄ±ÅŸtÄ±r.
+
+**Sapmalar:** Google/provider request client'larÄ± kullanÄ±m noktalarÄ±nda bÄ±rakÄ±ldÄ±; E3-T4 yalnÄ±z gerÃ§ekten shared server-side data/security dependency'lerini merkezileÅŸtirir.
+
+**Evidence:** `src/clients/shared-clients.js`, `tests/e3-t4-shared-clients.test.js`, E3/full/security test Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #52 merge commit `29ae299f228f10a1b3026c4c9da843ffc502a1dc`; post-merge Security Regression ve Vercel production deployment PASS, ardÄ±ndan insan canlÄ± smoke kontrolÃ¼ `dev.adstable.app` landing sayfasÄ±nÄ±n aÃ§Ä±ldÄ±ÄŸÄ±nÄ± doÄŸruladÄ±. Public static yÃ¼zey Express function boot failure'Ä±ndan fiziksel olarak ayrÄ±lmÄ±ÅŸtÄ±r.
+
+### E3-T5-A task aynasÄ± â€” HTTP middleware boundary
+
+**AmaÃ§:** E3-T5 middleware extraction iÅŸinin ilk kontrollÃ¼ parÃ§asÄ±nda request correlation, metadata-only HTTP logging ve uncaught error normalization iÃ§in tek canonical sÄ±nÄ±r kurmak.
+
+**Mevcut durum:** E3-T1â€“E3-T4 `Done`; E3-T5-A merge/CI ve canlÄ± incident kabulÃ¼ sonrasÄ± `Done`. Express base middleware composition sÄ±nÄ±rÄ±ndadÄ±r; request ID/correlation ve merkezi uncaught error contract yoktur. Auth/access/ownership helper'larÄ± kÃ¶k monolitte kalmaktadÄ±r.
+
+**Planlanan durum:** `src/middleware/http-boundary.js` gÃ¼venli request ID Ã¼retim/iletimini, hassas query/body/header taÅŸÄ±mayan tamamlanma logunu ve internal mesaj sÄ±zdÄ±rmayan standart error response'unu dependency injection ile saÄŸlar.
+
+**Kapsam:** Request ID validation/generation/response header, completion metadata, error metadata, 4xx/exposed ve 5xx message policy, composition/error-handler registration ve executable testler.
+
+**Kapsam dÄ±ÅŸÄ±:** Auth/access/ownership extraction (E3-T5-B), route registration (E3-T6), mevcut route-local catch bloklarÄ±nÄ±n toplu dÃ¶nÃ¼ÅŸÃ¼mÃ¼, response/business contract, production request veya deployment.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T4 shared clients ve E3-T2 composition root.
+
+**Uygulama adÄ±mlarÄ±:** Request/error boundary factory'leri eklendi; request boundary app creation sÄ±rasÄ±nda, terminal error boundary route registration sonrasÄ±nda kuruldu; correlation, redaction, fail-closed dependency ve error normalization testleri security/full suite kapsamÄ±na alÄ±ndÄ±.
+
+**Kabul kriterleri:** GÃ¼venli client request ID korunur, malformed ID yansÄ±tÄ±lmaz, response correlation header taÅŸÄ±r, query/body/header loglanmaz, beklenmeyen 5xx mesajÄ± maskelenir, request ID error response/log ile eÅŸleÅŸir ve E3 characterization/full/security CI PASS.
+
+**Test planÄ±:** Dedicated E3-T5-A testi, E3 characterization, full/security suite, JavaScript syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Middleware registration ve modÃ¼l commit'i revert edilir; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Event, request ID, method, path, status, duration ve gÃ¼venli error code; query string, body, headers, token, credential, identity veya provider payload yok.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime HTTP boundary refactor; production request, provider/database Ã§aÄŸrÄ±sÄ±, data/schema/policy/grant/token mutation veya canlÄ± deployment yapÄ±lmaz.
+
+**Planlanan:** E3-T5-A canonical HTTP middleware boundary.
+
+**GerÃ§ekleÅŸen:** Repository implementasyonu PR #52 ile review edilmiÅŸ ve `main` Ã¼zerine merge edilmiÅŸtir. Security Regression, Vercel production deployment ve insan landing-page smoke kontrolÃ¼ PASS olmuÅŸtur.
+
+**Sapmalar:** E3-T5 parent yalnÄ±z E3-T5-B auth/access/ownership extraction tamamlandÄ±ktan sonra `Done` olabilir.
+
+**Evidence:** `src/middleware/http-boundary.js`, `tests/e3-t5a-http-middleware-boundary.test.js`, E3/full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #52 merge commit `29ae299f228f10a1b3026c4c9da843ffc502a1dc`; full/security CI, production deployment ve insan canlÄ± smoke kapÄ±larÄ± tamamlandÄ±.
+
+### E3-T5-B task aynasÄ± â€” auth, access ve ownership boundary
+
+**AmaÃ§:** Kimlik doÄŸrulama, subscription/lifecycle capability, provider connection ve platform-account ownership enforcement uygulamalarÄ±nÄ± tek injectable canonical sÄ±nÄ±rda toplamak.
+
+**Mevcut durum:** E3-T5-A `Done`. AynÄ± enforcement davranÄ±ÅŸlarÄ± kÃ¶k `server.js` iÃ§inde daÄŸÄ±nÄ±k helper fonksiyonlarÄ± olarak bulunuyordu.
+
+**Planlanan durum:** `src/middleware/access-boundary.js`, doÄŸrulanmÄ±ÅŸ bearer user kimliÄŸini esas alan ve caller-controlled identity kabul etmeyen immutable bir enforcement graph Ã¼retir.
+
+**Kapsam:** User authentication, subscription access, lifecycle access, provider connection, manual refresh connection ve active ownership enforcement; mevcut status/body contract parity; dependency injection ve negatif testler.
+
+**Kapsam dÄ±ÅŸÄ±:** Route registration/extraction (E3-T6), policy deÄŸerlerinin redesign edilmesi, OAuth/provider business logic, schema/data veya production iÅŸlemi.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T5-A HTTP boundary, E1 OAuth/IDOR contract'larÄ± ve E3-T4 shared clients.
+
+**Uygulama adÄ±mlarÄ±:** Canonical access factory eklendi; altÄ± enforcement helper'Ä± kÃ¶k monolitten kaldÄ±rÄ±lÄ±p immutable boundary sonucuna baÄŸlandÄ±; auth/capability/connection/ownership negatif testleri security/full suite'e eklendi.
+
+**Kabul kriterleri:** Kimlik yalnÄ±z doÄŸrulanmÄ±ÅŸ request user'dan gelir; inactive capability 403; eksik connection 404; ownership user/account/status ile fail-closed; response parity korunur; invalid dependency boot sÄ±rasÄ±nda reddedilir; full/security CI PASS.
+
+**Test planÄ±:** Dedicated E3-T5-B testi, OAuth/IDOR ve E3 characterization, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Factory delegation commit'i revert edilerek Ã¶nceki kÃ¶k helper uygulamalarÄ± geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** YalnÄ±z HTTP boundary gÃ¼venli metadata'sÄ±; bearer token, user/account identity, connection veya provider payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Mevcut fail-closed enforcement'Ä±n repository refactor'Ä±dÄ±r; production/provider/database Ã§aÄŸrÄ±sÄ± veya mutation yoktur.
+
+**Planlanan:** E3-T5-B canonical access enforcement boundary.
+
+**GerÃ§ekleÅŸen:** Repository implementasyonu PR #53 ile review edilmiÅŸ, full/security CI ve Vercel kontrolleri geÃ§miÅŸ ve `main` Ã¼zerine merge edilmiÅŸtir.
+
+**Sapmalar:** Policy hesaplayÄ±cÄ±larÄ± bu kÃ¼Ã§Ã¼k extraction'da yerinde bÄ±rakÄ±lmÄ±ÅŸ, yalnÄ±z enforcement tekilleÅŸtirilmiÅŸtir. E3-T5 parent PR merge edilmeden `Done` deÄŸildir.
+
+**Evidence:** `src/middleware/access-boundary.js`, `tests/e3-t5b-access-boundary.test.js`, OAuth/IDOR/E3/full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #53 merge commit `4836514de0fd4720b6f14d2eeec89b5066801536`; focused IDOR, full/security CI ve Vercel deployment status kapÄ±larÄ± tamamlandÄ±. E3-T5-A ve E3-T5-B birlikte parent E3-T5'i kapatÄ±r.
+
+### E3-T6-A task aynasÄ± â€” public route registration
+
+**AmaÃ§:** E3-T6 route-registration iÅŸinin ilk kontrollÃ¼ parÃ§asÄ±nda public/static sayfalar, public config ve TikTok test guard registration'Ä±nÄ± kÃ¶k monolitten ince ve injectable route modÃ¼lÃ¼ne taÅŸÄ±mak.
+
+**Mevcut durum:** E3-T1â€“E3-T5 `Done`. Public route bildirimleri kÃ¶k `server.js` iÃ§inde tek satÄ±rlÄ± inline handler kÃ¼mesi olarak bulunuyordu.
+
+**Planlanan durum:** `src/routes/public-routes.js` immutable route manifest'i ve explicit dependency validation ile route registration yapar; handler'lar yalnÄ±z response delegation taÅŸÄ±r.
+
+**Kapsam:** Dokuz public page route'u, TikTok test feature guard, `/api/public-config`, physical file mapping, duplicate/order contract ve root delegation.
+
+**Kapsam dÄ±ÅŸÄ±:** Authenticated business/API route extraction (E3-T6-B), OAuth extraction (E3-T7), response redesign, data/schema veya production iÅŸlemi.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T5 middleware boundary, E3-T1 characterization ve PR #52 static-entrypoint incident contract'Ä±.
+
+**Uygulama adÄ±mlarÄ±:** Public route manifest/registrar eklendi; root inline declarations kaldÄ±rÄ±ldÄ±; static handler, config parity, feature guard ve missing dependency testleri full/security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Route'lar tam bir kez kaydedilir; static file mapping deterministik; public config shape ve TikTok 404 parity korunur; relative/missing dependency fail-closed; critical characterization ve full/security CI PASS.
+
+**Test planÄ±:** Dedicated E3-T6-A registration testi, E3-T1 characterization, Vercel static contract, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Registrar delegation commit'i revert edilerek inline public registration geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** E3-T5-A gÃ¼venli request metadata'sÄ±; public config dÄ±ÅŸÄ± environment deÄŸeri, credential veya identity loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime route registration refactor; production/provider/database Ã§aÄŸrÄ±sÄ± veya mutation yoktur.
+
+**Planlanan:** E3-T6-A public route registration boundary.
+
+**GerÃ§ekleÅŸen:** Repository implementasyonu PR #54 ile review edilmiÅŸ, full/security CI ve Vercel kontrolleri geÃ§miÅŸ ve `main` Ã¼zerine merge edilmiÅŸtir.
+
+**Sapmalar:** Authenticated API route'larÄ± kontrollÃ¼ E3-T6-B kapsamÄ±na bÄ±rakÄ±lmÄ±ÅŸtÄ±r; parent E3-T6 henÃ¼z `Done` deÄŸildir.
+
+**Evidence:** `src/routes/public-routes.js`, `tests/e3-t6a-public-route-registration.test.js`, E3 characterization/Vercel/full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #54 merge commit `82e1dc68feebd51cd3678436a0614a3eb08a92ca`; characterization, full/security CI ve Vercel deployment status kapÄ±larÄ± tamamlandÄ±.
+
+### E3-T6-B task aynasÄ± â€” authenticated API route registration
+
+**AmaÃ§:** E3-T6'nÄ±n authenticated yÃ¼zeyinde routeâ†’authorizationâ†’service/policy akÄ±ÅŸÄ±nÄ± ince, injectable ve merkezi error boundary'ye delege eden bir referans registration ile kurmak.
+
+**Mevcut durum:** E3-T6-A `Done`. Kritik `/api/account/status` route'u authentication, subscription lookup, lifecycle policy ve response/error handling'i inline kÃ¶k handler iÃ§inde birleÅŸtiriyordu.
+
+**Planlanan durum:** `src/routes/account-status-routes.js` yalnÄ±z explicit dependency'lerle route'u kaydeder; verified user authorization Ã¶nce Ã§alÄ±ÅŸÄ±r, service/policy dependency'leri sÄ±rayla Ã§aÄŸrÄ±lÄ±r ve hatalar canonical error boundary'ye iletilir.
+
+**Kapsam:** `/api/account/status`, dependency validation, auth-before-service ordering, response parity ve error forwarding.
+
+**Kapsam dÄ±ÅŸÄ±:** BÃ¼tÃ¼n legacy API route'larÄ±nÄ±n toplu taÅŸÄ±nmasÄ±, OAuth extraction (E3-T7), service/repository business logic redesign, schema/data veya production iÅŸlemi.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T6-A registrar, E3-T5 access/error boundary ve E3-T1 critical characterization.
+
+**Uygulama adÄ±mlarÄ±:** Authenticated account-status registrar eklendi; inline kÃ¶k route kaldÄ±rÄ±ldÄ±; auth ordering, response parity, error forwarding ve missing dependency testleri full/security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Authentication subscription eriÅŸiminden Ã¶nce; unauthenticated contract 401 parity; baÅŸarÄ±lÄ± response shape deÄŸiÅŸmez; async hata response yazmadan `next(error)` ile canonical boundary'ye gider; invalid dependency fail-closed; full/security CI PASS.
+
+**Test planÄ±:** Dedicated E3-T6-B testi, E3-T1 characterization, access/error boundary, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Registrar delegation commit'i revert edilerek inline account-status route'u geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Canonical HTTP request/error metadata'sÄ±; bearer token, user/subscription identity veya payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime route registration refactor; production/provider/database Ã§aÄŸrÄ±sÄ± veya mutation yoktur.
+
+**Planlanan:** E3-T6-B authenticated route registration reference flow.
+
+**GerÃ§ekleÅŸen:** Repository implementasyonu PR #55 ile review edilmiÅŸ, full/security CI ve Vercel kontrolleri geÃ§miÅŸ ve `main` Ã¼zerine merge edilmiÅŸtir.
+
+**Sapmalar:** Legacy route'lar risk kontrollÃ¼ sonraki epic extraction'larÄ±nda aynÄ± registrar pattern'ine taÅŸÄ±nacaktÄ±r; E3-T6 parent merge tamamlanmadan `Done` deÄŸildir.
+
+**Evidence:** `src/routes/account-status-routes.js`, `tests/e3-t6b-authenticated-route-registration.test.js`, E3 characterization/access/error/full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #55 merge commit `a176e128ed2a7643c58cc66b67ba93febd2b1bbe`; characterization, full/security CI ve Vercel deployment status kapÄ±larÄ± tamamlandÄ±. E3-T6-A ve E3-T6-B birlikte parent E3-T6'yÄ± kapatÄ±r.
+
+### E3-T7-A task aynasÄ± â€” OAuth transaction boundary
+
+**AmaÃ§:** E1'de gÃ¼venli hale getirilen OAuth transaction create/consume ve authorization response orchestration'Ä±nÄ± kÃ¶k monolitten immutable, test edilebilir OAuth modÃ¼lÃ¼ne taÅŸÄ±mak.
+
+**Mevcut durum:** E3-T1â€“E3-T6 `Done`. Transaction cleanup/create/consume ve JSON/redirect response-mode helper'larÄ± kÃ¶k `server.js` iÃ§inde bulunuyordu.
+
+**Planlanan durum:** `src/oauth/transaction-boundary.js`, transaction store'u injectable dependency olarak tÃ¼ketir; create Ã¶ncesi cleanup, atomic consume delegation ve aÃ§Ä±k response-mode davranÄ±ÅŸÄ±nÄ± tek sÄ±nÄ±rda korur.
+
+**Kapsam:** OAuth transaction cleanup/create, provider+redirect+PKCE input delegation, state normalization/consume, missing-store fail-closed create, JSON handshake ve browser redirect response mode.
+
+**Kapsam dÄ±ÅŸÄ±:** Provider OAuth start/callback route extraction (E3-T7-B), transaction-store persistence redesign, token exchange, production provider isteÄŸi veya schema/data iÅŸlemi.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E1-T3 OAuth transaction store, E1 OAuth security regression ve E3-T6 route registration.
+
+**Uygulama adÄ±mlarÄ±:** OAuth transaction boundary eklendi; Ã¼Ã§ kÃ¶k helper kaldÄ±rÄ±lÄ±p immutable boundary alias'larÄ±na baÄŸlandÄ±; cleanup ordering, bound input, missing-state/store ve response-mode testleri security/full suite'e eklendi.
+
+**Kabul kriterleri:** Create cleanup sonrasÄ± Ã§alÄ±ÅŸÄ±r; user/provider/redirect/PKCE aynen store'a baÄŸlanÄ±r; consume yalnÄ±z store Ã¼zerinden ve normalized state ile Ã§alÄ±ÅŸÄ±r; missing store create'i fail-closed; response mode parity korunur; OAuth/full/security CI PASS.
+
+**Test planÄ±:** Dedicated E3-T7-A testi, OAuth security/transaction-store regresyonlarÄ±, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Boundary delegation commit'i revert edilerek kÃ¶k helper'lar geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Transaction state, PKCE, token, user/provider payload loglanmaz; yalnÄ±z mevcut gÃ¼venli HTTP metadata'sÄ± vardÄ±r.
+
+**GÃ¼venlik ve veri etkisi:** Mevcut OAuth orchestration'Ä±n repository refactor'Ä±dÄ±r; production/provider/database Ã§aÄŸrÄ±sÄ± veya mutation yoktur.
+
+**Planlanan:** E3-T7-A OAuth transaction orchestration boundary.
+
+**GerÃ§ekleÅŸen:** Repository implementasyonu PR #56 ile review edilmiÅŸ, full/security CI ve Vercel kontrolleri geÃ§miÅŸ ve `main` Ã¼zerine merge edilmiÅŸtir.
+
+**Sapmalar:** Provider start/callback route'larÄ± E3-T7-B kontrollÃ¼ extraction kapsamÄ±ndadÄ±r; parent E3-T7 henÃ¼z `Done` deÄŸildir.
+
+**Evidence:** `src/oauth/transaction-boundary.js`, `tests/e3-t7a-oauth-transaction-boundary.test.js`, OAuth security/store/full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #56 merge commit `1c340cb27dcd689f731b57965c979cc0fc5c4968`; OAuth/full/security CI ve deployment status kapÄ±larÄ± tamamlandÄ±.
+
+**CanlÄ± sÄ±nÄ±r:** PR #46 merge/review tamamlanmÄ±ÅŸtÄ±r. Revize read-only diagnostic preflight ancak yeni aÃ§Ä±k insan production onayÄ±ndan sonra tek istek olarak Ã§alÄ±ÅŸtÄ±rÄ±labilir.
+
+
+### E3-T7-B3-B2 task aynasÄ± â€” Organic, Klaviyo ve TikTok OAuth handlers
+
+**AmaÃ§:** Kalan Organic/GA4, Klaviyo ve TikTok OAuth start/callback orchestration'Ä±nÄ± kÃ¶k monolitten immutable, injectable provider handler modÃ¼llerine taÅŸÄ±mak.
+
+**Mevcut durum:** PR #60 ile Google Sheets extraction merge edilmiÅŸ ve `main` security/Vercel kontrolleri PASS olmuÅŸtur. ÃœÃ§ provider'Ä±n OAuth handler'larÄ± kÃ¶k `server.js` iÃ§inde inline bulunuyordu.
+
+**Planlanan durum:** Her provider canonical transaction ve route registrar sÄ±nÄ±rÄ±nÄ± kullanÄ±r; verified transaction identity, PKCE, reconnect/selection ve provider-specific response parity korunur.
+
+**Kapsam:** Organic, Klaviyo ve TikTok OAuth start/callback handler factory'leri, root composition, canonical route registration ve negatif gÃ¼venlik testleri.
+
+**Kapsam dÄ±ÅŸÄ±:** Provider ingest, account selection redesign, API business route'larÄ±, schema/data ve production OAuth Ã§aÄŸrÄ±larÄ±.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T7-A/B1/B2/B3-A/B3-B1 ve E1 OAuth security baseline.
+
+**Uygulama adÄ±mlarÄ±:** ÃœÃ§ injectable handler modÃ¼lÃ¼ eklendi; inline route'lar kaldÄ±rÄ±ldÄ±; transaction identity, invalid state, PKCE ve already-connected guard testleri security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Caller identity kullanÄ±lmaz; invalid state token exchange Ã¶ncesi durur; Klaviyo PKCE transaction'a baÄŸlÄ±dÄ±r; TikTok connected guard korunur; response parity ve full/security CI PASS olur.
+
+**Test planÄ±:** Dedicated E3-T7-B3-B2 testi, OAuth security/full suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Handler wiring commit'i revert edilerek inline implementation geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Token, PKCE, state, user/account identity veya provider payload loglanmaz; mevcut gÃ¼venli HTTP metadata sÄ±nÄ±rÄ± korunur.
+
+**GÃ¼venlik ve veri etkisi:** Repository refactor; production OAuth/provider/database Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T7-B3-B2 remaining provider OAuth extraction.
+
+**GerÃ§ekleÅŸen:** Organic, Klaviyo ve TikTok handler factory'leri ve root delegation tamamlandÄ±; executable negatif testler eklendi.
+
+**Sapmalar:** Uygulanamaz â€” kapsam planlandÄ±ÄŸÄ± gibi uygulandÄ±.
+
+**Evidence:** `src/oauth/organic-handlers.js`, `src/oauth/klaviyo-handlers.js`, `src/oauth/tiktok-handlers.js`, `tests/e3-t7b3b2-provider-oauth-handlers.test.js` ve CI Ã§Ä±ktÄ±larÄ±.
+
+**Durum:** `Done` â€” PR #61 merge commit `d849fe53cd0e6ad430e79139a0b5dcb33a4a271f`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapÄ±larÄ± tamamlandÄ±. E3-T7 parent kapanmÄ±ÅŸtÄ±r.
+
+
+### E3-T8-A task aynasÄ± â€” refresh job lifecycle boundary
+
+**AmaÃ§:** Refresh/snapshot job persistence ve queuedâ†’runningâ†’terminal orchestration'Ä± kÃ¶k monolitten injectable, test edilebilir bir job sÄ±nÄ±rÄ±na taÅŸÄ±mak.
+
+**Mevcut durum:** E3-T7 PR #61 ile merge ve post-merge CI kapÄ±larÄ±nÄ± tamamladÄ±. Job duplicate guard, insert ve status timestamp davranÄ±ÅŸlarÄ± kÃ¶k `server.js` helper'larÄ±nda bulunuyordu.
+
+**Planlanan durum:** `src/jobs/refresh-job-boundary.js` create/transition/run portlarÄ±nÄ± immutable dependency graph ile sunar; root yalnÄ±z compatibility delegation taÅŸÄ±r.
+
+**Kapsam:** Active-job duplicate guard, queued insert contract, running/completed/failed timestamps, safe failure transition, injectable clock/client ve root delegation.
+
+**Kapsam dÄ±ÅŸÄ±:** Provider-specific snapshot work extraction ve automation/recovery policy orchestration (E3-T8-B), schema/data, production job veya provider Ã§aÄŸrÄ±sÄ±.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T2 composition root, E3-T4 shared client, E3-T5 error boundary ve E3-T7 OAuth extraction.
+
+**Uygulama adÄ±mlarÄ±:** Job boundary factory eklendi; kÃ¶k create/status helper implementasyonlarÄ± boundary alias'larÄ±na dÃ¶nÃ¼ÅŸtÃ¼rÃ¼ldÃ¼; deterministic lifecycle ve failure testleri security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Duplicate active job 409 ile insert Ã¶ncesi reddedilir; queued row parity korunur; running ve terminal timestamp'leri canonical clock kullanÄ±r; work hatasÄ± failed transition denedikten sonra aynÄ± hatayÄ± yeniden fÄ±rlatÄ±r; invalid dependency fail-closed; full/security CI PASS.
+
+**Test planÄ±:** Dedicated E3-T8-A testi, E3 characterization, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Boundary delegation commit'i revert edilerek kÃ¶k helper implementasyonlarÄ± geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Mevcut snapshot_jobs status/timestamp/error_message alanlarÄ± korunur; credential, token veya provider payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime refactor; production database/provider Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T8-A canonical refresh job lifecycle boundary.
+
+**GerÃ§ekleÅŸen:** Factory, root delegation ve executable lifecycle/failure testleri tamamlandÄ±.
+
+**Sapmalar:** Parent E3-T8, provider work ve automation/recovery orchestration E3-T8-B ile boundary `run` portuna taÅŸÄ±nmadan `Done` deÄŸildir.
+
+**Evidence:** `src/jobs/refresh-job-boundary.js`, `tests/e3-t8a-refresh-job-boundary.test.js`, full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #62 merge commit `23f5dfc3f5ba0bff0e60be61e16e0203a200b62f`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapÄ±larÄ± tamamlandÄ±.
+
+
+### E3-T8-B1 task aynasÄ± â€” manual snapshot job orchestration
+
+**AmaÃ§:** Organic, TikTok ve Klaviyo manual snapshot handler'larÄ±ndaki tekrarlÄ± createâ†’runningâ†’writeâ†’completed/failed job akÄ±ÅŸÄ±nÄ± E3-T8-A boundary `run` portuna taÅŸÄ±mak.
+
+**Mevcut durum:** E3-T8-A PR #62 ile merge ve post-merge CI kapÄ±larÄ±nÄ± tamamladÄ±. ÃœÃ§ handler lifecycle geÃ§iÅŸlerini ayrÄ± ayrÄ± yÃ¶netiyordu.
+
+**Planlanan durum:** `src/jobs/manual-snapshot-orchestrator.js` provider work callback'ine yalnÄ±z immutable source-job context verir ve completion evidence sÃ¶zleÅŸmesini tekilleÅŸtirir.
+
+**Kapsam:** Organic/TikTok/Klaviyo manual refresh job orchestration, source job identity, completion metadata, failure job correlation ve root wiring.
+
+**Kapsam dÄ±ÅŸÄ±:** Meta/Google Ã¶zel diagnostic completion payload'larÄ± ve automation/recovery orchestration (E3-T8-B2), provider fetch/write business logic, schema/data veya production iÅŸlemi.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T8-A refresh job lifecycle boundary.
+
+**Uygulama adÄ±mlarÄ±:** Manual orchestrator eklendi; Ã¼Ã§ handler boundary `run` portuna delege edildi; job boundary failure'a non-enumerable job correlation ekledi; focused testler security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Job metadata parity korunur; provider write verified job ID alÄ±r; completion snapshot/spread evidence taÅŸÄ±r; failed transition tek kez boundary tarafÄ±ndan yapÄ±lÄ±r; HTTP hata response job ID correlation'Ä±nÄ± korur; full/security CI PASS.
+
+**Test planÄ±:** E3-T8-A/B1 focused testleri, characterization, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Orchestrator delegation commit'i revert edilerek Ã¼Ã§ handler'Ä±n inline lifecycle akÄ±ÅŸÄ± geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Existing snapshot_jobs lifecycle ve HTTP job_id correlation korunur; credential/provider payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime orchestration refactor; production job/database/provider Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T8-B1 manual snapshot orchestration boundary.
+
+**GerÃ§ekleÅŸen:** Organic, TikTok ve Klaviyo manual handler delegation ve executable orchestration/failure testleri tamamlandÄ±.
+
+**Sapmalar:** Meta/Google ve automation/recovery akÄ±ÅŸlarÄ± provider-specific evidence ÅŸekilleri nedeniyle E3-T8-B2 kontrollÃ¼ kapsamÄ±na bÄ±rakÄ±ldÄ±; parent E3-T8 henÃ¼z `Done` deÄŸildir.
+
+**Evidence:** `src/jobs/manual-snapshot-orchestrator.js`, `src/jobs/refresh-job-boundary.js`, `tests/e3-t8b1-manual-snapshot-orchestrator.test.js`, full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #63 merge commit `d38eda63d8fa395036d898cd480cda1cdb8acd7a`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapÄ±larÄ± tamamlandÄ±.
+
+
+### E3-T8-B2-A task aynasÄ± â€” TikTok/Klaviyo automation recovery orchestration
+
+**AmaÃ§:** TikTok ve Klaviyo automation primary/recovery snapshot job zincirini canonical E3-T8 job boundary Ã¼zerine taÅŸÄ±mak ve paired recovery davranÄ±ÅŸÄ±nÄ± tekilleÅŸtirmek.
+
+**Mevcut durum:** E3-T8-B1 PR #63 ile merge ve post-merge CI kapÄ±larÄ±nÄ± tamamladÄ±. Ä°ki provider aynÄ± createâ†’runningâ†’writeâ†’completed/failed ve optional recovery akÄ±ÅŸÄ±nÄ± kopyalÄ±yordu.
+
+**Planlanan durum:** `src/jobs/automation-snapshot-orchestrator.js` primary ve paired recovery run'larÄ±nÄ± yÃ¶netir; provider wrapper yalnÄ±z prerequisites, policy ve write dependency'sini saÄŸlar.
+
+**Kapsam:** TikTok/Klaviyo primary automation job, optional paired recovery, recovery failure isolation/correlation, schedule success update parity ve ortak provider wrapper.
+
+**Kapsam dÄ±ÅŸÄ±:** Organic/Meta/Google Ã¶zel ownership/diagnostic/recovery akÄ±ÅŸlarÄ± (E3-T8-B2-B), policy redesign, provider business logic, schema/data veya production iÅŸlem.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T8-A ve E3-T8-B1.
+
+**Uygulama adÄ±mlarÄ±:** Automation orchestrator eklendi; TikTok/Klaviyo tekrarlarÄ± ortak wrapper ve boundary run portuna taÅŸÄ±ndÄ±; paired identity ve recovery failure testleri security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Primary metadata parity; recovery `pairedPrimaryJobId` taÅŸÄ±r; provider write immutable job context alÄ±r; recovery failure primary success'i bozmaz ve job ID taÅŸÄ±r; primary failure rethrow edilir; schedule yalnÄ±z primary success sonrasÄ± gÃ¼ncellenir; full/security CI PASS.
+
+**Test planÄ±:** E3-T8 focused orchestration testleri, characterization, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Orchestrator/wrapper delegation commit'i revert edilerek iki inline automation akÄ±ÅŸÄ± geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Existing job/recovery result ve schedule timestamp sÃ¶zleÅŸmeleri korunur; credential/provider payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime orchestration refactor; production cron/job/database/provider Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T8-B2-A TikTok/Klaviyo automation/recovery boundary.
+
+**GerÃ§ekleÅŸen:** Common automation orchestrator, provider wrapper ve executable primary/recovery/failure testleri tamamlandÄ±.
+
+**Sapmalar:** Organic/Meta/Google farklÄ± prerequisites ve completion diagnostics nedeniyle E3-T8-B2-B kontrollÃ¼ kapsamÄ±na bÄ±rakÄ±ldÄ±; parent E3-T8 henÃ¼z `Done` deÄŸildir.
+
+**Evidence:** `src/jobs/automation-snapshot-orchestrator.js`, `tests/e3-t8b2a-automation-snapshot-orchestrator.test.js`, full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #64 merge commit `eb25e9effc1c198960e85fdf2bb5f29cba616dc3`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapÄ±larÄ± tamamlandÄ±.
+
+
+### E3-T8-B2-B1 task aynasÄ± â€” Organic automation orchestration
+
+**AmaÃ§:** Organic automation primary/recovery job zincirini canonical automation orchestrator'a taÅŸÄ±rken ownership, timezone ve time-engine diagnostic metadata parity'sini korumak.
+
+**Mevcut durum:** E3-T8-B2-A PR #64 ile merge ve post-merge CI kapÄ±larÄ±nÄ± tamamladÄ±. Organic aynÄ± lifecycle zincirini ek time diagnostics ile inline yÃ¶netiyordu.
+
+**Planlanan durum:** Automation orchestrator provider-specific primary/recovery metadata extension portlarÄ± taÅŸÄ±r; pairing alanÄ± caller metadata tarafÄ±ndan override edilemez.
+
+**Kapsam:** Organic automation delegation, primary time diagnostics, recovery engine version, paired recovery, schedule update ve response parity.
+
+**Kapsam dÄ±ÅŸÄ±:** Meta/Google Ã¶zel lifecycle/diagnostic akÄ±ÅŸlarÄ± (E3-T8-B2-B2), policy/time-engine redesign, schema/data veya production iÅŸlem.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T8-B2-A automation orchestrator.
+
+**Uygulama adÄ±mlarÄ±:** Orchestrator'a controlled metadata extension eklendi; Organic inline lifecycle kaldÄ±rÄ±ldÄ±; pairing override negatif testi eklendi.
+
+**Kabul kriterleri:** Organic prerequisite/skip parity korunur; primary diagnostic metadata kayÄ±psÄ±zdÄ±r; recovery engine version taÅŸÄ±r; caller pairing override edemez; recovery failure isolation ve schedule success timing deÄŸiÅŸmez; full/security CI PASS.
+
+**Test planÄ±:** E3-T8 automation focused testleri, characterization, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Organic delegation ve metadata extension commit'i revert edilerek inline lifecycle geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Existing job time diagnostics, recovery result ve schedule timestamps korunur; credential/provider payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime orchestration refactor; production cron/job/database/provider Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T8-B2-B1 Organic automation boundary.
+
+**GerÃ§ekleÅŸen:** Organic delegation, controlled metadata extension ve pairing override testleri tamamlandÄ±.
+
+**Sapmalar:** Meta/Google diagnostic shapes E3-T8-B2-B2 kapsamÄ±na bÄ±rakÄ±ldÄ±; parent E3-T8 henÃ¼z `Done` deÄŸildir.
+
+**Evidence:** `src/jobs/automation-snapshot-orchestrator.js`, `server.js`, `tests/e3-t8b2a-automation-snapshot-orchestrator.test.js`, full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #65 merge commit `21dfb0596a36d51696df6eb5823ed466866796c2`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapÄ±larÄ± tamamlandÄ±.
+
+
+### E3-T8-B2-B2-A task aynasÄ± â€” Meta/Google manual job orchestration
+
+**AmaÃ§:** Meta ve Google manual snapshot lifecycle'larÄ±nÄ± canonical manual orchestrator'a taÅŸÄ±mak ve Google completion diagnostics'i allowlisted saf evidence mapper'a Ã§Ä±karmak.
+
+**Mevcut durum:** E3-T8-B2-B1 PR #65 ile merge ve post-merge CI kapÄ±larÄ±nÄ± tamamladÄ±. Meta/Google create/transition/failure akÄ±ÅŸlarÄ±nÄ± inline yÃ¶netiyor, Google Ã¼Ã§ grain diagnostic payload'Ä±nÄ± handler iÃ§inde kuruyordu.
+
+**Planlanan durum:** Manual orchestrator controlled job metadata ve custom completion portlarÄ± sunar; canonical manual alanlar caller tarafÄ±ndan override edilemez; Google evidence ayrÄ± saf mapper'dÄ±r.
+
+**Kapsam:** Meta/Google manual job delegation, time/account/limit metadata parity, Google campaign/adgroup/ad diagnostic evidence, failure job correlation ve HTTP response parity.
+
+**Kapsam dÄ±ÅŸÄ±:** Meta/Google automation/recovery orchestration (E3-T8-B2-B2-B), provider fetch/write logic, diagnostic redesign, schema/data veya production iÅŸlem.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T8-B1 manual orchestrator ve E3-T8-B2-B1 merge kabulÃ¼.
+
+**Uygulama adÄ±mlarÄ±:** Manual orchestrator metadata/custom completion portlarÄ± eklendi; Meta ve Google handler'larÄ± delege edildi; Google evidence mapper ve negatif testler security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Manual canonical metadata override edilemez; Meta time/limit parity; Google account/date/login metadata parity; provider write verified source job alÄ±r; Google evidence raw rows taÅŸÄ±maz; failed transition tek kez boundary tarafÄ±ndan yapÄ±lÄ±r ve HTTP job correlation korunur; full/security CI PASS.
+
+**Test planÄ±:** Manual orchestrator/evidence focused testleri, characterization, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Delegation/evidence mapper commit'i revert edilerek inline lifecycle ve diagnostic mapping geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Existing job metadata/Google diagnostic allowlist ve HTTP correlation korunur; raw row, credential veya provider payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime orchestration refactor; production job/database/provider Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T8-B2-B2-A Meta/Google manual orchestration.
+
+**GerÃ§ekleÅŸen:** Meta/Google delegation, manual extension portlarÄ±, Google evidence mapper ve executable testler tamamlandÄ±.
+
+**Sapmalar:** Meta/Google automation/recovery E3-T8-B2-B2-B kapsamÄ±na bÄ±rakÄ±ldÄ±; parent E3-T8 henÃ¼z `Done` deÄŸildir.
+
+**Evidence:** `src/jobs/manual-snapshot-orchestrator.js`, `src/jobs/google-snapshot-job-evidence.js`, `tests/e3-t8b2b2a-google-job-evidence.test.js`, full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #66 merge commit `25705b33307423ebdd23db044ab3c45186b796b9`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapÄ±larÄ± tamamlandÄ±.
+
+
+### E3-T8-B2-B2-B task aynasÄ± â€” Meta/Google automation orchestration
+
+**AmaÃ§:** Meta ve Google automation primary/recovery lifecycle'larÄ±nÄ± canonical automation orchestrator'a taÅŸÄ±mak ve provider-specific completion evidence parity'sini korumak.
+
+**Mevcut durum:** E3-T8-B2-B2-A PR #66 ile merge ve post-merge CI kapÄ±larÄ±nÄ± tamamladÄ±. Meta/Google automation akÄ±ÅŸlarÄ± create/transition/recovery durumlarÄ±nÄ± inline yÃ¶netiyordu.
+
+**Planlanan durum:** Automation orchestrator custom primary/recovery completion portlarÄ± sunar; Meta/Google yalnÄ±z prerequisite, metadata, write ve response shaping taÅŸÄ±r.
+
+**Kapsam:** Meta/Google primary/recovery delegation, time/login/limit metadata, Google row/spread completion evidence, paired recovery, failure isolation, schedule update ve result parity.
+
+**Kapsam dÄ±ÅŸÄ±:** Provider fetch/write ve automation policy redesign, schema/data veya production iÅŸlem; E3-T9 architecture guard ayrÄ± tasktÄ±r.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T8-Aâ€“B2-B2-A job boundaries/orchestrators.
+
+**Uygulama adÄ±mlarÄ±:** Automation custom completion portlarÄ± eklendi; Meta/Google inline lifecycle kaldÄ±rÄ±ldÄ±; primary/recovery spread evidence mapper ve executable testleri security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Provider prerequisite/skip parity; diagnostic metadata kayÄ±psÄ±z; recovery canonical pairing; Google primary metadata korunur ve recovery narrow contract deÄŸiÅŸmez; primary failure rethrow, recovery failure isolation; schedule yalnÄ±z primary success sonrasÄ± gÃ¼ncellenir; full/security CI PASS.
+
+**Test planÄ±:** Automation/evidence focused testleri, characterization, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Delegation/custom completion commit'i revert edilerek inline Meta/Google lifecycle geri alÄ±nÄ±r; data/schema rollback yoktur.
+
+**GÃ¶zlemlenebilirlik:** Existing job metadata, recovery result, schedule timestamps ve provider result contracts korunur; raw row/credential/provider payload loglanmaz.
+
+**GÃ¼venlik ve veri etkisi:** Repository/runtime orchestration refactor; production cron/job/database/provider Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T8-B2-B2-B Meta/Google automation orchestration.
+
+**GerÃ§ekleÅŸen:** Meta/Google delegation, custom completion ports, spread evidence mapper ve executable testler tamamlandÄ±.
+
+**Sapmalar:** Uygulanamaz â€” kapsam planlandÄ±ÄŸÄ± gibi uygulandÄ±. E3-T8 parent PR merge/CI tamamlanana kadar `Verification` kalÄ±r.
+
+**Evidence:** `src/jobs/automation-snapshot-orchestrator.js`, `src/jobs/snapshot-job-evidence.js`, `tests/e3-t8b2b2b-snapshot-job-evidence.test.js`, full/security Ã§Ä±ktÄ±larÄ± ve PR CI.
+
+**Durum:** `Done` â€” PR #67 merge commit `2cb6b14453b2fbf543f9e2fe4f3c54208169a2d9`; focused/full/security CI, Vercel ve post-merge `main` Security Regression kapÄ±larÄ± tamamlandÄ±. Parent E3-T8 kapanmÄ±ÅŸtÄ±r.
+
+
+### E3-T9 task aynasÄ± â€” architecture growth guard
+
+**AmaÃ§:** Yeni business logic, named/async function veya route registration'Ä±n kÃ¶k `server.js` monolitini bÃ¼yÃ¼tmesini ve extracted `src` modÃ¼llerinin root monolite geri baÄŸÄ±mlÄ± olmasÄ±nÄ± CI seviyesinde engellemek.
+
+**Mevcut durum:** E3-T8 PR #67 ile merge ve post-merge CI kapÄ±larÄ±nÄ± tamamladÄ±. Monolit bÃ¼yÃ¼tmeme kuralÄ± belge dÃ¼zeyindeydi; executable CI guard yoktu.
+
+**Planlanan durum:** Frozen baseline ve fail-closed architecture evaluator, root satÄ±r/function/route growth'Ã¼nÃ¼ ve `src`â†’`server.js` ters baÄŸÄ±mlÄ±lÄ±ÄŸÄ±nÄ± reddeder; workflow iÃ§indeki zorunlu security suite guard testini Ã§alÄ±ÅŸtÄ±rÄ±r.
+
+**Kapsam:** Server line/named/async/route ceilings, extracted-module root import rejection, deterministic JSON CLI, unit/negative testler, locked security manifest ve mevcut GitHub Actions security-suite entegrasyonu.
+
+**Kapsam dÄ±ÅŸÄ±:** Canonical DTO/repository boundary guard (E3-T10), mevcut monolitin kalan extraction'Ä±, runtime/data/schema veya production iÅŸlem.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** E3-T1â€“E3-T8 modularization baseline.
+
+**Uygulama adÄ±mlarÄ±:** Baseline manifest ve evaluator eklendi; CLI/npm script oluÅŸturuldu; mevcut zorunlu security suite manifestine architecture testi baÄŸlandÄ±; growth/root-import negatif testleri security suite'e eklendi.
+
+**Kabul kriterleri:** Current main PASS; herhangi guarded metric growth FAIL; invalid limit FAIL; `src` module root server import FAIL; deterministic redacted output; security/full CI PASS.
+
+**Test planÄ±:** Dedicated architecture test, CLI, locked manifest, full/security suite, workflow contract, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Guard/manifest entegrasyon commit'i revert edilir; runtime/data/schema rollback yoktur. Guard bypass iÃ§in baseline sessizce yÃ¼kseltilemez; yeni business logic Ã¶nce target module extraction ile net-negative root deÄŸiÅŸiklik Ã¼retmelidir.
+
+**GÃ¶zlemlenebilirlik:** YalnÄ±z metric/limit/violation code JSON Ã§Ä±ktÄ±sÄ±; source, credential, env veya payload yok.
+
+**GÃ¼venlik ve veri etkisi:** CI/repository statik kontrol; production runtime/database/provider Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T9 executable architecture guard.
+
+**GerÃ§ekleÅŸen:** Baseline/evaluator, CLI, tests ve mevcut zorunlu workflow tarafÄ±ndan Ã§alÄ±ÅŸtÄ±rÄ±lan security manifest entegrasyonu tamamlandÄ±.
+
+**Sapmalar:** Uygulanamaz â€” kapsam planlandÄ±ÄŸÄ± gibi uygulandÄ±.
+
+**Evidence:** `security/e3-architecture-baseline.json`, `security/architecture-guard.js`, `tests/e3-t9-architecture-guard.test.js`, `tests/security-regression-manifest.js`, `.github/workflows/security-regression.yml` ve CI Ã§Ä±ktÄ±larÄ±.
+
+**Durum:** `Done` â€” PR #68 merge commit `718b370dc2df7b5897e79aa27b759c85ad2ff8f6`; architecture/security/full CI, Vercel ve post-merge `main` Security Regression kapÄ±larÄ± tamamlandÄ±.
+
+
+### E3-T10 task aynasÄ± â€” canonical boundary guard
+
+**AmaÃ§:** Provider-specific DTO veya doÄŸrudan Dataset V2 eriÅŸiminin canonical validator/hierarchy ve repository portunu atlayarak persistence, Formula Engine veya Funnel Query sÄ±nÄ±rÄ±na geÃ§mesini executable CI kontrolÃ¼yle engellemek.
+
+**Mevcut durum:** E3-T9 PR #68 ile merge ve post-merge CI kapÄ±larÄ±nÄ± tamamladÄ±. Repository implementasyonlarÄ±nda validator vardÄ±; cross-module bypass ve providerâ†’business-math import yasaÄŸÄ± iÃ§in merkezi guard/port yoktu.
+
+**Planlanan durum:** Canonical write boundary validation-before-delegation uygular; policy guard Dataset V2 relation ve canonical upsert allowlist'ini, business-math provider import yasaÄŸÄ±nÄ± ve zorunlu boundary dosyalarÄ±nÄ± fail-closed denetler.
+
+**Kapsam:** Runtime module scan, direct Dataset V2 access rejection, canonical upsert bypass rejection, Formula/Query provider import rejection, canonical write port, deterministic CLI, negative tests ve locked security manifest.
+
+**Kapsam dÄ±ÅŸÄ±:** Provider adapter implementasyonlarÄ± (E4+), Dataset V2 schema/data, production ingest veya canlÄ± iÅŸlem.
+
+**BaÄŸÄ±mlÄ±lÄ±klar:** V4 canonical envelope freeze, existing canonical/hierarchy validators, Dataset V2 repositories ve E3-T9 architecture guard.
+
+**Uygulama adÄ±mlarÄ±:** Canonical write boundary ve policy manifest eklendi; runtime scanner/CLI oluÅŸturuldu; bypass/provider-import/missing-boundary negatif testleri security suite'e baÄŸlandÄ±.
+
+**Kabul kriterleri:** Current runtime PASS; invalid provider DTO repository'ye ulaÅŸmadan FAIL; direct Dataset V2 runtime access allowlist dÄ±ÅŸÄ± FAIL; canonical repository method bypass FAIL; Formula/Query provider import FAIL; missing boundary/policy FAIL; full/security CI PASS.
+
+**Test planÄ±:** Dedicated canonical boundary test, CLI, Phase 1/2 regression, locked manifest, full/security suite, syntax ve diff kontrolÃ¼.
+
+**Rollback planÄ±:** Guard/port/manifest commit'i revert edilir; runtime/data/schema rollback yoktur. Guard allowlist'i provider ihtiyacÄ±yla sessizce geniÅŸletilemez; yeni write path canonical port Ã¼zerinden kurulmalÄ±dÄ±r.
+
+**GÃ¶zlemlenebilirlik:** YalnÄ±z checked-module count ve violation code JSON Ã§Ä±ktÄ±sÄ±; source, row, credential, identity veya provider payload yok.
+
+**GÃ¼venlik ve veri etkisi:** CI/repository static/runtime validation boundary; production database/provider Ã§aÄŸrÄ±sÄ± veya mutation yapÄ±lmaz.
+
+**Planlanan:** E3-T10 canonical validation/repository/business-math boundary guard.
+
+**GerÃ§ekleÅŸen:** Canonical write port, policy/scanner CLI, bypass/import/missing-boundary testleri ve security manifest entegrasyonu tamamlandÄ±.
+
+**Sapmalar:** Uygulanamaz â€” kapsam planlandÄ±ÄŸÄ± gibi uygulandÄ±.
+
+**Evidence:** `funnel-core/canonical-write-boundary.js`, `security/e3-canonical-boundary-policy.json`, `security/canonical-boundary-guard.js`, `tests/e3-t10-canonical-boundary-guard.test.js` ve CI Ã§Ä±ktÄ±larÄ±.
+
+**Durum:** `Done` â€” PR #69 merge commit `67c7a19d17541db734747e6de712486555585f3e`; PR Security/Vercel kapÄ±larÄ± ile post-merge `main` Security Regression (security + full regression) tamamlandÄ±. Production iÅŸlemi yapÄ±lmadÄ±.
+
+### E2-T6-D1 task aynasÄ± â€” postcheck failure diagnostic preparation
+
+**AmaÃ§:** E2-T6 V3 rollback-only acceptance sonrasÄ±nda alÄ±nan `POSTCHECK_FAILED` sonucunu transaction retry, cleanup veya raw production veri ifÅŸasÄ± olmadan allowlisted failed gate code seviyesinde teÅŸhis etmek.
+
+**Mevcut durum:** Read-only preflight 21/21 PASS verdi. AÃ§Ä±k production onayÄ±yla transaction tam bir kez ve mandatory postcheck tam bir kez gÃ¶nderildi; operator `POSTCHECK_FAILED` Ã¼retti, capsule `consumed` oldu ve retry yapÄ±lmadÄ±.
+
+**Kapsam:** Consumed state ve exact `POSTCHECK_FAILED` outcome binding; explicit diagnostic confirmation; mevcut postcheck sorgusunun operator-local baseline ile read-only Ã§alÄ±ÅŸtÄ±rÄ±lmasÄ±; yalnÄ±z failed gate code, checked gate count ve `productionCountsExposed:false` Ã§Ä±ktÄ±sÄ±; fail-closed test ve security manifest entegrasyonu.
+
+**Kapsam dÄ±ÅŸÄ±:** Bu PR'da production diagnostic sorgusu, transaction retry, cleanup/recovery, write, schema/policy/grant/ledger, deployment, environment veya secret deÄŸiÅŸikliÄŸi.
+
+**Kabul kriterleri:** Exact confirmation olmadan Ã§alÄ±ÅŸma yok; yalnÄ±z consumed failed capsule kabul edilir; gate allowlist/count/passed sÃ¶zleÅŸmesi exact olur; all-pass diagnostic `currentPostcheckPass:true` olarak raporlanÄ±r; malformed diagnostic fail-closed olur; actual/expected production count ve identity raporlanmaz; full/security CI PASS.
+
+**Rollback:** Diagnostic operator/script/test ve manifest kaydÄ± revert edilir. Consumed production capsule ve outcome deÄŸiÅŸtirilmez.
+
+**Durum:** `Verification` â€” repository hazÄ±rlÄ±ÄŸÄ± ve PR/CI tamamlanmadan, ardÄ±ndan ayrÄ± aÃ§Ä±k production onayÄ±yla diagnostic Ã§alÄ±ÅŸtÄ±rÄ±lmadan E2-T6-D1 `Done` deÄŸildir. E2-T6 ve parent E2 `Verification/In progress` kalÄ±r.
+
+### E2-T6-D1-R1 revision aynasÄ± â€” diagnostic all-pass ve safe-stage contract
+
+**Incident:** AÃ§Ä±k onaylÄ± ilk read-only diagnostic request `DIAGNOSTIC_FAIL_CLOSED` Ã¼retti. Repository-local prerequisite audit PASS olduÄŸundan failure query veya result-contract aÅŸamasÄ±ndadÄ±r; ikinci production query/retry Ã§alÄ±ÅŸtÄ±rÄ±lmadÄ±.
+
+**DÃ¼zeltme:** GÃ¼ncel postcheck artÄ±k tÃ¼m gate'ler PASS ise bunu hata saymak yerine `currentPostcheckPass:true` ve boÅŸ `failedGateCodes` ile redacted baÅŸarÄ± olarak raporlar. Query ve contract failure ayrÄ± allowlisted safe code Ã¼retir; count/identity/raw error yine raporlanmaz.
+
+**Durum:** `Verification` â€” corrective PR #72 merge commit `a1c11fb2ce5e642858ed2734a6061b66a7351f17` ile `main` Ã¼zerine alÄ±ndÄ±; PR security/Vercel kapÄ±larÄ±, post-merge `main` Security Regression ve 439 testlik yerel full regression PASS. GitHub'daki merge sonucu baÅŸarÄ±lÄ±dÄ±r; aÃ§Ä±k PR kalmamÄ±ÅŸtÄ±r. AyrÄ± aÃ§Ä±k production onayÄ±yla tek read-only diagnostic tamamlanmadan E2-T6-D1-R1 veya E2-T6 `Done` deÄŸildir ve diagnostic retry Ã§alÄ±ÅŸtÄ±rÄ±lmamÄ±ÅŸtÄ±r.
+
+**SÄ±radaki uygulanabilir kapÄ±:** E2-T6-D1-R1 iÃ§in yalnÄ±z aÃ§Ä±k insan production onayÄ± sonrasÄ±nda tek read-only diagnostic. E2 `Done` olmadÄ±ÄŸÄ± iÃ§in E4-T1 baÄŸÄ±mlÄ±lÄ±k kapÄ±sÄ± henÃ¼z aÃ§Ä±lmamÄ±ÅŸtÄ±r; production onayÄ± gelmeden E4 kodlamasÄ± baÅŸlatÄ±lmaz.
+
+### E2-T6-D2 task aynasÄ± â€” capsule-independent current-state safety audit
+
+**AmaÃ§:** D1'e ait tÃ¼ketilmiÅŸ operator capsule/outcome sidecar'Ä±nÄ±n yeni Ã§alÄ±ÅŸma ortamÄ±nda bulunmamasÄ± nedeniyle geÃ§miÅŸ sonucu tahmin ederek yeniden Ã¼retmeden, production'Ä±n bugÃ¼n yeni bir E2-T6 kabulÃ¼ne hazÄ±rlanmasÄ±nÄ±n gÃ¼venli olup olmadÄ±ÄŸÄ±nÄ± tek salt-okuma isteÄŸiyle belirlemek.
+
+**Kapsam:** Merge edilmiÅŸ V3 preflight'in 21 kapÄ±sÄ±nÄ± yeniden kullanan checksum/main-bound audit operatorÃ¼; exact insan confirmation; tek Management API read-only request; sÄ±fÄ±r retry; yalnÄ±z baÅŸarÄ±sÄ±z gate kodlarÄ± ile `safeToPrepareFreshAcceptance` kararÄ±; production count, identity, raw row ve raw error ifÅŸa etmeyen Ã§Ä±ktÄ±.
+
+**Kapsam dÄ±ÅŸÄ±:** Eski capsule/outcome rekonstrÃ¼ksiyonu, V3 diagnostic veya transaction retry, E2-T6 PASS iddiasÄ±, fixture write, cleanup, schema/policy/grant/ledger/data/environment/deployment deÄŸiÅŸikliÄŸi ve E2-T7 execution.
+
+**Kabul kriterleri:** Query tek read-only `WITH` statement'tÄ±r; exact 21 gate allowlist/boolean/integer contract fail-closed doÄŸrulanÄ±r; query/contract/prerequisite hatalarÄ± ayrÄ± gÃ¼venli kodlara dÃ¶nÃ¼ÅŸÃ¼r; hiÃ§bir count veya identity raporlanmaz; full/security CI PASS. Audit PASS yalnÄ±z yeni ve ayrÄ± isim alanlÄ± acceptance hazÄ±rlÄ±ÄŸÄ±na izin verir; E2-T6'yÄ± `Done` yapmaz.
+
+**GerÃ§ekleÅŸen:** PR #74 merge commit `6b2618571ded9076530b6294df313d848f7e4c4a` ve post-merge `main` CI PASS sonrasÄ±nda aÃ§Ä±k insan production onayÄ± alÄ±ndÄ±. Audit production'a tam bir read-only istek gÃ¶nderdi, 21/21 gate PASS verdi, baÅŸarÄ±sÄ±z gate kodu Ã¼retmedi ve `safeToPrepareFreshAcceptance:true` sonucunu dÃ¶ndÃ¼rdÃ¼. Production count/identity ifÅŸa edilmedi; retry, write, cleanup, schema/policy/grant/ledger/data/environment/deployment deÄŸiÅŸikliÄŸi yapÄ±lmadÄ±.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/current-state-audit-v1.json` ve executable redaction/contract testi.
+
+**Durum:** `Done` â€” repository paketi, PR/CI, tek insan onaylÄ± read-only production audit ve redacted evidence tamamlandÄ±. Bu sonuÃ§ E2-T6 kabulÃ¼nÃ¼ `Done` yapmaz; yalnÄ±z yeni ve ayrÄ± namespace/version kullanan fresh acceptance hazÄ±rlÄ±ÄŸÄ±na gÃ¼venli geÃ§iÅŸ kapÄ±sÄ±nÄ± aÃ§ar. E2-T6/T7 `Verification` ve parent E2 `In progress` kalÄ±r.
+
+**SÄ±radaki uygulanabilir iÅŸ:** E2-T6-D3 fresh namespaced acceptance preparation. Bu repository hazÄ±rlÄ±ÄŸÄ± production iÅŸlemi deÄŸildir; ilerideki preflight ve rollback-only transaction ayrÄ± aÃ§Ä±k production onaylarÄ±na tabi kalÄ±r.
+
+### E2-T6-D3 task aynasÄ± â€” fresh namespaced V4 acceptance preparation
+
+**AmaÃ§:** D2 current-state safety audit PASS sonrasÄ±nda geÃ§miÅŸ V1/V2/V3 operation veya capsule'larÄ±nÄ± tekrar kullanmadan, E2-T6'nÄ±n 16-case canlÄ± RLS kabulÃ¼nÃ¼ yeni `e2_t6_rls_v4` namespace/version ile gÃ¼venli biÃ§imde yeniden hazÄ±rlamak.
+
+**Kapsam:** PR #75 merge main binding; V4 checksum-bound 21-gate preflight; iki distinct eligible user; corrected canonical fixture; intact 16-case rollback-only transaction; 19-gate mandatory postcheck; bÃ¼tÃ¼n historical E2-T6 namespace'lerinde aggregate residue-zero kapÄ±sÄ±; tek kullanÄ±mlÄ±k repository-dÄ±ÅŸÄ± state/outcome; safe terminal code ve redacted evidence.
+
+**Kapsam dÄ±ÅŸÄ±:** Bu PR'da production preflight/transaction/postcheck, geÃ§miÅŸ operation retry, cleanup, persistent DDL, schema/policy/grant/ledger/data/environment/deployment deÄŸiÅŸikliÄŸi ve E2-T7 execution.
+
+**Kabul kriterleri:** V4 operation/fixture/artifact isimleri distinct olur; preflight ve postcheck bÃ¼tÃ¼n E2-T6 namespace residue'sunu fail-closed izler; transaction tek outer `BEGIN`/zorunlu `ROLLBACK` taÅŸÄ±r ve V3 disposable-corrected contract'Ä± korur; operator query/gate/transaction/postcheck hatalarÄ±nÄ± gÃ¼venli terminal kodlarla ayÄ±rÄ±r; capsule tekrar kullanÄ±lamaz; focused/full/security CI PASS.
+
+**GerÃ§ekleÅŸen:** Preparation PR #76 merge commit `2dc3da54d1a3415bc5b4272e8f51970fd9c03bca` ve post-merge `main` CI PASS oldu. AyrÄ± aÃ§Ä±k insan production onayÄ±yla V4 preflight tam bir kez gÃ¶nderildi; repository full regression 452/452 ve canlÄ± 21/21 gate PASS sonrasÄ±nda repository-dÄ±ÅŸÄ± tek kullanÄ±mlÄ±k capsule `APPROVAL_READY` oluÅŸturuldu. Transaction request sayÄ±sÄ± sÄ±fÄ±rdÄ±r; production count/identity ifÅŸa edilmedi ve write/cleanup/deployment yapÄ±lmadÄ±.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/v4-preflight-live.json`; operator-local beÅŸ baseline source control'a alÄ±nmaz.
+
+**Durum:** `Verification` â€” preparation ve preflight PASS; rollback-only transaction ile mandatory postcheck henÃ¼z Ã§alÄ±ÅŸtÄ±rÄ±lmadÄ±. Bunlar yalnÄ±z ayrÄ± aÃ§Ä±k production onayÄ±ndan sonra tek execute akÄ±ÅŸÄ±nda gÃ¶nderilir. Redacted evidence review PASS olmadan E2-T6 `Done` deÄŸildir; E2-T7 `Verification` ve parent E2 `In progress` kalÄ±r.
+
+### E2-T6-D3-R1 task aynasÄ± â€” V4 postcheck failure diagnostic
+
+**Incident:** PR #77 merge ve post-merge CI sonrasÄ±nda aÃ§Ä±k insan production onayÄ±yla V4 execute tam bir kez Ã§alÄ±ÅŸtÄ±rÄ±ldÄ±. Transaction response 16-case evidence converter'dan geÃ§ti; mandatory postcheck tam bir kez gÃ¶nderildi ve terminal outcome `POSTCHECK_FAILED` oldu. Capsule `CONSUMED`; transaction/postcheck retry edilmedi.
+
+**AmaÃ§:** BaÅŸarÄ±lÄ± transaction evidence ile baÅŸarÄ±sÄ±z postcheck sonucunu, tÃ¼ketilmiÅŸ V4 capsule/outcome'a exact baÄŸlanan tek read-only diagnostic ile yalnÄ±z failed gate code seviyesinde ayÄ±rmak.
+
+**Kapsam:** V4 state/outcome binding; exact confirmation; mevcut postcheck'in operator-local baseline ile tek read-only Ã§alÄ±ÅŸtÄ±rÄ±lmasÄ±; count/identity/raw error iÃ§ermeyen allowlisted sonuÃ§; query/contract/prerequisite safe-code ayrÄ±mÄ±; executable redaction testi.
+
+**Kapsam dÄ±ÅŸÄ±:** Bu PR'da production diagnostic, transaction/postcheck retry, cleanup, write, schema/policy/grant/ledger/data/environment/deployment deÄŸiÅŸikliÄŸi ve E2-T7 execution.
+
+**Durum:** `Verification` â€” diagnostic preparation PR/CI/merge ve ayrÄ± aÃ§Ä±k production onayÄ±yla tek diagnostic tamamlanmadan E2-T6 `Done` deÄŸildir. V4 transaction veya mandatory postcheck hiÃ§bir koÅŸulda tekrar gÃ¶nderilmez.
+
+### E2-T6-D3-R2 task aynasÄ± â€” safe diagnostic shape classification
+
+**Incident:** PR #78 merge ve post-merge CI sonrasÄ±nda aÃ§Ä±k insan production onayÄ±yla ilk V4 diagnostic tam bir kez gÃ¶nderildi. Query aÅŸamasÄ± tamamlandÄ± fakat strict result contract `DIAGNOSTIC_CONTRACT_FAILED` Ã¼retti. Diagnostic retry edilmedi; production count/identity/raw result ifÅŸa edilmedi.
+
+**DÃ¼zeltme:** Diagnostic yalnÄ±z allowlisted gate kodlarÄ± Ã¼zerinden `failed`, `missing`, `duplicate` ve `malformed` listeleri ile bilinmeyen gate varlÄ±ÄŸÄ±nÄ± boolean olarak sÄ±nÄ±flandÄ±rÄ±r. Bilinmeyen deÄŸer asla echo edilmez. BÃ¶ylece structural mismatch gÃ¼venli biÃ§imde teÅŸhis edilirken count, identity, raw row veya raw error aÃ§Ä±ÄŸa Ã§Ä±kmaz.
+
+**Durum:** `Verification` â€” R2 PR/CI/merge ve ayrÄ± aÃ§Ä±k production onayÄ±yla tek yeni read-only shape diagnostic tamamlanmadan E2-T6 `Done` deÄŸildir. Ã–nceki diagnostic, transaction veya mandatory postcheck retry edilmez.
+
+### E2-T6-D3-R3 task aynasÄ± â€” zero-baseline-safe corrective diagnostic
+
+**Bulgu:** PR #79 merge ve post-merge CI sonrasÄ±nda aÃ§Ä±k insan production onayÄ±yla shape diagnostic tam bir kez gÃ¶nderildi. SonuÃ§ 18 gate, sÄ±fÄ±r failed/duplicate/malformed/unknown ve yalnÄ±z `DATASET_V2_BASELINE` missing oldu. Bu, Dataset V2 baÅŸlangÄ±Ã§ nÃ¼fusu sÄ±fÄ±rken `count(*) ... cross join expected ... group by` ifadesinin sÄ±fÄ±r input group nedeniyle gate satÄ±rÄ± Ã¼retmemesinden kaynaklanan deterministic SQL result-shape hatasÄ±dÄ±r; gÃ¼venlik gate failure veya residue kanÄ±tÄ± deÄŸildir.
+
+**DÃ¼zeltme:** ÃœÃ§ population baseline gate'i zero-row-safe scalar subquery olarak Ã¼reten ayrÄ± read-only corrective diagnostic SQL'i hazÄ±rlanÄ±r. Original mandatory postcheck ve checksum-bound acceptance artefaktÄ± deÄŸiÅŸtirilmez; consumed transaction/postcheck tekrar edilmez. Corrective diagnostic exact state baselines ile 19 gate'i tek istekte deÄŸerlendirir.
+
+**GerÃ§ekleÅŸen:** PR #80 merge commit `ed783c4f79defe10800bf9656f6945892a9e2ab2` ve post-merge CI PASS sonrasÄ±nda aÃ§Ä±k insan production onayÄ±yla zero-baseline-safe corrective diagnostic tam bir kez gÃ¶nderildi. SonuÃ§ 19/19 PASS; failed/missing/duplicate/malformed gate yok, unknown gate yok, current postcheck PASS. Production count/identity ifÅŸa edilmedi; diagnostic retry, transaction/postcheck retry, cleanup, write veya deployment yapÄ±lmadÄ±.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t6-rls/v4-corrective-diagnostic-live.json` ve executable exact/redaction testi.
+
+**Kabul Ã¶nerisi:** V4 21/21 preflight PASS, corrected canonical 16-case transaction evidence PASS, mandatory rollback, terminal observability, deterministic missing-gate root cause ve zero-safe 19/19 current postcheck PASS birlikte E2-T6 kabul zincirini tamamlar. Original mandatory postcheck'in `POSTCHECK_FAILED` sonucu silinmez; zero-baseline SQL shape sapmasÄ± olarak evidence zincirinde korunur.
+
+**Durum:** `Done` â€” closeout PR #81 merge commit `97e380daa37dd38d811d918c8c5f8e121100af7f`, post-merge Security/Full Regression ve aÃ§Ä±k insan iÅŸ kabulÃ¼ tamamlandÄ±. E2-T7 final no-change acceptance sÄ±radaki uygulanabilir iÅŸtir; parent E2, T7/T8 tamamlanana kadar `In progress` kalÄ±r.
+
+### E2-T7-A task aynasÄ± â€” V3/V4 final residue coverage
+
+**AmaÃ§:** E2-T7 final no-change kabulÃ¼nÃ¼n, ilk hazÄ±rlÄ±ktan sonra eklenen E2-T6 V3 ve kabul edilen V4 canonical fixture anahtarlarÄ±nÄ± da eksiksiz kapsamasÄ±nÄ± saÄŸlamak.
+
+**Kapsam:** Fixture inventory'ye V3/V4 escaped canonical prefix eklenmesi; baseline ve final read-only selector'larÄ±nÄ±n V1â€“V4 bÃ¼tÃ¼n T6 nesillerini hem `E2_T6_RESIDUE` hem `TOTAL_E2_RESIDUE` kapÄ±larÄ±nda izlemesi; runbook ve executable exact-source testlerinin gÃ¼ncellenmesi.
+
+**Kapsam dÄ±ÅŸÄ±:** Bu PR'da production baseline/final query, cleanup/delete, data/schema/policy/grant/ledger/environment/deployment deÄŸiÅŸikliÄŸi ve E2-T8 execution.
+
+**Kabul kriterleri:** Inventory sekiz exact/prefix kaynaÄŸÄ± taÅŸÄ±r; V3/V4 prefix'leri committed transaction entity key kaynaklarÄ±yla eÅŸleÅŸir; iki read-only SQL aynÄ± selector setini kullanÄ±r; broad wildcard yoktur; converter contract ve full/security CI PASS.
+
+**Durum:** `Verification` â€” repository preparation PR/CI/merge tamamlanmadan ve ayrÄ± aÃ§Ä±k production onayÄ±yla E2-T7 baseline/final evidence ile insan review'Ä± PASS olmadan E2-T7 `Done` deÄŸildir.
+
+### E2-T7-B task aynasÄ± â€” fail-closed baseline/final operator
+
+**AmaÃ§:** E2-T7'nin 19-gate baseline ve final no-change kontrollerini manuel placeholder veya sonuÃ§ birleÅŸtirmesi olmadan, checksum/main-bound ve tek kullanÄ±mlÄ±k operator akÄ±ÅŸÄ±yla yÃ¼rÃ¼tmek.
+
+**Kapsam:** PR #83 merge main binding; full regression Ã¶n kapÄ±sÄ±; baseline query tek istek; 19 satÄ±rlÄ±k operator-local `0600` baseline sidecar ve beÅŸ scalar baseline capsule; exact confirmation; final placeholder otomasyonu; final query tek istek; redacted evidence converter; consumed state, zero retry ve safe terminal codes.
+
+**Kapsam dÄ±ÅŸÄ±:** Bu PR'da production baseline/final query, cleanup/delete, fixture operation tekrarÄ±, data/schema/policy/grant/ledger/environment/deployment deÄŸiÅŸikliÄŸi ve E2-T8 execution.
+
+**Kabul kriterleri:** Baseline/final SQL read-only kalÄ±r; operator bÃ¼tÃ¼n executable artefaktlara checksum-bound olur; baseline gate failure state oluÅŸturmaz; final gÃ¶nderilmeden Ã¶nce state consumed iÅŸaretlenir ve tekrar gÃ¶nderilemez; baseline/final raw count'larÄ± source control'a girmez; yalnÄ±z redacted PASS evidence paylaÅŸÄ±lÄ±r; focused/full/security CI PASS.
+
+**GerÃ§ekleÅŸen:** Operator preparation PR #84 merge commit `b3744f617895b93951c3fc873b38a94898caf1eb` ve post-merge CI PASS oldu. AyrÄ± aÃ§Ä±k insan production onayÄ±yla baseline tam bir kez gÃ¶nderildi; repository full regression 467/467 ve canlÄ± baseline 19/19 PASS. Repository-dÄ±ÅŸÄ± `0600` baseline sidecar ile tek kullanÄ±mlÄ±k `APPROVAL_READY` capsule oluÅŸturuldu. Final request sÄ±fÄ±r; production count/identity ifÅŸa edilmedi ve retry/cleanup/write/deployment yapÄ±lmadÄ±.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t7-cleanup/v2-baseline-live.json`; ham baseline satÄ±rlarÄ± ve beÅŸ scalar deÄŸer source control'a alÄ±nmaz.
+
+**Durum:** `Verification` â€” operator preparation ve baseline PASS; final no-change query henÃ¼z Ã§alÄ±ÅŸtÄ±rÄ±lmadÄ±. AyrÄ± aÃ§Ä±k production onayÄ±yla tek final request, redacted evidence ve insan review PASS olmadan E2-T7 `Done` deÄŸildir.
+
+### E2-T7-B-D1 task aynasÄ± â€” final evidence corrective diagnostic
+
+**AmaÃ§:** Tek kullanÄ±mlÄ±k E2-T7 final sorgusu veri deÄŸiÅŸikliÄŸi yapmadan tamamlandÄ±ÄŸÄ± halde evidence sÃ¶zleÅŸmesinin sonucu reddetmesinin nedenini, production adetleri ve kimlikleri yayÄ±mlamadan sÄ±nÄ±flandÄ±rmak.
+
+**GerÃ§ekleÅŸen (2026-08-29):** AÃ§Ä±k insan production onayÄ±yla E2-T7-B final no-change sorgusu yalnÄ±z bir kez gÃ¶nderildi. Sorgu hatasÄ± oluÅŸmadÄ±; sonuÃ§ evidence katmanÄ±nda `FINAL_EVIDENCE_FAILED` gÃ¼venli koduyla fail-closed oldu. KapsÃ¼l `CONSUMED` durumundadÄ±r, outcome Ã¼retilmemiÅŸtir ve retry yapÄ±lmayacaktÄ±r.
+
+**DÃ¼zeltme paketi:** AyrÄ± `e2_t7_final_diagnostic_v1` iÅŸlemi, tÃ¼ketilmiÅŸ baÅŸarÄ±sÄ±z kapsÃ¼lÃ¼ ÅŸart koÅŸar; aynÄ± 19 kapÄ±yÄ± tek salt-okunur sorguyla yalnÄ±z `check_code` ve boolean `passed` biÃ§iminde sÄ±nÄ±flandÄ±rÄ±r. Ham/Ã¶zet production adetleri, beklenen deÄŸerler ve kimlikler sonuÃ§tan Ã§Ä±karÄ±lmÄ±ÅŸtÄ±r. TanÄ±lama da tek kullanÄ±mlÄ±dÄ±r ve sorgudan Ã¶nce tÃ¼ketilir.
+
+**Durum:** `Verification` â€” repository test/CI/merge tamamlandÄ±ktan sonra ayrÄ± aÃ§Ä±k insan production onayÄ± olmadan tanÄ±lama Ã§alÄ±ÅŸtÄ±rÄ±lmaz. TanÄ±lama bir kabul retry'Ä± veya E2-T7 PASS kanÄ±tÄ± deÄŸildir; gÃ¼venli dÃ¼zeltme kararÄ±nÄ±n girdisidir.
+
+### E2-T7-B-D1-R1 task aynasÄ± â€” diagnostic CLI baÄŸlantÄ± dÃ¼zeltmesi
+
+**GerÃ§ekleÅŸen (2026-08-29):** PR #86 merge ve post-merge CI PASS sonrasÄ±nda aÃ§Ä±k insan production onayÄ±yla tanÄ±lama baÅŸlatÄ±ldÄ±; CLI var olmayan `createClient` sembolÃ¼nÃ¼ Ã§aÄŸÄ±rdÄ±ÄŸÄ± iÃ§in Management API istemcisi kurulmadan yerel olarak durdu. Production sorgusu sÄ±fÄ±r, diagnostic outcome yok ve kapsÃ¼l tÃ¼ketilmedi.
+
+**DÃ¼zeltme:** CLI repository'nin gerÃ§ek `createManagementClient` fabrikasÄ±na baÄŸlandÄ±; import sÄ±rasÄ±nda yan etki Ã¼retmeyen `main` sÄ±nÄ±rÄ± ve argÃ¼man/fabrika regresyon testi eklendi.
+
+**Durum:** `Verification` â€” dÃ¼zeltme PR/CI/merge tamamlanmadan production tanÄ±lamasÄ± Ã§alÄ±ÅŸtÄ±rÄ±lmaz. Ä°lk onaylÄ± giriÅŸim production'a ulaÅŸmadÄ±ÄŸÄ± iÃ§in ayrÄ± production sorgusu oluÅŸmamÄ±ÅŸtÄ±r.
+
+### E2-T7-B-D2 task aynasÄ± â€” named-baseline corrective diagnostic
+
+**GerÃ§ekleÅŸen (2026-08-29):** AÃ§Ä±k insan production onayÄ±yla `e2_t7_final_diagnostic_v1` tek salt-okunur request olarak tamamlandÄ±. Redacted sonuÃ§ yalnÄ±z beÅŸ operator-local baseline kapÄ±sÄ±nÄ± (`DATASET_V2_BASELINE`, `DATASET_V1_BASELINE`, `SNAPSHOT_BASELINE`, `CONNECTED_CONNECTIONS`, `ENCRYPTED_TOKEN_ROWS`) baÅŸarÄ±sÄ±z sÄ±nÄ±flandÄ±rdÄ±; request `1`, retry `0`, production count/identity exposure `false`.
+
+**KÃ¶k neden:** V1/final operator beÅŸ Ã¶zdeÅŸ `(-1)::bigint` placeholder'Ä±nÄ± dosyadaki pozisyona gÃ¶re, fakat baseline anahtarlarÄ±nÄ± farklÄ± bir sÄ±rayla yerleÅŸtirdi. Bu nedenle beÅŸ baseline deÄŸeri yanlÄ±ÅŸ kapÄ±lara baÄŸlandÄ±; tanÄ±lama gerÃ§ek bir residue/security ihlali gÃ¶stermedi.
+
+**DÃ¼zeltme paketi:** V2 tanÄ±lama her baseline iÃ§in ayrÄ± ve testle bire bir doÄŸrulanan marker kullanÄ±r. V1 diagnostic tÃ¼ketilmiÅŸ olmalÄ±; V2 sorgudan Ã¶nce tÃ¼ketilir, tek request/read-only kalÄ±r ve yalnÄ±z check code/boolean sÄ±nÄ±flandÄ±rmasÄ± dÃ¶ndÃ¼rÃ¼r.
+
+**Durum:** `Verification` â€” repository PR/CI/merge ve ayrÄ± aÃ§Ä±k insan production onayÄ± tamamlanmadan V2 tanÄ±lama Ã§alÄ±ÅŸtÄ±rÄ±lmaz. V1 sonucu E2-T7 PASS sayÄ±lmaz ve final kabul retry'Ä± yapÄ±lmaz.
+
+### E2-T7-B-D2 evidence ve review kaydÄ±
+
+**GerÃ§ekleÅŸen (2026-08-29):** PR #88 merge commit `e7aa1d981f59f06de278a2a8a74782a5d5cc86cc` ve post-merge Security/Full Regression PASS sonrasÄ±nda aÃ§Ä±k insan production onayÄ±yla named-baseline V2 tanÄ±lamasÄ± tek kez Ã§alÄ±ÅŸtÄ±rÄ±ldÄ±. SonuÃ§ `ALL_GATES_PASS`, 19/19 gate, failed code boÅŸ, request `1`, retry `0`; production count ve identity yayÄ±mlanmadÄ±.
+
+**Karar anlamÄ±:** V1/final baÅŸarÄ±sÄ±zlÄ±ÄŸÄ± production drift veya residue kanÄ±tÄ± deÄŸildir; positional placeholder eÅŸleme kusurudur. AynÄ± operator-local baseline deÄŸerleri isimleriyle doÄŸru kapÄ±lara baÄŸlandÄ±ÄŸÄ±nda tÃ¼m residue, Dataset V2/V1/snapshot, ledger/OAuth/token/schema/RLS/policy/grant ve persistent-object kontrolleri PASS olmuÅŸtur.
+
+**Evidence:** `artifacts/dataset-v2-acceptance/e2-t7-cleanup/v2-diagnostic-live.json` yalnÄ±z allowlisted/redacted sonuÃ§ taÅŸÄ±r. Ham sayÄ±mlar ve kimlikler source control'a alÄ±nmamÄ±ÅŸtÄ±r.
+
+**Durum:** `Done` â€” evidence PR #89 merge commit `c68ffce246a17c8068280cd965235ec82528f6c6`, post-merge Security/Full Regression ve aÃ§Ä±k insan iÅŸ kabulÃ¼ tamamlandÄ±. E2-T8 `Verification` ve parent E2 `In progress` kalÄ±r.
+
+
+### E2-T7 closeout kaydÄ±
+
+**GerÃ§ekleÅŸen (2026-08-29):** Baseline 19/19 PASS sonrasÄ±nda tek final request evidence katmanÄ±nda positional placeholder kusuruyla fail-closed oldu ve retry edilmedi. V1 read-only tanÄ±lama beÅŸ baseline kapÄ±sÄ±nÄ± sÄ±nÄ±flandÄ±rdÄ±. Root cause repository'de doÄŸrulandÄ±; named-baseline V2 read-only tanÄ±lama tek request ile 19/19 `ALL_GATES_PASS` verdi. PR #89 merge commit `c68ffce246a17c8068280cd965235ec82528f6c6`, post-merge CI ve aÃ§Ä±k insan iÅŸ kabulÃ¼ tamamlandÄ±.
+
+**KapanÄ±ÅŸ kararÄ±:** E2-T7 `Done`. Production data/schema/ledger/policy/grant/environment/deployment deÄŸiÅŸmedi; fixture residue ve persistent evidence object kapÄ±larÄ± PASS; raw count/identity paylaÅŸÄ±lmadÄ±. Parent E2 yalnÄ±z E2-T8 tamamlanana kadar `In progress` kalÄ±r.
+
+### E2-T8-A task aynasÄ± â€” source capture operatorÃ¼
+
+**AmaÃ§:** Production application-schema current-state baseline hazÄ±rlÄ±ÄŸÄ± iÃ§in source inventory ve schema-only capture'Ä± iki ayrÄ± insan onayÄ±yla, tek kullanÄ±mlÄ±k kapsÃ¼l ve repository-dÄ±ÅŸÄ± karantina sÄ±nÄ±rÄ±nda yÃ¼rÃ¼tmek.
+
+**Kapsam:** `E2-T8-A1` read-only source inventory preflight; `E2-T8-A2` fixed `public` schema-only/no-owner capture; `E2-T8-A3` approved-main/artifact checksum ve external `0600` state/inventory; `E2-T8-A4` strict captured-SQL validator ile redacted checksum sonucu.
+
+**Kabul kriterleri:** Source inventory tek read-only request; unclassified/duplicate/malformed object fail-closed; raw inventory repository dÄ±ÅŸÄ±nda; capture yalnÄ±z exact ikinci confirmation ile; raw SQL yalnÄ±z repository dÄ±ÅŸÄ± `0700/0600` karantinada; row/identity/URI/SQL Ã§Ä±ktÄ±sÄ± paylaÅŸÄ±lmaz; state sorgu/capture Ã¶ncesi tÃ¼ketilir ve retry yoktur.
+
+**GerÃ§ekleÅŸen (2026-08-29):** PR #90 merge commit `a5e0917acf650e753161a97a85baf9e851d967b9` ve post-merge CI PASS sonrasÄ±nda capture operator repository paketi hazÄ±rlandÄ±. Bu pakette production inventory/capture, target provisioning, restore, migration, ledger, data/schema/policy/grant/environment/deployment deÄŸiÅŸikliÄŸi yapÄ±lmadÄ±.
+
+**Durum:** `Verification` â€” PR/CI/merge sonrasÄ±nda source inventory preflight iÃ§in ayrÄ± aÃ§Ä±k production onayÄ±; preflight PASS sonrasÄ±nda schema-only capture iÃ§in ikinci aÃ§Ä±k production onayÄ± gerekir. Static testler actual capture veya restore deÄŸildir.
+
+> **2026-09-07 â€” Pinterest Paket 1 canlÄ± corrective:** Ä°kinci Connect denemesi environment readiness kontrolÃ¼nÃ¼ geÃ§ti ancak `PINTEREST_OAUTH_START_FAILED` ile OAuth transaction oluÅŸturulmadan durdu. Repository migration denetiminde kesin kÃ¶k neden bulundu: `oauth_transactions_provider_check` izin listesinde `pinterest` yoktu. Pinterest resmi V5 OpenAPI tanÄ±mÄ±ndaki authorization/token URL'leri mevcut runtime ile eÅŸleÅŸtiÄŸinden provider URL'si deÄŸiÅŸtirilmedi. Constraint'e `pinterest` eklendi; Paket 1 canlÄ± OAuth/account-selection doÄŸrulamasÄ± alÄ±nana kadar `Verification` durumundadÄ±r.
+
+> **2026-09-07 â€” Pinterest Paket 1 advertiser discovery corrective:** CanlÄ± OAuth authorization/callback baÅŸarÄ±yla tamamlandÄ± ve encrypted connection yenilendi; Ã¶nceki OAuth transaction engelinin kapandÄ±ÄŸÄ± doÄŸrulandÄ±. Account picker'Ä±n boÅŸ kalmasÄ±nÄ±n kesin nedeni Pinterest resmi V5 `AdAccount.time_zone` alanÄ±nÄ±n normalizer tarafÄ±ndan okunmamasÄ±ydÄ± (`timezone`/`timezone_name` bekleniyordu). Resmi `time_zone` desteÄŸi eklendi; eksik identity/currency/timezone fail-closed kuralÄ± korundu. Paket 1 canlÄ± account-selection kanÄ±tÄ±na kadar `Verification` durumundadÄ±r.
+
+> **2026-09-07 â€” Pinterest Paket 1 ID-only discovery corrective:** `time_zone` dÃ¼zeltmesi sonrasÄ±nda canlÄ± picker yine boÅŸ kaldÄ±. Resmi Pinterest V5 OpenAPI yeniden incelendi: list endpoint'indeki `AdAccount` ÅŸemasÄ±nda yalnÄ±z `id` zorunlu; `name`, `currency`, `time_zone` opsiyoneldir. DolayÄ±sÄ±yla list row'unun tam profil olduÄŸu varsayÄ±mÄ± kaldÄ±rÄ±ldÄ±. Runtime accessible ID listesini alÄ±p her ID'yi resmi `/ad_accounts/{id}` ile, mevcut Ã¼Ã§ hesap sÄ±nÄ±rÄ± iÃ§inde zenginleÅŸtirir; eksik alan uydurmadan fail-closed kalÄ±r. CanlÄ± account-selection kanÄ±tÄ±na kadar Paket 1 `Verification` durumundadÄ±r.
+
+> **2026-09-07 â€” Pinterest Ã¼rÃ¼n kararÄ± / PARKED:** KullanÄ±cÄ± Pinterest entegrasyonundan vazgeÃ§ti. Paket 1 `Stopped/Parked`; Paket 2â€“3 `Not started/Parked` durumuna alÄ±ndÄ±. Yeni OAuth start/callback, provider token deÄŸiÅŸimi ve account discovery kapatÄ±ldÄ±; dashboard `Parked` gÃ¶sterir. Mevcut encrypted connection/token, ownership ve tarihsel snapshot kayÄ±tlarÄ± destructive olarak silinmez. Yeniden baÅŸlatma yalnÄ±z yeni aÃ§Ä±k kullanÄ±cÄ± iÅŸ kararÄ±yla mÃ¼mkÃ¼ndÃ¼r.
+
+### 30 EylÃ¼l 2026 â€” BaÄŸlayÄ±cÄ± Shopify Embedded UI anayasasÄ± ve R7-B6 corrective kapÄ±sÄ±
+
+- `docs/SHOPIFY_EMBEDDED_UI_CONSTITUTION.md` bÃ¼tÃ¼n Shopify embedded UI iÅŸleri iÃ§in baÄŸlayÄ±cÄ±dÄ±r; executable karÅŸÄ±lÄ±ÄŸÄ± `contracts/shopify/shopify-embedded-ui-constitution-v1.json` dosyasÄ±dÄ±r.
+- UI yalnÄ±z Shopify App Bridge ve gÃ¼ncel stabil App Home Polaris web componentleriyle kurulur. Raw HTML kontrolÃ¼, Ã¶zel component, inline CSS, literal renk, CSS ile Shopify taklidi ve standart button yerine `s-clickable` kullanÄ±mÄ± yasaktÄ±r.
+- Her task koddan Ã¶nce analist brief'i, state/copy matrisi ve exact resmÃ® Shopify component/property/variant eÅŸlemesi Ã¼retir. ResmÃ® karÅŸÄ±lÄ±k doÄŸrulanamÄ±yorsa implementation durur; tahmin yapÄ±lmaz.
+- Desktop gerÃ§ek Shopify Admin ve en az 320 px gerÃ§ek mobil Shopify Admin kanÄ±tÄ±, bÃ¼tÃ¼n loading/empty/error/cancel/success durumlarÄ± ve aÃ§Ä±k Ã¼rÃ¼n sahibi kabulÃ¼ olmadan iÅŸ `Done`, `PASS` veya `Accepted` sayÄ±lamaz ve merge edilemez.
+- Root `AGENTS.md`, task ÅŸablonu, PR checklist'i ve `tests/shopify-embedded-ui-constitution.test.js` bu kapÄ±yÄ± gelecek tasklara taÅŸÄ±r. BÃ¼tÃ¼n dondurulmuÅŸ Shopify UI contract'larÄ± merkezÃ® anayasayÄ± referans eder.
+- `e9cd2490f1e9a9c70213baf3f47feba8c264380f` Settings sunumu `s-clickable`, inline style ve literal renk kullandÄ±ÄŸÄ±; mobil/desktop gÃ¶rsel kabulÃ¼ geÃ§mediÄŸi iÃ§in R7-B6 aÃ§Ä±sÄ±ndan **FAIL / corrective work required** durumundadÄ±r. Bu governance paketi UI kodunu deÄŸiÅŸtirmez ve mevcut gÃ¶rÃ¼nÃ¼mÃ¼ tamamlandÄ± saymaz.

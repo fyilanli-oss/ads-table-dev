@@ -32,3 +32,19 @@ test("fallback policy forbids destructive local recovery and unrelated uploads",
     assert.ok(agents.includes(forbiddenAction), `Missing safety boundary: ${forbiddenAction}`);
   }
 });
+
+test("AGENTS enforces a zero local-only work finish gate", () => {
+  for (const requiredText of [
+    "## Zorunlu iş bitiş kapısı: local-only iş sıfır",
+    "doğrulanmamış local-only proje içeriği sıfır olmalıdır",
+    "beklenen commit SHA ve exact content/hash doğrulanır",
+    "merge bekleyen çalışma dahi GitHub branch/PR üzerinde dayanıklı olmalıdır",
+    "Yerel stash, reflog, worktree veya makine yedeği tek başına dayanıklı teslim ya da uzak yedek sayılmaz",
+    "uzak eşdeğeri ve kurtarılabilirliği doğrulanmadan silinmez",
+    "Repository ZIP veya günlük makine yedeği ikincil kurtarma katmanıdır",
+    "Git commit geçmişi, branch/tag, PR/issue ve diğer GitHub metadata'sının yerine geçmez",
+  ]) {
+    assert.ok(agents.includes(requiredText), `Missing finish-gate control: ${requiredText}`);
+  }
+});
+

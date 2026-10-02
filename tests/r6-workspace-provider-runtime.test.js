@@ -132,6 +132,22 @@ test('R6 resolves the R6-R7 dependency cycle without early provider activation',
   assert.ok(contract.forbidden_until_later_gate.includes('tiktok_or_pinterest_activation'));
 });
 
+test('R6 separates provider lifecycle evidence from reporting completeness', () => {
+  const gate = contract.reporting_completeness_gate;
+  assert.equal(gate.status, 'OPEN');
+  assert.equal(gate.lifecycle_pass_is_reporting_completeness_pass, false);
+  assert.equal(gate.absence_of_provider_rows_is_zero_metric_evidence, false);
+  assert.equal(gate.unsupported_or_unobservable_metrics_must_not_be_coerced_to_zero, true);
+  assert.deepEqual(gate.providers.meta.required_hierarchy, ['campaign', 'ad_set', 'ad']);
+  assert.deepEqual(gate.providers.meta.required_observed_metrics, ['impressions', 'clicks', 'spend']);
+  assert.equal(gate.providers.meta.dataset_v2_non_empty_metric_acceptance, 'PENDING');
+  assert.deepEqual(gate.providers.google_ads.required_hierarchies.standard, ['campaign', 'ad_group', 'ad']);
+  assert.deepEqual(gate.providers.google_ads.required_hierarchies.performance_max, ['campaign', 'asset_group']);
+  assert.equal(gate.providers.google_ads.zero_metric_row_omission_must_not_be_interpreted_as_observed_zero, true);
+  assert.equal(gate.providers.google_ads.dataset_v2_non_empty_metric_acceptance, 'PENDING_UNTIL_REAL_PROVIDER_DATA_EXISTS');
+  assert.equal(gate.r7_b7_requires_all_provider_rows, true);
+});
+
 test('R6 preflight is read-only and fail-closed', () => {
   const sql = read('docs/security/sql/R6_WORKSPACE_RUNTIME_PREFLIGHT.sql');
   assert.match(sql, /PASS_PREPARATION_ONLY/);
@@ -143,7 +159,9 @@ test('R6 preflight is read-only and fail-closed', () => {
 
 test('Execution Plan records the failed C6 attempts and the verified-empty live corrective', () => {
   const plan = read('codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md');
-  assert.match(plan, /R6-D2 Klaviyo live PASS; R6-D3 Meta full lifecycle live PASS; R6-D4 Google Ads full lifecycle live PASS; R6-D5-K2 first non-empty Klaviyo write PASS; K3 data maturity pending/);
+  assert.match(plan, /R6-D iş aynası — In progress \/ lifecycle kanıtları korunuyor; üç-provider reporting completeness açık/);
+  assert.match(plan, /Meta gerçek non-empty hierarchy\/metrik kanıtını; Google Ads canlı veri yokken capability \+ verified-empty/);
+  assert.match(plan, /Lifecycle PASS reporting completeness PASS değildir; unsupported\/unobservable değerler `0`a çevrilmez/);
   assert.match(plan, /R6-D2-C2 Klaviyo satış kaynağı ürün sözleşmesi — PASS \/ C3 next/);
   assert.match(plan, /R6-D2-C3 salt-okunur satış kaynağı keşfi — Live PASS/);
   assert.match(plan, /R6-D2-C4 canonical satış kaynağı bağı — Live PASS/);
@@ -160,7 +178,7 @@ test('Execution Plan records the failed C6 attempts and the verified-empty live 
   assert.match(plan, /R6-D3-F Meta bağımsız Disconnect yaşam döngüsü — Production Disconnect and clean Reconnect PASS \/ R6-D3 complete/);
   assert.match(plan, /tamamlanmış E4\/E5\/E7.*yeniden geliştirilmedi/i);
   assert.match(plan, /R7-A.*R6-D/i);
-  assert.match(plan, /R7-A merchant acceptance PASS; R7-B1 Settings decision contract PASS; R7-B2–B4 merchant acceptance PASS; R7-B5-C1\/C2\/C3 repository checks PASS, production migration\/live acceptance pending; R7-B6 visual acceptance FAIL \/ corrective work required; UI constitution guard prepared; R7-B7 pending/i);
+  assert.match(plan, /R7-A merchant acceptance PASS; R7-B1 Settings decision contract PASS; R7-B2–B4 merchant acceptance PASS; R7-B5-C1\/C2\/C3 repository checks PASS, production migration\/live acceptance pending; R7-B6 visual acceptance FAIL \/ corrective work required; R7-B7 three-provider integrated acceptance pending/i);
   assert.match(plan, /SHOPIFY_EMBEDDED_UI_CONSTITUTION\.md/);
   assert.match(plan, /R7-B5-C3 Dataset cost boundary — Repository checks PASS \/ live acceptance pending/);
   assert.match(plan, /R7-B1 Settings ürün ve veri davranışı uzlaştırması — Contract PASS \/ implementation pending/);

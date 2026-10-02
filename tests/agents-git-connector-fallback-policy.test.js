@@ -15,7 +15,7 @@ test("AGENTS defines the Connector-first managed-worktree delivery model", () =>
     "görev bazlı Codex-managed worktree'de yapılır",
     "birincil uzak yol GitHub Connector'dır",
     "güncel uzak `main` kanıtı yoksa implementasyona başlanmaz",
-    "güncel blob SHA/content yeniden okunur",
+    "Güncel blob SHA/content yeniden okunur",
     "PR ve zorunlu CI PASS olmadan iş merge-ready sayılmaz",
     "Merge ayrıca açık kullanıcı onayı gerektirir.",
   ]) {

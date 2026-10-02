@@ -3787,6 +3787,9 @@ Bu V4 plan ile:
 
 ### 2 Ekim 2026 — Klaviyo email maliyet dağıtımı v2 ve 15 Ekim GA kapısı
 
+- Ad Analysis analytical leaf bağlayıcı sözleşmesi `contracts/dataset-v2-analytical-leaf-v2.json` dosyasıdır. Yayımlanmamış yerel v1 taslağındaki geçerli kararları korur: `Meta → Ad`, `Google Ads Standard → Ad`, `Google Performance Max → Asset Group`; sentetik Ad Group/Ad ve tekil PMax Asset tam finansal leaf sayılamaz.
+- Klaviyo Campaign bugün `Campaign → Campaign Message` leaf grain'inde kalır; `Campaign → Campaign Message → Campaign Variation` yalnız aşağıdaki 15 Ekim GA kapısı eksiksiz geçerse devreye alınabilir. Flow bugün ve hedefte `Flow → Flow Message` olarak kalır; `Flow Variation` varsayımı yasaktır. Klaviyo Audience yalnız targeting metadata'dır, performance leaf veya allocated spend owner değildir.
+- Analytical leaf v2 `contracts/r7b5-klaviyo-email-cost-allocation-v2.json` maliyet sözleşmesini değiştirmez; yalnız onun ürettiği `allocated_spend`i tüketir. Günlük maliyet, recipient ağırlığı, kanal kapsamı ve no-double-count kuralları yalnız r7b5 sözleşmesinin yetkisindedir.
 - Bağlayıcı executable karar `contracts/r7b5-klaviyo-email-cost-allocation-v2.json` dosyasıdır; `r7b5-klaviyo-estimated-30-day-email-spend-v1` silinmez, tarihsel karar olarak korunur.
 - Günlük Email toplamı `estimated_30_day_email_spend / 30` formülüyle sabittir. Aynı kapalı provider business date içindeki gerçek Campaign Message ve Flow Message Email leaf'lerine Klaviyo Reporting API `recipients` oranında dağıtılır: `row_spend = daily_email_cost * row_recipients / sum(eligible_row_recipients)`.
 - Recipient hacmi yalnız ağırlığı değiştirir; günlük toplamı değiştirmez. Tam maliyet her leaf'e kopyalanamaz, keyfî owner veya sentetik leaf üretilemez. Uygun recipient yoksa leaf spend `null`, account-day Email maliyeti ise tam bir kez `unallocated` kalır.

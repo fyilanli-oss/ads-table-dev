@@ -1,0 +1,197 @@
+{
+  "contract_id": "r7b5-klaviyo-email-cost-allocation-v2",
+  "version": "2.0.0",
+  "status": "decision_frozen_implementation_pending",
+  "effective_decision_date": "2026-10-02",
+  "supersedes": [
+    {
+      "contract_id": "r7b5-klaviyo-estimated-30-day-email-spend-v1",
+      "scope": "email cost allocation and Formula Engine propagation only",
+      "preserved_as": "historical decision record"
+    }
+  ],
+  "authoritative_sources": {
+    "checked_at": "2026-10-02",
+    "klaviyo_reporting_api": "https://developers.klaviyo.com/en/reference/reporting_api_overview",
+    "klaviyo_campaigns_api": "https://developers.klaviyo.com/en/v2026-04-15/reference/campaigns_api_overview",
+    "klaviyo_campaign_variation_beta": "https://developers.klaviyo.com/en/reference/get_message_for_campaign_variation_beta"
+  },
+  "scope": {
+    "included": [
+      "Klaviyo estimated 30-day email spend",
+      "closed provider business-day email cost",
+      "Campaign Message and Flow Message recipient-weighted allocation",
+      "Formula Engine propagation from raw Dataset V2 facts",
+      "2026-10-15 Campaign Variation GA revalidation gate"
+    ],
+    "excluded": [
+      "SMS spend",
+      "MMS spend",
+      "WhatsApp spend",
+      "provider mutation",
+      "production activation",
+      "historical backfill",
+      "runtime implementation in this contract-only package"
+    ]
+  },
+  "source_cost": {
+    "setting": "estimated_30_day_email_spend",
+    "source_currency_required": true,
+    "daily_formula": "estimated_30_day_email_spend / 30",
+    "period_semantics": "The estimate is divided by 30 for every closed provider business date; calendar-month length does not change the divisor.",
+    "immutable_daily_total": true
+  },
+  "eligible_leaf_rows": {
+    "channel": "email",
+    "grain": [
+      "campaign_message",
+      "flow_message"
+    ],
+    "provider_business_date_required": true,
+    "recipient_metric": "recipients",
+    "recipient_metric_source": "Klaviyo Reporting API",
+    "eligibility_formula": "channel == email AND provider_business_date == allocation_date AND recipients > 0",
+    "synthetic_leaf_forbidden": true
+  },
+  "allocation": {
+    "weight_formula": "row_recipients / sum(eligible_row_recipients)",
+    "row_spend_formula": "daily_email_cost * row_recipients / sum(eligible_row_recipients)",
+    "total_invariant": "sum(allocated_row_spend) == daily_email_cost",
+    "volume_weighted": true,
+    "copy_daily_cost_to_each_leaf": false,
+    "arbitrary_owner_forbidden": true,
+    "cross_day_allocation_forbidden": true,
+    "rounding": {
+      "calculation_precision": "full available decimal precision",
+      "persisted_currency_precision": "workspace monetary precision",
+      "residual_rule": "After deterministic ordering by canonical leaf identity ascending, assign the rounding residual to the final eligible row.",
+      "invariant_after_rounding": "Persisted row spend sums exactly to persisted account-day daily email cost."
+    },
+    "no_eligible_recipients": {
+      "leaf_spend": null,
+      "account_day_spend": "preserve daily_email_cost exactly once as unallocated email spend",
+      "synthetic_leaf": false,
+      "reason_code": "KLAVIYO_EMAIL_COST_UNALLOCATED_NO_RECIPIENTS"
+    }
+  },
+  "fx": {
+    "order": [
+      "calculate and allocate spend in source currency",
+      "aggregate raw monetary facts at the requested scope",
+      "apply the same canonical FX rate/date/provider provenance once to spend and every monetary fact",
+      "run Formula Engine in workspace reporting currency"
+    ],
+    "mixed_currency_formula_forbidden": true,
+    "double_conversion_forbidden": true
+  },
+  "dataset_v2": {
+    "persist_raw_facts_only": true,
+    "raw_facts": [
+      "impressions",
+      "funnel_click",
+      "checkout",
+      "checkout_value",
+      "purchase",
+      "purchase_value",
+      "allocated_spend",
+      "source_currency",
+      "reporting_currency",
+      "fx_rate",
+      "fx_date",
+      "fx_provider",
+      "provider_business_date",
+      "canonical_leaf_identity"
+    ],
+    "derived_metrics_persisted": false,
+    "derived_metrics_owner": "Formula Engine"
+  },
+  "formula_engine": {
+    "aggregate_raw_facts_before_formula": true,
+    "denominator_zero_or_unsupported": null,
+    "formulas": {
+      "sales": "purchase_value",
+      "abandoned": "max(checkout - purchase, 0)",
+      "abandoned_value": "max(checkout_value - purchase_value, 0)",
+      "ctr": "funnel_click / impressions * 100",
+      "cpc": "spend / funnel_click",
+      "roas": "sales / spend",
+      "cps": "spend / purchase",
+      "revenue": "sales - spend",
+      "revenue_margin": "revenue / sales * 100"
+    },
+    "cost_dependency": {
+      "recalculated_at_same_aggregate_scope_but_not_cost_dependent": [
+        "ctr",
+        "abandoned",
+        "abandoned_value"
+      ],
+      "directly_depends_on_allocated_spend": [
+        "cpc",
+        "roas",
+        "cps",
+        "revenue",
+        "revenue_margin"
+      ]
+    },
+    "naming": {
+      "canonical": [
+        "revenue",
+        "revenue_margin"
+      ],
+      "legacy_compatibility_only": [
+        "profit",
+        "margin"
+      ],
+      "legacy_semantics": {
+        "profit": "revenue",
+        "margin": "revenue_margin"
+      }
+    }
+  },
+  "support_and_aggregation": {
+    "formula_scope": "requested aggregate grain after support-aware raw fact aggregation",
+    "partial_total_as_full_total_forbidden": true,
+    "unsupported_input_result": null,
+    "double_count_guard": "A source fact and allocated spend row may contribute once to an aggregate."
+  },
+  "campaign_variation_ga_gate": {
+    "target_revision_date": "2026-10-15",
+    "automatic_activation_on_date": false,
+    "required_steps": [
+      "Read the current official Klaviyo 2026-10-15 GA documentation.",
+      "Revalidate Campaign -> Campaign Message -> Campaign Variation hierarchy.",
+      "Prove the identity mapping between Reporting API variation grouping and Campaign Variation API resource identity; never infer equality from labels or names.",
+      "Version Dataset V2 identity and Ad Analysis hierarchy contracts only after the mapping is proven.",
+      "Define variation-level recipient allocation without duplicating Campaign Message cost.",
+      "Test raw-fact and allocated-spend no-double-count invariants.",
+      "Run read-only preflight, repository tests and controlled non-empty live acceptance under separate approval gates."
+    ],
+    "campaign_target_hierarchy": [
+      "campaign",
+      "campaign_message",
+      "campaign_variation"
+    ],
+    "flow_target_hierarchy": [
+      "flow",
+      "flow_message"
+    ],
+    "flow_hierarchy_change_requires_official_evidence": true,
+    "reporting_variation_equals_resource_id_assumption_forbidden": true,
+    "production_backfill_requires_separate_approval": true
+  },
+  "acceptance": [
+    "For a daily cost of 10 and recipient counts 600, 300 and 100, persisted leaf spend is 6, 3 and 1.",
+    "Changing recipient volume changes weights but does not change the account-day daily email cost.",
+    "Eligible leaf spend sums exactly to the account-day daily email cost after rounding.",
+    "No eligible recipient rows preserve one account-day unallocated cost and create no synthetic leaf.",
+    "SMS, MMS and WhatsApp facts receive no share of email cost.",
+    "Dataset V2 stores raw facts and allocated spend, not derived Formula Engine KPIs.",
+    "Formula Engine computes CPC, ROAS, CPS, Revenue and Revenue Margin from allocated spend at the requested aggregate scope.",
+    "CTR, Abandoned and Abandoned Value remain raw-fact formulas at that same aggregate scope.",
+    "The 2026-10-15 date alone cannot activate variation-level identity, allocation, backfill or production writes."
+  ],
+  "rollback": {
+    "before_runtime_activation": "Remove no historical contract; supersede this version with a new versioned decision.",
+    "after_runtime_activation": "Feature-flag allocation writes off, keep raw facts and account-day cost auditable, and restore the last accepted allocation contract without deleting historical evidence."
+  }
+}

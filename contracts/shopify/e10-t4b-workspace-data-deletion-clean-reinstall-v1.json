@@ -1,0 +1,151 @@
+{
+  "contract_id": "e10-t4b-shopify-workspace-data-deletion-clean-reinstall-v1",
+  "version": "1.0.0",
+  "status": "decision_frozen_implementation_pending",
+  "effective_decision_date": "2026-10-02",
+  "authoritative_sources": {
+    "checked_at": "2026-10-02",
+    "shopify_privacy_law_compliance": "https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance",
+    "shopify_webhook_topics": "https://shopify.dev/docs/api/webhooks/latest",
+    "shopify_webhook_subscriptions": "https://shopify.dev/docs/apps/build/webhooks/subscribe"
+  },
+  "corrects_status_interpretation": {
+    "e10_t4_foundation": "contract and executable planner complete",
+    "operational_lifecycle": "not implemented or production accepted",
+    "done_must_not_mean": [
+      "mandatory compliance webhook registration proven",
+      "production deletion persistence active",
+      "production token or workspace deletion executed",
+      "clean reinstall accepted"
+    ]
+  },
+  "mandatory_webhooks": {
+    "compliance_topics": [
+      "customers/data_request",
+      "customers/redact",
+      "shop/redact"
+    ],
+    "app_uninstalled_operational_topic": "app/uninstalled",
+    "subscriptions_configured_in_app_configuration": true,
+    "valid_hmac_required": true,
+    "invalid_hmac_response": 401,
+    "valid_delivery_acknowledgement": "2xx after durable idempotent claim/enqueue",
+    "compliance_completion_deadline_days": 30,
+    "shop_redact_after_uninstall_hours": 48,
+    "shop_redact_not_emitted_if_reinstalled_before_delivery": true,
+    "replay_key": "shop_id + topic + webhook_event_id",
+    "raw_payload_or_personal_data_in_logs_forbidden": true
+  },
+  "uninstall": {
+    "authority": "verified app/uninstalled webhook or verified Shopify admin event",
+    "immediate_order": [
+      "disable workspace access to new provider operations",
+      "pause and prevent all SnapshotJobs",
+      "invalidate or remove local Shopify session and offline token material",
+      "mark workspace uninstall_pending_redaction",
+      "record redacted lifecycle evidence"
+    ],
+    "analytics_deleted_immediately": false,
+    "provider_calls_after_uninstall": false,
+    "automatic_shared_provider_grant_revoke": false,
+    "reason": "Uninstall is an access-stop event; Shopify shop/redact and the approved retention/deletion policy govern destructive workspace deletion."
+  },
+  "shop_redact": {
+    "authority": "verified shop/redact compliance webhook",
+    "ordered_actions": [
+      "durably claim the webhook",
+      "disable access and schedules",
+      "remove Shopify and provider credential material",
+      "delete or irreversibly anonymize shop-associated personal and workspace data according to the approved deletion manifest",
+      "record minimum redacted deletion evidence",
+      "complete the idempotent claim"
+    ],
+    "legal_retention_exception": "retain only data required by documented law or dispute obligations, isolated from product use and recorded with reason and expiry",
+    "restores_deleted_workspace": false
+  },
+  "customer_privacy_requests": {
+    "customers_data_request": "prepare a scoped export for the merchant using opaque subject identity",
+    "customers_redact": "delete or irreversibly anonymize the scoped customer personal data and record redacted evidence",
+    "workspace_wide_deletion": false,
+    "provider_or_other_workspace_data_inclusion_forbidden": true
+  },
+  "delete_my_data": {
+    "available_while_installed": true,
+    "product_surface": "Shopify Settings",
+    "separate_from_uninstall": true,
+    "confirmation": [
+      "explain destructive scope and consequences",
+      "require a second explicit server-verified confirmation"
+    ],
+    "immediate_order": [
+      "create idempotent deletion request",
+      "disable workspace product access and SnapshotJobs",
+      "block new provider operations",
+      "remove credential material under provider-specific revoke safety rules",
+      "execute the versioned workspace deletion manifest asynchronously",
+      "record minimum redacted evidence"
+    ],
+    "cancellation_after_destructive_execution_begins": false,
+    "browser_supplied_workspace_identity_authoritative": false,
+    "completion_visible_to_merchant": true
+  },
+  "reinstall": {
+    "within_shop_redact_delay": {
+      "same_shop_identity": "reuse the same workspace generation only if deletion has not begun",
+      "duplicate_workspace_forbidden": true,
+      "reverify_install_entitlement_and_connections": true,
+      "schedules_resume_automatically": false,
+      "shopify_note": "Shopify does not emit shop/redact if the app is reinstalled before that webhook is delivered."
+    },
+    "after_completed_deletion": {
+      "create_new_workspace_generation": true,
+      "reconnect_providers_required": true,
+      "old_dataset_token_binding_restore": false,
+      "old_and_new_authority_overlap_forbidden": true
+    },
+    "clean_reinstall": {
+      "requires_explicit_delete_my_data_or_equivalent_admin_request": true,
+      "old_workspace_must_reach_terminal_deletion_before_new_authority": true,
+      "automatic_copy_from_deleted_workspace": false
+    }
+  },
+  "deletion_manifest_required_categories": [
+    "workspace and shop bindings",
+    "Shopify session and offline token material",
+    "provider credentials and connection bindings",
+    "SnapshotJobs schedules leases and queued work",
+    "Dataset V2 and derived reporting artifacts",
+    "settings reporting account and currency data",
+    "billing and entitlement data subject to legal retention classification",
+    "customer personal data",
+    "audit and deletion evidence classified into delete anonymize or legally-retain"
+  ],
+  "implementation_gates": [
+    "Re-read current official Shopify privacy and webhook documentation.",
+    "Version and approve the exact table/object deletion manifest and dependency order.",
+    "Prove app configuration contains mandatory compliance topics.",
+    "Implement HMAC verification, invalid-HMAC 401, durable idempotent claims and 2xx acknowledgement.",
+    "Implement fail-closed scheduler and provider-operation shutdown before destructive work.",
+    "Add retry-safe asynchronous deletion and legal-retention isolation.",
+    "Test uninstall, reinstall before 48 hours, shop/redact, customer requests, Delete my data and clean reinstall.",
+    "Run repository CI, development-store webhook tests and separate production acceptance approvals."
+  ],
+  "excluded_from_this_contract_only_package": [
+    "webhook registration or delivery",
+    "database migration",
+    "token or data deletion",
+    "provider revoke",
+    "production deployment",
+    "production acceptance"
+  ],
+  "acceptance": [
+    "Uninstall immediately prevents new provider calls and SnapshotJobs but does not pretend that all data was deleted.",
+    "A verified shop/redact performs the approved manifest exactly once.",
+    "Invalid HMAC receives 401 and causes no claim or deletion.",
+    "Reinstall before shop/redact never creates a duplicate authoritative workspace.",
+    "Delete my data is available independently of uninstall and requires two explicit confirmations.",
+    "Clean reinstall cannot copy deleted Dataset, credentials or bindings into the new workspace generation.",
+    "Only minimum redacted evidence or documented legal-retention data survives terminal deletion.",
+    "The package remains implementation-pending until real webhook, persistence and acceptance gates pass."
+  ]
+}

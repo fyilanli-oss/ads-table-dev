@@ -1,0 +1,133 @@
+{
+  "contract_id": "e9-t8-connected-data-bootstrap-hourly-snapshot-v1",
+  "version": "1.0.0",
+  "status": "decision_frozen_implementation_pending",
+  "effective_decision_date": "2026-10-02",
+  "scope": {
+    "providers": [
+      "meta",
+      "google_ads",
+      "klaviyo"
+    ],
+    "included": [
+      "first connected data bootstrap",
+      "system-owned hourly snapshot scheduling",
+      "single-flight and idempotency rules",
+      "data maturity and freshness presentation"
+    ],
+    "excluded": [
+      "runtime implementation",
+      "production schedule activation",
+      "historical backfill",
+      "provider mutation",
+      "manual merchant refresh"
+    ]
+  },
+  "activation_gate": {
+    "common_required": [
+      "canonical workspace exists",
+      "provider connection is connected",
+      "workspace reporting currency is merchant-selected",
+      "trial or paid entitlement is active",
+      "provider-specific setup is complete"
+    ],
+    "meta_and_google_ads_required": [
+      "at least one provider-verified connected account exists",
+      "exactly one reporting account is selected and revalidated"
+    ],
+    "klaviyo_required": [
+      "single connected account is provider-verified",
+      "required metric and journey bindings are complete",
+      "Estimated 30-Day Klaviyo Email Spend configuration is complete"
+    ],
+    "browser_or_page_open_is_not_a_trigger": true
+  },
+  "initial_bootstrap": {
+    "automatic_after_activation_gate": true,
+    "ordered_business_dates": [
+      {
+        "relative_date": "yesterday",
+        "maturity": "closed_date_candidate"
+      },
+      {
+        "relative_date": "today",
+        "maturity": "provisional"
+      }
+    ],
+    "automatic_lookback_days": 2,
+    "older_history_automatic_fetch": false,
+    "trial_days": 14,
+    "trial_days_are_not_lookback_days": true,
+    "rule": "The initial bootstrap fetches only yesterday and today. The 14-day trial controls entitlement, not historical fetch depth."
+  },
+  "scheduler": {
+    "owner": "AdsTable server",
+    "cadence": "hourly",
+    "merchant_refresh_control": false,
+    "page_view_trigger": false,
+    "deterministic_minute_sharding_by": "workspace_id + provider + reporting_account_id",
+    "top_of_hour_fanout_forbidden": true,
+    "concurrency_key": "workspace_id + provider + reporting_account_id",
+    "single_flight": true,
+    "expiring_worker_lease": true,
+    "duplicate_active_job_rejected": true,
+    "provider_isolated_budgets": true,
+    "retry_after_respected": true,
+    "bounded_retry": true
+  },
+  "hourly_run": {
+    "first_eligible_run": "execute ordered initial bootstrap",
+    "subsequent_runs": [
+      "refresh today as provisional using idempotent upsert",
+      "after provider business-date rollover reconcile yesterday",
+      "preserve older rows unless a separately approved provider reconciliation or backfill policy selects them"
+    ],
+    "canonical_job_states": [
+      "queued",
+      "running",
+      "completed",
+      "failed"
+    ],
+    "idempotency_key_fields": [
+      "workspace_id",
+      "provider",
+      "reporting_account_id",
+      "provider_business_date",
+      "job_purpose"
+    ]
+  },
+  "maturity": {
+    "day_closed_does_not_guarantee_metric_finality": true,
+    "states": [
+      "provisional",
+      "settling",
+      "finalized"
+    ],
+    "finalized_requires": "provider-specific current official reporting, attribution and correction-window contract",
+    "provider_revalidation_required_before_runtime": true,
+    "no_synthetic_finality": true
+  },
+  "failure_and_product_behavior": {
+    "last_successful_data_preserved": true,
+    "stale_data_deleted_on_failure": false,
+    "user_surface": [
+      "last_success_at",
+      "freshness_state",
+      "provider-scoped safe error state"
+    ],
+    "tokens_provider_payloads_and_account_ids_in_user_error_forbidden": true,
+    "automatic_unbounded_retry_forbidden": true,
+    "merchant_concurrency_cannot_create_jobs": true,
+    "manual_recovery": "server-side operator capability only; not a merchant product control in v1"
+  },
+  "acceptance": [
+    "Completing a provider setup creates at most one bootstrap job without a page refresh or merchant button.",
+    "The bootstrap requests yesterday before today and does not request older history.",
+    "A 14-day trial never expands the initial fetch to 14 days.",
+    "Multiple Shopify users opening the app cannot create duplicate snapshot jobs.",
+    "Hourly jobs are sharded and single-flight by workspace, provider and reporting account.",
+    "Today remains provisional; yesterday is not marked finalized until the provider-specific maturity contract permits it.",
+    "Failures preserve the last successful dataset and expose safe freshness state.",
+    "This contract alone does not activate a production schedule or historical backfill."
+  ]
+}

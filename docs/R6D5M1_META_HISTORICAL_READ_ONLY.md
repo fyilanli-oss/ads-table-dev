@@ -56,6 +56,19 @@ Raw HTML kontrolü, `s-clickable`, inline CSS, literal renk veya özel component
 
 Bu belge veya implementation kendi başına Dataset V2 yazımı ya da production schedule izni vermez.
 
+## Canlı kabul kanıtı
+
+- Production deployment: `dpl_779vYvFQXQrApvuaNxsxfxkMMgHq`; `dev.adstable.app`; commit `1a9d492c94eb4f2b19ca1a474eae831eb8badf5c`.
+- Meta provider tarihi: `2026-10-01`.
+- Hiyerarşi: 1 Campaign → 1 Ad Set → 1 Ad.
+- Sonuç: 181 impressions, 8 canonical link clicks, 117.22 TRY spend.
+- Conversion support: add-to-cart 0 satır, checkout 0 satır, purchase 0 satır. Pixel/CAPI gözlemi bulunmadığından bunlar dönüşüm değeri 0 değil; `unknown/null` semantiğidir.
+- Dataset V2 yazımı: 0.
+- Desktop gerçek Shopify Admin: PASS.
+- 390×844 mobil gerçek Shopify Admin: PASS.
+- Production error/fatal runtime log taraması: temiz.
+- Ürün sahibi görsel kabulü: 3 Ekim 2026 tarihinde ACCEPTED.
+
 ## Repository sonucu
 
-PR #323 Security regression ve Full Regression PASS; Vercel preview PASS. Durum `REPOSITORY_PASS_LIVE_ACCEPTANCE_PENDING`dir. Production deployment, gerçek desktop/mobil Shopify kabulü, ürün sahibi onayı ve salt-okunur canlı sonuç henüz yapılmadı. Dataset V2 write, schedule ve backfill kapalıdır.
+PR #323 Security regression ve Full Regression PASS; Vercel preview PASS. Production deployment ve salt-okunur canlı Meta kabulü PASS; desktop ve 390×844 mobil Shopify Admin sonucu ürün sahibi tarafından kabul edildi. Durum `LIVE_READ_ONLY_PASS_PRODUCT_OWNER_ACCEPTED_MERGE_PENDING`dir. PR henüz merge edilmemiştir. Dataset V2 write, schedule ve backfill kapalıdır.

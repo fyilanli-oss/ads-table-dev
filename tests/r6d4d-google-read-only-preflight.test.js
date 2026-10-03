@@ -47,19 +47,20 @@ function providerSearch(calls, {withRows = true} = {}) {
 }
 
 test('R6-D4-D contract reuses E5, records live query evidence, and keeps Dataset V2 closed', () => {
-  assert.equal(contract.status, 'PASS_LIVE_PROVIDER_RESPONSE_EVIDENCE_EMPTY_BY_ACCOUNT_STRUCTURE');
+  assert.equal(contract.status, 'GOOGLE_RAW_PROVIDER_RESPONSE_EVIDENCE_PREPARED');
   assert.equal(contract.reuse.e5_standard_query_and_mapper, true);
   assert.equal(contract.reuse.e5_performance_max_query_and_mapper, true);
   assert.equal(contract.reuse.e5_time_fx, true);
   assert.equal(contract.reuse.new_metric_contract, false);
   assert.equal(contract.acceptance.normal_data_sources_ui_changed, false);
   assert.equal(contract.acceptance.empty_result_requires_structure_and_query_evidence, true);
-  assert.equal(contract.acceptance.empty_result_must_be_provider_verified, true);
+  assert.equal(contract.acceptance.empty_result_must_be_provider_verified, false);
+  assert.equal(contract.acceptance.exact_empty_raw_response_body_required, true);
   assert.equal(contract.corrective.prior_empty_status, 'REOPENED');
-  assert.equal(contract.corrective.live_result, 'PASS');
+  assert.equal(contract.corrective.live_result, 'AGGREGATE_ONLY');
   assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
-  assert.equal(contract.live_acceptance.status, 'PASS_LIVE_PROVIDER_RESPONSE_EVIDENCE');
+  assert.equal(contract.live_acceptance.status, 'AGGREGATE_EVIDENCE_ONLY_RAW_RESPONSE_PENDING');
   assert.equal(contract.live_acceptance.selected_account_count, 3);
   assert.equal(contract.live_acceptance.provider_query_count, 33);
   assert.equal(contract.live_acceptance.provider_stream_chunk_count, 33);
@@ -67,14 +68,14 @@ test('R6-D4-D contract reuses E5, records live query evidence, and keeps Dataset
   assert.equal(contract.live_acceptance.standard_structure_result_count, 0);
   assert.equal(contract.live_acceptance.performance_max_structure_result_count, 0);
   assert.equal(contract.live_acceptance.verified_row_count, 0);
-  assert.equal(contract.live_acceptance.provider_result_status, 'empty_by_account_structure');
+  assert.equal(contract.live_acceptance.provider_result_status, 'not_final');
   assert.equal(contract.live_acceptance.provider_transport_and_auth_verified, true);
   assert.equal(contract.live_acceptance.exact_selected_fields_verified, true);
   assert.equal(contract.live_acceptance.time_fx_verified, true);
   assert.equal(contract.live_acceptance.dataset_v2_writes, 0);
   assert.equal(priorLiveEvidence.result, 'PASS_PRODUCTION_READ_ONLY_ACCEPTANCE');
   assert.equal(priorLiveEvidence.merchant_acceptance.dataset_v2_writes, 0);
-  assert.equal(providerResponseEvidence.result, 'PASS_EMPTY_BY_ACCOUNT_STRUCTURE');
+  assert.equal(providerResponseEvidence.result, 'AGGREGATE_EVIDENCE_ONLY_RAW_RESPONSE_PENDING');
   assert.equal(providerResponseEvidence.aggregate_provider_response.query_count, 33);
   assert.equal(providerResponseEvidence.aggregate_provider_response.search_stream_chunk_count, 33);
   assert.equal(providerResponseEvidence.aggregate_provider_response.customer_metadata.result_count, 3);
@@ -83,6 +84,7 @@ test('R6-D4-D contract reuses E5, records live query evidence, and keeps Dataset
   assert.equal(providerResponseEvidence.verification.dataset_v2_writes, 0);
   assert.equal(providerResponseEvidence.verification.synthetic_rows, 0);
   assert.equal(providerResponseEvidence.verification.provider_ids_exposed, false);
+  assert.equal(providerResponseEvidence.verification.raw_provider_response_verified, false);
 });
 test('completed E5 Standard and PMax mappers support workspace authority without legacy user ownership', () => {
   const customer = standardFixture.customer;

@@ -66,17 +66,10 @@ Corrective salt-okunur kabul her seçilmiş hesap için provider kimliği göste
 
 Conversion evidence hem `metrics.conversions / conversions_value` hem de `metrics.all_conversions / all_conversions_value` alanlarını ister. Dataset V2 write, schedule ve backfill kapalıdır. Gerçek Shopify oturumundaki corrective sonuç görülmeden empty/unsupported PASS tekrar verilemez.
 
+## 3 Ekim 2026 canlı corrective — ham yanıt kapısı açık
 
-## 3 Ekim 2026 canlı corrective sonucu
+Gerçek Shopify oturumundaki ilk corrective çalışma `PASS — 3 account(s), 0 verified canonical row(s)` ve `33` sorgu / `33` SearchStream chunk aggregate kanıtı verdi. Ancak bu çalışma Google'ın exact HTTP/SearchStream response gövdesini göstermedi; yalnız uygulamanın ham yanıttan çıkardığı result/chunk/field-mask özetini gösterdi. Bu nedenle empty-by-account-structure kararı henüz final değildir.
 
-Gerçek Shopify oturumundaki salt-okunur çalışma `PASS — 3 account(s), 0 verified canonical row(s)` verdi. Bu kez boş sonucun nedeni query-level provider evidence ile ayrıştırıldı:
+Yeni kontrollü salt-okunur çalışma, customer metadata dışındaki Standard ve Performance Max structure/performance/conversion sorgularında yalnız sonuç satırı `0` ise exact response body string'ini authenticated operator çıktısına taşır. Non-empty body provider ID veya satır içeriği sızdırmamak için fail-closed gizlenir. Credential, token ve customer/login-customer ID hiçbir durumda raw evidence alanına girmez.
 
-- Üç hesabın her birinde customer metadata sorgusu `1` sonuç ve `1` SearchStream chunk döndürdü.
-- Her hesap için Standard structure, 31 günlük performance/conversion ve önceki gün performance/conversion sorguları başarılı yanıt verdi; her biri `1` chunk ve `0` sonuç döndürdü.
-- Her hesap için Performance Max structure, 31 günlük performance/conversion ve önceki gün performance/conversion sorguları başarılı yanıt verdi; her biri `1` chunk ve `0` sonuç döndürdü.
-- Toplam `33` provider sorgusunda `33` SearchStream chunk görüldü. Auth, transport veya query failure yoktur.
-- Standard Campaign → Ad Group → Ad yapı satırı `0`; Performance Max Campaign → Asset Group yapı satırı `0`dır. Bu nedenle performance ve conversion satırları da `0`dır.
-- Conversion sorguları exact olarak `metrics.conversions`, `metrics.conversions_value`, `metrics.all_conversions` ve `metrics.all_conversions_value` alanlarını istedi.
-- Time/FX kontrolleri geçti; Dataset V2 yazımı `0`, sentetik satır `0` kaldı.
-
-Sonuç: Google Ads entegrasyonu ve üç seçilmiş hesaba erişim çalışmaktadır. Seçili hesaplarda raporlanabilir Standard veya Performance Max hiyerarşisi bulunmadığı için canonical satır oluşmamıştır. Non-empty serving metriği ancak gerçek reklam yayınlayan bir production Google Ads hesabıyla kanıtlanabilir; Google'ın resmî kuralına göre test hesapları reklam yayınlamaz. Redacted canlı kanıt `docs/security/evidence/R6D5G1_GOOGLE_PROVIDER_RESPONSE_LIVE_2026-10-03.json` içindedir.
+Dataset V2 write, schedule ve backfill kapalıdır. Gerçek Shopify oturumunda raw response body görülüp kullanıcıyla birlikte değerlendirilmeden Google reporting-completeness PASS veya unsupported kararı verilemez.

@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d4d-google-read-only-preflight-v1",
-  "status": "GOOGLE_PROVIDER_RESPONSE_EVIDENCE_PREPARED",
+  "status": "PASS_LIVE_PROVIDER_RESPONSE_EVIDENCE_EMPTY_BY_ACCOUNT_STRUCTURE",
   "provider": "google_ads",
   "business_outcome": "Verify each selected Google Ads customer with explicit provider response evidence for Standard structure, Performance Max structure, previous-day mapping queries, and a 31-day performance/conversion window before accepting an empty reporting result.",
   "reuse": {
@@ -62,7 +62,7 @@
     "reporting_currency_must_be_merchant_selected": true,
     "standard_and_performance_max_must_both_execute": true,
     "time_fx_must_validate": true,
-    "empty_result_must_be_provider_verified": false,
+    "empty_result_must_be_provider_verified": true,
     "aggregate_response_only": true,
     "normal_data_sources_ui_changed": false,
     "operator_surface": "/shopify/app/platforms?acceptance=r6d4-google",
@@ -83,17 +83,34 @@
   "provider_contact": true,
   "dataset_v2_write": false,
   "live_acceptance": {
-    "status": "PRIOR_PASS_REOPENED",
+    "status": "PASS_LIVE_PROVIDER_RESPONSE_EVIDENCE",
+    "observed_at": "2026-10-03",
     "selected_account_count": 3,
+    "provider_query_count": 33,
+    "provider_stream_chunk_count": 33,
+    "customer_metadata_result_count": 3,
+    "standard_structure_result_count": 0,
+    "performance_max_structure_result_count": 0,
+    "standard_performance_result_count": 0,
+    "standard_conversion_result_count": 0,
+    "performance_max_performance_result_count": 0,
+    "performance_max_conversion_result_count": 0,
     "verified_row_count": 0,
-    "provider_result_status": "empty",
-    "customer_metadata_verified": true,
-    "standard_and_performance_max_verified": true,
+    "provider_result_status": "empty_by_account_structure",
+    "provider_transport_and_auth_verified": true,
+    "exact_selected_fields_verified": true,
+    "conversion_fields_verified": [
+      "metrics.conversions",
+      "metrics.conversions_value",
+      "metrics.all_conversions",
+      "metrics.all_conversions_value"
+    ],
     "time_fx_verified": true,
-    "supabase_postcheck": "PASS",
-    "evidence": "docs/security/evidence/R6D4D_GOOGLE_READ_ONLY_LIVE_ACCEPTANCE_2026-09-26.json"
+    "dataset_v2_writes": 0,
+    "conclusion": "All three selected accounts returned successful provider responses, but none contained reportable Standard Campaign -> Ad Group -> Ad or Performance Max Campaign -> Asset Group hierarchy rows.",
+    "evidence": "docs/security/evidence/R6D5G1_GOOGLE_PROVIDER_RESPONSE_LIVE_2026-10-03.json"
   },
-  "next_gate": "LIVE_GOOGLE_PROVIDER_RESPONSE_EVIDENCE_IN_REAL_SHOPIFY_SESSION",
+  "next_gate": "REAL_PRODUCTION_GOOGLE_ADS_ACCOUNT_WITH_SERVING_DATA_FOR_NON_EMPTY_ACCEPTANCE",
   "official_provider_check": {
     "checked_at": "2026-10-03",
     "sources": [
@@ -108,6 +125,9 @@
     "prepared_at": "2026-10-03",
     "prior_empty_status": "REOPENED",
     "reason": "The prior output proved only zero canonical rows and did not expose account structure, exact selected fields, SearchStream chunk counts, or per-query provider result counts.",
-    "dataset_v2_write": false
+    "dataset_v2_write": false,
+    "live_result": "PASS",
+    "closed_at": "2026-10-03",
+    "conclusion": "Provider authentication, account access and queries are healthy; the selected accounts contain no reportable Standard or Performance Max hierarchy. No Dataset V2 write was attempted."
   }
 }

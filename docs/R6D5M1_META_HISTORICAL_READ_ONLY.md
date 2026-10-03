@@ -71,4 +71,4 @@ Bu belge veya implementation kendi başına Dataset V2 yazımı ya da production
 
 ## Repository sonucu
 
-PR #323 Security regression ve Full Regression PASS; Vercel preview PASS. Production deployment ve salt-okunur canlı Meta kabulü PASS; desktop ve 390×844 mobil Shopify Admin sonucu ürün sahibi tarafından kabul edildi. Durum `LIVE_READ_ONLY_PASS_PRODUCT_OWNER_ACCEPTED_MERGE_PENDING`dir. PR henüz merge edilmemiştir. Dataset V2 write, schedule ve backfill kapalıdır.
+PR #323 Security regression ve Full Regression PASS; Vercel preview PASS. Production deployment ve salt-okunur canlı Meta kabulü PASS; desktop ve 390×844 mobil Shopify Admin sonucu ürün sahibi tarafından kabul edildi. PR #323 `b5bf97be5e4b09644147c3e30ba13b1544e79c19` commit'iyle merge edilmiştir. Son production deployment `dpl_ALzPA8cZWV4WNtM9mycdtsB9y9mo` durumunda `READY`; error/fatal runtime log bulunmadı. Durum `LIVE_READ_ONLY_PASS_MERGED`dir. Dataset V2 write, schedule ve backfill kapalıdır.

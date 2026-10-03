@@ -1,0 +1,182 @@
+{
+  "audit_wave": "A2",
+  "date": "2026-10-03",
+  "scope": [
+    "E4",
+    "E5",
+    "E6",
+    "E7",
+    "E8",
+    "E9",
+    "R6",
+    "R8"
+  ],
+  "mode": "read_only",
+  "mutations_performed": [],
+  "live_evidence_summary": {
+    "dataset_v2_rows": 5,
+    "rows_by_provider": {
+      "klaviyo": 4,
+      "meta": 1,
+      "google": 0
+    },
+    "rows_with_source_job_id": 0,
+    "synthetic_rows": 0,
+    "canonical_workspace_hourly_scheduler_found": false,
+    "physical_backfill_checkpoints_table_found": false,
+    "legacy_schedules": {
+      "active": 0,
+      "interval_minutes_observed": [
+        240
+      ],
+      "authority": "user_scoped"
+    }
+  },
+  "findings": [
+    {
+      "finding_id": "AF-A2-001",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Canonical provider data can remain stale because no live workspace-scoped hourly refresh chain was found.",
+      "affected_packages": [
+        "E4",
+        "E5",
+        "E7",
+        "E9",
+        "R6"
+      ],
+      "plan_claim": "Server-controlled hourly refresh is the accepted target.",
+      "contract_claim": "Workspace authority and canonical Dataset V2 are mandatory.",
+      "runtime_fact": "Legacy runtime uses fixed four-hour platform hours, today refresh, and one daily last_7d recovery.",
+      "schema_fact": "Observed schedules are user-scoped, inactive, and 240-minute; no canonical workspace schedule/job authority was found.",
+      "live_evidence": "Five Dataset V2 acceptance rows exist, but none is attributable to a recurring source job.",
+      "official_source_if_external": [],
+      "contradiction_or_gap": "Single acceptance writes do not prove recurring production refresh.",
+      "safe_boundary": "Do not reactivate legacy schedules.",
+      "remediation_dependency": "A6 scheduler/job authority package after audit completion.",
+      "acceptance_needed": "Hourly workspace-scoped lease/job execution, retry, lineage and freshness evidence."
+    },
+    {
+      "finding_id": "AF-A2-002",
+      "severity": "P1",
+      "status": "open_p0_candidate_in_A4",
+      "customer_or_platform_failure": "A displayed fact cannot be traced to the exact provider run or safely reconciled after corrections.",
+      "affected_packages": [
+        "E4",
+        "E5",
+        "E7",
+        "E9",
+        "R6"
+      ],
+      "plan_claim": "Canonical facts require reproducible provenance and observable jobs.",
+      "contract_claim": "Raw evidence must be redacted but reproducible.",
+      "runtime_fact": "Current controlled acceptance writes bypass recurring job lineage.",
+      "schema_fact": "All five live rows have null source_job_id; raw JSON lacks request/response identity, attribution configuration, observation timestamp and provider revision.",
+      "live_evidence": "1 Meta and 4 Klaviyo non-synthetic rows are present without run linkage.",
+      "official_source_if_external": [],
+      "contradiction_or_gap": "The data values may be valid, but their production and correction history is not provable.",
+      "safe_boundary": "Do not relabel existing rows as final solely from their values.",
+      "remediation_dependency": "Provider run provenance and reconciliation contract.",
+      "acceptance_needed": "Every new fact links to a durable run/request/revision record; A4 verifies truthful UI status."
+    },
+    {
+      "finding_id": "AF-A2-003",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Different provider correction windows can be collapsed into an invalid universal finality rule.",
+      "affected_packages": [
+        "E4",
+        "E5",
+        "E7",
+        "E9",
+        "R6"
+      ],
+      "plan_claim": "E9-T8 requires provider data maturity, reconciliation and finality.",
+      "contract_claim": "Unknown assumptions cannot become PASS.",
+      "runtime_fact": "Legacy policy includes a provider-independent three-hour maturity default.",
+      "schema_fact": "Dataset V2 has no explicit maturity/finality/provisional/reconciled state.",
+      "live_evidence": "Klaviyo 2026-10-02 rows are described as provisional outside the row itself.",
+      "official_source_if_external": [
+        "https://developers.google.com/google-ads/api/docs/conversions/reporting",
+        "https://developers.google.com/google-ads/api/docs/conversions/upload-adjustments",
+        "https://developers.klaviyo.com/en/reference/reporting_api_overview"
+      ],
+      "contradiction_or_gap": "Provider-specific semantics cannot be represented or enforced by the current live data path.",
+      "safe_boundary": "Do not introduce one guessed global window.",
+      "remediation_dependency": "Versioned provider-specific maturity contract before production cutover.",
+      "acceptance_needed": "Per-provider lookback/finality state with reproducible correction tests."
+    },
+    {
+      "finding_id": "AF-A2-004",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Interrupted backfill/reconciliation cannot prove safe resume or duplicate avoidance in live operation.",
+      "affected_packages": [
+        "E9",
+        "R8"
+      ],
+      "plan_claim": "Backfill is resumable, idempotent and measurable.",
+      "contract_claim": "R8 requires canonical validation/provenance and coverage.",
+      "runtime_fact": "Workspace checkpoint/idempotent code artefacts exist in the repository.",
+      "schema_fact": "No physical backfill_checkpoints table was found.",
+      "live_evidence": "R8 remains blocked and no live workspace checkpoint chain exists.",
+      "official_source_if_external": [],
+      "contradiction_or_gap": "Repository implementation artefacts are not live operational control.",
+      "safe_boundary": "Keep R8 blocked; do not copy V1 rows directly.",
+      "remediation_dependency": "Workspace lease/checkpoint schema and runtime package.",
+      "acceptance_needed": "Crash/retry/resume and duplicate-negative live evidence."
+    },
+    {
+      "finding_id": "AF-A2-005",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Late provider conversions or adjustments can be missed, causing AdsTable to diverge from provider Ads Manager.",
+      "affected_packages": [
+        "E4",
+        "E5",
+        "E7",
+        "E9",
+        "R6"
+      ],
+      "plan_claim": "Snapshots must reconcile provider corrections.",
+      "contract_claim": "Provider official semantics must govern attribution and correction.",
+      "runtime_fact": "Legacy runtime refreshes today and performs a daily last_7d recovery.",
+      "schema_fact": "No provider-specific reconciliation policy is persisted with facts or runs.",
+      "live_evidence": "Current rows do not record which lookback or attribution rule produced them.",
+      "official_source_if_external": [
+        "https://developers.google.com/google-ads/api/fields/v25/segments",
+        "https://www.postman.com/meta/facebook-marketing-api/request/5wdl62t/attributionsetting",
+        "https://developers.klaviyo.com/en/reference/query_campaign_values"
+      ],
+      "contradiction_or_gap": "A seven-day catch-up is not a complete universal provider finality policy.",
+      "safe_boundary": "Do not expand history blindly every hour before quota/cost and provider-specific rules are contracted.",
+      "remediation_dependency": "Provider-specific bounded rolling reconciliation design.",
+      "acceptance_needed": "Correction fixtures and live reconciliation evidence for each active provider."
+    },
+    {
+      "finding_id": "AF-A2-006",
+      "severity": "P2",
+      "status": "open",
+      "customer_or_platform_failure": "Stakeholders can mistake connection, verified-empty response, first write and recurring completeness as the same PASS.",
+      "affected_packages": [
+        "E4",
+        "E5",
+        "E7",
+        "E8",
+        "E9",
+        "R6",
+        "R8"
+      ],
+      "plan_claim": "Done/PASS requires all applicable acceptance and evidence conditions.",
+      "contract_claim": "Each claim is classified across plan, contract, runtime, schema and live evidence.",
+      "runtime_fact": "Provider acceptance was performed through several different controlled paths.",
+      "schema_fact": "Live data does not encode the acceptance stage.",
+      "live_evidence": "Meta non-empty, Google verified-empty and Klaviyo provisional non-empty evidence are materially different.",
+      "official_source_if_external": [],
+      "contradiction_or_gap": "Status language is not yet consistently split by acceptance layer.",
+      "safe_boundary": "Preserve current open/pending statements; do not downgrade valid evidence.",
+      "remediation_dependency": "A6 package/status vocabulary normalization.",
+      "acceptance_needed": "Four distinct gates per provider: capability/raw, hierarchy/mapping, first canonical write, recurring reconciliation/finality."
+    }
+  ]
+}

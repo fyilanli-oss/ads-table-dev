@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "audit_wave": "A6",
+  "date": "2026-10-03",
+  "rule": "Unknown hiçbir zaman PASS veya zero sayılmaz.",
+  "items": [
+    {
+      "id": "AU-A6-001",
+      "priority": "P1",
+      "question": "Legacy /dashboard productionda hangi kullanıcılarca erişiliyor ve trafik hacmi nedir?",
+      "known": "Route public asset'i servis ediyor ve false-zero davranışı kodda doğrulandı.",
+      "unknown": "Gerçek production reachability ve aktif kullanıcı sayısı ölçülmedi.",
+      "safe_action": "Risk çözülene kadar rollback truth target sayma."
+    },
+    {
+      "id": "AU-A6-002",
+      "priority": "P0",
+      "question": "Legacy Delete My Data yüzeyi productionda erişilebilir mi?",
+      "known": "Repository UI ve endpoint 90 günlük hard-delete vaadi taşıyor fakat executor yok.",
+      "unknown": "Canlı yüzey erişimi bağımsız doğrulanmadı.",
+      "safe_action": "Mevcut endpointi test amacıyla tetikleme; product-surface inventory ile doğrula."
+    },
+    {
+      "id": "AU-A6-003",
+      "priority": "P1",
+      "question": "Production crypto feature boolean ve aktif key startup anında gerçekten geçerli mi?",
+      "known": "Gerekli env adları doğru Vercel scope'larında var.",
+      "unknown": "Secret değerleri okunmadı; fail-closed startup garantisi yok.",
+      "safe_action": "Non-secret diagnostic ve invalid-config startup testi tasarla."
+    },
+    {
+      "id": "AU-A6-004",
+      "priority": "P1",
+      "question": "Broad DB grants pratikte hangi saldırı yolundan kullanılabilir?",
+      "known": "PUBLIC/anon/authenticated grant yüzeyi canlı şemada görüldü.",
+      "unknown": "Audit sırasında mutation/exploit testi yapılmadı.",
+      "safe_action": "Least-privilege uygulaması ve negatif rol testleri; production exploit denemesi yapma."
+    },
+    {
+      "id": "AU-A6-005",
+      "priority": "P1",
+      "question": "Repository/database dışında çalışan canonical bir scheduler var mı?",
+      "known": "Canonical workspace-scoped scheduler/job authority repo ve incelenen canlı şemada bulunmadı.",
+      "unknown": "Harici manuel/özel orchestrator varlığı bağımsız envanterle kanıtlanmadı.",
+      "safe_action": "Varlığını varsayma; control-plane inventory ile doğrula."
+    },
+    {
+      "id": "AU-A6-006",
+      "priority": "P1",
+      "question": "Workspace deletion manifestine girecek tüm storage, log, deployment ve üçüncü taraf kalıntıları neler?",
+      "known": "Canonical ve legacy DB tabloları birlikte mevcut; exact manifest yok.",
+      "unknown": "DB dışı tüm veri yüzeylerinin tam listesi yok.",
+      "safe_action": "Silme çalıştırmadan önce data map ve legal-retention sınıflaması çıkar."
+    },
+    {
+      "id": "AU-A6-007",
+      "priority": "P1",
+      "question": "Meta, Google ve Klaviyo için exact production reconciliation window ve quota/cost bütçesi ne olacak?",
+      "known": "Tek evrensel pencere geçersiz; provider correction semantiği farklı.",
+      "unknown": "Versiyonlanmış business/runtime policy henüz onaylı değil.",
+      "safe_action": "Her saat bütün geçmişi körlemesine çekme; bounded policy onayı bekle."
+    },
+    {
+      "id": "AU-A6-008",
+      "priority": "P1",
+      "question": "Google gerçek kampanya non-empty hierarchy/metric acceptance ne zaman elde edilecek?",
+      "known": "Google capability/raw response verified-empty; canlı test kampanyası açılamadı.",
+      "unknown": "Non-empty mapping ve recurring completeness kanıtı yok.",
+      "safe_action": "Verified-empty sonucunu production completeness PASS sayma."
+    },
+    {
+      "id": "AU-A6-009",
+      "priority": "P2",
+      "question": "Full application restore için kabul edilen RTO/RPO nedir?",
+      "known": "Dataset V2 component restore artefactları var; full rehearsal yok.",
+      "unknown": "DB/config/deployment/read-path toplam hedefleri dondurulmadı.",
+      "safe_action": "E13 GO öncesi hedef ve timed rehearsal belirle."
+    },
+    {
+      "id": "AU-A6-010",
+      "priority": "P2",
+      "question": "Common core ikinci commerce adapter için Shopify identity'den gerçekten bağımsız mı?",
+      "known": "Şema büyük ölçüde workspace tabanlı; R11 deferred.",
+      "unknown": "Bağımsız acceptance contract/test yok.",
+      "safe_action": "WooCommerce geliştirme; yalnız adapter-readiness contract hazırla."
+    }
+  ]
+}

@@ -57,3 +57,8 @@ Salt-okunur R6-D5-M1 çalışması, son kapanmış gün boş olsa bile 31 günl�
 Canlı salt-okunur kanıtın hedefi: `2026-10-01`, 1 Ad satırı, 181 impression, 8 canonical link click ve 117.22 TRY spend. Meta cevabında add-to-cart, checkout ve purchase action type'ları ile action_values bulunmadığından bu conversion alanları `unknown/null` kalır; `0` üretilmez.
 
 Koruma sınırı provider çağrısından önce tüm 31 günlük pencereyi kapsar. Aynı workspace/account için mevcut Meta satırı varsa işlem fail-closed durur. Route browser body içindeki workspace, account veya provider date alanlarını kullanmaz. Schedule, backfill ve production activation kapalı kalır. Bu repository hazırlığı Dataset V2'ye henüz yazmamıştır; tek production çalıştırma ayrıca açık işlem-anı onayı gerektirir.
+
+
+## Historical non-empty canlı sonuç — 3 Ekim 2026
+
+Açık işlem-anı onayıyla production kontrollü kabul bir kez çalıştırıldı ve `attempted 1 / persisted 1 / verified empty false` sonucu verdi. Salt-okunur Supabase postcheck `2026-10-01` tarihinde tek Meta Ad satırını, duplicate `0`, 181 impression, 8 ad click ve 117.22 TRY spend ile doğruladı. Add to cart, checkout ve purchase hem değer kolonlarında `NULL` hem de metric support'ta `unknown` kaldı. Satır sentetik değildir. Schedule, backfill ve production activation açılmadı. Redacted kanıt `docs/security/evidence/R6D5M2_META_HISTORICAL_DATASET_WRITE_LIVE_2026-10-03.json` içindedir.

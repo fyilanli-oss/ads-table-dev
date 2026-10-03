@@ -1,0 +1,113 @@
+{
+  "audit_wave": "A3",
+  "date": "2026-10-03",
+  "classification_rule": "decision correctness is separate from operational implementation and live acceptance",
+  "packages": [
+    {
+      "package": "E10-T4-foundation",
+      "classification": "partially_verified",
+      "verified": [
+        "verified-authority planner",
+        "ordered abstract operations",
+        "replay and missing-operation unit tests"
+      ],
+      "open": [
+        "route",
+        "HMAC",
+        "durable persistence",
+        "production operations",
+        "live acceptance"
+      ]
+    },
+    {
+      "package": "E10-T4-operational-lifecycle",
+      "classification": "unsupported",
+      "verified": [],
+      "open": [
+        "mandatory subscriptions",
+        "app/uninstalled",
+        "durable claim",
+        "immediate stop",
+        "async deletion",
+        "evidence"
+      ]
+    },
+    {
+      "package": "E10-T4-B",
+      "classification": "verified_as_decision_only",
+      "verified": [
+        "uninstall versus deletion distinction",
+        "48-hour reinstall split",
+        "clean-reinstall product decision",
+        "manifest categories"
+      ],
+      "open": [
+        "all implementation and acceptance gates"
+      ]
+    },
+    {
+      "package": "R7-delete-my-data",
+      "classification": "unsupported",
+      "verified": [
+        "decision requires Shopify Settings and two confirmations"
+      ],
+      "open": [
+        "Shopify-native surface",
+        "workspace-authoritative request",
+        "manifest execution",
+        "completion visibility"
+      ]
+    },
+    {
+      "package": "install",
+      "classification": "partially_verified",
+      "verified": [
+        "live active shop/workspace binding",
+        "encrypted token envelope schema",
+        "managed-install persistence"
+      ],
+      "open": [
+        "deletion-aware generation transition"
+      ]
+    },
+    {
+      "package": "uninstall",
+      "classification": "unsupported",
+      "verified": [
+        "status enum and planner intent"
+      ],
+      "open": [
+        "registered webhook",
+        "verified route",
+        "durable transition",
+        "provider/job stop",
+        "token removal"
+      ]
+    },
+    {
+      "package": "reinstall-before-shop-redact",
+      "classification": "partially_verified_by_shape_only",
+      "verified": [
+        "same shop conflict reuses workspace"
+      ],
+      "open": [
+        "deletion-not-started guard",
+        "entitlement/connection re-verification",
+        "no automatic schedule resume proof"
+      ]
+    },
+    {
+      "package": "clean-reinstall-after-terminal-deletion",
+      "classification": "unsupported",
+      "verified": [
+        "decision contract exists"
+      ],
+      "open": [
+        "terminal deletion ledger",
+        "new generation creation",
+        "old authority non-restore",
+        "live acceptance"
+      ]
+    }
+  ]
+}

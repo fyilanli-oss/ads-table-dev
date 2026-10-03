@@ -1,0 +1,162 @@
+{
+  "audit_wave": "A4",
+  "date": "2026-10-03",
+  "scope": [
+    "E11",
+    "E12",
+    "legacy-dashboard",
+    "formula-engine",
+    "workspace-query-service"
+  ],
+  "mode": "read_only",
+  "mutations_performed": [],
+  "test_evidence": {
+    "phase1": "53/53 PASS",
+    "phase2": "33/33 PASS"
+  },
+  "findings": [
+    {
+      "finding_id": "AF-A4-001",
+      "severity": "P0",
+      "status": "open",
+      "customer_or_platform_failure": "Missing, unavailable or failed snapshot data can be displayed as measured zero.",
+      "affected_packages": [
+        "E11",
+        "E12",
+        "E13",
+        "legacy-dashboard"
+      ],
+      "plan_claim": "Unsupported/unknown never becomes real zero; UI has distinct loading, empty, partial, stale and error states.",
+      "contract_claim": "Funnel UI forbids fake zero and requires support-aware presentation.",
+      "runtime_fact": "dashboard.html starts with zero KPIs, builds an all-zero snapshot when snapshot is null, and preserves existing zeros on auth/HTTP/payload/exception exits.",
+      "schema_fact": "Not applicable; this is presentation behavior.",
+      "live_evidence": "The public /dashboard route serves dashboard.html. Production reachability and current user traffic were not independently measured.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Absence/error is materially represented as measured zero.",
+      "safe_boundary": "Do not trigger provider writes or alter production UI during audit.",
+      "remediation_dependency": "Truthful state adapter before E11/E12 cutover.",
+      "acceptance_needed": "Loading, empty, error, partial and stale fixtures never render numeric zero unless the provider fact is supported zero."
+    },
+    {
+      "finding_id": "AF-A4-002",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Revenue can be mislabeled or duplicated as profit/margin across Formula/API/UI.",
+      "affected_packages": [
+        "E11",
+        "E12"
+      ],
+      "plan_claim": "Canonical derived names are revenue and revenue_margin; profit/margin are versioned compatibility aliases only.",
+      "contract_claim": "Ad Analysis removes margin and exposes Revenue.",
+      "runtime_fact": "Formula Engine and its tests return profit and margin as primary fields; revenue/revenue_margin are absent.",
+      "schema_fact": "Derived metrics are correctly not stored in Dataset V2.",
+      "live_evidence": "Local Phase 1 tests pass the old naming expectations.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Correct arithmetic is exposed under superseded business names.",
+      "safe_boundary": "Do not silently rename without versioning/golden parity.",
+      "remediation_dependency": "Versioned Formula/API compatibility decision.",
+      "acceptance_needed": "Canonical revenue/revenue_margin outputs, explicit alias policy and end-to-end parity."
+    },
+    {
+      "finding_id": "AF-A4-003",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "UI cannot distinguish unsupported, unknown, empty and zero-denominator null results.",
+      "affected_packages": [
+        "E11",
+        "E12"
+      ],
+      "plan_claim": "Support propagates and previous/denominator zero is explicitly not comparable.",
+      "contract_claim": "Unsupported bucket and new/not-comparable bucket are distinct.",
+      "runtime_fact": "Derived values return number or null without derived support/null_reason; Query meta only carries additive support.",
+      "schema_fact": "Raw metric support exists, but derived result semantics are not persisted or returned.",
+      "live_evidence": "Tests assert null but not a reason contract.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Null preserves numerical safety but loses the business meaning required for presentation.",
+      "safe_boundary": "UI must not infer the reason from null alone.",
+      "remediation_dependency": "Derived metric result envelope.",
+      "acceptance_needed": "Every derived value carries support and null_reason through Formula, API, Compare, Export and UI."
+    },
+    {
+      "finding_id": "AF-A4-004",
+      "severity": "P1",
+      "status": "open_p0_candidate_if_presented_as_current",
+      "customer_or_platform_failure": "Unreconciled or stale facts can be presented without freshness/finality warning.",
+      "affected_packages": [
+        "E9",
+        "E11",
+        "E12",
+        "R6"
+      ],
+      "plan_claim": "E11 returns freshness, partial and warnings metadata; E12 renders them.",
+      "contract_claim": "Current/final claims require provenance and reconciliation evidence.",
+      "runtime_fact": "Workspace query meta lacks data-through, observed-at, source job, provisional/final, partial/stale and warning fields.",
+      "schema_fact": "A2 found live rows with null source_job_id and no finality state.",
+      "live_evidence": "No Funnel API route exists yet; risk becomes P0 if a UI presents these results as current/final.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "The internal query output cannot carry A2 data maturity truth to a UI.",
+      "safe_boundary": "Keep E11 blocked until provenance/freshness contract exists.",
+      "remediation_dependency": "A2 run/finality provenance design.",
+      "acceptance_needed": "Stale/provisional/reconciled/final fixtures produce exact API and UI states."
+    },
+    {
+      "finding_id": "AF-A4-005",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Compare or growth ranking may be reimplemented in UI and mishandle previous zero.",
+      "affected_packages": [
+        "E11",
+        "E12"
+      ],
+      "plan_claim": "Backend Compare uses (current-previous)/abs(previous)*100; previous zero returns null.",
+      "contract_claim": "Funnel and Ad Analysis compare/ranking are backend-computed.",
+      "runtime_fact": "Current Query Service is single-period; no versioned Compare Engine or compare output was found.",
+      "schema_fact": "Not applicable.",
+      "live_evidence": "UI freeze contracts include comparison columns and percent-change ranking, but no runtime parity evidence exists.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Frozen UI depends on a backend capability that is absent.",
+      "safe_boundary": "Do not implement compare math in frontend.",
+      "remediation_dependency": "Formula naming/support envelope first.",
+      "acceptance_needed": "Versioned current/previous/absolute/percent output with zero-denominator and period-length fixtures."
+    },
+    {
+      "finding_id": "AF-A4-006",
+      "severity": "P2",
+      "status": "open_implementation_gate",
+      "customer_or_platform_failure": "An internal service could be reused as an HTTP boundary without verified tenant/account authority or query budgets.",
+      "affected_packages": [
+        "E11"
+      ],
+      "plan_claim": "Shopify session resolves workspace/account server-side; caller query identity is forbidden; bounds/pagination apply.",
+      "contract_claim": "Cross-user/account queries are rejected.",
+      "runtime_fact": "WorkspaceFunnelQueryService accepts workspace_id, platform_account_id and scope parameters and only checks returned rows; no HTTP auth wrapper, max range or pagination exists.",
+      "schema_fact": "Workspace repository boundary exists.",
+      "live_evidence": "No /api/funnel/data route was found, so this is not currently an exposed endpoint finding.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Internal query logic is not the planned E11 API boundary.",
+      "safe_boundary": "Do not wire it directly to a route.",
+      "remediation_dependency": "E11 request/auth contract.",
+      "acceptance_needed": "Verified session-derived tenant/account, caller-claim rejection, bounds, pagination, load and IDOR tests."
+    },
+    {
+      "finding_id": "AF-A4-007",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Parked Organic/internal scope can leak into the first Shopify product as a Paid/Organic/Blend selector.",
+      "affected_packages": [
+        "E11",
+        "E12"
+      ],
+      "plan_claim": "Shopify Funnel API does not produce Paid, Organic or Blend UI segments.",
+      "contract_claim": "Parked Organic is not rendered as frontend hierarchy/filter.",
+      "runtime_fact": "Generic Query Service accepts and returns paid, organic and blend analysis_scope.",
+      "schema_fact": "Organic capability remains in canonical model by design.",
+      "live_evidence": "No Shopify Funnel API adapter exists yet.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Generic backend capability requires a Shopify-specific response boundary.",
+      "safe_boundary": "Do not delete generic capability; prevent UI exposure.",
+      "remediation_dependency": "E11 Shopify response DTO.",
+      "acceptance_needed": "Negative contract tests prove Organic/Blend scope cannot appear in first-slice Shopify response."
+    }
+  ]
+}

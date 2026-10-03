@@ -73,3 +73,32 @@ Gerçek Shopify oturumundaki ilk corrective çalışma `PASS — 3 account(s), 0
 Yeni kontrollü salt-okunur çalışma, customer metadata dışındaki Standard ve Performance Max structure/performance/conversion sorgularında yalnız sonuç satırı `0` ise exact response body string'ini authenticated operator çıktısına taşır. Non-empty body provider ID veya satır içeriği sızdırmamak için fail-closed gizlenir. Credential, token ve customer/login-customer ID hiçbir durumda raw evidence alanına girmez.
 
 Dataset V2 write, schedule ve backfill kapalıdır. Gerçek Shopify oturumunda raw response body görülüp kullanıcıyla birlikte değerlendirilmeden Google reporting-completeness PASS veya unsupported kararı verilemez.
+
+## 3 Ekim 2026 final canlı corrective — Standard Ad adı ve ham verified-empty kanıtı
+
+Production'daki ayrı salt-okunur tekrar üç canonical Google Ads hesabında `PASS — 3 account(s), 0 verified canonical row(s)` verdi. Toplam `33` sorgunun her biri bir SearchStream chunk ile tamamlandı; üç customer metadata sorgusu birer sonuç döndürürken customer metadata dışındaki `30` Standard/PMax structure, performance ve conversion sorgusu sıfır sonuç döndürdü.
+
+Standard structure sorgusunun exact selected alanları şunlardır:
+
+```text
+campaign.id
+campaign.name
+campaign.advertising_channel_type
+campaign.status
+ad_group.id
+ad_group.name
+ad_group.status
+ad_group_ad.ad.id
+ad_group_ad.ad.name
+ad_group_ad.status
+```
+
+Üç hesabın her birindeki ham response body aynı field mask'i doğruladı:
+
+```json
+[{"fieldMask":"campaign.id,campaign.name,campaign.advertisingChannelType,campaign.status,adGroup.id,adGroup.name,adGroup.status,adGroupAd.ad.id,adGroupAd.ad.name,adGroupAd.status","requestId":"<redacted>","queryResourceConsumption":"<provider-reported>"}]
+```
+
+Body içinde `results` property bulunmadı. Bu nedenle sonuç uygulama tarafından üretilmiş bir boşluk değil, Google SearchStream'in başarılı fakat sonuçsuz cevabıdır. `adGroupAd.ad.name` hem sorgunun exact selected-field listesinde hem canlı provider `fieldMask` değerinde bulunduğu için Ad adı isteğinin Google tarafından kabul edildiği kanıtlanmıştır.
+
+Bu sonuç Google Ads bağlantı, sorgu ve alan kapsamını doğrular; sıfır sonucun provider-side nedeni hakkında test hesabı, kampanya durumu veya başka bir varsayım fact olarak yazılmaz. Gerçek provider satırı oluşana kadar non-empty metric ve Dataset V2 acceptance açık kalır. Time/FX PASS, Dataset V2 yazımı `0`, schedule/backfill/activation kapalıdır. Redacted kanıt `docs/security/evidence/R6D4D_GOOGLE_RAW_RESPONSE_LIVE_ACCEPTANCE_2026-10-03.json` içindedir.

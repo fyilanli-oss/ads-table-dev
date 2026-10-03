@@ -1,0 +1,98 @@
+{
+  "package": "R6-D5-G1",
+  "evidence_type": "google_ads_raw_searchstream_read_only_acceptance",
+  "observed_at": "2026-10-03",
+  "environment": "production",
+  "authority": "authenticated_shopify_operator",
+  "result": "PASS_VERIFIED_EMPTY",
+  "accounts_checked": 3,
+  "aggregate": {
+    "query_count": 33,
+    "stream_chunk_count": 33,
+    "customer_metadata_queries": 3,
+    "customer_metadata_results": 3,
+    "non_metadata_queries": 30,
+    "non_metadata_results": 0,
+    "verified_canonical_rows": 0,
+    "dataset_v2_writes": 0,
+    "time_check": "PASS",
+    "fx_check": "PASS"
+  },
+  "standard_structure": {
+    "selected_fields": [
+      "campaign.id",
+      "campaign.name",
+      "campaign.advertising_channel_type",
+      "campaign.status",
+      "ad_group.id",
+      "ad_group.name",
+      "ad_group.status",
+      "ad_group_ad.ad.id",
+      "ad_group_ad.ad.name",
+      "ad_group_ad.status"
+    ],
+    "provider_field_mask": "campaign.id,campaign.name,campaign.advertisingChannelType,campaign.status,adGroup.id,adGroup.name,adGroup.status,adGroupAd.ad.id,adGroupAd.ad.name,adGroupAd.status",
+    "account_results": [
+      {
+        "account_ordinal": 1,
+        "result_count": 0,
+        "stream_chunk_count": 1,
+        "raw_response_status": "captured_empty",
+        "response_keys": [
+          "fieldMask",
+          "requestId",
+          "queryResourceConsumption"
+        ],
+        "results_property_present": false,
+        "query_resource_consumption": "142"
+      },
+      {
+        "account_ordinal": 2,
+        "result_count": 0,
+        "stream_chunk_count": 1,
+        "raw_response_status": "captured_empty",
+        "response_keys": [
+          "fieldMask",
+          "requestId",
+          "queryResourceConsumption"
+        ],
+        "results_property_present": false,
+        "query_resource_consumption": "164"
+      },
+      {
+        "account_ordinal": 3,
+        "result_count": 0,
+        "stream_chunk_count": 1,
+        "raw_response_status": "captured_empty",
+        "response_keys": [
+          "fieldMask",
+          "requestId",
+          "queryResourceConsumption"
+        ],
+        "results_property_present": false,
+        "query_resource_consumption": "141"
+      }
+    ]
+  },
+  "conclusions": {
+    "query_executed_successfully": true,
+    "ad_name_requested_and_accepted": true,
+    "empty_result_verified_from_provider_response": true,
+    "provider_side_reason_inferred": false,
+    "non_empty_acceptance_pending": true
+  },
+  "mutations": {
+    "provider_write": false,
+    "dataset_v2_write": false,
+    "schedule_or_backfill": false,
+    "production_activation": false
+  },
+  "redactions": [
+    "provider account identifiers",
+    "login customer identifiers",
+    "credentials and tokens",
+    "request IDs"
+  ],
+  "source_pr_for_ad_name_selection": 331,
+  "source_main_commit": "e4c601eccf8367cb48538c1dd32147efaaa51320"
+}

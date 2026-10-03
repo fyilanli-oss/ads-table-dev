@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d5m1-meta-historical-read-only-v1",
-  "status": "LIVE_ACCEPTANCE_REOPENED_PROVIDER_ACTION_EVIDENCE_PENDING",
+  "status": "LIVE_PROVIDER_ACTION_EVIDENCE_PASS_VISUAL_ACCEPTANCE_PENDING",
   "provider": "meta",
   "business_outcome": "Find the most recent real Meta ad-level performance date and prove both canonical mapping and the provider-returned actions/action_values entries before any Dataset V2 write.",
   "official_provider_check": {
@@ -99,7 +99,11 @@
     "production_deployment_id": "dpl_ALzPA8cZWV4WNtM9mycdtsB9y9mo",
     "production_state": "READY",
     "production_runtime_errors": "NONE_FOUND",
-    "corrective_pull_request": null
+    "corrective_pull_request": 325,
+    "corrective_security_regression": "PASS",
+    "corrective_full_regression": "PASS",
+    "corrective_vercel_preview": "PASS",
+    "corrective_live_provider_evidence": true
   },
   "live_acceptance": {
     "accepted_at": "2026-10-03",
@@ -130,5 +134,69 @@
     "production_runtime_errors": "NONE_FOUND",
     "prior_interpretation_status": "REOPENED",
     "reopen_reason": "The live aggregate proved mapper support counts but did not expose the provider-returned actions/action_values entries; the prior pixel/CAPI causal explanation was unproven."
+  },
+  "corrective_live_evidence": {
+    "observed_at": "2026-10-03",
+    "deployed_commit": "7b99bb7b4917497fcc90400168e35d566be298a2",
+    "production_deployment_id": "dpl_76JB1cvVok41ApXyrT8LidsvmQjb",
+    "provider_date": "2026-10-01",
+    "source_row_count": 1,
+    "actions": [
+      {
+        "action_type": "landing_page_view",
+        "value": "8",
+        "entry_count": 1
+      },
+      {
+        "action_type": "link_click",
+        "value": "8",
+        "entry_count": 1
+      },
+      {
+        "action_type": "omni_landing_page_view",
+        "value": "8",
+        "entry_count": 1
+      },
+      {
+        "action_type": "onsite_conversion.post_net_like",
+        "value": "1",
+        "entry_count": 1
+      },
+      {
+        "action_type": "page_engagement",
+        "value": "9",
+        "entry_count": 1
+      },
+      {
+        "action_type": "post_engagement",
+        "value": "9",
+        "entry_count": 1
+      },
+      {
+        "action_type": "post_interaction_gross",
+        "value": "1",
+        "entry_count": 1
+      },
+      {
+        "action_type": "post_interaction_net",
+        "value": "1",
+        "entry_count": 1
+      },
+      {
+        "action_type": "post_reaction",
+        "value": "1",
+        "entry_count": 1
+      }
+    ],
+    "action_values": [],
+    "canonical_conversion_alias_presence": {
+      "add_to_cart": [],
+      "checkout": [],
+      "purchase": []
+    },
+    "proven_conclusion": "Meta returned no recognized add-to-cart, checkout, purchase or related action_values entries for the exact-date response.",
+    "unproven_conclusion": "The provider-side reason for the absence is not established by this response.",
+    "dataset_v2_writes": 0,
+    "production_runtime_errors": "NONE_FOUND"
   }
 }

@@ -3,7 +3,7 @@
   "observed_at": "2026-10-03",
   "environment": "production",
   "operation": "read_only_google_ads_provider_response_evidence",
-  "result": "PASS_EMPTY_BY_ACCOUNT_STRUCTURE",
+  "result": "AGGREGATE_EVIDENCE_ONLY_RAW_RESPONSE_PENDING",
   "authority": {
     "workspace": "verified_shopify_session",
     "selected_accounts": "canonical_workspace_provider_connection",
@@ -148,9 +148,11 @@
     "dataset_v2_writes": 0,
     "synthetic_rows": 0,
     "provider_ids_exposed": false,
-    "raw_provider_rows_retained": false
+    "raw_provider_rows_retained": false,
+    "raw_provider_response_verified": false
   },
-  "conclusion": "Google Ads authentication, selected-account access and query execution are healthy. All three accounts returned metadata and SearchStream responses, but none contained reportable Standard Campaign -> Ad Group -> Ad or Performance Max Campaign -> Asset Group hierarchy rows. Performance and conversion result counts are therefore zero.",
+  "conclusion": "Aggregate counters show successful queries and zero results, but the exact SearchStream response bodies were not inspected. No final empty-by-structure conclusion is recorded.",
   "non_empty_acceptance_boundary": "A real production Google Ads account containing serving Standard or Performance Max hierarchy and data is required. Google Ads test accounts do not serve ads, so they cannot prove non-empty serving metrics.",
-  "official_source": "https://developers.google.com/google-ads/api/docs/best-practices/test-accounts"
+  "official_source": "https://developers.google.com/google-ads/api/docs/best-practices/test-accounts",
+  "next_gate": "Run the authenticated read-only acceptance with exact empty raw response capture, then inspect the returned JSON bodies before deciding."
 }

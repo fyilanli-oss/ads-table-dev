@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d5m1-meta-historical-read-only-v1",
-  "status": "LIVE_READ_ONLY_PASS_PRODUCT_OWNER_ACCEPTED_MERGE_PENDING",
+  "status": "LIVE_READ_ONLY_PASS_MERGED",
   "provider": "meta",
   "business_outcome": "Find the most recent real Meta ad-level performance date in a bounded historical window and prove Campaign to Ad Set to Ad hierarchy plus impressions, link clicks and spend without writing Dataset V2.",
   "official_provider_check": {
@@ -82,7 +82,11 @@
     "desktop_shopify_admin": true,
     "mobile_shopify_admin_390x844": true,
     "product_owner_visual_acceptance": true,
-    "merged": false
+    "merged": true,
+    "merge_commit": "b5bf97be5e4b09644147c3e30ba13b1544e79c19",
+    "production_deployment_id": "dpl_ALzPA8cZWV4WNtM9mycdtsB9y9mo",
+    "production_state": "READY",
+    "production_runtime_errors": "NONE_FOUND"
   },
   "live_acceptance": {
     "accepted_at": "2026-10-03",

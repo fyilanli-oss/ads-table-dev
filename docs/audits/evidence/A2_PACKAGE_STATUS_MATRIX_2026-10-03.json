@@ -1,0 +1,119 @@
+{
+  "audit_wave": "A2",
+  "date": "2026-10-03",
+  "classification_rule": "verified requires every applicable evidence axis; partially_verified preserves valid evidence while keeping missing axes open",
+  "packages": [
+    {
+      "package": "E4",
+      "name": "Meta adapter",
+      "classification": "partially_verified",
+      "verified": [
+        "live non-empty ad row",
+        "hierarchy and supported impression/click/spend facts",
+        "unknown conversions were not coerced to zero"
+      ],
+      "open": [
+        "recurring job lineage",
+        "provider-specific attribution/reconciliation",
+        "finality evidence"
+      ]
+    },
+    {
+      "package": "E5",
+      "name": "Google Ads adapter",
+      "classification": "partially_verified",
+      "verified": [
+        "live SearchStream query accepted",
+        "fieldMask includes selected structure fields including ad name",
+        "raw response verified empty",
+        "no synthetic row written"
+      ],
+      "open": [
+        "non-empty live metric acceptance",
+        "conversion adjustment/finality runtime"
+      ]
+    },
+    {
+      "package": "E6",
+      "name": "TikTok adapter",
+      "classification": "verified_as_parked",
+      "verified": [
+        "no new activation required by current decision",
+        "existing artefacts preserved"
+      ],
+      "open": [
+        "future revalidation only after explicit reopening decision"
+      ]
+    },
+    {
+      "package": "E7",
+      "name": "Klaviyo adapter",
+      "classification": "partially_verified",
+      "verified": [
+        "campaign message rows",
+        "flow message rows",
+        "provisional journey count/value evidence"
+      ],
+      "open": [
+        "source job lineage",
+        "final reconciliation",
+        "durable Reporting API request provenance"
+      ]
+    },
+    {
+      "package": "E8",
+      "name": "Provider account access",
+      "classification": "partially_verified",
+      "verified": [
+        "OAuth/account access implementation evidence"
+      ],
+      "open": [
+        "full live provider acceptance"
+      ]
+    },
+    {
+      "package": "E9",
+      "name": "Backfill and operational data movement",
+      "classification": "partially_verified",
+      "verified": [
+        "repository checkpoint/idempotent artefacts"
+      ],
+      "open": [
+        "physical workspace checkpoint",
+        "live canonical scheduler/job authority",
+        "provider-specific correction windows"
+      ]
+    },
+    {
+      "package": "R6",
+      "name": "Embedded provider runtime to canonical V2",
+      "classification": "partially_verified",
+      "verified": [
+        "provider lifecycle evidence",
+        "Meta first non-empty write",
+        "Google verified-empty",
+        "Klaviyo Campaign/Flow writes"
+      ],
+      "open": [
+        "reporting completeness",
+        "recurring automation",
+        "run provenance",
+        "maturity/finality"
+      ]
+    },
+    {
+      "package": "R8",
+      "name": "Historical resumable backfill",
+      "classification": "verified_as_blocked",
+      "verified": [
+        "no blind direct V1 copy",
+        "synthetic/ambiguous rows excluded by contract"
+      ],
+      "open": [
+        "R3/R6 dependencies",
+        "workspace checkpoint and lease",
+        "coverage and replay acceptance"
+      ]
+    }
+  ]
+}

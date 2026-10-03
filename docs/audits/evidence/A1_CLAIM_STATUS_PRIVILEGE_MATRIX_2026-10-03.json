@@ -1,0 +1,353 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "A1",
+  "evidence_date": "2026-10-03",
+  "evidence_type": "claim_status_and_privilege_matrix",
+  "rules": {
+    "historical_snapshot_is_not_current_live_state": true,
+    "later_evidence_may_supersede_counts_without_invalidating_original_acceptance": true,
+    "status_claim_is_reopened_only_by_control_failure_not_by_age_alone": true,
+    "remediation_performed": false
+  },
+  "package_claim_matrix": [
+    {
+      "package": "E1",
+      "plan_status": "Done",
+      "audit_status": "revalidation_hold",
+      "reason": "OAuth/session and encrypted-token controls have repository/live DB support; production Vercel env name/scope metadata is not independently visible in the available authenticated channel.",
+      "linked_findings": [
+        "AF-A1-006"
+      ]
+    },
+    {
+      "package": "E2",
+      "plan_status": "Done; E2-T8 Deferred",
+      "audit_status": "authority_controls_supported",
+      "reason": "Dataset V2 has non-null workspace authority, one workspace cardinality, canonical uniqueness and no browser grants. Restore-readiness deferral is outside current live tenant-authority proof.",
+      "linked_findings": [
+        "AF-A1-007"
+      ]
+    },
+    {
+      "package": "E3",
+      "plan_status": "Done",
+      "audit_status": "supported",
+      "reason": "Composition/config/auth/route boundaries and caller-claim rejection are present in current canonical runtime."
+    },
+    {
+      "package": "R0",
+      "plan_status": "Ready",
+      "audit_status": "historical_gate_superseded",
+      "reason": "The temporary duplicate OAuth/refresh/revoke gate is superseded operationally by R4 write-freeze and R5 controlled reset. The top-level label is not a current blocker by itself."
+    },
+    {
+      "package": "R1",
+      "plan_status": "Done",
+      "audit_status": "supported",
+      "reason": "Workspace is canonical tenant authority in contract, code and live canonical tables."
+    },
+    {
+      "package": "R2",
+      "plan_status": "Done",
+      "audit_status": "supported_with_global_privilege_findings",
+      "reason": "Workspace/currency foundation exists with FORCE RLS and service-role-only canonical grants; global public default privileges remain unsafe.",
+      "linked_findings": [
+        "AF-A1-001"
+      ]
+    },
+    {
+      "package": "R3",
+      "plan_status": "In progress; R3-A+B+C1 Done / first-write enforcement PASS",
+      "audit_status": "status_valid_but_counts_stale",
+      "reason": "C1 enforcement is live and Dataset V2 now contains 5 rows. The recorded zero-row value is a dated acceptance snapshot, not current cardinality.",
+      "linked_findings": [
+        "AF-A1-007"
+      ]
+    },
+    {
+      "package": "R4",
+      "plan_status": "Done / R4-A+B+C",
+      "audit_status": "supported",
+      "reason": "Canonical workspace provider table exists; live legacy connection/token/standalone OAuth write guards are installed."
+    },
+    {
+      "package": "R5",
+      "plan_status": "Done / controlled clean reset",
+      "audit_status": "historical_acceptance_supported_current_count_superseded",
+      "reason": "The reset's canonical Klaviyo zero count was historical. A later valid embedded reconnection explains today's connected canonical Klaviyo row; this is not by itself a regression."
+    }
+  ],
+  "canonical_table_privilege_matrix": [
+    {
+      "object": "workspaces",
+      "browser_roles": "no grants",
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": true,
+      "classification": "pass"
+    },
+    {
+      "object": "workspace_settings",
+      "browser_roles": "no grants",
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": true,
+      "classification": "pass"
+    },
+    {
+      "object": "workspace_provider_connections",
+      "browser_roles": "no grants",
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": true,
+      "classification": "pass"
+    },
+    {
+      "object": "legacy_user_workspace_bindings",
+      "browser_roles": "no grants",
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": true,
+      "classification": "pass"
+    },
+    {
+      "object": "platform_connection_tokens",
+      "browser_roles": "no grants",
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "SELECT",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": true,
+      "classification": "pass"
+    },
+    {
+      "object": "performance_dataset_rows_v2",
+      "browser_roles": "no grants",
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": false,
+      "classification": "server_only_but_service_role_privileges_broader_than_minimum"
+    },
+    {
+      "object": "shopify_installations",
+      "browser_roles": "no grants",
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": true,
+      "classification": "server_only_but_service_role_privileges_broader_than_minimum"
+    },
+    {
+      "object": "shopify_workspace_provider_connections",
+      "browser_roles": "no grants",
+      "service_role": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": true,
+      "classification": "server_only_but_service_role_privileges_broader_than_minimum"
+    }
+  ],
+  "legacy_browser_grant_examples": [
+    {
+      "object": "dashboard_snapshots",
+      "anon_and_authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": false
+    },
+    {
+      "object": "platform_connections",
+      "anon_and_authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": false
+    },
+    {
+      "object": "snapshot_jobs",
+      "anon_and_authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": false
+    },
+    {
+      "object": "subscriptions",
+      "anon_and_authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": false
+    },
+    {
+      "object": "users",
+      "anon_and_authenticated": [
+        "DELETE",
+        "INSERT",
+        "REFERENCES",
+        "SELECT",
+        "TRIGGER",
+        "TRUNCATE",
+        "UPDATE"
+      ],
+      "rls": true,
+      "force_rls": false
+    }
+  ],
+  "function_privilege_matrix": [
+    {
+      "object": "cleanup_expired_oauth_transactions",
+      "security": "DEFINER",
+      "execute": [
+        "postgres",
+        "service_role"
+      ],
+      "search_path": "public, pg_temp",
+      "classification": "pass"
+    },
+    {
+      "object": "consume_oauth_transaction",
+      "security": "DEFINER",
+      "execute": [
+        "postgres",
+        "service_role"
+      ],
+      "search_path": "public, pg_temp",
+      "classification": "pass"
+    },
+    {
+      "object": "complete_shopify_managed_install",
+      "security": "INVOKER",
+      "execute": [
+        "postgres",
+        "service_role"
+      ],
+      "search_path": "public, pg_temp",
+      "classification": "pass"
+    },
+    {
+      "object": "expire_trials",
+      "security": "DEFINER",
+      "execute": [
+        "PUBLIC",
+        "anon",
+        "authenticated",
+        "postgres",
+        "service_role"
+      ],
+      "search_path": "public",
+      "classification": "p1_open",
+      "linked_finding": "AF-A1-002"
+    },
+    {
+      "object": "handle_new_user",
+      "security": "DEFINER",
+      "execute": [
+        "PUBLIC",
+        "anon",
+        "authenticated",
+        "postgres",
+        "service_role"
+      ],
+      "search_path": "public",
+      "classification": "p1_open",
+      "linked_finding": "AF-A1-003"
+    },
+    {
+      "object": "enforce_platform_account_limit_guard",
+      "security": "INVOKER",
+      "execute": [
+        "PUBLIC",
+        "anon",
+        "authenticated",
+        "postgres",
+        "service_role"
+      ],
+      "search_path": null,
+      "classification": "p2_open",
+      "linked_finding": "AF-A1-004"
+    }
+  ],
+  "conclusion": {
+    "canonical_cross_tenant_authority": "supported_by_current_evidence",
+    "global_database_privilege_hygiene": "hold",
+    "a1_gate": "hold",
+    "blocking_findings": [
+      "AF-A1-001",
+      "AF-A1-002",
+      "AF-A1-003",
+      "AF-A1-005",
+      "AF-A1-006"
+    ]
+  }
+}

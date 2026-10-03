@@ -1,0 +1,69 @@
+{
+  "audit_wave": "A5",
+  "date": "2026-10-03",
+  "classification_rule": "A planned rollback is not verified until the rollback target is both available and data-truthful.",
+  "packages": [
+    {
+      "package": "E13",
+      "classification": "verified_as_not_started",
+      "verified": [
+        "plan includes canary, SLO, restore and GO gates"
+      ],
+      "open": [
+        "control plane",
+        "API/UI readiness",
+        "restore rehearsal",
+        "human GO"
+      ]
+    },
+    {
+      "package": "E14",
+      "classification": "verified_as_not_started",
+      "verified": [
+        "destructive retirement has not started"
+      ],
+      "open": [
+        "consumer-zero",
+        "read-disable observation",
+        "retention",
+        "restore point",
+        "retirement migration"
+      ]
+    },
+    {
+      "package": "R9",
+      "classification": "verified_as_blocked",
+      "verified": [
+        "no premature read cutover found"
+      ],
+      "open": [
+        "R6-R8",
+        "E11-E12",
+        "safe rollback target",
+        "canary telemetry"
+      ]
+    },
+    {
+      "package": "R10",
+      "classification": "verified_as_blocked",
+      "verified": [
+        "legacy rows and artefacts preserved"
+      ],
+      "open": [
+        "R9 stabilization",
+        "consumer-zero",
+        "destructive approval"
+      ]
+    },
+    {
+      "package": "R11",
+      "classification": "verified_as_deferred",
+      "verified": [
+        "no WooCommerce implementation introduced"
+      ],
+      "open": [
+        "readiness contract and architecture tests"
+      ]
+    }
+  ]
+}

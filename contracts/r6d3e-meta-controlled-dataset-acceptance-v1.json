@@ -1,8 +1,8 @@
 {
   "contract_version": "r6d3e-meta-controlled-dataset-acceptance-v1",
-  "status": "PASS_PRODUCTION_VERIFIED_EMPTY",
+  "status": "HISTORICAL_NON_EMPTY_WRITE_PREPARED",
   "provider": "meta",
-  "business_outcome": "Prove the final workspace-authoritative Meta to Dataset V2 persistence boundary without schedules, backfill, V1 writes or synthetic rows.",
+  "business_outcome": "Persist the latest real Meta ad-level performance date within the bounded 31-day closed-date window through the workspace-authoritative Dataset V2 boundary, without schedules, backfill, V1 writes or synthetic rows.",
   "reuse": {
     "e4_client_mapper_time_fx": true,
     "workspace_runner": true,
@@ -21,14 +21,16 @@
     "exact_action_time_confirmation": "RUN_R6_D3_E_META_WRITE",
     "selected_account_minimum": 1,
     "selected_account_maximum": 3,
-    "existing_row_guard": "workspace_account_recent_business_date_window",
+    "existing_row_guard": "workspace_account_complete_31_day_historical_window",
     "provider_refetch": true,
     "verified_rows_only": true,
     "verified_empty_writes_synthetic_rows": false,
     "attempted_must_equal_persisted": true,
     "aggregate_response_only": true,
     "normal_data_sources_ui_changed": false,
-    "operator_surface": "/shopify/app/platforms?acceptance=r6d3-meta"
+    "operator_surface": "/shopify/app/platforms?acceptance=r6d3-meta",
+    "provider_date_strategy": "latest_non_empty_within_31_closed_business_days_per_account_timezone",
+    "browser_provider_date_is_authority": false
   },
   "accepted_outcomes": {
     "non_empty": "real verified rows persist with attempted equal persisted",
@@ -55,5 +57,17 @@
     "supabase_postcheck": "PASS",
     "evidence": "docs/security/evidence/R6D3E_META_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-25.json"
   },
-  "next_gate": "R6-D3-F_META_INDEPENDENT_DISCONNECT_DECISION"
+  "next_gate": "EXPLICIT_PRODUCTION_APPROVAL_FOR_ONE_CONTROLLED_NON_EMPTY_META_DATASET_WRITE",
+  "historical_corrective": {
+    "prepared_at": "2026-10-03",
+    "source_live_read_only_contract": "contracts/r6d5m1-meta-historical-read-only-v1.json",
+    "verified_provider_date": "2026-10-01",
+    "verified_row_count": 1,
+    "expected_impressions": 181,
+    "expected_ad_clicks": 8,
+    "expected_spend_value": 117.22,
+    "expected_reporting_currency": "TRY",
+    "conversion_semantics": "missing_action_types_are_unknown_null_not_zero",
+    "dataset_v2_write_executed": false
+  }
 }

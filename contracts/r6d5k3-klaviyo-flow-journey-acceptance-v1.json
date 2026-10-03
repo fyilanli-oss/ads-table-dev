@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d5k3-klaviyo-flow-journey-acceptance-v1",
-  "status": "PASS_ACCEPTANCE_CONTRACT_DATA_MATURITY_PENDING",
+  "status": "LIVE_PROVISIONAL_PASS_FINAL_RECONCILIATION_PENDING",
   "provider": "klaviyo",
   "business_outcome": "Prove that Campaign and Flow performance, provider-attributed journey count/value metrics, Time, FX and idempotent Dataset V2 persistence work together without synthetic fallback or leaf-level Email cost allocation.",
   "entry_conditions": [
@@ -71,5 +71,21 @@
     "account_day_fact_persistence_in_this_acceptance": false,
     "fx_rule": "account_day_cost_uses_its_business_date_fx_provenance"
   },
-  "done_rule": "R6-D5 remains open until Flow persistence and provider-attributed Added to Cart, Started Checkout and Placed Order count/value coverage are live-proven."
+  "done_rule": "R6-D5 remains open until Flow persistence and provider-attributed Added to Cart, Started Checkout and Placed Order count/value coverage are live-proven.",
+  "live_acceptance": {
+    "provider_date": "2026-10-02",
+    "observed_at": "2026-10-03",
+    "finality": "provisional",
+    "read_only_campaign_rows": 1,
+    "read_only_flow_rows": 1,
+    "controlled_write_attempted": 2,
+    "controlled_write_persisted": 2,
+    "duplicate_group_count": 0,
+    "synthetic_row_count": 0,
+    "leaf_spend": "null_unsupported",
+    "provider_attributed_journey_count_value_coverage": true,
+    "connection_and_token_postcheck": "pass",
+    "final_reconciliation_pending": true,
+    "evidence": "docs/security/evidence/R6D5K3_KLAVIYO_FLOW_JOURNEY_PROVISIONAL_LIVE_2026-10-03.json"
+  }
 }

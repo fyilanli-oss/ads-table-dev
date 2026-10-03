@@ -55,3 +55,13 @@ Klaviyo Campaign ve Flow verisi gönderim gününde okunabilir. Bugün ve dün i
 ## Done sınırı
 
 Flow persistence ve provider-attributed Added to Cart, Started Checkout ve Placed Order count/value kapsamı canlıda kanıtlanmadan R6-D5 `Done` değildir.
+## 3 Ekim 2026 — canlı provisional kabul
+
+- En yakın Sent business date `2026-10-02` olarak provider'dan bulundu; tarih attribution penceresinde olduğu için `PROVISIONAL`dır.
+- Salt-okunur tanı 1 Campaign Message ve 1 Flow Message döndürdü. Toplam delivered `2`, unique click `2`; Campaign unique open `0`, Flow unique open `1` gözlendi.
+- Campaign ve Flow'un her birinde provider-attributed Added to Cart, Started Checkout ve Placed Order count/value kapsamı `1 / 49.99 USD` olarak eşleşti; canonical key drift görülmedi.
+- Ayrı açık kullanıcı onayıyla yalnız bir kontrollü Dataset V2 acceptance çalıştı: attempted `2`, persisted `2`; Campaign `1`, Flow `1`, duplicate `0`, sentetik `0`.
+- Dataset V2 postcheck'te iki yaprakta spend `null`, spend support `unsupported`; Time/FX eksiksizdir. Canonical connection, account selection, encrypted access/refresh tokenlar ve üç journey binding'i korunmuştur.
+- Automatic retry, schedule, backfill ve production SnapshotJob açılmadı.
+- K3 canlı persistence ve journey kapsamı PASS'tir; tarih yalnız configured 5 günlük pencere kapandıktan sonraki yeniden uzlaştırmada finalized olabilir. Bu nedenle durum `LIVE_PROVISIONAL_PASS_FINAL_RECONCILIATION_PENDING`dir.
+- Redacted kanıt: `docs/security/evidence/R6D5K3_KLAVIYO_FLOW_JOURNEY_PROVISIONAL_LIVE_2026-10-03.json`.

@@ -55,3 +55,11 @@ Kontrol tarihi: 3 Ekim 2026.
 - Klaviyo Reporting API Campaign/Flow raporlarını Klaviyo UI ile eşleşen metrikler olarak sağlar.
 - Klaviyo message attribution çoğunlukla birkaç saat içinde işlenir; geç etkileşimler attribution penceresi boyunca sonucu güncelleyebilir.
 - Shopify `s-date-field` inclusive üst sınırı `allow` property ile destekler.
+## 3 Ekim 2026 — acceptance ve merge sonucu
+
+- PR #321, commit `d1974cebe0683eeb86b58bf674cf534940650918` ile merge edildi.
+- Gerçek Shopify Admin desktop ve 390×844 mobil viewport kabulü PASS oldu; kullanıcı görsel sonucu açıkça onayladı.
+- `2026-10-03` tarihi beklemeden okundu ve `PROVISIONAL` gösterildi; Dataset V2 yazımı `0` kaldı.
+- Ardından `2026-10-02` Sent Campaign/Flow verisi beklemeden bulundu ve K3 salt-okunur/kontrollü kabuline girdi.
+- `dev.adstable.app` yeni main deployment'ında READY ve endpoint HTTP `200` doğrulandı.
+- Sabit 48 saat kapısı kaldırılmıştır; K4 durumu `PASS_SHOPIFY_ACCEPTANCE_AND_MERGE`dir.

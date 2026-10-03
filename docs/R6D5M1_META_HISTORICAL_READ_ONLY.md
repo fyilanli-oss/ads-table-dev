@@ -102,3 +102,10 @@ Exact provider date `2026-10-01` için Meta Insights tekrar çalıştırıldı. 
 **Kanıtlanan:** Meta bu exact-date isteğinde add-to-cart, checkout, purchase veya bunların action_values entry'lerini döndürmedi.
 
 **Kanıtlanmayan:** Meta'nın provider-side bunu neden döndürmediği. Pixel/CAPI, kampanya hedefi, attribution veya başka bir neden bu response tek başına ispatlamaz.
+
+## Corrective görsel kabul
+
+- Desktop gerçek Shopify Admin: PASS.
+- Embedded mobil alan: 390×844 CSS px; document scroll width 375 px; yatay taşma yok; PASS.
+- Ürün sahibi corrective provider response çıktısını 3 Ekim 2026 tarihinde ACCEPTED olarak onayladı.
+- Durum: `LIVE_PROVIDER_ACTION_EVIDENCE_ACCEPTED_MERGE_PENDING`.

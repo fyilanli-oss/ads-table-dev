@@ -81,36 +81,55 @@
     "standard_structure": [
       "campaign.id",
       "campaign.name",
-      "campaign.status",
       "campaign.advertising_channel_type",
+      "campaign.status",
       "ad_group.id",
       "ad_group.name",
       "ad_group.status",
       "ad_group_ad.ad.id",
-      "ad_group_ad.ad.name",
       "ad_group_ad.status"
     ],
-    "performance_max_structure": [
-      "campaign.id",
-      "campaign.name",
-      "campaign.status",
-      "campaign.advertising_channel_type",
-      "asset_group.id",
-      "asset_group.name",
-      "asset_group.status"
-    ],
-    "performance": [
+    "standard_performance": [
       "segments.date",
       "campaign.id",
-      "hierarchy_leaf_id",
+      "ad_group.id",
+      "ad_group_ad.ad.id",
       "metrics.impressions",
       "metrics.clicks",
       "metrics.cost_micros"
     ],
-    "conversions": [
+    "standard_conversions": [
       "segments.date",
       "campaign.id",
-      "hierarchy_leaf_id",
+      "ad_group_ad.ad.id",
+      "segments.conversion_action_name",
+      "segments.conversion_action_category",
+      "metrics.conversions",
+      "metrics.conversions_value",
+      "metrics.all_conversions",
+      "metrics.all_conversions_value"
+    ],
+    "performance_max_structure": [
+      "campaign.id",
+      "campaign.name",
+      "campaign.advertising_channel_type",
+      "campaign.status",
+      "asset_group.id",
+      "asset_group.name",
+      "asset_group.status"
+    ],
+    "performance_max_performance": [
+      "segments.date",
+      "campaign.id",
+      "asset_group.id",
+      "metrics.impressions",
+      "metrics.clicks",
+      "metrics.cost_micros"
+    ],
+    "performance_max_conversions": [
+      "segments.date",
+      "campaign.id",
+      "asset_group.id",
       "segments.conversion_action_name",
       "segments.conversion_action_category",
       "metrics.conversions",

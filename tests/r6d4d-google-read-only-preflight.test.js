@@ -39,7 +39,8 @@ function providerSearch(calls, {withRows = true} = {}) {
     if (input.query.includes('FROM asset_group') && input.query.includes('metrics.impressions')) {
       return {results: withRows ? [pmaxFixture.row] : []};
     }
-    if (input.query.includes('metrics.conversions')) return {results: []};
+    if (input.query.includes('metrics.conversions') || input.query.includes('metrics.all_conversions')) return {results: []};
+    if (input.query.includes('FROM ad_group_ad') || input.query.includes('FROM asset_group')) return {results: []};
     throw new Error('unexpected Google query');
   };
 }

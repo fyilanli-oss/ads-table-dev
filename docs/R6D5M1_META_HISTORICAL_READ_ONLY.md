@@ -40,7 +40,7 @@ Raw HTML kontrolü, `s-clickable`, inline CSS, literal renk veya özel component
 - Gün: `time_increment=1`; üst sınır her hesabın timezone'unda önceki kapanmış gündür.
 - Pencere: 31 gün; browser tarih veya hesap sağlayamaz.
 - Canonical `ad_click`: yalnız `actions.action_type=link_click`. Meta `clicks` evidence-only kalır.
-- Pixel/CAPI ile gözlenemeyen add-to-cart, checkout ve purchase alanları `unknown/null` kalır; sahte 0 üretilmez.
+- Mapper'ın tanıdığı add-to-cart, checkout ve purchase alias'ları yoksa canonical alanlar `unknown/null` kalır; bunun provider nedeni ham response evidence görülmeden açıklanamaz.
 - Birden fazla source currency varsa spend source değerleri toplanmaz; canonical FX sonrası merchant reporting currency aggregate edilir.
 
 ## Kabul planı
@@ -62,7 +62,7 @@ Bu belge veya implementation kendi başına Dataset V2 yazımı ya da production
 - Meta provider tarihi: `2026-10-01`.
 - Hiyerarşi: 1 Campaign → 1 Ad Set → 1 Ad.
 - Sonuç: 181 impressions, 8 canonical link clicks, 117.22 TRY spend.
-- Conversion support: add-to-cart 0 satır, checkout 0 satır, purchase 0 satır. Pixel/CAPI gözlemi bulunmadığından bunlar dönüşüm değeri 0 değil; `unknown/null` semantiğidir.
+- Conversion support: add-to-cart 0 satır, checkout 0 satır, purchase 0 satır. Bu yalnız mapper'ın tanıdığı alias bulamadığını kanıtlar; Meta'nın ne döndürdüğü ve nedeni bu ilk kabulde kanıtlanmamıştır.
 - Dataset V2 yazımı: 0.
 - Desktop gerçek Shopify Admin: PASS.
 - 390×844 mobil gerçek Shopify Admin: PASS.
@@ -72,3 +72,16 @@ Bu belge veya implementation kendi başına Dataset V2 yazımı ya da production
 ## Repository sonucu
 
 PR #323 Security regression ve Full Regression PASS; Vercel preview PASS. Production deployment ve salt-okunur canlı Meta kabulü PASS; desktop ve 390×844 mobil Shopify Admin sonucu ürün sahibi tarafından kabul edildi. PR #323 `b5bf97be5e4b09644147c3e30ba13b1544e79c19` commit'iyle merge edilmiştir. Son production deployment `dpl_ALzPA8cZWV4WNtM9mycdtsB9y9mo` durumunda `READY`; error/fatal runtime log bulunmadı. Durum `LIVE_READ_ONLY_PASS_MERGED`dir. Dataset V2 write, schedule ve backfill kapalıdır.
+
+## 3 Ekim 2026 corrective — provider response opacity
+
+Önceki canlı kabul, provider'ın gerçek `actions` ve `action_values` içeriklerini göstermeden yalnız mapper support sayılarını sundu. Bu nedenle “pixel/CAPI olmadığı için dönmedi” açıklaması kanıtsızdır ve kabul geri açılmıştır.
+
+Corrective salt-okunur çıktı, exact provider date Meta Insights cevabından provider kimliklerini çıkartarak şu alanları gösterecektir:
+
+- `actions[].action_type`, `actions[].value` ve aynı type/value çiftinin entry count'u;
+- `action_values[].action_type`, `action_values[].value` ve aynı type/value çiftinin entry count'u;
+- malformed entry sayısı;
+- Dataset V2 write her durumda 0.
+
+Bu evidence görülmeden missing conversion için provider nedeni açıklanamaz, paket tekrar PASS sayılamaz ve kontrollü Dataset V2 write açılamaz. Aynı ilke Google Ads reporting completeness için de geçerlidir: test kampanyası üretilememesi, provider'ın gerçek response/field evidence'ını görmeden empty veya unsupported sonucu PASS sayma gerekçesi değildir.

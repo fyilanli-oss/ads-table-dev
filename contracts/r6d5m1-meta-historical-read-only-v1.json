@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d5m1-meta-historical-read-only-v1",
-  "status": "LIVE_PROVIDER_ACTION_EVIDENCE_PASS_VISUAL_ACCEPTANCE_PENDING",
+  "status": "LIVE_PROVIDER_ACTION_EVIDENCE_ACCEPTED_MERGE_PENDING",
   "provider": "meta",
   "business_outcome": "Find the most recent real Meta ad-level performance date and prove both canonical mapping and the provider-returned actions/action_values entries before any Dataset V2 write.",
   "official_provider_check": {
@@ -93,7 +93,7 @@
     "live_read_only_acceptance": true,
     "desktop_shopify_admin": true,
     "mobile_shopify_admin_390x844": true,
-    "product_owner_visual_acceptance": false,
+    "product_owner_visual_acceptance": true,
     "merged": true,
     "merge_commit": "b5bf97be5e4b09644147c3e30ba13b1544e79c19",
     "production_deployment_id": "dpl_ALzPA8cZWV4WNtM9mycdtsB9y9mo",
@@ -103,7 +103,9 @@
     "corrective_security_regression": "PASS",
     "corrective_full_regression": "PASS",
     "corrective_vercel_preview": "PASS",
-    "corrective_live_provider_evidence": true
+    "corrective_live_provider_evidence": true,
+    "corrective_desktop_shopify_admin": true,
+    "corrective_mobile_shopify_admin_390x844": true
   },
   "live_acceptance": {
     "accepted_at": "2026-10-03",
@@ -197,6 +199,17 @@
     "proven_conclusion": "Meta returned no recognized add-to-cart, checkout, purchase or related action_values entries for the exact-date response.",
     "unproven_conclusion": "The provider-side reason for the absence is not established by this response.",
     "dataset_v2_writes": 0,
-    "production_runtime_errors": "NONE_FOUND"
+    "production_runtime_errors": "NONE_FOUND",
+    "desktop_shopify_admin": "PASS",
+    "mobile_shopify_admin": {
+      "status": "PASS",
+      "viewport_css_px": "390x844",
+      "embedded_scroll_width_px": 375,
+      "horizontal_overflow": false
+    },
+    "product_owner_visual_acceptance": {
+      "status": "ACCEPTED",
+      "accepted_at": "2026-10-03"
+    }
   }
 }

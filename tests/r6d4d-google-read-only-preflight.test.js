@@ -46,12 +46,14 @@ function providerSearch(calls, {withRows = true} = {}) {
 }
 
 test('R6-D4-D contract reuses E5 and keeps Dataset V2 closed', () => {
-  assert.equal(contract.status, 'PASS_PRODUCTION_READ_ONLY_ACCEPTANCE');
+  assert.equal(contract.status, 'GOOGLE_PROVIDER_RESPONSE_EVIDENCE_PREPARED');
   assert.equal(contract.reuse.e5_standard_query_and_mapper, true);
   assert.equal(contract.reuse.e5_performance_max_query_and_mapper, true);
   assert.equal(contract.reuse.e5_time_fx, true);
   assert.equal(contract.reuse.new_metric_contract, false);
   assert.equal(contract.acceptance.normal_data_sources_ui_changed, false);
+  assert.equal(contract.acceptance.empty_result_requires_structure_and_query_evidence, true);
+  assert.equal(contract.corrective.prior_empty_status, 'REOPENED');
   assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
   assert.equal(contract.live_acceptance.status, 'PASS');

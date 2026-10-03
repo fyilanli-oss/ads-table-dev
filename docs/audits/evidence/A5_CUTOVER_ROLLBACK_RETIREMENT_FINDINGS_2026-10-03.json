@@ -1,0 +1,146 @@
+{
+  "audit_wave": "A5",
+  "date": "2026-10-03",
+  "scope": [
+    "E13",
+    "E14",
+    "R9",
+    "R10",
+    "R11"
+  ],
+  "mode": "read_only",
+  "mutations_performed": [],
+  "live_inventory": {
+    "performance_dataset_rows_v1": 4947,
+    "performance_dataset_rows_v2": 5,
+    "dashboard_snapshots": 2185,
+    "snapshot_jobs": 2392,
+    "snapshot_schedules": 10,
+    "platform_connections": 8,
+    "platform_connection_tokens": 6,
+    "workspace_provider_connections": 3
+  },
+  "findings": [
+    {
+      "finding_id": "AF-A5-001",
+      "severity": "P0",
+      "status": "open_release_blocker",
+      "customer_or_platform_failure": "Rollback can restore availability while displaying absent/failed data as measured zero.",
+      "affected_packages": [
+        "E13",
+        "R9",
+        "E12"
+      ],
+      "plan_claim": "UI/API read flags roll back to legacy safely.",
+      "contract_claim": "Rollback must preserve data truth and null/support semantics.",
+      "runtime_fact": "Legacy public dashboard converts snapshot absence to an all-zero snapshot and preserves initial zeros on failures.",
+      "schema_fact": "Legacy data remains present.",
+      "live_evidence": "A4 AF-A4-001 provides exact route/UI evidence.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Technical availability is not a truthful rollback.",
+      "safe_boundary": "Do not start cutover until rollback target passes truthfulness acceptance.",
+      "remediation_dependency": "AF-A4-001.",
+      "acceptance_needed": "Failure-injection rollback renders correct loading/empty/error/stale/support states."
+    },
+    {
+      "finding_id": "AF-A5-002",
+      "severity": "P1",
+      "status": "open_expected_blocker",
+      "customer_or_platform_failure": "Without canary and telemetry a cutover becomes all-or-nothing.",
+      "affected_packages": [
+        "E13",
+        "R9"
+      ],
+      "plan_claim": "Provider/workspace percentage canary, parity/SLO alerts and instant rollback are required.",
+      "contract_claim": "legacy_dashboard, funnel_api_canary and funnel_api_enabled states are planned.",
+      "runtime_fact": "No Funnel API route, read cutover flags, canary assignment or cutover telemetry was found.",
+      "schema_fact": "Not applicable.",
+      "live_evidence": "R9 remains blocked and E13 not started.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "The control plane does not exist yet.",
+      "safe_boundary": "Preserve blocked status.",
+      "remediation_dependency": "A2, A4, E11 and E12.",
+      "acceptance_needed": "Percentage ramp, error budget, parity, lag, rejection and rollback evidence."
+    },
+    {
+      "finding_id": "AF-A5-003",
+      "severity": "P1",
+      "status": "open_expected_blocker",
+      "customer_or_platform_failure": "Early legacy removal can break active reads, refresh, jobs, audit and rollback.",
+      "affected_packages": [
+        "E14",
+        "R10"
+      ],
+      "plan_claim": "Retirement only after consumer-zero and stabilization.",
+      "contract_claim": "Read-disable observation and restore point precede destructive work.",
+      "runtime_fact": "server.js and public dashboard still own legacy dataset/snapshot/job/connection behavior.",
+      "schema_fact": "Live V1, snapshot, job, schedule, connection and token tables contain material rows.",
+      "live_evidence": "V1=4947, snapshots=2185, jobs=2392, schedules=10 versus V2=5.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Consumer-zero is not close; current blocked status is correct.",
+      "safe_boundary": "No table/column/route deletion.",
+      "remediation_dependency": "Successful R9 stabilization.",
+      "acceptance_needed": "Static and runtime consumer registry reaches zero for the observation period."
+    },
+    {
+      "finding_id": "AF-A5-004",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Stopping V2 writes can unintentionally resume V1 writes and increase divergence.",
+      "affected_packages": [
+        "E13",
+        "R9",
+        "R10"
+      ],
+      "plan_claim": "V2 write may be separately disabled; V1 data is preserved for rollback.",
+      "contract_claim": "Read rollback and write control are separate operational decisions.",
+      "runtime_fact": "Meta/Google V2 primary flags choose V2 when true and actively call legacy V1 writers when false; absent defaults to true.",
+      "schema_fact": "Both V1 and V2 stores exist.",
+      "live_evidence": "Current code and tests assert the branch behavior.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Stop, read rollback and legacy-write fallback are conflated.",
+      "safe_boundary": "Do not use one flag as a universal incident switch.",
+      "remediation_dependency": "Versioned cutover control-plane contract.",
+      "acceptance_needed": "Independent stop-write, read-source and explicit fallback controls with failure-injection tests."
+    },
+    {
+      "finding_id": "AF-A5-005",
+      "severity": "P2",
+      "status": "open_expected",
+      "customer_or_platform_failure": "A real recovery may miss RTO/RPO when only component-level restore readiness exists.",
+      "affected_packages": [
+        "E13"
+      ],
+      "plan_claim": "Backup/restore and rollback rehearsal are mandatory before GO.",
+      "contract_claim": "Restore target and rollback are applied and verified.",
+      "runtime_fact": "Dataset V2 restore-readiness artefacts exist; no full application rehearsal was found.",
+      "schema_fact": "Multiple live legacy and canonical stores must be coordinated.",
+      "live_evidence": "E13 remains not started.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Component readiness is not full recovery evidence.",
+      "safe_boundary": "Do not infer full restore from Dataset-only artefacts.",
+      "remediation_dependency": "Stable E11/E12 and cutover control plane.",
+      "acceptance_needed": "Timed DB/config/deployment/read-path restore rehearsal with RTO/RPO and data-loss evidence."
+    },
+    {
+      "finding_id": "AF-A5-006",
+      "severity": "P2",
+      "status": "open_deferred",
+      "customer_or_platform_failure": "Shopify-specific assumptions can leak into the common core and make a second commerce adapter expensive or unsafe.",
+      "affected_packages": [
+        "R11",
+        "E14"
+      ],
+      "plan_claim": "Common workspace/currency/connection/V2 core must not require Shopify identity.",
+      "contract_claim": "WooCommerce is an adapter readiness check, not an implementation.",
+      "runtime_fact": "No independent R11/WooCommerce readiness contract or test package was found.",
+      "schema_fact": "Canonical workspace tables are largely platform-independent; Shopify installation remains an adapter table.",
+      "live_evidence": "R11 is explicitly Deferred.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "The decision exists but acceptance artefact does not.",
+      "safe_boundary": "Do not implement WooCommerce during this audit.",
+      "remediation_dependency": "Core architecture stabilizes before legacy retirement.",
+      "acceptance_needed": "Static/schema contract proves common core has no mandatory Shopify identity and defines safe adapter binding."
+    }
+  ]
+}

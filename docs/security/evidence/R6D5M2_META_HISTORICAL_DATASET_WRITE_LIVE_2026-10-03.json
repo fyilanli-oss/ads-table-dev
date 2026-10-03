@@ -1,0 +1,39 @@
+{
+  "evidence_version": "r6d5m2-meta-historical-dataset-write-live-2026-10-03",
+  "observed_at": "2026-10-03",
+  "provider": "meta",
+  "environment": "production",
+  "trigger": "explicit_product_owner_action_time_approval",
+  "repository_commit": "6ef0019ff10d1914339741dbbeb755a09e61ce49",
+  "ui_result": {
+    "status": "PASS",
+    "attempted": 1,
+    "persisted": 1,
+    "verified_empty": false
+  },
+  "dataset_v2_postcheck": {
+    "business_date": "2026-10-01",
+    "row_count": 1,
+    "distinct_entity_keys": 1,
+    "duplicate_count": 0,
+    "impressions": 181,
+    "ad_clicks": 8,
+    "spend": 117.22,
+    "target_currency": "TRY",
+    "metric_support": {
+      "add_to_cart": "unknown",
+      "checkout": "unknown",
+      "purchase": "unknown"
+    },
+    "conversion_values": {
+      "add_to_cart": null,
+      "checkout": null,
+      "purchase": null
+    },
+    "all_non_synthetic": true
+  },
+  "schedule_enabled": false,
+  "backfill_enabled": false,
+  "production_activation": false,
+  "secrets_or_provider_ids_in_evidence": false
+}

@@ -209,6 +209,17 @@ Bu bölüm, Shopify Embedded kararından önceki standalone kullanıcı/OAuth mo
 
 Her R paketi başlamadan zorunlu task aynasıyla ayrıntılandırılır; planlanan/gerçekleşen/sapma ayrımı korunur. Supabase DDL önce repository migration ve rollback olarak hazırlanır; canlı uygulama ayrı açık production onayı ister. Migration sonrası schema/constraint/RLS/grant sorguları, Supabase security/performance advisor, ilgili unit/integration/security testleri ve redacted acceptance evidence zorunludur. Bir R paketinin `PASS` olması sonraki provider teması, production mutation veya destructive retirement için örtük onay değildir.
 
+
+### 1.6 Bağımsız repository-wide execution integrity audit kapısı — 3 Ekim 2026
+
+E9-T8 ön incelemesi, tek paket içinde görülemeyen veri güvenilirliği ve lifecycle risklerinin paket sınırlarını aştığını doğrulamıştır. Bu nedenle E1–E14, R0–R11 ve keşfedilecek alt paketler üzerinde bağımsız genel audit, yeni remediation implementation'dan önce zorunlu kapıdır.
+
+Bağlayıcı kapsam `contracts/repository-wide-execution-integrity-audit-v1.json`, analist açıklaması `docs/audits/REPOSITORY_WIDE_EXECUTION_INTEGRITY_AUDIT_2026-10-03.md`, ilk doğrulanmış seed bulguları `docs/audits/E9_T8_CRITICAL_AUDIT_FINDINGS_2026-10-03.md` dosyalarındadır.
+
+Audit her `Done/PASS` iddiasını Execution Plan, executable contract, runtime kodu, veritabanı authority/schema ve canlı evidence eksenlerinde yeniden sınıflandırır. Provider/platform semantiği gereken noktalarda güncel resmî kaynak doğrulaması zorunludur; varsayım fact veya PASS olamaz. Audit read-only yürütülür; remediation kodu, migration, deploy, provider mutation, scheduler aktivasyonu, veri silme veya legacy retirement yetkisi vermez.
+
+Audit tamamlanmadan bulgular tek tek fırsatçı çözümlere dönüştürülmez. Son çıktı P0/P1 release blocker listesi, bilinmeyenler sicili ve bağımlılık sıralı remediation paket önerisidir. Audit tamamlanması bulguların çözüldüğü veya implementation'ın onaylandığı anlamına gelmez.
+
 ## 2. V3 gerçekleşme haritası
 
 | V3 fazı | Planlanan | Doğrulanmış gerçekleşen | V4 kararı |

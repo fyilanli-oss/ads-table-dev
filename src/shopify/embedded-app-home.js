@@ -273,8 +273,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
     <s-stack id="r6d2-klaviyo-acceptance" display="none">
       <s-section heading="Klaviyo acceptance check">
         <s-stack gap="base">
-          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs for one closed provider date. It does not write Dataset V2.</s-paragraph>
-          <s-date-field id="r6d2-klaviyo-provider-date" label="Provider date" details="Choose the closed date when the Campaign or Flow message was sent."></s-date-field>
+          <s-paragraph>This one-time check reads the verified Klaviyo account, Campaign and Flow reporting APIs through today. Dates still inside the attribution window are provisional and must be reconciled again. It does not write Dataset V2.</s-paragraph>
+          <s-date-field id="r6d2-klaviyo-provider-date" label="Provider date" details="Choose today or an earlier date when the Campaign or Flow message was sent."></s-date-field>
           <s-paragraph id="r6d2-klaviyo-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d2-klaviyo-run" variant="primary">Run read-only acceptance</s-button>
           <s-stack id="r6d2-klaviyo-c6-step" gap="base">
@@ -293,14 +293,14 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
     <s-stack id="r6d5-klaviyo-historical-inventory" display="none">
       <s-section heading="Klaviyo historical test-data inventory">
         <s-stack gap="base">
-          <s-paragraph>This read-only check finds closed dates for sent Klaviyo campaigns and evaluates only the most recent date through the existing Campaign and Flow mapping. It does not write Dataset V2.</s-paragraph>
+          <s-paragraph>This read-only check finds sent Klaviyo campaign dates through today and evaluates the most recent date through the existing Campaign and Flow mapping. Open attribution dates are reported as provisional. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d5-klaviyo-historical-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d5-klaviyo-historical-run" variant="primary">Run historical read-only inventory</s-button>
           <s-paragraph>This separate read-only check inventories Flow status and known synthetic Event categories. Events remain diagnostic evidence and are not written as Campaign or Flow performance rows.</s-paragraph>
           <s-paragraph id="r6d5-klaviyo-flow-event-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d5-klaviyo-flow-event-run" variant="primary">Run Flow/Event read-only inventory</s-button>
-          <s-paragraph>This read-only diagnostic shows Campaign and Flow delivery, engagement and journey metrics for one closed provider send date. It does not write Dataset V2.</s-paragraph>
-          <s-date-field id="r6d5-klaviyo-journey-diagnostic-date" label="Diagnostic provider date" details="Choose the closed date when the Campaign or Flow message was sent."></s-date-field>
+          <s-paragraph>This read-only diagnostic shows Campaign and Flow delivery, engagement and journey metrics through today. Open attribution dates are provisional and will change during reconciliation. It does not write Dataset V2.</s-paragraph>
+          <s-date-field id="r6d5-klaviyo-journey-diagnostic-date" label="Diagnostic provider date" details="Choose today or an earlier date when the Campaign or Flow message was sent."></s-date-field>
           <s-paragraph id="r6d5-klaviyo-journey-diagnostic-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d5-klaviyo-journey-diagnostic-run" variant="primary">Run journey diagnostic</s-button>
         </s-stack>
@@ -451,13 +451,13 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       });
       if (params.get("acceptance") === "r6d5-klaviyo") {
         historicalInventoryPanel.display = "auto";
-        const latestClosedDiagnosticDate = new Date(Date.now() - (48 * 60 * 60 * 1000)).toISOString().slice(0, 10);
-        journeyDiagnosticDate.value = latestClosedDiagnosticDate;
-        journeyDiagnosticDate.setAttribute("allow", "--" + latestClosedDiagnosticDate);
+        const latestReadableDiagnosticDate = new Date().toISOString().slice(0, 10);
+        journeyDiagnosticDate.value = latestReadableDiagnosticDate;
+        journeyDiagnosticDate.setAttribute("allow", "--" + latestReadableDiagnosticDate);
         historicalInventoryButton.addEventListener("click", async () => {
           historicalInventoryButton.disabled = true;
           historicalInventoryButton.loading = true;
-          historicalInventoryMessage.textContent = "Inspecting closed sent-campaign dates without writing Dataset V2…";
+          historicalInventoryMessage.textContent = "Inspecting sent-campaign dates through today without writing Dataset V2…";
           try {
             const result = await sessionRequest("/api/shopify/providers/klaviyo/runtime/historical-inventory", {method: "POST"});
             if (result.status !== "PASS_R6_D5_A_KLAVIYO_HISTORICAL_INVENTORY") throw new Error("KLAVIYO_HISTORICAL_INVENTORY_FAILED");
@@ -465,9 +465,10 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
               result.sent_with_scheduled_at_count + " with scheduled_at, " +
               result.sent_without_scheduled_at_count + " without scheduled_at. ";
             historicalInventoryMessage.textContent = result.checked_date_count === 0
-              ? "PASS — " + campaignSummary + "No closed sent date. Dataset V2 writes: 0."
-              : "PASS — " + campaignSummary + result.closed_sent_date_count + " closed sent date(s) found; " +
-                result.row_count + " verified row(s) mapped on " + result.provider_date + ". Dataset V2 writes: 0.";
+              ? "PASS — " + campaignSummary + "No available sent date. Dataset V2 writes: 0."
+              : "PASS — " + campaignSummary + result.available_sent_date_count + " available sent date(s) found; " +
+                result.row_count + " verified row(s) mapped on " + result.provider_date + " (" +
+                result.provider_date_finality.toUpperCase() + "). Dataset V2 writes: 0.";
           } catch (error) {
             historicalInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "KLAVIYO_HISTORICAL_INVENTORY_FAILED";
             historicalInventoryButton.disabled = false;
@@ -521,7 +522,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             const summary = (label, branch) => label + ": Purchase " + stage(diagnostics.purchase, branch) +
               "; Added to Cart " + stage(diagnostics.add_to_cart, branch) +
               "; Checkout " + stage(diagnostics.checkout, branch) + ".";
-            journeyDiagnosticMessage.textContent = "PASS — " + providerDate + ". " + performance("Campaign", "campaign") +
+            journeyDiagnosticMessage.textContent = "PASS — " + providerDate + " (" + result.provider_date_finality.toUpperCase() + "). " + performance("Campaign", "campaign") +
               " " + performance("Flow", "flow") + " Journey conversions — " + summary("Campaign", "campaign") +
               " " + summary("Flow", "flow") + " Key drift observed: " +
               (diagnostics.journey_key_drift ? "yes" : "no") + ". Dataset V2 writes: 0.";
@@ -532,9 +533,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       }
       if (params.get("acceptance") === "r6d2-klaviyo") {
         acceptancePanel.display = "auto";
-        const latestClosedDate = new Date(Date.now() - (48 * 60 * 60 * 1000)).toISOString().slice(0, 10);
-        acceptanceProviderDate.value = latestClosedDate;
-        acceptanceProviderDate.setAttribute("allow", "--" + latestClosedDate);
+        const latestReadableDate = new Date().toISOString().slice(0, 10);
+        acceptanceProviderDate.value = latestReadableDate;
+        acceptanceProviderDate.setAttribute("allow", "--" + latestReadableDate);
         const acceptanceRequest = () => JSON.stringify({provider_date: String(acceptanceProviderDate.value || "")});
         const showAcceptanceResult = result => {
           if (result.status !== "PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT") {
@@ -544,7 +545,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           }
           datasetAcceptanceButton.disabled = result.empty_provider_result === true;
           const outcome = result.empty_provider_result ? "VERIFIED EMPTY" : "PASS";
-          acceptanceMessage.textContent = outcome + " — " + result.provider_date + ": " +
+          acceptanceMessage.textContent = outcome + " — " + result.provider_date + " (" + result.provider_date_finality.toUpperCase() + "): " +
             result.campaign_row_count + " Campaign row(s), " + result.flow_row_count +
             " Flow row(s). Account, Time and FX checks succeeded. Dataset V2 writes: 0.";
         };
@@ -593,7 +594,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
               body: JSON.stringify({confirmation: "RUN_R6_D2_C6_KLAVIYO_WRITE", provider_date: String(acceptanceProviderDate.value || "")}),
             });
             datasetAcceptanceMessage.textContent = result.status === "PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE"
-              ? "PASS — " + result.provider_date + ": attempted " + result.attempted + ", persisted " + result.persisted +
+              ? "PASS — " + result.provider_date + " (" + result.provider_date_finality.toUpperCase() + "): attempted " + result.attempted + ", persisted " + result.persisted +
                 "; Campaign rows " + result.campaign_row_count + ", Flow rows " + result.flow_row_count + "."
               : "The Dataset V2 acceptance result could not be verified.";
           } catch (error) {

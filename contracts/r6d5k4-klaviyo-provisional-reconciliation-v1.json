@@ -1,0 +1,39 @@
+{
+  "contract_version": "r6d5k4-klaviyo-provisional-reconciliation-v1",
+  "status": "REPOSITORY_PREPARED_SHOPIFY_ACCEPTANCE_PENDING",
+  "provider": "klaviyo",
+  "read_eligibility": {
+    "today": true,
+    "yesterday": true,
+    "fixed_48_hour_gate": false,
+    "future_date": "reject_fail_closed",
+    "bounded_manual_window_days": 31
+  },
+  "finality": {
+    "today": "provisional",
+    "yesterday": "provisional",
+    "refresh_interval_minutes": 60,
+    "reconcile_while_provisional": true,
+    "finalize_only_after_configured_attribution_window": true,
+    "default_attribution_window_days": 5,
+    "default_is_configurable_not_universal": true,
+    "date_level_close_is_conservative": true
+  },
+  "writes": {
+    "synthetic_rows": "forbidden",
+    "provisional_reconciliation": "idempotent_canonical_upsert",
+    "dataset_schema_change": false,
+    "production_snapshot_schedule_activation": false,
+    "automatic_retry_activation": false
+  },
+  "shopify_ui": {
+    "components": ["s-section", "s-stack", "s-paragraph", "s-date-field", "s-button"],
+    "date_allow_upper_bound": "today",
+    "finality_visible": true,
+    "custom_css": false,
+    "desktop_acceptance_required": true,
+    "real_mobile_acceptance_required": true,
+    "explicit_user_visual_acceptance_required": true
+  },
+  "done_rule": "Repository tests, deployed desktop and real mobile Shopify Admin evidence, and explicit user visual acceptance are all required before Done, PASS or merge."
+}

@@ -6,6 +6,8 @@ const { requireServerWorkspaceAuthority } = require('../../../funnel-core/worksp
 const { createMetaAdapter } = require('./adapter');
 const { createMetaClient } = require('./client');
 
+const MAX_HISTORICAL_LOOKBACK_DAYS = 31;
+
 function required(value, field) {
   if (typeof value !== 'string' || value.trim() === '') throw new TypeError(`${field} is required`);
   return value.trim();
@@ -30,6 +32,29 @@ function previousClosedBusinessDate(now, timeZone) {
   return date.toISOString().slice(0, 10);
 }
 
+function subtractDays(value, days) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (!Number.isFinite(date.getTime())) throw new Error('META_PROVIDER_DATE_INVALID');
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+function historicalRequest(request) {
+  if (request?.providerDateStrategy !== 'latest_non_empty_within_closed_lookback') return null;
+  const lookbackDays = request.lookbackDays;
+  if (!Number.isInteger(lookbackDays) || lookbackDays < 1 || lookbackDays > MAX_HISTORICAL_LOOKBACK_DAYS) {
+    throw new Error('META_HISTORICAL_LOOKBACK_INVALID');
+  }
+  return Object.freeze({ lookbackDays });
+}
+
+function latestProviderDate(rows, since, until) {
+  const dates = rows.map(row => String(row?.date_start || ''))
+    .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= since && date <= until)
+    .sort();
+  return dates.at(-1) || null;
+}
+
 function createMetaWorkspaceRunner({ transport = globalThis.fetch, graphVersion = 'v23.0', resolveFxRate, now = () => new Date() } = {}) {
   if (typeof transport !== 'function') throw new TypeError('Meta transport is required');
   if (typeof resolveFxRate !== 'function') throw new TypeError('FX resolver is required');
@@ -43,18 +68,27 @@ function createMetaWorkspaceRunner({ transport = globalThis.fetch, graphVersion 
     const accounts = selectedAccounts(connection);
     const reportingCurrency = normalizeCurrencyCode(context.reportingCurrency, 'reportingCurrency');
     const accessToken = required(connection.accessToken, 'connection.accessToken');
+    const request = historicalRequest(context.request);
     const client = createMetaClient({ accessToken, graphVersion, transport });
     const response = await client.listAccounts();
     if (!response || !Array.isArray(response.data)) throw new Error('META_ACCOUNTS_RESPONSE_INVALID');
     const providerAccounts = new Map(response.data.map(account => [String(account?.id || ''), account]));
     const rows = [];
+    const checkedProviderDates = [];
 
     for (const selected of accounts) {
       const account = providerAccounts.get(selected.id);
       if (!account) throw new Error('META_PROVIDER_ACCOUNT_MISMATCH');
       const sourceCurrency = normalizeCurrencyCode(account.currency, 'provider_account.currency');
       if (sourceCurrency !== selected.currency) throw new Error('META_PROVIDER_CURRENCY_MISMATCH');
-      const providerDate = previousClosedBusinessDate(now(), account.timezone_name);
+      const closedUntil = previousClosedBusinessDate(now(), account.timezone_name);
+      let providerDate = closedUntil;
+      if (request) {
+        const since = subtractDays(closedUntil, request.lookbackDays - 1);
+        const inventory = await client.fetchAdInsights({ accountId: selected.id, since, until: closedUntil });
+        providerDate = latestProviderDate(inventory.data, since, closedUntil);
+        if (!providerDate) continue;
+      }
       const fx = await resolveFxRate(sourceCurrency, reportingCurrency, { rateDate: providerDate });
       const adapter = createMetaAdapter({ client });
       const mapped = await adapter.fetchCanonicalRows({
@@ -70,15 +104,25 @@ function createMetaWorkspaceRunner({ transport = globalThis.fetch, graphVersion 
           fxProvider: fx.fx_provider,
         },
       });
+      checkedProviderDates.push(providerDate);
       rows.push(...mapped.map(result => result.row));
     }
 
     return Object.freeze({
       rows: Object.freeze(rows),
       checked_account_ids: Object.freeze(accounts.map(account => account.id)),
+      checked_provider_dates: Object.freeze(checkedProviderDates),
       provider_result_status: rows.length === 0 ? 'empty' : 'non_empty',
     });
   };
 }
 
-module.exports = Object.freeze({ createMetaWorkspaceRunner, previousClosedBusinessDate, selectedAccounts });
+module.exports = Object.freeze({
+  MAX_HISTORICAL_LOOKBACK_DAYS,
+  createMetaWorkspaceRunner,
+  historicalRequest,
+  latestProviderDate,
+  previousClosedBusinessDate,
+  selectedAccounts,
+  subtractDays,
+});

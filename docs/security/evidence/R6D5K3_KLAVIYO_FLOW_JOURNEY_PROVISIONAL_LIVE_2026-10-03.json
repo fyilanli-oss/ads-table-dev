@@ -1,0 +1,70 @@
+{
+  "contract_version": "r6d5k3-klaviyo-flow-journey-provisional-live-evidence-v1",
+  "status": "PASS_PROVISIONAL_FINAL_RECONCILIATION_PENDING",
+  "observed_at": "2026-10-03",
+  "provider": "klaviyo",
+  "provider_date": "2026-10-02",
+  "provider_date_finality": "provisional",
+  "configured_attribution_window_days": 5,
+  "final_reconciliation_required": true,
+  "read_only_inventory": {
+    "total_campaigns": 4,
+    "sent_campaigns": 2,
+    "available_sent_dates": 2,
+    "checked_date_rows": 2,
+    "flow_count": 1,
+    "live_flows": 1,
+    "scanned_events": 150,
+    "attributed_events": 12,
+    "dataset_v2_writes": 0
+  },
+  "read_only_journey_diagnostic": {
+    "campaign_rows": 1,
+    "flow_rows": 1,
+    "delivered_total": 2,
+    "unique_click_total": 2,
+    "campaign_unique_opens": 0,
+    "flow_unique_opens": 1,
+    "added_to_cart_count": 2,
+    "started_checkout_count": 2,
+    "placed_order_count": 2,
+    "source_value_per_stage_total_usd": 99.98,
+    "canonical_key_drift": false
+  },
+  "controlled_dataset_v2_acceptance": {
+    "explicitly_approved_runs": 1,
+    "automatic_retries": 0,
+    "attempted": 2,
+    "persisted": 2,
+    "campaign_rows": 1,
+    "flow_rows": 1,
+    "duplicate_groups": 0,
+    "synthetic_rows": 0,
+    "nonnull_leaf_spend_rows": 0,
+    "target_currency_value_per_stage_total": "4913.493719376392",
+    "missing_fx_rows": 0,
+    "missing_timezone_rows": 0
+  },
+  "connection_postcheck": {
+    "connected_connections": 1,
+    "access_token_envelope_preserved": true,
+    "refresh_token_envelope_preserved": true,
+    "account_selection_preserved": true,
+    "journey_bindings_preserved": true
+  },
+  "finality_boundary": {
+    "dataset_schema_changed": false,
+    "finality_classification": "runtime_business_date_plus_configured_attribution_window",
+    "hourly_schedule_activated": false,
+    "backfill_activated": false,
+    "production_snapshot_job_activated": false
+  },
+  "privacy": {
+    "workspace_id_exposed": false,
+    "account_id_exposed": false,
+    "campaign_id_exposed": false,
+    "flow_id_exposed": false,
+    "message_id_exposed": false,
+    "token_material_exposed": false
+  }
+}

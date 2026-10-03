@@ -45,6 +45,42 @@ function supportSummary(rows, key) {
   });
 }
 
+function providerMetricEvidence(rows, field) {
+  const entries = new Map();
+  let malformedEntryCount = 0;
+  for (const row of rows) {
+    const list = row?.[field];
+    if (list === null || list === undefined) continue;
+    if (!Array.isArray(list)) {
+      malformedEntryCount += 1;
+      continue;
+    }
+    for (const item of list) {
+      const actionType = typeof item?.action_type === 'string' ? item.action_type.trim() : '';
+      const rawValue = item?.value === null || item?.value === undefined ? '' : String(item.value).trim();
+      if (!/^[A-Za-z0-9._:-]{1,128}$/.test(actionType) || !/^\d+(?:\.\d+)?$/.test(rawValue)) {
+        malformedEntryCount += 1;
+        continue;
+      }
+      const key = `${actionType}\u0000${rawValue}`;
+      const previous = entries.get(key);
+      entries.set(key, Object.freeze({
+        action_type: actionType,
+        value: rawValue,
+        entry_count: (previous?.entry_count || 0) + 1,
+      }));
+    }
+  }
+  return Object.freeze({
+    source_field: field,
+    source_row_count: rows.length,
+    entry_count: [...entries.values()].reduce((total, entry) => total + entry.entry_count, 0),
+    malformed_entry_count: malformedEntryCount,
+    entries: Object.freeze([...entries.values()].sort((left, right) =>
+      left.action_type.localeCompare(right.action_type) || left.value.localeCompare(right.value))),
+  });
+}
+
 function createMetaHistoricalReadOnlyInventory({
   connectionStore,
   settingsStore,
@@ -79,6 +115,7 @@ function createMetaHistoricalReadOnlyInventory({
       const providerAccounts = new Map(response.data.map(account => [String(account?.id || ''), account]));
       const canonicalRows = [];
       const candidateDates = [];
+      const providerActionEvidence = [];
       const scanStarts = [];
       const scanEnds = [];
 
@@ -99,7 +136,19 @@ function createMetaHistoricalReadOnlyInventory({
         if (!providerDate) continue;
         candidateDates.push(providerDate);
         const fx = await resolveFxRate(sourceCurrency, reportingCurrency, { rateDate: providerDate });
-        const adapter = createMetaAdapter({ client });
+        const exactInventory = await client.fetchAdInsights({
+          accountId: selected.id,
+          since: providerDate,
+          until: providerDate,
+        });
+        providerActionEvidence.push(Object.freeze({
+          provider_date: providerDate,
+          actions: providerMetricEvidence(exactInventory.data, 'actions'),
+          action_values: providerMetricEvidence(exactInventory.data, 'action_values'),
+        }));
+        const adapter = createMetaAdapter({
+          client: Object.freeze({ fetchAdInsights: async () => exactInventory }),
+        });
         const mapped = await adapter.fetchCanonicalRows({
           accountId: selected.id,
           since: providerDate,
@@ -142,6 +191,7 @@ function createMetaHistoricalReadOnlyInventory({
           checkout: supportSummary(canonicalRows, 'checkout'),
           purchase: supportSummary(canonicalRows, 'purchase'),
         }),
+        provider_action_evidence: Object.freeze(providerActionEvidence),
         account_api_verified: true,
         insights_verified: true,
         time_fx_verified: canonicalRows.length > 0,
@@ -161,6 +211,7 @@ module.exports = Object.freeze({
   DEFAULT_LOOKBACK_DAYS,
   createMetaHistoricalReadOnlyInventory,
   metricTotal,
+  providerMetricEvidence,
   safeFailure,
   subtractDays,
   supportSummary,

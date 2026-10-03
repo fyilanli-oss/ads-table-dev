@@ -1,8 +1,8 @@
 {
   "contract_version": "r6d5m1-meta-historical-read-only-v1",
-  "status": "LIVE_READ_ONLY_PASS_MERGED",
+  "status": "LIVE_PROVIDER_ACTION_EVIDENCE_ACCEPTED_MERGE_PENDING",
   "provider": "meta",
-  "business_outcome": "Find the most recent real Meta ad-level performance date in a bounded historical window and prove Campaign to Ad Set to Ad hierarchy plus impressions, link clicks and spend without writing Dataset V2.",
+  "business_outcome": "Find the most recent real Meta ad-level performance date and prove both canonical mapping and the provider-returned actions/action_values entries before any Dataset V2 write.",
   "official_provider_check": {
     "checked_at": "2026-10-03",
     "sources": [
@@ -44,7 +44,19 @@
     "ad_click_source": "actions.link_click",
     "clicks_field": "evidence_only",
     "conversion_missing_semantics": "unknown_not_zero",
-    "aggregate_response_only": true
+    "aggregate_response_only": false,
+    "provider_response_evidence": {
+      "source": "exact_date_meta_insights_response",
+      "exposed_fields": [
+        "actions.action_type",
+        "actions.value",
+        "action_values.action_type",
+        "action_values.value"
+      ],
+      "grouping": "identical_type_and_value_with_entry_count",
+      "provider_ids_exposed": false,
+      "required_before_metric_explanation": true
+    }
   },
   "ui": {
     "surface": "/shopify/app/platforms?acceptance=r6d3-meta",
@@ -71,7 +83,7 @@
     "oauth_or_token_lifecycle_change",
     "mapper_contract_change"
   ],
-  "next_gate": "SEPARATE_EXPLICIT_APPROVAL_FOR_ONE_CONTROLLED_META_HISTORICAL_DATASET_WRITE_ONLY_AFTER_NON_EMPTY_READ_ONLY_PASS",
+  "next_gate": "REPEAT_LIVE_READ_ONLY_AND_INSPECT_PROVIDER_ACTION_EVIDENCE_BEFORE_ANY_CONTROLLED_DATASET_WRITE",
   "repository_result": {
     "pull_request": 323,
     "security_regression": "PASS",
@@ -86,7 +98,14 @@
     "merge_commit": "b5bf97be5e4b09644147c3e30ba13b1544e79c19",
     "production_deployment_id": "dpl_ALzPA8cZWV4WNtM9mycdtsB9y9mo",
     "production_state": "READY",
-    "production_runtime_errors": "NONE_FOUND"
+    "production_runtime_errors": "NONE_FOUND",
+    "corrective_pull_request": 325,
+    "corrective_security_regression": "PASS",
+    "corrective_full_regression": "PASS",
+    "corrective_vercel_preview": "PASS",
+    "corrective_live_provider_evidence": true,
+    "corrective_desktop_shopify_admin": true,
+    "corrective_mobile_shopify_admin_390x844": true
   },
   "live_acceptance": {
     "accepted_at": "2026-10-03",
@@ -114,6 +133,83 @@
       "viewport_px": "390x844"
     },
     "product_owner_visual_acceptance": "ACCEPTED",
-    "production_runtime_errors": "NONE_FOUND"
+    "production_runtime_errors": "NONE_FOUND",
+    "prior_interpretation_status": "REOPENED",
+    "reopen_reason": "The live aggregate proved mapper support counts but did not expose the provider-returned actions/action_values entries; the prior pixel/CAPI causal explanation was unproven."
+  },
+  "corrective_live_evidence": {
+    "observed_at": "2026-10-03",
+    "deployed_commit": "7b99bb7b4917497fcc90400168e35d566be298a2",
+    "production_deployment_id": "dpl_76JB1cvVok41ApXyrT8LidsvmQjb",
+    "provider_date": "2026-10-01",
+    "source_row_count": 1,
+    "actions": [
+      {
+        "action_type": "landing_page_view",
+        "value": "8",
+        "entry_count": 1
+      },
+      {
+        "action_type": "link_click",
+        "value": "8",
+        "entry_count": 1
+      },
+      {
+        "action_type": "omni_landing_page_view",
+        "value": "8",
+        "entry_count": 1
+      },
+      {
+        "action_type": "onsite_conversion.post_net_like",
+        "value": "1",
+        "entry_count": 1
+      },
+      {
+        "action_type": "page_engagement",
+        "value": "9",
+        "entry_count": 1
+      },
+      {
+        "action_type": "post_engagement",
+        "value": "9",
+        "entry_count": 1
+      },
+      {
+        "action_type": "post_interaction_gross",
+        "value": "1",
+        "entry_count": 1
+      },
+      {
+        "action_type": "post_interaction_net",
+        "value": "1",
+        "entry_count": 1
+      },
+      {
+        "action_type": "post_reaction",
+        "value": "1",
+        "entry_count": 1
+      }
+    ],
+    "action_values": [],
+    "canonical_conversion_alias_presence": {
+      "add_to_cart": [],
+      "checkout": [],
+      "purchase": []
+    },
+    "proven_conclusion": "Meta returned no recognized add-to-cart, checkout, purchase or related action_values entries for the exact-date response.",
+    "unproven_conclusion": "The provider-side reason for the absence is not established by this response.",
+    "dataset_v2_writes": 0,
+    "production_runtime_errors": "NONE_FOUND",
+    "desktop_shopify_admin": "PASS",
+    "mobile_shopify_admin": {
+      "status": "PASS",
+      "viewport_css_px": "390x844",
+      "embedded_scroll_width_px": 375,
+      "horizontal_overflow": false
+    },
+    "product_owner_visual_acceptance": {
+      "status": "ACCEPTED",
+      "accepted_at": "2026-10-03"
+    }
   }
 }

@@ -263,7 +263,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-paragraph id="r6d3-meta-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d3-meta-run" variant="primary">Run read-only acceptance</s-button>
           <s-stack id="r6d3-meta-historical-step" gap="base">
-              <s-paragraph>This read-only inventory finds the most recent Meta ad-performance date in the last 31 closed business days. It shows aggregate Campaign, Ad Set, Ad, impression, link-click, spend and conversion-support evidence without writing Dataset V2.</s-paragraph>
+              <s-paragraph>This read-only inventory finds the most recent Meta ad-performance date in the last 31 closed business days. It shows aggregate performance plus the provider-returned actions and action_values entries, without provider IDs or Dataset V2 writes.</s-paragraph>
               <s-paragraph id="r6d3-meta-historical-message" aria-live="polite"></s-paragraph>
               <s-button id="r6d3-meta-historical-run" variant="secondary">Run historical read-only inventory</s-button>
           </s-stack>
@@ -657,7 +657,12 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
                 result.impression_total + ", link clicks " + result.ad_click_total + ", spend " + result.spend_total + " " +
                 result.reporting_currency + "; conversion support rows — add to cart " + result.conversion_support.add_to_cart.supported_rows +
                 ", checkout " + result.conversion_support.checkout.supported_rows + ", purchase " +
-                result.conversion_support.purchase.supported_rows + ". Dataset V2 writes: 0.";
+                result.conversion_support.purchase.supported_rows + ". Provider response evidence: " +
+                result.provider_action_evidence.map((evidence, index) => {
+                  const actions = evidence.actions.entries.map(entry => entry.action_type + "=" + entry.value + " x" + entry.entry_count).join(", ") || "none";
+                  const actionValues = evidence.action_values.entries.map(entry => entry.action_type + "=" + entry.value + " x" + entry.entry_count).join(", ") || "none";
+                  return "account " + (index + 1) + " actions [" + actions + "]; action_values [" + actionValues + "]";
+                }).join(" | ") + ". Dataset V2 writes: 0.";
             }
           } catch (error) {
             metaHistoricalInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "")

@@ -70,6 +70,8 @@ function safeQueryEvidence({accountOrdinal, label, query, response}) {
     stream_chunk_count: Number.isInteger(provider.stream_chunk_count) ? provider.stream_chunk_count : null,
     chunks_with_results: Number.isInteger(provider.chunks_with_results) ? provider.chunks_with_results : null,
     field_mask_paths: Object.freeze(Array.isArray(provider.field_mask_paths) ? provider.field_mask_paths : []),
+    raw_response_status: typeof provider.raw_response_status === 'string' ? provider.raw_response_status : 'unavailable',
+    raw_response_body: typeof provider.raw_response_body === 'string' ? provider.raw_response_body : null,
   });
 }
 
@@ -111,6 +113,7 @@ function createGoogleWorkspaceRunner({search, resolveFxRate, now = () => new Dat
           customerId: selected.id,
           loginCustomerId: selected.loginCustomerId,
           query,
+          captureRawResponse: Boolean(label && label !== 'customer_metadata'),
         });
         if (label) providerResponseEvidence.push(safeQueryEvidence({accountOrdinal: accountIndex + 1, label, query, response}));
         return response;

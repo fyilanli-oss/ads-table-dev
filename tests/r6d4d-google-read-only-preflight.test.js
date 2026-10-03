@@ -116,15 +116,29 @@ test('Google read-only preflight returns only aggregate evidence and accepts pro
     now,
   });
   const result = await preflight.execute(authority);
-  assert.deepEqual(result, {
-    status: 'PASS_R6_D4_D_GOOGLE_READ_ONLY_PREFLIGHT', provider_result_status: 'empty', selected_account_count: 3,
-    row_count: 0, standard_row_count: 0, pmax_row_count: 0, empty_provider_result: true,
-    customer_metadata_verified: true, standard_and_pmax_verified: true, time_fx_verified: true,
-    provider_date_strategy: 'previous_closed_business_date_per_customer_timezone', dataset_v2_write: false,
-    production_activation: false, currency_version: 4,
-  });
+  assert.equal(result.status, 'PASS_R6_D4_D_GOOGLE_READ_ONLY_PREFLIGHT');
+  assert.equal(result.provider_result_status, 'empty');
+  assert.equal(result.selected_account_count, 3);
+  assert.equal(result.row_count, 0);
+  assert.equal(result.standard_row_count, 0);
+  assert.equal(result.pmax_row_count, 0);
+  assert.equal(result.empty_provider_result, true);
+  assert.equal(result.customer_metadata_verified, true);
+  assert.equal(result.standard_and_pmax_verified, true);
+  assert.equal(result.time_fx_verified, true);
+  assert.equal(result.provider_date_strategy, 'previous_closed_business_date_per_customer_timezone_with_31_day_evidence_window');
+  assert.equal(result.dataset_v2_write, false);
+  assert.equal(result.production_activation, false);
+  assert.equal(result.currency_version, 4);
+  assert.equal(result.provider_response_evidence.length, 33);
+  assert.deepEqual(new Set(result.provider_response_evidence.map(item => item.account_ordinal)), new Set([1, 2, 3]));
+  assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.structure'));
+  assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.history_performance'));
+  assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.history_conversions'));
+  assert.ok(result.provider_response_evidence.some(item => item.label === 'performance_max.structure'));
+  assert.ok(result.provider_response_evidence.every(item => item.result_count === 0 || item.label === 'customer_metadata'));
   assert.equal(lifecycleCalls, 1);
-  assert.equal(calls.length, 15);
+  assert.equal(calls.length, 33);
   assert.equal(Object.hasOwn(result, 'rows'), false);
   assert.equal(JSON.stringify(result).includes('secret-access'), false);
   assert.ok(accounts.every(account => !JSON.stringify(result).includes(account.id)));
@@ -170,6 +184,8 @@ test('Google acceptance surface is hidden unless the explicit operator parameter
   assert.match(html, /id="r6d4-google-acceptance" display="none"/);
   assert.match(html, /params\.get\("acceptance"\) === "r6d4-google"/);
   assert.match(html, /\/api\/shopify\/providers\/google_ads\/runtime\/preflight/);
+  assert.match(html, /Provider query evidence:/);
+  assert.match(html, /selected_fields\.join/);
   assert.match(html, /Dataset V2 writes: 0/);
 });
 

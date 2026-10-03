@@ -7,16 +7,18 @@ function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
 }
 
-function closedProviderDate(now) {
+const DEFAULT_ATTRIBUTION_WINDOW_DAYS = 5;
+
+function currentProviderDate(now) {
   const instant = now instanceof Date ? now : new Date(now);
   if (Number.isNaN(instant.getTime())) throw new TypeError('now must be a valid Date');
-  return new Date(instant.getTime() - (48 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+  return instant.toISOString().slice(0, 10);
 }
 
 function resolveProviderDate(requestedProviderDate, now) {
-  const latestClosedDate = closedProviderDate(now);
+  const latestReadableDate = currentProviderDate(now);
   if (requestedProviderDate === undefined || requestedProviderDate === null || requestedProviderDate === '') {
-    return latestClosedDate;
+    return latestReadableDate;
   }
   if (typeof requestedProviderDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(requestedProviderDate)) {
     throw codedError('KLAVIYO_PROVIDER_DATE_INVALID', 409);
@@ -25,10 +27,10 @@ function resolveProviderDate(requestedProviderDate, now) {
   if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== requestedProviderDate) {
     throw codedError('KLAVIYO_PROVIDER_DATE_INVALID', 409);
   }
-  if (requestedProviderDate > latestClosedDate) {
-    throw codedError('KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 409);
+  if (requestedProviderDate > latestReadableDate) {
+    throw codedError('KLAVIYO_PROVIDER_DATE_IN_FUTURE', 409);
   }
-  const earliest = new Date(`${latestClosedDate}T00:00:00.000Z`);
+  const earliest = new Date(`${latestReadableDate}T00:00:00.000Z`);
   earliest.setUTCDate(earliest.getUTCDate() - 31);
   if (requestedProviderDate < earliest.toISOString().slice(0, 10)) {
     throw codedError('KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE', 409);
@@ -36,9 +38,25 @@ function resolveProviderDate(requestedProviderDate, now) {
   return requestedProviderDate;
 }
 
+function classifyProviderDate(providerDate, now, attributionWindowDays = DEFAULT_ATTRIBUTION_WINDOW_DAYS) {
+  if (!Number.isInteger(attributionWindowDays) || attributionWindowDays < 1 || attributionWindowDays > 90) {
+    throw new TypeError('attributionWindowDays must be an integer between 1 and 90');
+  }
+  const today = currentProviderDate(now);
+  const finalBefore = new Date(`${today}T00:00:00.000Z`);
+  finalBefore.setUTCDate(finalBefore.getUTCDate() - attributionWindowDays);
+  const finality = providerDate < finalBefore.toISOString().slice(0, 10) ? 'finalized' : 'provisional';
+  return Object.freeze({
+    provider_date: providerDate,
+    finality,
+    attribution_window_days: attributionWindowDays,
+    reconciliation_required: finality === 'provisional',
+  });
+}
+
 function safeFailure(error) {
   const reason = String(error?.code || error?.message || '');
-  if (['KLAVIYO_PROVIDER_DATE_INVALID', 'KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE'].includes(reason)) {
+  if (['KLAVIYO_PROVIDER_DATE_INVALID', 'KLAVIYO_PROVIDER_DATE_IN_FUTURE', 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE'].includes(reason)) {
     return codedError(reason, 409);
   }
   if (reason === 'KLAVIYO_REAUTHORIZE') return codedError('KLAVIYO_REAUTHORIZE', 409);
@@ -56,7 +74,7 @@ function safeFailure(error) {
 
 function safeDiagnosticFailure(error) {
   const reason = String(error?.code || error?.message || '');
-  if (['KLAVIYO_PROVIDER_DATE_INVALID', 'KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE'].includes(reason)) {
+  if (['KLAVIYO_PROVIDER_DATE_INVALID', 'KLAVIYO_PROVIDER_DATE_IN_FUTURE', 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE'].includes(reason)) {
     return codedError(reason, 409);
   }
   if (reason === 'KLAVIYO_REAUTHORIZE') return codedError('KLAVIYO_REAUTHORIZE', 409);
@@ -79,6 +97,7 @@ function createKlaviyoReadOnlyPreflight({
   tokenLifecycle = null,
   resolveFxRate,
   now = () => new Date(),
+  attributionWindowDays = DEFAULT_ATTRIBUTION_WINDOW_DAYS,
 } = {}) {
   if (!connectionStore || typeof connectionStore.resolveConnected !== 'function') {
     throw new TypeError('canonical connection store is required');
@@ -94,6 +113,7 @@ function createKlaviyoReadOnlyPreflight({
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       const currency = await settingsStore.resolveReportingCurrency(authority);
       const providerDate = resolveProviderDate(requestedProviderDate, now());
+      const dateState = classifyProviderDate(providerDate, now(), attributionWindowDays);
       const operation = activeConnection => runner(Object.freeze({
           authority,
           connection: activeConnection,
@@ -129,6 +149,9 @@ function createKlaviyoReadOnlyPreflight({
         dataset_v2_write: false,
         production_activation: false,
         provider_date: providerDate,
+        provider_date_finality: dateState.finality,
+        attribution_window_days: dateState.attribution_window_days,
+        reconciliation_required: dateState.reconciliation_required,
         currency_version: currency.currencyVersion,
       });
     } catch (error) {
@@ -142,6 +165,7 @@ function createKlaviyoReadOnlyPreflight({
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       const currency = await settingsStore.resolveReportingCurrency(authority);
       const providerDate = resolveProviderDate(requestedProviderDate, now());
+      const dateState = classifyProviderDate(providerDate, now(), attributionWindowDays);
       const operation = activeConnection => runner(Object.freeze({
         authority,
         connection: activeConnection,
@@ -163,6 +187,9 @@ function createKlaviyoReadOnlyPreflight({
       return Object.freeze({
         status: 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC',
         provider_date: providerDate,
+        provider_date_finality: dateState.finality,
+        attribution_window_days: dateState.attribution_window_days,
+        reconciliation_required: dateState.reconciliation_required,
         provider_result_status: verified.providerResultStatus,
         selected_account_count: verified.selectedAccountCount,
         row_count: verified.rows.length,
@@ -180,7 +207,10 @@ function createKlaviyoReadOnlyPreflight({
   return Object.freeze({ execute, executeDiagnostic });
 }
 
-module.exports = Object.freeze({ closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight });
-
-
-
+module.exports = Object.freeze({
+  DEFAULT_ATTRIBUTION_WINDOW_DAYS,
+  currentProviderDate,
+  resolveProviderDate,
+  classifyProviderDate,
+  createKlaviyoReadOnlyPreflight,
+});

@@ -2,7 +2,11 @@
 
 const { verifyProviderResult } = require('../workspace-provider-runtime');
 const { createKlaviyoWorkspaceRunner } = require('./workspace-runner');
-const { closedProviderDate } = require('./read-only-preflight');
+const {
+  DEFAULT_ATTRIBUTION_WINDOW_DAYS,
+  classifyProviderDate,
+  currentProviderDate,
+} = require('./read-only-preflight');
 
 function codedError(code, status) {
   return Object.assign(new Error(code), { code, status });
@@ -38,6 +42,7 @@ function createKlaviyoHistoricalInventory({
   tokenLifecycle = null,
   resolveFxRate,
   now = () => new Date(),
+  attributionWindowDays = DEFAULT_ATTRIBUTION_WINDOW_DAYS,
 } = {}) {
   if (!connectionStore || typeof connectionStore.resolveConnected !== 'function') {
     throw new TypeError('canonical connection store is required');
@@ -56,7 +61,7 @@ function createKlaviyoHistoricalInventory({
       let connection = await connectionStore.resolveConnected({ authority, provider: 'klaviyo' });
       if (!connection) throw new Error('CANONICAL_PROVIDER_CONNECTION_REQUIRED');
       const currency = await settingsStore.resolveReportingCurrency(authority);
-      const latestClosedDate = closedProviderDate(now());
+      const latestReadableDate = currentProviderDate(now());
 
       const operation = async activeConnection => {
         const accountId = onlySelectedAccount(activeConnection);
@@ -68,7 +73,7 @@ function createKlaviyoHistoricalInventory({
           accessToken: activeConnection.accessToken,
           timeZone: account.timezone,
         });
-        const eligibleDates = campaignInventory.sent_dates.filter(date => date <= latestClosedDate);
+        const eligibleDates = campaignInventory.sent_dates.filter(date => date <= latestReadableDate);
         if (eligibleDates.length === 0) {
           return Object.freeze({ providerDate: null, eligibleDates, campaignInventory, result: null });
         }
@@ -98,7 +103,7 @@ function createKlaviyoHistoricalInventory({
           sent_campaign_count: inventory.campaignInventory.sent_campaign_count,
           sent_with_scheduled_at_count: inventory.campaignInventory.sent_with_scheduled_at_count,
           sent_without_scheduled_at_count: inventory.campaignInventory.sent_without_scheduled_at_count,
-          closed_sent_date_count: 0,
+          available_sent_date_count: 0,
           checked_date_count: 0,
           row_count: 0,
           empty_provider_result: true,
@@ -110,6 +115,9 @@ function createKlaviyoHistoricalInventory({
           dataset_v2_write: false,
           production_activation: false,
           provider_date: null,
+          provider_date_finality: null,
+          attribution_window_days: attributionWindowDays,
+          reconciliation_required: false,
           currency_version: currency.currencyVersion,
         });
       }
@@ -120,6 +128,7 @@ function createKlaviyoHistoricalInventory({
         reportingCurrency: currency.reportingCurrency,
         result: inventory.result,
       });
+      const dateState = classifyProviderDate(inventory.providerDate, now(), attributionWindowDays);
       return Object.freeze({
         status: 'PASS_R6_D5_A_KLAVIYO_HISTORICAL_INVENTORY',
         provider_result_status: verified.providerResultStatus,
@@ -128,7 +137,7 @@ function createKlaviyoHistoricalInventory({
         sent_campaign_count: inventory.campaignInventory.sent_campaign_count,
         sent_with_scheduled_at_count: inventory.campaignInventory.sent_with_scheduled_at_count,
         sent_without_scheduled_at_count: inventory.campaignInventory.sent_without_scheduled_at_count,
-        closed_sent_date_count: inventory.eligibleDates.length,
+        available_sent_date_count: inventory.eligibleDates.length,
         checked_date_count: 1,
         row_count: verified.rows.length,
         empty_provider_result: verified.providerResultStatus === 'empty',
@@ -140,6 +149,9 @@ function createKlaviyoHistoricalInventory({
         dataset_v2_write: false,
         production_activation: false,
         provider_date: inventory.providerDate,
+        provider_date_finality: dateState.finality,
+        attribution_window_days: dateState.attribution_window_days,
+        reconciliation_required: dateState.reconciliation_required,
         currency_version: currency.currencyVersion,
       });
     } catch (error) {

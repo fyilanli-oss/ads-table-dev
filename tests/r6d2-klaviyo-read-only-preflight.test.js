@@ -2,7 +2,12 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { closedProviderDate, resolveProviderDate, createKlaviyoReadOnlyPreflight } = require('../src/providers/klaviyo/read-only-preflight');
+const {
+  classifyProviderDate,
+  currentProviderDate,
+  resolveProviderDate,
+  createKlaviyoReadOnlyPreflight,
+} = require('../src/providers/klaviyo/read-only-preflight');
 const { registerShopifyKlaviyoAccountRoutes } = require('../src/routes/shopify-klaviyo-account-routes');
 
 const WORKSPACE = '11111111-1111-4111-8111-111111111111';
@@ -30,28 +35,41 @@ function preflight({ facts = { rows: [], verified_empty: true }, providerError =
         return { id: 'account-1', currency: 'USD', timezone: 'UTC' };
       },
       fetchMessageFacts: async ({ providerDate, conversionMetricId, journeyMetricIds }) => {
-        assert.equal(providerDate, '2026-09-23');
+        assert.equal(providerDate, '2026-09-25');
         assert.equal(conversionMetricId, 'metric-1');
         assert.deepEqual(journeyMetricIds, { addToCart: 'metric-add', checkout: 'metric-checkout', purchase: 'metric-1' });
         return facts;
       },
     },
-    resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: '2026-09-23', fx_provider: 'test' }),
+    resolveFxRate: async () => ({ fx_rate: 40, fx_rate_date: '2026-09-25', fx_provider: 'test' }),
     now: () => new Date('2026-09-25T12:00:00Z'),
   });
 }
 
-test('R6-D2 chooses a provider date closed across supported timezones', () => {
-  assert.equal(closedProviderDate(new Date('2026-09-25T00:01:00Z')), '2026-09-23');
+test('R6-D2 makes the current provider date readable without a 48-hour gate', () => {
+  assert.equal(currentProviderDate(new Date('2026-09-25T00:01:00Z')), '2026-09-25');
 });
 
-test('R6-D2 accepts only valid closed provider dates inside the bounded acceptance window', () => {
+test('R6-D2 accepts today and yesterday, rejects future dates and keeps a bounded acceptance window', () => {
   const now = new Date('2026-09-25T12:00:00Z');
-  assert.equal(resolveProviderDate(null, now), '2026-09-23');
-  assert.equal(resolveProviderDate('2026-09-22', now), '2026-09-22');
-  assert.throws(() => resolveProviderDate('2026-09-24', now), error => error.code === 'KLAVIYO_PROVIDER_DATE_NOT_CLOSED');
+  assert.equal(resolveProviderDate(null, now), '2026-09-25');
+  assert.equal(resolveProviderDate('2026-09-24', now), '2026-09-24');
+  assert.throws(() => resolveProviderDate('2026-09-26', now), error => error.code === 'KLAVIYO_PROVIDER_DATE_IN_FUTURE');
   assert.throws(() => resolveProviderDate('2026-02-30', now), error => error.code === 'KLAVIYO_PROVIDER_DATE_INVALID');
   assert.throws(() => resolveProviderDate('2026-08-01', now), error => error.code === 'KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE');
+});
+
+test('R6-D2 keeps attribution-window dates provisional and finalizes only after the window', () => {
+  const now = new Date('2026-10-03T12:00:00Z');
+  assert.equal(classifyProviderDate('2026-10-03', now, 5).finality, 'provisional');
+  assert.equal(classifyProviderDate('2026-10-02', now, 5).finality, 'provisional');
+  assert.equal(classifyProviderDate('2026-09-28', now, 5).finality, 'provisional');
+  assert.deepEqual(classifyProviderDate('2026-09-27', now, 5), {
+    provider_date: '2026-09-27',
+    finality: 'finalized',
+    attribution_window_days: 5,
+    reconciliation_required: false,
+  });
 });
 
 test('R6-D2 preflight fails closed when the canonical metric binding is absent', async () => {
@@ -71,7 +89,8 @@ test('R6-D2 read-only preflight returns aggregate evidence and never returns pro
     status: 'PASS_R6_D2_KLAVIYO_READ_ONLY_PREFLIGHT',
     provider_result_status: 'empty', selected_account_count: 1, row_count: 0, campaign_row_count: 0, flow_row_count: 0, empty_provider_result: true,
     account_api_verified: true, campaign_reporting_verified: true, flow_reporting_verified: true, time_fx_verified: true,
-    dataset_v2_write: false, production_activation: false, provider_date: '2026-09-23', currency_version: 2,
+    dataset_v2_write: false, production_activation: false, provider_date: '2026-09-25',
+    provider_date_finality: 'provisional', attribution_window_days: 5, reconciliation_required: true, currency_version: 2,
   });
   assert.equal(Object.hasOwn(result, 'rows'), false);
   assert.equal(JSON.stringify(result).includes('secret-token'), false);
@@ -87,7 +106,7 @@ test('R6-D2 read-only preflight redacts provider failures', async () => {
   });
 });
 
-test('R6-D5 journey diagnostic uses the requested closed send date and returns performance plus journey aggregates', async () => {
+test('R6-D5 journey diagnostic uses a requested provisional send date and returns performance plus journey aggregates', async () => {
   const diagnosticDate = '2026-09-26';
   const diagnosticReport = {
     provider_date: diagnosticDate,
@@ -126,7 +145,8 @@ test('R6-D5 journey diagnostic uses the requested closed send date and returns p
   });
   const result = await diagnostic.executeDiagnostic(authority, diagnosticDate);
   assert.deepEqual(result, {
-    status: 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC', provider_date: diagnosticDate, provider_result_status: 'empty',
+    status: 'PASS_R6_D5_KLAVIYO_JOURNEY_DIAGNOSTIC', provider_date: diagnosticDate,
+    provider_date_finality: 'provisional', attribution_window_days: 5, reconciliation_required: true, provider_result_status: 'empty',
     selected_account_count: 1, row_count: 0, campaign_row_count: 0, flow_row_count: 0,
     journey_diagnostics: diagnosticReport, dataset_v2_write: false, production_activation: false,
   });
@@ -209,6 +229,3 @@ test('R6-D2 C6 controlled Dataset acceptance route is session-bound and forwards
   assert.deepEqual(received, { input: authority, confirmation: 'RUN_R6_D2_C6_KLAVIYO_WRITE', providerDate: '2099-01-01' });
   assert.equal(res.code, 200);
 });
-
-
-

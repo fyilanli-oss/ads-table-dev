@@ -4,7 +4,7 @@ const INCLUDED_PLATFORMS=Object.freeze(["meta","google","tiktok","klaviyo"]);
 const PARKED_PLATFORMS=Object.freeze(["pinterest","organic"]);
 const ACCOUNT_LIMIT=3;
 const DATE_WINDOWS=Object.freeze([
-  Object.freeze({date_key:"yesterday",finality:"finalized",priority:1}),
+  Object.freeze({date_key:"yesterday",finality:"provisional",priority:1}),
   Object.freeze({date_key:"today",finality:"provisional",priority:2})
 ]);
 
@@ -24,7 +24,7 @@ function createOnboardingBackfillPlan({accounts=[]}={}){
     seen.add(identity);counts.set(platform,count+1);
     for(const window of DATE_WINDOWS)units.push(Object.freeze({platform,platform_account_id:accountId,...window}));
   }
-  return Object.freeze({contract_version:"e9-t1-v1",account_limit:ACCOUNT_LIMIT,included_platforms:INCLUDED_PLATFORMS,parked_platforms:PARKED_PLATFORMS,date_windows:DATE_WINDOWS,older_history_automatic:false,day_14_behavior:"continue_daily_accumulation",units:Object.freeze(units),excluded:Object.freeze(excluded)});
+  return Object.freeze({contract_version:"e9-t1-v2",account_limit:ACCOUNT_LIMIT,included_platforms:INCLUDED_PLATFORMS,parked_platforms:PARKED_PLATFORMS,date_windows:DATE_WINDOWS,refresh_interval_minutes:60,reconcile_while_provisional:true,finalize_after_attribution_window:true,older_history_automatic:false,day_14_behavior:"continue_daily_accumulation",units:Object.freeze(units),excluded:Object.freeze(excluded)});
 }
 
 module.exports=Object.freeze({INCLUDED_PLATFORMS,PARKED_PLATFORMS,ACCOUNT_LIMIT,DATE_WINDOWS,createOnboardingBackfillPlan});

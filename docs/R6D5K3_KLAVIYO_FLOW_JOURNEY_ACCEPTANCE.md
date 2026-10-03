@@ -8,7 +8,7 @@ Bu belge, eski recipient bazlı Email maliyet dağıtımı yaklaşımını geçe
 
 ## Ne zaman çalıştırılır?
 
-Klaviyo Flow gönderiminin kaynak saat dilimindeki iş günü kapanmadan kabul başlatılmaz. Tarih kapanmamışsa sonuç hata değildir; `WAIT_NO_WRITE` olarak kaydedilir.
+Klaviyo Campaign ve Flow verisi gönderim gününde okunabilir. Bugün ve dün için 48 saatlik bekleme uygulanmaz. Attribution penceresi içindeki sonuç `provisional` olarak gösterilir; saatlik uzlaştırma ile yeniden okunur ve yalnız pencere kapandıktan sonra `finalized` olur.
 
 ## Önce salt okunur kapı
 
@@ -23,7 +23,8 @@ Klaviyo Flow gönderiminin kaynak saat dilimindeki iş günü kapanmadan kabul b
 
 ## Karar sınıfları
 
-- Flow tarihi kapanmamışsa: `WAIT_NO_WRITE`.
+- Gelecek provider tarihi: fail-closed, okuma ve yazım yok.
+- Attribution penceresi açık tarih: `PROVISIONAL_RECONCILIATION_REQUIRED`; salt-okunur teşhis ve açık onaylı idempotent kontrollü yazım yapılabilir, fakat final PASS verilmez.
 - Provider Flow sonucu boşsa: verified-empty kaydedilebilir; Flow persistence PASS verilmez.
 - Journey stage provider sonucunda yok veya `unknown` ise: değer uydurulmaz, R6-D5 açık kalır.
 - Event envanteri mevcut fakat provider attribution yoksa: event sayıları Campaign/Flow satırına taşınmaz.
@@ -39,6 +40,7 @@ Klaviyo Flow gönderiminin kaynak saat dilimindeki iş günü kapanmadan kabul b
 - Connection, account selection ve encrypted tokenlar korunmalıdır.
 - AdsTable sentetik Campaign, Flow veya journey satırı üretmez.
 - Schedule, backfill ve production activation açılmaz.
+- Bu kabul paketi saatlik schedule'ı aktive etmez; production SnapshotJob aktivasyonu E9 execution kapısındadır.
 
 ## Email maliyeti ve FX sınırı
 

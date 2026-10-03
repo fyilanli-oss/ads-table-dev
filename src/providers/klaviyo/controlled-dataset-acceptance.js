@@ -3,7 +3,11 @@
 const { WorkspaceCanonicalWriteBoundary } = require('../../../funnel-core/workspace-canonical-write-boundary');
 const { requireServerWorkspaceAuthority } = require('../../../funnel-core/workspace-dataset-runtime');
 const { verifyProviderResult } = require('../workspace-provider-runtime');
-const { resolveProviderDate } = require('./read-only-preflight');
+const {
+  DEFAULT_ATTRIBUTION_WINDOW_DAYS,
+  classifyProviderDate,
+  resolveProviderDate,
+} = require('./read-only-preflight');
 const { createKlaviyoWorkspaceRunner } = require('./workspace-runner');
 
 const CONFIRMATION = 'RUN_R6_D2_C6_KLAVIYO_WRITE';
@@ -27,7 +31,7 @@ function diagnosticFailure(error, fallbackStage) {
     ['KLAVIYO_TOKEN_REFRESH_RESPONSE_INVALID', ['KLAVIYO_DATASET_ACCEPTANCE_TOKEN_REFRESH_RESPONSE_INVALID', 503]],
     ['KLAVIYO_TOKEN_REFRESH_FAILED', ['KLAVIYO_DATASET_ACCEPTANCE_TOKEN_REFRESH_FAILED', 503]],
     ['KLAVIYO_PROVIDER_DATE_INVALID', ['KLAVIYO_PROVIDER_DATE_INVALID', 409]],
-    ['KLAVIYO_PROVIDER_DATE_NOT_CLOSED', ['KLAVIYO_PROVIDER_DATE_NOT_CLOSED', 409]],
+    ['KLAVIYO_PROVIDER_DATE_IN_FUTURE', ['KLAVIYO_PROVIDER_DATE_IN_FUTURE', 409]],
     ['KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE', ['KLAVIYO_PROVIDER_DATE_OUT_OF_RANGE', 409]],
     ['KLAVIYO_DATASET_ACCEPTANCE_EMPTY_PROVIDER_RESULT', ['KLAVIYO_DATASET_ACCEPTANCE_EMPTY_PROVIDER_RESULT', 409]],
   ]);
@@ -39,7 +43,7 @@ function diagnosticFailure(error, fallbackStage) {
   return codedError(`KLAVIYO_DATASET_ACCEPTANCE_FAILED_${SAFE_FAILURE_STAGES.has(stage) ? stage : 'RUNTIME_CONTEXT'}`, 503);
 }
 
-function createKlaviyoControlledDatasetAcceptance({ connectionStore, settingsStore, providerClient, tokenLifecycle = null, resolveFxRate, repository, now = () => new Date() } = {}) {
+function createKlaviyoControlledDatasetAcceptance({ connectionStore, settingsStore, providerClient, tokenLifecycle = null, resolveFxRate, repository, now = () => new Date(), attributionWindowDays = DEFAULT_ATTRIBUTION_WINDOW_DAYS } = {}) {
   if (!connectionStore || typeof connectionStore.resolveConnected !== 'function') throw new TypeError('canonical connection store is required');
   if (!settingsStore || typeof settingsStore.resolveReportingCurrency !== 'function') throw new TypeError('workspace settings store is required');
   if (!repository || typeof repository.readCanonicalRawFacts !== 'function') throw new TypeError('workspace Dataset V2 read repository is required');
@@ -56,6 +60,7 @@ function createKlaviyoControlledDatasetAcceptance({ connectionStore, settingsSto
       stage = 'CURRENCY';
       const currency = await settingsStore.resolveReportingCurrency(authority);
       const providerDate = resolveProviderDate(requestedProviderDate, now());
+      const dateState = classifyProviderDate(providerDate, now(), attributionWindowDays);
       stage = 'ACCOUNT_SELECTION';
       const selectedAccounts = Array.isArray(connection.selectedAccounts) ? connection.selectedAccounts : [];
       if (selectedAccounts.length !== 1 || typeof selectedAccounts[0]?.id !== 'string' || !selectedAccounts[0].id.trim()) throw new Error('KLAVIYO_SINGLE_ACCOUNT_REQUIRED');
@@ -81,7 +86,7 @@ function createKlaviyoControlledDatasetAcceptance({ connectionStore, settingsSto
       const persisted = await writeBoundary.write(verified.rows);
       stage = 'PERSISTENCE_CARDINALITY';
       if (!Array.isArray(persisted) || persisted.length !== verified.rows.length) throw new Error('WORKSPACE_DATASET_WRITE_CARDINALITY_MISMATCH');
-      return Object.freeze({ status: 'PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE', attempted: verified.rows.length, persisted: persisted.length, empty_provider_result: false, provider_result_status: verified.providerResultStatus, selected_account_count: verified.selectedAccountCount, provider_date: providerDate, campaign_row_count: campaignRowCount, flow_row_count: flowRowCount, production_activation: false, currency_version: currency.currencyVersion });
+      return Object.freeze({ status: 'PASS_R6_D2_C6_KLAVIYO_DATASET_WRITE', attempted: verified.rows.length, persisted: persisted.length, empty_provider_result: false, provider_result_status: verified.providerResultStatus, selected_account_count: verified.selectedAccountCount, provider_date: providerDate, provider_date_finality: dateState.finality, attribution_window_days: dateState.attribution_window_days, reconciliation_required: dateState.reconciliation_required, campaign_row_count: campaignRowCount, flow_row_count: flowRowCount, production_activation: false, currency_version: currency.currencyVersion });
     } catch (error) {
       if (error?.code === 'KLAVIYO_DATASET_ACCEPTANCE_ALREADY_EXECUTED') throw error;
       throw diagnosticFailure(error, stage);

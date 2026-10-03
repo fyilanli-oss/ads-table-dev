@@ -16,6 +16,9 @@ test('R6-D2 acceptance control is hidden from the normal Data Sources experience
   assert.match(html, /\/api\/shopify\/providers\/klaviyo\/runtime\/metrics/);
   assert.match(html, /Confirm metric and continue/);
   assert.match(html, /<s-date-field id="r6d2-klaviyo-provider-date"/);
+  assert.match(html, /through today/);
+  assert.match(html, /provider_date_finality\.toUpperCase/);
+  assert.doesNotMatch(html, /Date\.now\(\) - \(48 \* 60 \* 60 \* 1000\)/);
   assert.match(html, /provider_date: String\(acceptanceProviderDate\.value/);
   assert.match(html, /campaign_row_count/);
   assert.match(html, /flow_row_count/);
@@ -68,5 +71,6 @@ test('R6-D5 journey diagnostic stays hidden, date-selectable and exposes perform
     html.indexOf('<s-stack gap="large">'),
   );
   assert.match(diagnosticMarkup, /s-date-field/);
+  assert.match(diagnosticMarkup, /Open attribution dates are provisional/);
   assert.doesNotMatch(diagnosticMarkup, /workspace_id|account_id|campaign_id|flow_id|message_id|accessToken/);
 });

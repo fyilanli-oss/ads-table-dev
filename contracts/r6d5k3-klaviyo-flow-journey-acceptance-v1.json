@@ -7,7 +7,7 @@
     "canonical_klaviyo_connection_is_connected",
     "single_provider_verified_account_is_selected",
     "added_to_cart_started_checkout_and_placed_order_bindings_are_provider_verified",
-    "flow_send_business_date_is_closed_in_source_timezone",
+    "flow_send_business_date_is_not_in_the_future",
     "r6d5k2_campaign_row_remains_unique"
   ],
   "execution_sequence": [
@@ -23,7 +23,9 @@
     "flow_scope_observed": true,
     "provider_rows_only": true,
     "synthetic_fallback_allowed": false,
-    "closed_business_date_required": true,
+    "closed_business_date_required": false,
+    "open_attribution_date_is_provisional": true,
+    "hourly_reconciliation_required_until_finalized": true,
     "leaf_spend_must_be_null_and_unsupported": true,
     "journey_metrics": [
       "added_to_cart_count_and_value",
@@ -32,7 +34,8 @@
     ]
   },
   "decision_rules": {
-    "flow_date_not_closed": "WAIT_NO_WRITE",
+    "future_provider_date": "FAIL_CLOSED_NO_READ_OR_WRITE",
+    "open_attribution_date": "PROVISIONAL_RECONCILIATION_REQUIRED",
     "provider_flow_result_empty": "WAIT_OR_VERIFIED_EMPTY_NOT_FLOW_PERSISTENCE_PASS",
     "diagnostic_event_without_provider_attribution": "DO_NOT_WRITE_AS_CAMPAIGN_OR_FLOW_PERFORMANCE",
     "journey_stage_missing_or_unknown": "KEEP_R6D5_OPEN_NO_SYNTHETIC_VALUE",
@@ -50,6 +53,14 @@
     "connection_and_encrypted_tokens_must_be_preserved": true,
     "production_activation": false,
     "schedule_or_backfill_activation": false
+  },
+  "finality": {
+    "today": "provisional",
+    "yesterday": "provisional",
+    "refresh_interval_minutes": 60,
+    "finalize_only_after_configured_attribution_window": true,
+    "default_klaviyo_window_days": 5,
+    "default_is_configurable_not_universal": true
   },
   "email_cost_semantics": {
     "canonical_input": "estimated_30_day_klaviyo_email_spend",

@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d5m1-meta-historical-read-only-v1",
-  "status": "ANALYST_DECISION_FROZEN_IMPLEMENTATION_PENDING",
+  "status": "REPOSITORY_PASS_LIVE_ACCEPTANCE_PENDING",
   "provider": "meta",
   "business_outcome": "Find the most recent real Meta ad-level performance date in a bounded historical window and prove Campaign to Ad Set to Ad hierarchy plus impressions, link clicks and spend without writing Dataset V2.",
   "official_provider_check": {
@@ -71,5 +71,13 @@
     "oauth_or_token_lifecycle_change",
     "mapper_contract_change"
   ],
-  "next_gate": "SEPARATE_EXPLICIT_APPROVAL_FOR_ONE_CONTROLLED_META_HISTORICAL_DATASET_WRITE_ONLY_AFTER_NON_EMPTY_READ_ONLY_PASS"
+  "next_gate": "SEPARATE_EXPLICIT_APPROVAL_FOR_ONE_CONTROLLED_META_HISTORICAL_DATASET_WRITE_ONLY_AFTER_NON_EMPTY_READ_ONLY_PASS",
+  "repository_result": {
+    "pull_request": 323,
+    "security_regression": "PASS",
+    "full_regression": "PASS",
+    "vercel_preview": "PASS",
+    "production_deployment": false,
+    "live_read_only_acceptance": false
+  }
 }

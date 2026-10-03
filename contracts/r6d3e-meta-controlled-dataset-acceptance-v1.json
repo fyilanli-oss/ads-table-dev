@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d3e-meta-controlled-dataset-acceptance-v1",
-  "status": "HISTORICAL_NON_EMPTY_WRITE_PREPARED",
+  "status": "LIVE_HISTORICAL_NON_EMPTY_WRITE_PASS",
   "provider": "meta",
   "business_outcome": "Persist the latest real Meta ad-level performance date within the bounded 31-day closed-date window through the workspace-authoritative Dataset V2 boundary, without schedules, backfill, V1 writes or synthetic rows.",
   "reuse": {
@@ -46,7 +46,7 @@
   ],
   "production_deployed": true,
   "provider_contact": true,
-  "dataset_v2_write": false,
+  "dataset_v2_write": true,
   "live_acceptance": {
     "selected_account_count": 1,
     "attempted": 0,
@@ -57,7 +57,7 @@
     "supabase_postcheck": "PASS",
     "evidence": "docs/security/evidence/R6D3E_META_CONTROLLED_DATASET_LIVE_ACCEPTANCE_2026-09-25.json"
   },
-  "next_gate": "EXPLICIT_PRODUCTION_APPROVAL_FOR_ONE_CONTROLLED_NON_EMPTY_META_DATASET_WRITE",
+  "next_gate": "R6_D5_GOOGLE_REPORTING_COMPLETENESS_EVIDENCE",
   "historical_corrective": {
     "prepared_at": "2026-10-03",
     "source_live_read_only_contract": "contracts/r6d5m1-meta-historical-read-only-v1.json",
@@ -68,6 +68,25 @@
     "expected_spend_value": 117.22,
     "expected_reporting_currency": "TRY",
     "conversion_semantics": "missing_action_types_are_unknown_null_not_zero",
-    "dataset_v2_write_executed": false
+    "dataset_v2_write_executed": true,
+    "live_result": {
+      "executed_at": "2026-10-03",
+      "attempted": 1,
+      "persisted": 1,
+      "verified_empty": false,
+      "business_date": "2026-10-01",
+      "row_count": 1,
+      "duplicate_count": 0,
+      "impressions": 181,
+      "ad_clicks": 8,
+      "spend_value": 117.22,
+      "target_currency": "TRY",
+      "add_to_cart": "unknown_null",
+      "checkout": "unknown_null",
+      "purchase": "unknown_null",
+      "synthetic_rows": 0,
+      "supabase_postcheck": "PASS",
+      "evidence": "docs/security/evidence/R6D5M2_META_HISTORICAL_DATASET_WRITE_LIVE_2026-10-03.json"
+    }
   }
 }

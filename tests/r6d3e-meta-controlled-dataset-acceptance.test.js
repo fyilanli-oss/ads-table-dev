@@ -48,21 +48,24 @@ test('R6-D3-E guards the complete historical lookback before provider contact', 
 });
 
 test('R6-D3-E contract records the verified-empty production acceptance without inventing writes', () => {
-  assert.equal(contract.status, 'HISTORICAL_NON_EMPTY_WRITE_PREPARED');
+  assert.equal(contract.status, 'LIVE_HISTORICAL_NON_EMPTY_WRITE_PASS');
   assert.equal(contract.reuse.e4_client_mapper_time_fx, true);
   assert.equal(contract.reuse.new_metric_contract, false);
   assert.equal(contract.controls.verified_empty_writes_synthetic_rows, false);
   assert.equal(contract.production_deployed, true);
   assert.equal(contract.provider_contact, true);
-  assert.equal(contract.dataset_v2_write, false);
+  assert.equal(contract.dataset_v2_write, true);
   assert.equal(contract.live_acceptance.attempted, 0);
   assert.equal(contract.live_acceptance.persisted, 0);
   assert.equal(contract.live_acceptance.synthetic_rows_written, 0);
   assert.equal(contract.live_acceptance.non_empty_physical_upsert_observed, false);
   assert.equal(contract.live_acceptance.supabase_postcheck, 'PASS');
   assert.equal(contract.controls.provider_date_strategy, 'latest_non_empty_within_31_closed_business_days_per_account_timezone');
-  assert.equal(contract.historical_corrective.dataset_v2_write_executed, false);
-  assert.equal(contract.next_gate, 'EXPLICIT_PRODUCTION_APPROVAL_FOR_ONE_CONTROLLED_NON_EMPTY_META_DATASET_WRITE');
+  assert.equal(contract.historical_corrective.dataset_v2_write_executed, true);
+  assert.equal(contract.historical_corrective.live_result.attempted, 1);
+  assert.equal(contract.historical_corrective.live_result.persisted, 1);
+  assert.equal(contract.historical_corrective.live_result.duplicate_count, 0);
+  assert.equal(contract.next_gate, 'R6_D5_GOOGLE_REPORTING_COMPLETENESS_EVIDENCE');
 });
 
 test('R6-D3-E requires exact action-time confirmation before provider or Dataset access', async () => {

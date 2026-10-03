@@ -13,8 +13,8 @@
     {
       "package": "E1",
       "plan_status": "Done",
-      "audit_status": "revalidation_hold",
-      "reason": "OAuth/session and encrypted-token controls have repository/live DB support; production Vercel env name/scope metadata is not independently visible in the available authenticated channel.",
+      "audit_status": "supported_with_fail_closed_revalidation_hold",
+      "reason": "OAuth/session and encrypted-token controls have repository/live DB support. Required Vercel variable names and production scopes are verified without reading values; exact encryption/legacy-read booleans and startup fail-closed enforcement remain open.",
       "linked_findings": [
         "AF-A1-006"
       ]
@@ -349,5 +349,54 @@
       "AF-A1-005",
       "AF-A1-006"
     ]
+  },
+  "vercel_environment_metadata": {
+    "verified_at": "2026-10-03",
+    "project": "ads-table-dev",
+    "secret_values_read": false,
+    "variables": [
+      {
+        "name": "SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED",
+        "targets": [
+          "production"
+        ]
+      },
+      {
+        "name": "PROVIDER_TOKEN_ENCRYPTION_ENABLED",
+        "targets": [
+          "production",
+          "preview"
+        ]
+      },
+      {
+        "name": "PROVIDER_TOKEN_ACTIVE_KEY_ID",
+        "targets": [
+          "production",
+          "preview"
+        ]
+      },
+      {
+        "name": "PROVIDER_TOKEN_ENCRYPTION_KEYS",
+        "targets": [
+          "production",
+          "preview"
+        ]
+      },
+      {
+        "name": "SUPABASE_URL",
+        "targets": [
+          "production",
+          "preview"
+        ]
+      },
+      {
+        "name": "SUPABASE_SERVICE_ROLE_KEY",
+        "targets": [
+          "production",
+          "preview"
+        ]
+      }
+    ],
+    "exact_boolean_values_verified": false
   }
 }

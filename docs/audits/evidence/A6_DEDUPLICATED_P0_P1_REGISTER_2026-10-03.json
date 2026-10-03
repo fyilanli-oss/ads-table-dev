@@ -1,0 +1,191 @@
+{
+  "schema_version": "1.0",
+  "audit_wave": "A6",
+  "date": "2026-10-03",
+  "status": "execution_complete_review_pending",
+  "scoring_note": "Aynı kök nedenin farklı dalgalardaki sonuçları tek kayıtta birleştirildi; kaynak bulgular kapatılmadı.",
+  "totals": {
+    "deduplicated_p0": 4,
+    "deduplicated_p1": 7,
+    "release_blockers": 11
+  },
+  "findings": [
+    {
+      "id": "AF-A6-001",
+      "severity": "P0",
+      "title": "Shopify lifecycle ingress ve uninstall fail-closed zinciri operasyonel değil",
+      "source_findings": [
+        "AF-A3-001",
+        "AF-A3-003"
+      ],
+      "customer_failure": "Zorunlu compliance veya app/uninstalled olayı doğrulanmış, dayanıklı ve tekrar güvenli biçimde sisteme giremez; uninstall sonrası yeni provider/job işlemleri sürebilir.",
+      "release_gate": "Shopify review/production lifecycle GO yasak",
+      "dependencies": [],
+      "acceptance": "Resmî topic abonelikleri, HMAC negatif testi, durable claim/replay, retry ve uninstall sonrası sıfır provider/job çağrısı development-store kanıtıyla doğrulanır."
+    },
+    {
+      "id": "AF-A6-002",
+      "severity": "P0",
+      "title": "Delete My Data vaadi gerçek workspace silme yürütücüsüne bağlı değil",
+      "source_findings": [
+        "AF-A3-002",
+        "AF-A3-005",
+        "AF-A3-006"
+      ],
+      "customer_failure": "Kullanıcıya silme planlandı/tamamlanacak denirken ürün verisi, credential veya dış sistem kalıntıları kalabilir.",
+      "release_gate": "Delete My Data görünür vaat ve hard-delete PASS yasak",
+      "dependencies": [
+        "AF-A6-001"
+      ],
+      "acceptance": "Versiyonlu tablo/obje/dış-sistem manifesti, bağımlılık sırası, resume, zero-residue, redacted kanıt ve tamamlanma durumu uçtan uca doğrulanır."
+    },
+    {
+      "id": "AF-A6-003",
+      "severity": "P0",
+      "title": "Terminal deletion sonrası clean reinstall eski yetkiyi canlandırabilir",
+      "source_findings": [
+        "AF-A3-004"
+      ],
+      "customer_failure": "Silinmiş mağaza eski workspace/token/dataset otoritesine dönebilir veya eski-yeni nesiller çakışabilir.",
+      "release_gate": "Clean reinstall GO yasak",
+      "dependencies": [
+        "AF-A6-002"
+      ],
+      "acceptance": "Pre-redact reinstall ve post-terminal-deletion reinstall ayrı test edilir; ikinci yol yeni izole workspace generation üretir ve authority overlap oluşturmaz."
+    },
+    {
+      "id": "AF-A6-004",
+      "severity": "P0",
+      "title": "Legacy dashboard ve rollback hedefi absence/error durumunu ölçülmüş sıfır gösterebilir",
+      "source_findings": [
+        "AF-A4-001",
+        "AF-A5-001"
+      ],
+      "customer_failure": "Müşteri provider verisi yok, geç veya hatalı iken gerçek performans sıfırmış gibi görür; rollback erişimi geri getirirken veri doğruluğunu bozar.",
+      "release_gate": "E11/E12 cutover ve legacy rollback GO yasak",
+      "dependencies": [],
+      "acceptance": "Loading, empty, error, partial, stale ve unsupported fixture'ları sayısal sıfır üretmez; yalnız desteklenen provider zero değeri 0 görünür; rollback failure-injection ile aynı kuralı korur."
+    },
+    {
+      "id": "AF-A6-005",
+      "severity": "P1",
+      "title": "Supabase public/default privilege ve SECURITY DEFINER yüzeyi gereğinden geniş",
+      "source_findings": [
+        "AF-A1-001",
+        "AF-A1-002",
+        "AF-A1-003",
+        "AF-A1-004",
+        "AF-A1-005"
+      ],
+      "customer_failure": "Yanlış rol veya gelecekteki bir route beklenenden fazla database yetkisi kazanabilir.",
+      "release_gate": "Privilege hardening ve negatif yetki kanıtı olmadan güvenlik kabulü yok",
+      "dependencies": [],
+      "acceptance": "Object/function bazlı least-privilege matrisi uygulanır; anon/authenticated negatif testleri, search_path sabitlemesi ve regresyon testi geçer."
+    },
+    {
+      "id": "AF-A6-006",
+      "severity": "P1",
+      "title": "Production token encryption değişkenleri var fakat fail-closed başlangıç garantisi kanıtlanmadı",
+      "source_findings": [
+        "AF-A1-006"
+      ],
+      "customer_failure": "Yanlış boolean/key yapılandırması provider token yolunu belirsiz veya güvensiz moda sokabilir.",
+      "release_gate": "Güvenli non-secret startup diagnostic olmadan production configuration PASS yok",
+      "dependencies": [
+        "AF-A6-005"
+      ],
+      "acceptance": "Secret okumadan exact feature state ve aktif key doğrulanır; eksik/bozuk yapılandırmada süreç fail-closed olur."
+    },
+    {
+      "id": "AF-A6-007",
+      "severity": "P1",
+      "title": "Canonical saatlik refresh, run provenance, lease ve checkpoint zinciri yok",
+      "source_findings": [
+        "AF-A2-001",
+        "AF-A2-002",
+        "AF-A2-004"
+      ],
+      "customer_failure": "Veri bayat kalabilir; bir satırın hangi provider koşusundan geldiği ve kesilen backfill'in güvenli devamı kanıtlanamaz.",
+      "release_gate": "Recurring completeness ve R8 GO yasak",
+      "dependencies": [
+        "AF-A6-005",
+        "AF-A6-006"
+      ],
+      "acceptance": "Workspace-scoped scheduler/job/lease/retry/checkpoint çalışır; her yeni fact durable run/request/revision kaydına bağlıdır; crash/resume duplicate-negative testleri geçer."
+    },
+    {
+      "id": "AF-A6-008",
+      "severity": "P1",
+      "title": "Provider-specific maturity, correction lookback ve finality modeli taşınmıyor",
+      "source_findings": [
+        "AF-A2-003",
+        "AF-A2-005",
+        "AF-A4-004"
+      ],
+      "customer_failure": "Geç dönüşüm ve düzeltmeler kaçabilir; provisional/bayat veri current/final gibi sunulabilir ve Ads Manager ile ayrışabilir.",
+      "release_gate": "E9-T8, E11 ve E12 GO yasak",
+      "dependencies": [
+        "AF-A6-007"
+      ],
+      "acceptance": "Meta/Google/Klaviyo için versiyonlu lookback-attribution-finality sözleşmesi, bounded rolling reconciliation ve correction fixture'ları; API/UI freshness/finality meta alanları doğrulanır."
+    },
+    {
+      "id": "AF-A6-009",
+      "severity": "P1",
+      "title": "Formula/API semantic envelope eksik",
+      "source_findings": [
+        "AF-A4-002",
+        "AF-A4-003",
+        "AF-A4-005",
+        "AF-A4-007"
+      ],
+      "customer_failure": "Revenue eski profit/margin adıyla sunulabilir; null nedenleri kaybolabilir; compare frontendde yanlış hesaplanabilir; parked Organic/Blend Shopify UI'a sızabilir.",
+      "release_gate": "E11/E12 implementation GO öncesi contract gate",
+      "dependencies": [
+        "AF-A6-008"
+      ],
+      "acceptance": "Revenue/revenue_margin canonical isimleri, versioned alias, support/null_reason, backend compare ve Shopify-specific DTO negatif testlerle uçtan uca doğrulanır."
+    },
+    {
+      "id": "AF-A6-010",
+      "severity": "P1",
+      "title": "Cutover control plane yok ve read/write/fallback kararları ayrışmamış",
+      "source_findings": [
+        "AF-A5-002",
+        "AF-A5-004"
+      ],
+      "customer_failure": "Cutover all-or-nothing olur; V2 write durdurmak beklenmeden V1 write'ı yeniden başlatabilir.",
+      "release_gate": "E13/R9 GO yasak",
+      "dependencies": [
+        "AF-A6-004",
+        "AF-A6-007",
+        "AF-A6-008",
+        "AF-A6-009"
+      ],
+      "acceptance": "Bağımsız stop-write/read-source/explicit-fallback kontrolleri, workspace/provider canary, parity/lag/error-budget telemetry ve failure-injection rollback kanıtı."
+    },
+    {
+      "id": "AF-A6-011",
+      "severity": "P1",
+      "title": "Legacy consumer-zero koşulu sağlanmadan retirement riski",
+      "source_findings": [
+        "AF-A5-003"
+      ],
+      "customer_failure": "Erken söküm aktif read, refresh, job, audit ve rollback yollarını kırabilir.",
+      "release_gate": "E14/R10 destructive retirement yasak",
+      "dependencies": [
+        "AF-A6-010"
+      ],
+      "acceptance": "Statik ve runtime consumer registry gözlem süresi boyunca sıfır; restore point ve rollback prova edilmiş; ancak sonra yıkıcı söküm ayrı onay alır."
+    }
+  ],
+  "p2_preserved_not_in_release_blocker_register": [
+    "AF-A1-004",
+    "AF-A1-007",
+    "AF-A1-008",
+    "AF-A2-006",
+    "AF-A4-006",
+    "AF-A5-005",
+    "AF-A5-006"
+  ]
+}

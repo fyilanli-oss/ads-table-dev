@@ -1,0 +1,127 @@
+{
+  "schema_version": "1.0",
+  "audit_wave": "A6",
+  "date": "2026-10-03",
+  "ratings": {
+    "blocked": "P0/P1 release gate çözülmeden güvenli devam edemez",
+    "at_risk": "Akış var veya planlı fakat kanıt/operasyon boşluğu var",
+    "preserved": "Audit pozitif kontrolüyle doğrulandı"
+  },
+  "stages": [
+    {
+      "order": 1,
+      "stage": "Install ve workspace authority",
+      "rating": "at_risk",
+      "root_findings": [
+        "AF-A6-003"
+      ],
+      "verified": "Caller-supplied workspace/user/shop canonical authority değil; server-side binding pozitif kontrolü var.",
+      "gap": "Terminal deletion sonrası generation ayrımı yok."
+    },
+    {
+      "order": 2,
+      "stage": "Provider connect ve credential storage",
+      "rating": "at_risk",
+      "root_findings": [
+        "AF-A6-005",
+        "AF-A6-006"
+      ],
+      "verified": "Canonical token envelope server-only/encrypted tasarlanmış; plaintext legacy token sayısı 0.",
+      "gap": "Privilege yüzeyi ve production fail-closed config kanıtı açık."
+    },
+    {
+      "order": 3,
+      "stage": "Initial bootstrap",
+      "rating": "at_risk",
+      "root_findings": [
+        "AF-A6-007",
+        "AF-A6-008"
+      ],
+      "verified": "Meta/Klaviyo controlled acceptance rows var; Google raw verified-empty.",
+      "gap": "Run provenance ve provider maturity state yok; Google non-empty kabulü yok."
+    },
+    {
+      "order": 4,
+      "stage": "Saatlik snapshot ve backfill",
+      "rating": "blocked",
+      "root_findings": [
+        "AF-A6-007"
+      ],
+      "verified": "Legacy dört saatlik/today ve daily last_7d davranışı bulundu.",
+      "gap": "Canonical hourly scheduler/job/lease/checkpoint/retry chain yok."
+    },
+    {
+      "order": 5,
+      "stage": "Ads Manager karşılaştırma ve correction/finality",
+      "rating": "blocked",
+      "root_findings": [
+        "AF-A6-008"
+      ],
+      "verified": "Provider-specific correction ihtiyacı resmî kaynak ve canlı acceptance ile doğrulandı.",
+      "gap": "Fact üzerinde lookback/attribution/revision/provisional/final state yok."
+    },
+    {
+      "order": 6,
+      "stage": "Formula, compare ve Shopify presentation",
+      "rating": "blocked",
+      "root_findings": [
+        "AF-A6-004",
+        "AF-A6-009"
+      ],
+      "verified": "Mevcut Formula Phase1 53/53 ve Query Phase2 33/33 testleri geçiyor.",
+      "gap": "False-zero, eski isimler, null reason, compare ve truthful freshness envelope eksik."
+    },
+    {
+      "order": 7,
+      "stage": "Delete My Data",
+      "rating": "blocked",
+      "root_findings": [
+        "AF-A6-001",
+        "AF-A6-002"
+      ],
+      "verified": "Karar/contract niyeti mevcut.",
+      "gap": "Webhook ingress, exact manifest, executor, resume, completion ve residue kanıtı yok."
+    },
+    {
+      "order": 8,
+      "stage": "Uninstall",
+      "rating": "blocked",
+      "root_findings": [
+        "AF-A6-001"
+      ],
+      "verified": "Installation status modeli ve soyut planner portları var.",
+      "gap": "Gerçek app/uninstalled subscription/route/claim ve immediate-stop composition yok."
+    },
+    {
+      "order": 9,
+      "stage": "Clean reinstall",
+      "rating": "blocked",
+      "root_findings": [
+        "AF-A6-003"
+      ],
+      "verified": "Ordinary managed-install upsert yolu var.",
+      "gap": "Post-terminal-deletion yeni izole generation kanıtı yok."
+    },
+    {
+      "order": 10,
+      "stage": "Cutover ve rollback",
+      "rating": "blocked",
+      "root_findings": [
+        "AF-A6-004",
+        "AF-A6-010"
+      ],
+      "verified": "Plan canary/rollback hedefini tanımlıyor.",
+      "gap": "Control plane yok; rollback target false-zero; write/read/fallback conflated."
+    },
+    {
+      "order": 11,
+      "stage": "Legacy retirement",
+      "rating": "blocked",
+      "root_findings": [
+        "AF-A6-011"
+      ],
+      "verified": "Destructive retirement henüz yapılmadı; bu doğru güvenlik durumu.",
+      "gap": "V1 4947, snapshots 2185, jobs 2392, schedules 10; consumer-zero uzak."
+    }
+  ]
+}

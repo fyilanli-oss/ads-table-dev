@@ -1,0 +1,181 @@
+{
+  "schema_version": "1.0",
+  "audit_wave": "A6",
+  "date": "2026-10-03",
+  "authorization": "proposal_only_no_implementation_authorized",
+  "ordering_rule": "Önce yanlış vaat/yanlış veri ve yetki riskini kapat; sonra operasyonel veri zincirini kur; sonra Formula/API/UI; en son cutover ve retirement.",
+  "packages": [
+    {
+      "order": 0,
+      "id": "A6-RM-00",
+      "title": "Release/status containment gates",
+      "type": "governance_and_safe_containment",
+      "covers": [
+        "AF-A6-001",
+        "AF-A6-002",
+        "AF-A6-003",
+        "AF-A6-004"
+      ],
+      "depends_on": [],
+      "outcome": "Mevcut riskler çözülene kadar review, deletion-complete, clean-reinstall, E11/E12 cutover ve rollback GO iddiaları engellenir.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 1,
+      "id": "A6-RM-01",
+      "title": "Database least-privilege ve crypto fail-closed",
+      "covers": [
+        "AF-A6-005",
+        "AF-A6-006"
+      ],
+      "depends_on": [
+        "A6-RM-00"
+      ],
+      "outcome": "Supabase rol/function yüzeyi daralır; production token configuration güvenli diagnostic ve startup gate ile kanıtlanır.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 2,
+      "id": "A6-RM-02",
+      "title": "Truthful legacy state adapter",
+      "covers": [
+        "AF-A6-004"
+      ],
+      "depends_on": [
+        "A6-RM-00"
+      ],
+      "outcome": "Legacy dashboard ve rollback hedefi zero/unknown/error/stale ayrımını doğru taşır.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 3,
+      "id": "A6-RM-03",
+      "title": "Shopify verified lifecycle ingress ve immediate uninstall stop",
+      "covers": [
+        "AF-A6-001"
+      ],
+      "depends_on": [
+        "A6-RM-01"
+      ],
+      "outcome": "Compliance/uninstall olayları HMAC doğrulamalı, durable, replay-safe kabul edilir; uninstall yeni operasyonları fail-closed durdurur.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 4,
+      "id": "A6-RM-04",
+      "title": "Workspace deletion manifest ve resumable executor",
+      "covers": [
+        "AF-A6-002"
+      ],
+      "depends_on": [
+        "A6-RM-03"
+      ],
+      "outcome": "Delete My Data tam, ölçülebilir ve dependency-safe bir yürütmeye bağlanır; yanıltıcı eski yüzey konsolide edilir.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 5,
+      "id": "A6-RM-05",
+      "title": "Clean reinstall generation authority",
+      "covers": [
+        "AF-A6-003"
+      ],
+      "depends_on": [
+        "A6-RM-04"
+      ],
+      "outcome": "Terminal deletion sonrası yeni izole workspace/install generation kurulur; eski authority revive olmaz.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 6,
+      "id": "A6-RM-06",
+      "title": "Workspace-scoped scheduler/job/lease/checkpoint/provenance",
+      "covers": [
+        "AF-A6-007"
+      ],
+      "depends_on": [
+        "A6-RM-01"
+      ],
+      "outcome": "Saatlik refresh ve backfill dayanıklı, izlenebilir, idempotent ve resume edilebilir olur.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 7,
+      "id": "A6-RM-07",
+      "title": "Provider maturity ve bounded reconciliation policy",
+      "covers": [
+        "AF-A6-008"
+      ],
+      "depends_on": [
+        "A6-RM-06"
+      ],
+      "outcome": "Her provider kendi düzeltme/attribution/finality kuralıyla yeniden çekilir ve fact durumuna taşınır.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 8,
+      "id": "A6-RM-08",
+      "title": "Versioned Formula/Compare/support semantic envelope",
+      "covers": [
+        "AF-A6-009"
+      ],
+      "depends_on": [
+        "A6-RM-07"
+      ],
+      "outcome": "Canonical metric isimleri, support/null reason ve compare backend sözleşmesi tamamlanır.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 9,
+      "id": "A6-RM-09",
+      "title": "E11/E12 secure Shopify API ve truthful UI",
+      "covers": [
+        "AF-A6-008",
+        "AF-A6-009"
+      ],
+      "depends_on": [
+        "A6-RM-02",
+        "A6-RM-08"
+      ],
+      "outcome": "Session-derived tenant/account sınırı ve freshness/finality/partial/error UI durumları gerçek veri zincirine bağlanır.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 10,
+      "id": "A6-RM-10",
+      "title": "Cutover control plane, canary, telemetry ve full restore rehearsal",
+      "covers": [
+        "AF-A6-010"
+      ],
+      "depends_on": [
+        "A6-RM-09"
+      ],
+      "outcome": "Read/write/fallback ayrılır; kontrollü ramp ve doğruluk koruyan rollback kanıtlanır.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 11,
+      "id": "A6-RM-11",
+      "title": "Consumer-zero ve legacy retirement",
+      "covers": [
+        "AF-A6-011"
+      ],
+      "depends_on": [
+        "A6-RM-10"
+      ],
+      "outcome": "Gözlem süresi ve restore kanıtından sonra yıkıcı emeklilik ayrı onayla yapılabilir.",
+      "implementation_authorized": false
+    },
+    {
+      "order": 12,
+      "id": "A6-RM-12",
+      "title": "R11 adapter-readiness contract",
+      "covers": [],
+      "depends_on": [
+        "A6-RM-09"
+      ],
+      "outcome": "Common core'un zorunlu Shopify identity taşımadığı ikinci-adapter statik/schema kabulüyle kanıtlanır; WooCommerce uygulanmaz.",
+      "implementation_authorized": false
+    }
+  ]
+}

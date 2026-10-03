@@ -67,13 +67,13 @@ Buna karşılık canlı Supabase `public` şemasında eski ve genel güvenlik y�
 **Risk:** RLS satır bazlı DML'i sınırlar; TRUNCATE gibi table-level ayrıcalıkların güvenlik modeli farklıdır. PostgREST standart table API doğrudan TRUNCATE sunmasa da grant seti least-privilege değildir ve başka SQL/RPC yüzeyleriyle birleştiğinde risk üretir.  
 **Karar:** “Şu an sömürülebilir” diye varsayılmadı; ayrı privilege-matrix paketiyle her tablo/rol için kapı doğrulanacak.
 
-### AF-A1-006 — Üretim token-encryption konfigürasyonu canlı ortamda doğrulanamadı
+### AF-A1-006 — Üretim token-encryption fail-closed değeri tam doğrulanmadı
 
 **Öncelik:** P1 — doğrulama kapısı  
 **Kod kanıtı:** `server.js` içinde `PROVIDER_TOKEN_ENCRYPTION_ENABLED` varsayılanı false; `security/production-config.js` bu flag'i production start için zorunlu kılmıyor. Canonical embedded runtime kendi vault/keyring kapısına sahip ve canlı DB'deki canonical tokenlar şifreli.  
-**Canlı ortam kanıtı:** Vercel connector proje listesini doğruladı ancak environment-variable metadata aracı sunmuyor. CLI tarafında mevcut oturum bulunmadığı için login akışı başlatılmadan durduruldu; secret değerleri okunmadı.  
-**Risk:** Mevcut canlı tokenların şifreli olması olumlu fakat production fail-closed garantisi env metadata görülmeden kanıtlanmış değildir.  
-**Karar:** Değişken adları ve target scope'ları yetkili Vercel metadata kanalıyla doğrulanana kadar bu madde PASS olamaz.
+**Canlı ortam kanıtı:** Yetkili Vercel proje ekranında altı gerekli değişkenin varlığı ve target scope'ları doğrulandı. `SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED` yalnız Production; `PROVIDER_TOKEN_ENCRYPTION_ENABLED`, `PROVIDER_TOKEN_ACTIVE_KEY_ID`, `PROVIDER_TOKEN_ENCRYPTION_KEYS`, `SUPABASE_URL` ve `SUPABASE_SERVICE_ROLE_KEY` Production + Preview kapsamındadır. Hiçbir secret veya config değeri okunmadı ya da kayda alınmadı.  
+**Risk:** Gerekli isimlerin doğru scope'ta bulunması olumlu; ancak `PROVIDER_TOKEN_ENCRYPTION_ENABLED=true` ve `PROVIDER_TOKEN_LEGACY_READ_ENABLED=false` değerleri bağımsız olarak görülmedi. Ayrıca `security/production-config.js` encryption flag'ini startup'ta fail-closed zorunlu kılmıyor.  
+**Karar:** Metadata kapısı PASS; exact boolean value ve startup fail-closed garantisi için AF-A1-006 açık hardening/revalidation bulgusu olarak kalır.
 
 Kontrol edilecek adlar:
 - `PROVIDER_TOKEN_ENCRYPTION_ENABLED`
@@ -124,5 +124,5 @@ Bir sonraki audit adımı:
 
 1. E1–E3 ve R0–R5 contract iddialarını bulgu matrisiyle tek tek eşleştirmek.
 2. Browser/anon/authenticated/service_role privilege matrisini tamamlamak.
-3. Vercel env ad/scope metadata doğrulamasını secret okumadan tamamlamak.
+3. AF-A1-006 exact boolean değerini secret ifşa etmeden ve production mutasyonu yapmadan doğrulayacak güvenli yöntemi belirlemek.
 4. Bulguları remediation paketlerine ayırmak; ancak audit tamamlandıktan sonra uygulama sırasını kullanıcıya analist açıklamasıyla sunmak.

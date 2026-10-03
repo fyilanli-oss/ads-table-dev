@@ -1,0 +1,169 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "A1",
+  "title": "Tenant, Credential and Security Authority",
+  "audit_date": "2026-10-03",
+  "scope": {
+    "execution_packages": [
+      "E1",
+      "E2",
+      "E3",
+      "R0",
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5"
+    ],
+    "repository": "fyilanli-oss/ads-table-dev",
+    "live_systems": [
+      "Supabase adstable-dev",
+      "Vercel ads-table-dev metadata"
+    ]
+  },
+  "status": "in_progress",
+  "remediation_allowed": false,
+  "overall_gate": "hold",
+  "positive_controls": [
+    {
+      "id": "PC-A1-001",
+      "status": "verified",
+      "claim": "Caller-supplied workspace/user/shop identifiers are not authorization authority on canonical embedded path."
+    },
+    {
+      "id": "PC-A1-002",
+      "status": "verified",
+      "claim": "Canonical workspace/provider connections and live provider token envelopes are server-only and encrypted."
+    },
+    {
+      "id": "PC-A1-003",
+      "status": "verified",
+      "claim": "Canonical workspace-scoped dataset writes reject cross-workspace authority."
+    },
+    {
+      "id": "PC-A1-004",
+      "status": "verified",
+      "claim": "Legacy provider writes and standalone OAuth inserts are frozen by live database guards."
+    }
+  ],
+  "findings": [
+    {
+      "id": "AF-A1-001",
+      "priority": "P1",
+      "status": "open",
+      "title": "Broad default privileges on public schema objects",
+      "evidence_kind": [
+        "live_database",
+        "official_documentation"
+      ],
+      "remediation_package_required": true
+    },
+    {
+      "id": "AF-A1-002",
+      "priority": "P1",
+      "status": "open",
+      "title": "expire_trials SECURITY DEFINER executable by anon/authenticated",
+      "evidence_kind": [
+        "live_database",
+        "security_advisor"
+      ],
+      "mutation_test_performed": false,
+      "remediation_package_required": true
+    },
+    {
+      "id": "AF-A1-003",
+      "priority": "P1",
+      "status": "open",
+      "title": "handle_new_user trigger function has public executable surface",
+      "evidence_kind": [
+        "live_database",
+        "security_advisor"
+      ],
+      "mutation_test_performed": false,
+      "remediation_package_required": true
+    },
+    {
+      "id": "AF-A1-004",
+      "priority": "P2",
+      "status": "open",
+      "title": "Mutable search_path and trigger-function grant drift",
+      "evidence_kind": [
+        "live_database",
+        "security_advisor"
+      ],
+      "remediation_package_required": true
+    },
+    {
+      "id": "AF-A1-005",
+      "priority": "P1",
+      "status": "open",
+      "title": "Legacy tables retain broad non-DML grants",
+      "evidence_kind": [
+        "live_database"
+      ],
+      "exploitability": "not_asserted",
+      "remediation_package_required": true
+    },
+    {
+      "id": "AF-A1-006",
+      "priority": "P1",
+      "status": "open_verification_gate",
+      "title": "Production token-encryption env metadata not independently verified",
+      "evidence_kind": [
+        "repository_code",
+        "vercel_project_metadata"
+      ],
+      "secret_values_read": false,
+      "remediation_package_required": "depends_on_verification"
+    },
+    {
+      "id": "AF-A1-007",
+      "priority": "P2",
+      "status": "open",
+      "title": "Plan/contract aggregate counts drift from live cardinality",
+      "evidence_kind": [
+        "repository_documentation",
+        "live_database"
+      ],
+      "contradiction_asserted": false
+    },
+    {
+      "id": "AF-A1-008",
+      "priority": "P2",
+      "status": "open",
+      "title": "Leaked password protection disabled",
+      "evidence_kind": [
+        "security_advisor"
+      ],
+      "remediation_package_required": true
+    }
+  ],
+  "live_aggregate_evidence": {
+    "workspaces": 1,
+    "workspace_settings": 1,
+    "canonical_workspace_provider_connections": 3,
+    "legacy_user_workspace_bindings": 1,
+    "performance_dataset_rows_v2": 5,
+    "performance_dataset_rows_v2_distinct_workspaces": 1,
+    "shopify_installations": 1,
+    "shopify_workspace_provider_connections_revoked_history": 1,
+    "platform_connections": 8,
+    "platform_connection_tokens": 6,
+    "legacy_plaintext_access_tokens": 0,
+    "legacy_plaintext_refresh_tokens": 0
+  },
+  "official_sources": [
+    "https://supabase.com/docs/guides/api/securing-your-api",
+    "https://supabase.com/docs/guides/database/postgres/row-level-security",
+    "https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable",
+    "https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable",
+    "https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable",
+    "https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection"
+  ],
+  "next_steps": [
+    "Map every E1-E3/R0-R5 contract claim to evidence.",
+    "Complete role/object privilege matrix.",
+    "Verify Vercel environment variable names and target scopes without reading values.",
+    "Create remediation packages only after audit classification."
+  ]
+}

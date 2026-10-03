@@ -48,3 +48,12 @@ Provider doğrulanmış boş sonuç döndürürse `attempted=0`, `persisted=0` v
 PR #265 merge commit `ef0d2cd240b87b626b141111ed5712404fff816d` production'a dağıtıldı. Açık kullanıcı onayıyla tek kontrollü kabul çalıştırıldı ve `PASS — attempted: 0, persisted: 0, verified empty: true` sonucu alındı. Supabase salt-okunur postcheck canonical Meta bağlantısını `connected · 1 account`; Dataset V2 toplam/Meta, aktif Meta schedule, açık Meta job ve browser grant sayılarını `0` olarak doğruladı. Legacy Meta kaydı `1` olarak değişmeden kaldı.
 
 Bu PASS gerçek provider sonucunun güvenli boş-yol kabulüdür. Sahte satır üretilmedi ve production activation açılmadı. Gerçek non-empty fiziksel UPSERT henüz gözlenmemiştir; ilk gerçek Meta satırı geldiğinde mevcut idempotent writer ve evidence sayaçlarıyla ayrıca izlenecektir.
+
+
+## 3 Ekim 2026 historical non-empty corrective
+
+Salt-okunur R6-D5-M1 çalışması, son kapanmış gün boş olsa bile 31 günlük bounded pencerede gerçek Meta verisinin bulunduğunu kanıtladı. Kontrollü Dataset V2 kabulü artık browser'dan tarih almaz; her seçilmiş hesabın timezone'undaki son kapanmış günden geriye en fazla 31 gün tarar, provider'ın döndürdüğü en son gerçek günü server-side seçer ve aynı günü exact-date olarak yeniden çekip mevcut E4 mapper, Time/FX ve workspace canonical write boundary üzerinden işler.
+
+Canlı salt-okunur kanıtın hedefi: `2026-10-01`, 1 Ad satırı, 181 impression, 8 canonical link click ve 117.22 TRY spend. Meta cevabında add-to-cart, checkout ve purchase action type'ları ile action_values bulunmadığından bu conversion alanları `unknown/null` kalır; `0` üretilmez.
+
+Koruma sınırı provider çağrısından önce tüm 31 günlük pencereyi kapsar. Aynı workspace/account için mevcut Meta satırı varsa işlem fail-closed durur. Route browser body içindeki workspace, account veya provider date alanlarını kullanmaz. Schedule, backfill ve production activation kapalı kalır. Bu repository hazırlığı Dataset V2'ye henüz yazmamıştır; tek production çalıştırma ayrıca açık işlem-anı onayı gerektirir.

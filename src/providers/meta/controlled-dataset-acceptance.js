@@ -4,7 +4,7 @@ const { WorkspaceCanonicalWriteBoundary } = require('../../../funnel-core/worksp
 const { requireServerWorkspaceAuthority } = require('../../../funnel-core/workspace-dataset-runtime');
 const { verifyProviderResult } = require('../workspace-provider-runtime');
 const { validateToken } = require('./read-only-preflight');
-const { createMetaWorkspaceRunner } = require('./workspace-runner');
+const { createMetaWorkspaceRunner, MAX_HISTORICAL_LOOKBACK_DAYS } = require('./workspace-runner');
 
 const CONFIRMATION = 'RUN_R6_D3_E_META_WRITE';
 const SAFE_FAILURE_STAGES = new Set([
@@ -25,7 +25,7 @@ function diagnosticFailure(error, fallbackStage) {
 function acceptanceDateWindow(now) {
   const end = new Date(now().getTime());
   const start = new Date(end.getTime());
-  start.setUTCDate(start.getUTCDate() - 2);
+  start.setUTCDate(start.getUTCDate() - (MAX_HISTORICAL_LOOKBACK_DAYS + 1));
   return Object.freeze({ from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) });
 }
 
@@ -75,7 +75,10 @@ function createMetaControlledDatasetAcceptance({ connectionStore, settingsStore,
         connection,
         reportingCurrency: currency.reportingCurrency,
         currencyVersion: currency.currencyVersion,
-        request: Object.freeze({}),
+        request: Object.freeze({
+          providerDateStrategy: 'latest_non_empty_within_closed_lookback',
+          lookbackDays: MAX_HISTORICAL_LOOKBACK_DAYS,
+        }),
       }));
       stage = 'RESULT_VERIFICATION';
       const verified = verifyProviderResult({ provider: 'meta', connection, reportingCurrency: currency.reportingCurrency, result });
@@ -83,6 +86,7 @@ function createMetaControlledDatasetAcceptance({ connectionStore, settingsStore,
       const persisted = await writeBoundary.write(verified.rows);
       stage = 'PERSISTENCE_CARDINALITY';
       if (!Array.isArray(persisted) || persisted.length !== verified.rows.length) throw new Error('WORKSPACE_DATASET_WRITE_CARDINALITY_MISMATCH');
+      const providerDates = Array.isArray(result.checked_provider_dates) ? [...result.checked_provider_dates].sort() : [];
       return Object.freeze({
         status: 'PASS_R6_D3_E_META_DATASET_WRITE',
         attempted: verified.rows.length,
@@ -90,7 +94,9 @@ function createMetaControlledDatasetAcceptance({ connectionStore, settingsStore,
         empty_provider_result: verified.providerResultStatus === 'empty',
         provider_result_status: verified.providerResultStatus,
         selected_account_count: verified.selectedAccountCount,
-        provider_date_strategy: 'previous_closed_business_date_per_account_timezone',
+        provider_date_strategy: 'latest_non_empty_within_31_closed_business_days_per_account_timezone',
+        provider_date_start: providerDates.at(0) || null,
+        provider_date_end: providerDates.at(-1) || null,
         production_activation: false,
         currency_version: currency.currencyVersion,
       });

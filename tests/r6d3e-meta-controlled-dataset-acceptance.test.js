@@ -43,12 +43,12 @@ function acceptance({ insights = [fixture.insight], existingRows = [], failAt = 
   return { calls, service };
 }
 
-test('R6-D3-E uses a conservative three-day guard window for account timezones', () => {
-  assert.deepEqual(acceptanceDateWindow(now), { from: '2026-09-23', to: '2026-09-25' });
+test('R6-D3-E guards the complete historical lookback before provider contact', () => {
+  assert.deepEqual(acceptanceDateWindow(now), { from: '2026-08-24', to: '2026-09-25' });
 });
 
 test('R6-D3-E contract records the verified-empty production acceptance without inventing writes', () => {
-  assert.equal(contract.status, 'PASS_PRODUCTION_VERIFIED_EMPTY');
+  assert.equal(contract.status, 'HISTORICAL_NON_EMPTY_WRITE_PREPARED');
   assert.equal(contract.reuse.e4_client_mapper_time_fx, true);
   assert.equal(contract.reuse.new_metric_contract, false);
   assert.equal(contract.controls.verified_empty_writes_synthetic_rows, false);
@@ -60,7 +60,9 @@ test('R6-D3-E contract records the verified-empty production acceptance without 
   assert.equal(contract.live_acceptance.synthetic_rows_written, 0);
   assert.equal(contract.live_acceptance.non_empty_physical_upsert_observed, false);
   assert.equal(contract.live_acceptance.supabase_postcheck, 'PASS');
-  assert.equal(contract.next_gate, 'R6-D3-F_META_INDEPENDENT_DISCONNECT_DECISION');
+  assert.equal(contract.controls.provider_date_strategy, 'latest_non_empty_within_31_closed_business_days_per_account_timezone');
+  assert.equal(contract.historical_corrective.dataset_v2_write_executed, false);
+  assert.equal(contract.next_gate, 'EXPLICIT_PRODUCTION_APPROVAL_FOR_ONE_CONTROLLED_NON_EMPTY_META_DATASET_WRITE');
 });
 
 test('R6-D3-E requires exact action-time confirmation before provider or Dataset access', async () => {
@@ -75,8 +77,14 @@ test('R6-D3-E persists only verified workspace Meta rows and returns aggregate e
   assert.deepEqual(result, {
     status: 'PASS_R6_D3_E_META_DATASET_WRITE', attempted: 1, persisted: 1,
     empty_provider_result: false, provider_result_status: 'non_empty', selected_account_count: 1,
-    provider_date_strategy: 'previous_closed_business_date_per_account_timezone', production_activation: false, currency_version: 7,
+    provider_date_strategy: 'latest_non_empty_within_31_closed_business_days_per_account_timezone',
+    provider_date_start: '2026-08-29', provider_date_end: '2026-08-29',
+    production_activation: false, currency_version: 7,
   });
+  const providerCalls = calls.filter(([name]) => name === 'provider');
+  assert.equal(providerCalls.length, 3);
+  assert.match(providerCalls[1][1], /time_range/);
+  assert.match(providerCalls[2][1], /time_range/);
   const write = calls.find(([name]) => name === 'write')[1];
   assert.equal(write.length, 1);
   assert.equal(write[0].identity.workspace_id, WORKSPACE);

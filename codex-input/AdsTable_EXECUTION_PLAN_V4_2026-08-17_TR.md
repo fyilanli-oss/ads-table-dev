@@ -2282,6 +2282,7 @@ Gösterim yalnız Shopify-native bir **Attribution comparison / overlap diagnost
 2. **E10-T5-C2 — `Done` — Ad Analysis:** UI/ranking freeze'i ve Creative capability/data model kararı tamamlandı.
    - **E10-T5-C2-A — `Done` — Ad Analysis UI:** Sales varsayılan ranking, Purchase/Sales/Revenue switch, compare growth ranking, Creative metadata-only sınırı ve Shopify component yönü onaylandı.
    - **E10-T5-C2-B — `Done` — Creative provider capability ve data model:** Provider-specific metadata sidecar kararı verildi; Creative performance kapalı, Dataset V2 ve Funnel hierarchy değişmez.
+   - **E10-T5-C2-C — `Planned / no execution` — Cross-platform deepest-grain discovery:** Mevcut first-slice kararını geriye dönük değiştirmeden Meta, Google Standard/PMax, Klaviyo ve parked TikTok/Pinterest aynı capability matrisinde yeniden değerlendirilir; Shopify attribution ve Organic için Ad Analysis uygulanabilirliği ayrıca `not_applicable / supported / unsupported / unknown` olarak karara bağlanır.
 3. **E10-T5-C3 — `Done` — Dashboard:** Completed-day dönemleri, proportional automatic compare, count+value Funnel Overview ve state-koruyan View Funnel kararı tamamlandı.
 4. **E10-T5-C4 — `Done` — Platforms:** Currency-first onboarding; Meta/Google/Klaviyo açıklama modalı → OAuth → server-verified tek aktif account seçimi; warning modalı ile Disconnect. Provider scope revizyonuyla TikTok ve Pinterest `Parked`tır.
 5. **E10-T5-C5 — `Done for first slice` — Attribution:** C5-A `Done`; C5-B `Deferred`.
@@ -2325,6 +2326,40 @@ Karar belgesi `docs/E10_T5C2A_AD_ANALYSIS_SHOPIFY_COMPONENT_FREEZE.md`, executab
 - **Scope/runtime:** Bu karar yeni scope talep etmez veya provider query çalıştırmaz. Preview on-demand ve server-authoritative olur; credential/token browser'a taşınmaz.
 
 Karar belgesi `docs/E10_T5C2B_CREATIVE_CAPABILITY_DATA_MODEL.md`, executable matris `contracts/shopify/e10-t5c2b-creative-capability.json`, guard `tests/e10-t5c2b-creative-capability.test.js` içindedir. C2-A ve C2-B ile E10-T5-C2 `Done`dur.
+
+
+#### E10-T5-C2-C Cross-platform deepest-grain discovery — Planned / no execution
+
+**Amaç:** Ad Analysis implementation'ına parça parça provider eklemek yerine bütün platformları tek karar paketinde yeniden masaya yatırmak; her provider için API'nin gerçekten sunabildiği en alt kimlik ve performans grain'ini güncel resmî doküman + ham provider response kanıtıyla belirlemek ve ardından tek versionlı Ad Analysis sözleşmesini dondurmak.
+
+**İncelenecek provider yolları:**
+
+- Meta: `Campaign → Ad Set → Ad → Creative/asset association`.
+- Google Standard: `Campaign → Ad Group → Ad → ad_group_ad_asset_view / Asset`.
+- Google Performance Max: `Campaign → Asset Group → AssetGroupAsset → Asset`; brand-guideline varlıkları için ayrı `CampaignAsset` yolu.
+- Klaviyo: `Campaign/Flow → Message → Variation/Template/Content`; performansın gerçekten hangi leaf'te ayrıştığı ayrıca kanıtlanır.
+- TikTok ve Pinterest: parked durumları korunarak yalnız güncel resmî capability/grain incelemesi yapılır; Connect/OAuth/provider activation açılmaz.
+- Shopify-reported attribution ve Organic: Ad Analysis kapsamına uygulanabilirlikleri açıkça `not_applicable / supported / unsupported / unknown` sınıflarından biriyle kaydedilir; sahte Ad/Creative leaf üretilmez.
+
+**Her provider için zorunlu sorular:**
+
+1. En derin stable identity nedir; parent-child association ve effective/version time nasıl korunur?
+2. Hangi alanlar yalnız metadata/preview, hangileri gerçek tarihli metric grain'idir?
+3. Impression, click, spend, conversion count/value ve revenue hangi leaf'te gerçekten ayrışır?
+4. Alt seviye metric parent metrikle birlikte toplandığında double-count oluşur mu; reconciliation kuralı nedir?
+5. Dynamic/responsive/auto-generated creative, PMax asset combination, Klaviyo variation ve yeniden kullanılan asset nasıl temsil edilir?
+6. Scope, retention, pagination/rate limit, currency/time, attribution ve privacy sınırları nelerdir?
+7. Provider değeri dönmediğinde sonuç `zero`, `unsupported`, `unknown` veya `not_applicable` sınıflarından hangisidir?
+
+**Kanıt ve teslimatlar:**
+
+- Her provider için güncel resmî doküman revalidation'ı ve mümkün olan hesaplarda salt-okunur exact query + ham response kanıtı.
+- Tek cross-platform capability matrix; aday alan ile production/parity kanıtı birbirinden ayrılır.
+- Versionlı analytical-leaf ve creative/asset association contract'ı.
+- Dataset V2 mevcut leaf'in korunması, metadata sidecar'ın genişletilmesi veya ayrı creative/asset fact tablosu seçenekleri için açık karar.
+- Ad Analysis API/UI hierarchy, ranking, aggregation ve Formula etkisi; migration/backfill/activation planı ancak grain kararı sonrasında hazırlanır.
+
+**Fail-closed kapılar:** C2-C yalnız araştırma ve sözleşme paketidir. Bu aşamada provider query kodu, yeni OAuth scope'u, database migration, Dataset V2 write, schedule/backfill, parked provider activation veya UI implementasyonu yapılmaz. Bir provider için resmî alanın varlığı metric'in o leaf'e ait olduğunu kanıtlamaz; ham response, stable identity, date grain ve reconciliation birlikte doğrulanmadan performance açılmaz. Bütün provider matrisi ve kullanıcı kararı tamamlanmadan provider bazında ayrı ayrı implementation'a başlanmaz.
 
 #### E10-T5-C3 Dashboard — onaylı dönem, compare ve Funnel Overview freeze'i
 

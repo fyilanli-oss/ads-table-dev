@@ -1,0 +1,86 @@
+{
+  "audit_wave": "A4",
+  "date": "2026-10-03",
+  "classification_rule": "Correct internal arithmetic does not verify an API or UI claim unless support, freshness and state semantics survive to presentation.",
+  "packages": [
+    {
+      "package": "canonical-and-aggregate-core",
+      "classification": "partially_verified",
+      "verified": [
+        "supported zero preserved",
+        "unknown/unsupported null",
+        "mixed support refuses partial sum",
+        "aggregate-first formulas",
+        "currency mismatch rejection"
+      ],
+      "open": [
+        "provider finality provenance from A2"
+      ]
+    },
+    {
+      "package": "formula-engine-v1",
+      "classification": "partially_verified",
+      "verified": [
+        "core arithmetic",
+        "zero denominator null",
+        "abandoned floor",
+        "aggregate-first ratios"
+      ],
+      "open": [
+        "revenue/revenue_margin naming",
+        "derived support/null reason",
+        "versioned compatibility"
+      ]
+    },
+    {
+      "package": "workspace-query-service",
+      "classification": "partially_verified_as_internal_artifact",
+      "verified": [
+        "workspace filter",
+        "cross-workspace result rejection",
+        "currency guard",
+        "deterministic grouping"
+      ],
+      "open": [
+        "verified session authority",
+        "active account authority",
+        "compare",
+        "freshness",
+        "warnings",
+        "bounds",
+        "pagination"
+      ]
+    },
+    {
+      "package": "E11",
+      "classification": "verified_as_blocked",
+      "verified": [
+        "no premature HTTP route found"
+      ],
+      "open": [
+        "all planned API tasks and acceptance"
+      ]
+    },
+    {
+      "package": "E12",
+      "classification": "verified_as_not_started",
+      "verified": [
+        "frozen UI contracts exist"
+      ],
+      "open": [
+        "all implementation, real desktop/mobile and state acceptance"
+      ]
+    },
+    {
+      "package": "legacy-dashboard",
+      "classification": "contradicted",
+      "verified": [
+        "authenticated snapshot fetch exists"
+      ],
+      "open": [
+        "truthful loading/empty/error/partial/stale states",
+        "zero versus unknown correctness"
+      ]
+    }
+  ]
+}

@@ -85,3 +85,20 @@ Corrective salt-okunur çıktı, exact provider date Meta Insights cevabından p
 - Dataset V2 write her durumda 0.
 
 Bu evidence görülmeden missing conversion için provider nedeni açıklanamaz, paket tekrar PASS sayılamaz ve kontrollü Dataset V2 write açılamaz. Aynı ilke Google Ads reporting completeness için de geçerlidir: test kampanyası üretilememesi, provider'ın gerçek response/field evidence'ını görmeden empty veya unsupported sonucu PASS sayma gerekçesi değildir.
+
+## Corrective canlı provider cevabı — 3 Ekim 2026
+
+Exact provider date `2026-10-01` için Meta Insights tekrar çalıştırıldı. Provider kimlikleri çıkarılmış canlı response evidence:
+
+- `actions`: `landing_page_view=8`, `link_click=8`, `omni_landing_page_view=8`, `onsite_conversion.post_net_like=1`, `page_engagement=9`, `post_engagement=9`, `post_interaction_gross=1`, `post_interaction_net=1`, `post_reaction=1`.
+- `action_values`: boş.
+- Mapper'ın add-to-cart alias'ları: provider cevabında yok.
+- Mapper'ın checkout alias'ları: provider cevabında yok.
+- Mapper'ın purchase alias'ları: provider cevabında yok.
+- Dataset V2 write: 0.
+- Production deployment: `dpl_76JB1cvVok41ApXyrT8LidsvmQjb`, commit `7b99bb7b4917497fcc90400168e35d566be298a2`, READY.
+- Production error/fatal runtime log: bulunmadı.
+
+**Kanıtlanan:** Meta bu exact-date isteğinde add-to-cart, checkout, purchase veya bunların action_values entry'lerini döndürmedi.
+
+**Kanıtlanmayan:** Meta'nın provider-side bunu neden döndürmediği. Pixel/CAPI, kampanya hedefi, attribution veya başka bir neden bu response tek başına ispatlamaz.

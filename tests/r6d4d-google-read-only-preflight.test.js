@@ -162,6 +162,31 @@ test('Google preflight route is Shopify-session-bound and ignores caller workspa
   assert.equal(res.code, 200);
 });
 
+test('Google search preserves sanitized empty SearchStream response evidence', async () => {
+  const client = createGoogleAdsSearchClient({
+    developerToken: 'developer-secret', apiVersion: 'v25',
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: {get: () => null},
+      json: async () => [{results: [], fieldMask: 'campaign.id,metrics.impressions'}],
+    }),
+  });
+  const result = await client({
+    accessToken: 'access-secret',
+    customerId: '1111111111',
+    loginCustomerId: '9999999999',
+    query: 'SELECT campaign.id, metrics.impressions FROM campaign',
+  });
+  assert.deepEqual(result.results, []);
+  assert.deepEqual(result.response_evidence, {
+    stream_chunk_count: 1,
+    chunks_with_results: 1,
+    result_count: 0,
+    field_mask_paths: ['campaign.id', 'metrics.impressions'],
+  });
+});
+
 test('Google search uses the selected manager context and safely classifies unauthorized responses', async () => {
   const requests = [];
   const client = createGoogleAdsSearchClient({

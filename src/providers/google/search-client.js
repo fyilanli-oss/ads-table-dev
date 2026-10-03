@@ -36,7 +36,25 @@ function createGoogleAdsSearchClient({fetchImpl = fetch, developerToken, apiVers
     if (response.status === 401) throw failure('GOOGLE_ACCESS_TOKEN_INVALID', 409, response, payload);
     if (!response.ok) throw failure('GOOGLE_PREFLIGHT_PROVIDER_FAILED', 503, response, payload);
     const chunks = Array.isArray(payload) ? payload : [];
-    return Object.freeze({results: chunks.flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : [])});
+    const results = chunks.flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : []);
+    const fieldMaskPaths = new Set();
+    for (const chunk of chunks) {
+      const mask = chunk?.fieldMask ?? chunk?.field_mask;
+      const paths = Array.isArray(mask?.paths) ? mask.paths : typeof mask === 'string' ? mask.split(',') : [];
+      for (const path of paths) {
+        const value = typeof path === 'string' ? path.trim() : '';
+        if (/^[a-z0-9_.]{1,128}$/.test(value)) fieldMaskPaths.add(value);
+      }
+    }
+    return Object.freeze({
+      results,
+      response_evidence: Object.freeze({
+        stream_chunk_count: chunks.length,
+        chunks_with_results: chunks.filter(chunk => Array.isArray(chunk?.results)).length,
+        result_count: results.length,
+        field_mask_paths: Object.freeze([...fieldMaskPaths].sort()),
+      }),
+    });
   };
 }
 

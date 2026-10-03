@@ -68,7 +68,7 @@ function createInventory(selectedTransport) {
 }
 
 test('R6-D5-M1 contract freezes a bounded read-only and no-zero conversion boundary', () => {
-  assert.equal(contract.status, 'LIVE_ACCEPTANCE_REOPENED_PROVIDER_ACTION_EVIDENCE_PENDING');
+  assert.equal(contract.status, 'LIVE_PROVIDER_ACTION_EVIDENCE_PASS_VISUAL_ACCEPTANCE_PENDING');
   assert.equal(contract.read_only_inventory.bounded_lookback_days, 31);
   assert.equal(contract.read_only_inventory.hierarchy, 'campaign_to_adset_to_ad');
   assert.equal(contract.read_only_inventory.ad_click_source, 'actions.link_click');

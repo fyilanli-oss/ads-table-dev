@@ -56,7 +56,7 @@ test('R6-D4-D contract reuses E5 and keeps Dataset V2 closed', () => {
   assert.equal(contract.corrective.prior_empty_status, 'REOPENED');
   assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
-  assert.equal(contract.live_acceptance.status, 'PASS');
+  assert.equal(contract.live_acceptance.status, 'PRIOR_PASS_REOPENED');
   assert.equal(contract.live_acceptance.selected_account_count, 3);
   assert.equal(contract.live_acceptance.verified_row_count, 0);
   assert.equal(contract.live_acceptance.provider_result_status, 'empty');

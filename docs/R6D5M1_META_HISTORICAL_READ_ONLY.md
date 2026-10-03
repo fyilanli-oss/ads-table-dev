@@ -55,3 +55,7 @@ Raw HTML kontrolü, `s-clickable`, inline CSS, literal renk veya özel component
 - Yalnız non-empty read-only PASS sonrasında, ayrı açık işlem-anı onayıyla tek kontrollü Dataset V2 write paketi hazırlanabilir.
 
 Bu belge veya implementation kendi başına Dataset V2 yazımı ya da production schedule izni vermez.
+
+## Repository sonucu
+
+PR #323 Security regression ve Full Regression PASS; Vercel preview PASS. Durum `REPOSITORY_PASS_LIVE_ACCEPTANCE_PENDING`dir. Production deployment, gerçek desktop/mobil Shopify kabulü, ürün sahibi onayı ve salt-okunur canlı sonuç henüz yapılmadı. Dataset V2 write, schedule ve backfill kapalıdır.

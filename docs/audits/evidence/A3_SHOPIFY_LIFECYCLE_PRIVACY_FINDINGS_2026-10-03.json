@@ -1,0 +1,160 @@
+{
+  "audit_wave": "A3",
+  "date": "2026-10-03",
+  "scope": [
+    "E10-T4",
+    "E10-T4-B",
+    "R7-delete-my-data",
+    "install",
+    "uninstall",
+    "reinstall",
+    "clean-reinstall"
+  ],
+  "mode": "read_only",
+  "mutations_performed": [],
+  "official_sources": [
+    "https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance",
+    "https://shopify.dev/docs/api/webhooks/latest",
+    "https://supabase.com/docs/guides/auth/managing-user-data"
+  ],
+  "live_evidence_summary": {
+    "active_workspaces": 1,
+    "active_shopify_installations": 1,
+    "observed_install_generation_range": "1..1",
+    "mandatory_compliance_topics_in_shopify_app_toml": false,
+    "production_webhook_route_found": false,
+    "durable_webhook_claim_table_found": false,
+    "deletion_request_or_run_table_found": false,
+    "redacted_deletion_evidence_table_found": false
+  },
+  "findings": [
+    {
+      "finding_id": "AF-A3-001",
+      "severity": "P0",
+      "status": "open_release_blocker",
+      "customer_or_platform_failure": "Mandatory Shopify compliance requests and app uninstall cannot enter a verified durable lifecycle path.",
+      "affected_packages": [
+        "E10-T4",
+        "E10-T4-B",
+        "E10-T9",
+        "E10-T10"
+      ],
+      "plan_claim": "Uninstall and privacy lifecycle must stop access and execute documented retention/deletion policy.",
+      "contract_claim": "customers/data_request, customers/redact and shop/redact plus app/uninstalled require valid HMAC, durable idempotent claim and retry-safe handling.",
+      "runtime_fact": "Only an uncomposed planner/executor exists; no production webhook route or HMAC handler was found.",
+      "schema_fact": "No webhook claim/event table or deletion run/evidence table was found.",
+      "live_evidence": "Canonical shopify.app.toml has no webhooks or compliance_topics section.",
+      "official_source_if_external": "https://shopify.dev/docs/apps/build/compliance/privacy-law-compliance",
+      "contradiction_or_gap": "Foundation Done does not provide operational compliance handling.",
+      "safe_boundary": "Do not deploy app config or simulate destructive events during audit.",
+      "remediation_dependency": "Exact manifest and durable lifecycle persistence design.",
+      "acceptance_needed": "Configured subscriptions, invalid-HMAC 401, durable 2xx claim, retry/replay tests and development-store evidence."
+    },
+    {
+      "finding_id": "AF-A3-002",
+      "severity": "P0",
+      "status": "open",
+      "customer_or_platform_failure": "A user can be told that Delete My Data/hard deletion is scheduled while product data and credentials are not deleted.",
+      "affected_packages": [
+        "E10-T4-B",
+        "R7",
+        "E14"
+      ],
+      "plan_claim": "Delete My Data executes a versioned workspace deletion manifest and exposes completion.",
+      "contract_claim": "Workspace access/jobs/provider operations stop, credentials and data are deleted or anonymized, and minimum redacted evidence survives.",
+      "runtime_fact": "Legacy route updates only subscriptions.status, deleted_at and hard_delete_at; no 90-day executor was found.",
+      "schema_fact": "No durable workspace deletion request/run/step/completion authority exists.",
+      "live_evidence": "Repository UI displays Delete My Data and a 90-day hard-delete statement. Production reachability of the legacy surface remains independently unverified.",
+      "official_source_if_external": "https://supabase.com/docs/guides/auth/managing-user-data",
+      "contradiction_or_gap": "Visible product promise materially exceeds runtime behavior.",
+      "safe_boundary": "Do not trigger the current delete endpoint as a test.",
+      "remediation_dependency": "Canonical manifest executor and product-surface consolidation.",
+      "acceptance_needed": "End-to-end deletion evidence across every manifest category, access/session shutdown and completion UI."
+    },
+    {
+      "finding_id": "AF-A3-003",
+      "severity": "P0",
+      "status": "open_release_blocker",
+      "customer_or_platform_failure": "After merchant uninstall, provider credentials and operations may remain usable because no verified event is composed to shutdown operations.",
+      "affected_packages": [
+        "E10-T4",
+        "E10-T4-B",
+        "E10-T10",
+        "R6"
+      ],
+      "plan_claim": "Uninstall immediately stops new provider operations and SnapshotJobs without pretending all data is deleted.",
+      "contract_claim": "Verified app/uninstalled authority performs fail-closed access/job/token shutdown.",
+      "runtime_fact": "disable_access and remove_shop_tokens are abstract ports used only by tests; no webhook route/event store/operations composition was found.",
+      "schema_fact": "Installation supports uninstalled status but no durable transition/claim authority was found.",
+      "live_evidence": "One active installation and one active workspace exist; no uninstall acceptance evidence exists.",
+      "official_source_if_external": "https://shopify.dev/docs/api/webhooks/latest",
+      "contradiction_or_gap": "A status enum and planner do not create an operational uninstall boundary.",
+      "safe_boundary": "Do not uninstall the development app during audit.",
+      "remediation_dependency": "AF-A3-001 lifecycle ingress plus immediate-stop implementation.",
+      "acceptance_needed": "Verified uninstall causes no subsequent provider/job calls, removes local Shopify token material and records redacted evidence."
+    },
+    {
+      "finding_id": "AF-A3-004",
+      "severity": "P0",
+      "status": "open_release_blocker",
+      "customer_or_platform_failure": "A terminally deleted shop could revive old workspace authority or overlap old/new generations on reinstall.",
+      "affected_packages": [
+        "E10-T2",
+        "E10-T3",
+        "E10-T4-B",
+        "E10-T6-B"
+      ],
+      "plan_claim": "Terminal deletion followed by clean reinstall creates a new workspace generation and never restores old Dataset, token or binding.",
+      "contract_claim": "Old workspace reaches terminal deletion before new authority; no automatic copy or authority overlap.",
+      "runtime_fact": "complete_shopify_managed_install upserts same shop_id to active with the same workspace_id and does not increment install_generation.",
+      "schema_fact": "shopify_installations is unique by shop_id, shop_domain and workspace_id; no terminal deletion generation ledger exists.",
+      "live_evidence": "Current installation is active generation 1; no clean-reinstall acceptance evidence exists.",
+      "official_source_if_external": "https://shopify.dev/docs/api/webhooks/latest",
+      "contradiction_or_gap": "The current upsert can model ordinary reinstall but cannot prove terminal clean reinstall semantics.",
+      "safe_boundary": "Do not test by deleting the live development workspace.",
+      "remediation_dependency": "Terminal deletion state/evidence and generation authority.",
+      "acceptance_needed": "Two tested paths: pre-redact reinstall reuses authority only before deletion; post-deletion reinstall creates a new isolated workspace generation."
+    },
+    {
+      "finding_id": "AF-A3-005",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Workspace deletion can partially fail or leave unknown data because exact table/object order is not contracted.",
+      "affected_packages": [
+        "E10-T4-B",
+        "E14",
+        "R8"
+      ],
+      "plan_claim": "Deletion follows an approved manifest and dependency order.",
+      "contract_claim": "Every category is classified delete, anonymize or legally retain.",
+      "runtime_fact": "No table-by-table manifest executor exists.",
+      "schema_fact": "Authority inventory spans canonical and legacy tables; workspace dependencies include both CASCADE and RESTRICT rules.",
+      "live_evidence": "No deletion run/step or legal-retention record exists.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Category list is not an executable dependency-safe manifest.",
+      "safe_boundary": "Do not infer ON DELETE CASCADE as complete privacy deletion.",
+      "remediation_dependency": "Full authority/data inventory including storage and external systems.",
+      "acceptance_needed": "Versioned exact manifest, dry-run inventory, partial-failure resume and zero-residue checks."
+    },
+    {
+      "finding_id": "AF-A3-006",
+      "severity": "P1",
+      "status": "open",
+      "customer_or_platform_failure": "Webhook replay isolation and workspace-wide deletion behavior can diverge from the frozen contract.",
+      "affected_packages": [
+        "E10-T4",
+        "E10-T4-B"
+      ],
+      "plan_claim": "Executable lifecycle contract is the authority.",
+      "contract_claim": "Replay key is shop_id + topic + webhook_event_id and shop_redact executes the approved workspace manifest.",
+      "runtime_fact": "event_store.claim receives only shop_id and event_id; shop_redact action list names only shop personal data deletion.",
+      "schema_fact": "No durable schema exists to enforce the contract key or manifest steps.",
+      "live_evidence": "Only unit tests with in-memory mock ports pass.",
+      "official_source_if_external": null,
+      "contradiction_or_gap": "Planner/executor foundation predates and does not fully implement E10-T4-B.",
+      "safe_boundary": "Do not mark foundation tests as operational PASS.",
+      "remediation_dependency": "Versioned contract-to-runtime alignment after manifest approval.",
+      "acceptance_needed": "Cross-topic same-ID negative test, replay test and full manifest action evidence."
+    }
+  ]
+}

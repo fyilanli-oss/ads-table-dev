@@ -1,0 +1,234 @@
+{
+  "contract_id": "repository-wide-execution-integrity-audit-v1",
+  "version": "1.0.0",
+  "status": "scope_prepared_audit_execution_pending",
+  "decision_date": "2026-10-03",
+  "authority": {
+    "execution_plan_is_constitution": true,
+    "purpose": "Independently verify that repository status claims and the real customer lifecycle cannot silently produce incorrect data, unsafe deletion behavior, cross-tenant exposure or irreversible release failure.",
+    "audit_does_not_authorize": [
+      "remediation implementation",
+      "database migration",
+      "provider mutation",
+      "production scheduler activation",
+      "deployment",
+      "data deletion",
+      "legacy retirement"
+    ]
+  },
+  "scope": {
+    "epics": [
+      "E1",
+      "E2",
+      "E3",
+      "E4",
+      "E5",
+      "E6",
+      "E7",
+      "E8",
+      "E9",
+      "E10",
+      "E11",
+      "E12",
+      "E13",
+      "E14"
+    ],
+    "revision_packages": [
+      "R0",
+      "R1",
+      "R2",
+      "R3",
+      "R4",
+      "R5",
+      "R6",
+      "R7",
+      "R8",
+      "R9",
+      "R10",
+      "R11"
+    ],
+    "evidence_layers": [
+      "Execution Plan",
+      "decision documents and executable contracts",
+      "runtime source and tests",
+      "database migrations and current schema evidence",
+      "provider and platform official current documentation",
+      "redacted live acceptance evidence",
+      "CI, deployment and operational runbooks"
+    ],
+    "included_customer_journey": [
+      "install and workspace authority",
+      "provider connect and reporting account selection",
+      "initial bootstrap",
+      "hourly snapshot and reconciliation",
+      "provider Ads Manager versus Dataset V2 comparison",
+      "attribution, correction and finality changes",
+      "formula, currency, cost and presentation",
+      "disconnect",
+      "Delete My Data",
+      "uninstall",
+      "clean reinstall",
+      "cutover, rollback and legacy retirement"
+    ],
+    "excluded": [
+      "fixing findings during the audit",
+      "opening remediation packages before cross-package dependency analysis is complete",
+      "production writes or destructive validation",
+      "treating synthetic evidence as live acceptance",
+      "changing a status merely to make documents agree"
+    ]
+  },
+  "non_negotiable_method": {
+    "comparison_axes": [
+      "Execution Plan promise",
+      "executable contract",
+      "runtime behavior",
+      "database schema and authority",
+      "live evidence"
+    ],
+    "package_status_classification": [
+      "verified",
+      "partially_verified",
+      "unsupported",
+      "contradicted",
+      "not_applicable"
+    ],
+    "rule": "A Done or PASS claim is verified only when all applicable axes agree. Missing evidence never becomes PASS.",
+    "provider_semantics_rule": "Current official provider/platform documentation must be checked for attribution, correction, absence, deletion, privacy, quota and review semantics. Assumptions are recorded as unknown.",
+    "audit_fix_separation": true,
+    "raw_evidence_redaction_required": true
+  },
+  "risk_model": {
+    "P0": "Can show materially wrong customer data, lose or expose data, violate deletion/privacy/security obligations, corrupt tenant authority, or create a credible Shopify removal/review blocker.",
+    "P1": "Can create stale, incomplete, misleading or operationally unsafe behavior without immediate irreversible harm.",
+    "P2": "Governance, observability, maintainability or scale weakness that can later become a release blocker.",
+    "P3": "Cleanup or quality improvement with no current material customer or compliance impact.",
+    "escalation_rule": "A finding is scored by customer/platform impact, not implementation difficulty."
+  },
+  "execution_waves": [
+    {
+      "wave": "A0",
+      "name": "Inventory and status truth map",
+      "output": "Complete E1-E14 and R package inventory with every Done/PASS/Pending claim and evidence pointer."
+    },
+    {
+      "wave": "A1",
+      "name": "Tenant, credential and security authority",
+      "focus": [
+        "E1",
+        "E2",
+        "E3",
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5"
+      ]
+    },
+    {
+      "wave": "A2",
+      "name": "Provider data fidelity and maturity",
+      "focus": [
+        "E4",
+        "E5",
+        "E6",
+        "E7",
+        "E8",
+        "E9",
+        "R6",
+        "R8"
+      ],
+      "seeded_findings": "docs/audits/E9_T8_CRITICAL_AUDIT_FINDINGS_2026-10-03.md"
+    },
+    {
+      "wave": "A3",
+      "name": "Shopify lifecycle, privacy and deletion",
+      "focus": [
+        "E10",
+        "R7"
+      ],
+      "required_journey": [
+        "install",
+        "Delete My Data",
+        "uninstall",
+        "clean reinstall"
+      ]
+    },
+    {
+      "wave": "A4",
+      "name": "Formula, API and UI truthfulness",
+      "focus": [
+        "E11",
+        "E12"
+      ],
+      "required_checks": [
+        "metric support",
+        "zero versus unknown",
+        "currency",
+        "cost allocation",
+        "aggregation",
+        "presentation"
+      ]
+    },
+    {
+      "wave": "A5",
+      "name": "Cutover, rollback and retirement safety",
+      "focus": [
+        "E13",
+        "E14",
+        "R9",
+        "R10",
+        "R11"
+      ]
+    },
+    {
+      "wave": "A6",
+      "name": "Cross-package dependency and death-warrant review",
+      "output": "Deduplicated P0/P1 register and dependency-ordered remediation package proposal."
+    }
+  ],
+  "finding_record_required_fields": [
+    "finding_id",
+    "severity",
+    "status",
+    "customer_or_platform_failure",
+    "affected_packages",
+    "plan_claim",
+    "contract_claim",
+    "runtime_fact",
+    "schema_fact",
+    "live_evidence",
+    "official_source_if_external",
+    "contradiction_or_gap",
+    "safe_boundary",
+    "remediation_dependency",
+    "acceptance_needed"
+  ],
+  "stop_conditions": [
+    "A production mutation is required to continue.",
+    "A destructive or irreversible check is proposed.",
+    "Provider credentials, tokens, PII or unredacted payloads could be exposed.",
+    "A missing business decision would materially change the audit conclusion.",
+    "Evidence conflicts and cannot be resolved read-only."
+  ],
+  "deliverables": [
+    "human-readable audit report",
+    "machine-readable finding register",
+    "package status truth matrix",
+    "customer lifecycle risk matrix",
+    "P0/P1 release blocker list",
+    "dependency-ordered remediation package set",
+    "explicit unresolved and unknown register"
+  ],
+  "acceptance": [
+    "Every E1-E14 epic and every R0-R11 package, including discovered subpackages, appears exactly once in the inventory.",
+    "Every Done/PASS claim is classified against the five evidence axes.",
+    "Every P0/P1 finding includes reproducible evidence and a safe acceptance requirement.",
+    "Known E9-T8 findings are preserved and reconciled into the final finding register without being prematurely closed.",
+    "Delete My Data, uninstall and clean reinstall are assessed as a separate P0 compliance journey.",
+    "No remediation implementation is mixed into audit evidence collection.",
+    "The audit ends with a dependency-ordered package proposal, not an automatic implementation authorization."
+  ],
+  "completion_rule": "The audit may be marked complete only after all waves and deliverables are reviewed; completion does not mean findings are resolved."
+}

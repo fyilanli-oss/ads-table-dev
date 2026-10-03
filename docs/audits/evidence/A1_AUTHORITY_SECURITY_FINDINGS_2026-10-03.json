@@ -107,14 +107,40 @@
     {
       "id": "AF-A1-006",
       "priority": "P1",
-      "status": "open_verification_gate",
-      "title": "Production token-encryption env metadata not independently verified",
+      "status": "open_hardening_and_value_revalidation",
+      "title": "Production token-encryption variables exist in correct scopes; exact boolean and startup fail-closed guarantee remain open",
       "evidence_kind": [
         "repository_code",
         "vercel_project_metadata"
       ],
       "secret_values_read": false,
-      "remediation_package_required": "depends_on_verification"
+      "remediation_package_required": "depends_on_verification",
+      "environment_metadata_verified": true,
+      "verified_scopes": {
+        "SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED": [
+          "production"
+        ],
+        "PROVIDER_TOKEN_ENCRYPTION_ENABLED": [
+          "production",
+          "preview"
+        ],
+        "PROVIDER_TOKEN_ACTIVE_KEY_ID": [
+          "production",
+          "preview"
+        ],
+        "PROVIDER_TOKEN_ENCRYPTION_KEYS": [
+          "production",
+          "preview"
+        ],
+        "SUPABASE_URL": [
+          "production",
+          "preview"
+        ],
+        "SUPABASE_SERVICE_ROLE_KEY": [
+          "production",
+          "preview"
+        ]
+      }
     },
     {
       "id": "AF-A1-007",
@@ -163,7 +189,7 @@
   "next_steps": [
     "Map every E1-E3/R0-R5 contract claim to evidence.",
     "Complete role/object privilege matrix.",
-    "Verify Vercel environment variable names and target scopes without reading values.",
+    "Verify exact encryption/legacy-read boolean state through a safe non-secret diagnostic and require startup fail-closed behavior.",
     "Create remediation packages only after audit classification."
   ]
 }

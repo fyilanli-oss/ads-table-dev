@@ -192,6 +192,7 @@ test('Google search preserves sanitized empty SearchStream response evidence', a
     customerId: '1111111111',
     loginCustomerId: '9999999999',
     query: 'SELECT campaign.id, metrics.impressions FROM campaign',
+    captureRawResponse: true,
   });
   assert.deepEqual(result.results, []);
   assert.deepEqual(result.response_evidence, {
@@ -199,7 +200,33 @@ test('Google search preserves sanitized empty SearchStream response evidence', a
     chunks_with_results: 1,
     result_count: 0,
     field_mask_paths: ['campaign.id', 'metrics.impressions'],
+    raw_response_body: '[{"results":[],"fieldMask":"campaign.id,metrics.impressions"}]',
+    raw_response_status: 'captured_empty',
   });
+});
+
+
+test('Google search never exposes a raw body when provider rows are non-empty', async () => {
+  const client = createGoogleAdsSearchClient({
+    developerToken: 'developer-secret', apiVersion: 'v25',
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: {get: () => null},
+      text: async () => '[{"results":[{"campaign":{"id":"1234567890"}}],"fieldMask":"campaign.id"}]',
+    }),
+  });
+  const result = await client({
+    accessToken: 'access-secret',
+    customerId: '1111111111',
+    loginCustomerId: '9999999999',
+    query: 'SELECT campaign.id FROM campaign',
+    captureRawResponse: true,
+  });
+  assert.equal(result.results.length, 1);
+  assert.equal(result.response_evidence.raw_response_body, null);
+  assert.equal(result.response_evidence.raw_response_status, 'withheld_non_empty');
+  assert.equal(JSON.stringify(result.response_evidence).includes('1234567890'), false);
 });
 
 test('Google search uses the selected manager context and safely classifies unauthorized responses', async () => {
@@ -227,6 +254,8 @@ test('Google acceptance surface is hidden unless the explicit operator parameter
   assert.match(html, /\/api\/shopify\/providers\/google_ads\/runtime\/preflight/);
   assert.match(html, /Provider query evidence:/);
   assert.match(html, /selected_fields\.join/);
+  assert.match(html, /raw_response_status/);
+  assert.match(html, /raw_response_body/);
   assert.match(html, /Dataset V2 writes: 0/);
 });
 

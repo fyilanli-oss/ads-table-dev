@@ -83,7 +83,7 @@
   "provider_contact": true,
   "dataset_v2_write": false,
   "live_acceptance": {
-    "status": "PASS",
+    "status": "PRIOR_PASS_REOPENED",
     "selected_account_count": 3,
     "verified_row_count": 0,
     "provider_result_status": "empty",

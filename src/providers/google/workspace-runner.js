@@ -79,7 +79,7 @@ function evidenceQuerySet(campaignType, from, to) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new Error('Google evidence date range is invalid');
   const date = `segments.date BETWEEN '${from}' AND '${to}'`;
   if (campaignType === 'standard') return Object.freeze({
-    structure: "SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.status FROM ad_group_ad WHERE campaign.advertising_channel_type != 'PERFORMANCE_MAX' LIMIT 10000",
+    structure: "SELECT campaign.id, campaign.name, campaign.advertising_channel_type, campaign.status, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status FROM ad_group_ad WHERE campaign.advertising_channel_type != 'PERFORMANCE_MAX' LIMIT 10000",
     performance: `SELECT segments.date, campaign.id, ad_group.id, ad_group_ad.ad.id, metrics.impressions, metrics.clicks, metrics.cost_micros FROM ad_group_ad WHERE ${date} AND campaign.advertising_channel_type != 'PERFORMANCE_MAX' LIMIT 10000`,
     conversions: `SELECT segments.date, campaign.id, ad_group_ad.ad.id, segments.conversion_action_name, segments.conversion_action_category, metrics.conversions, metrics.conversions_value, metrics.all_conversions, metrics.all_conversions_value FROM ad_group_ad WHERE ${date} AND campaign.advertising_channel_type != 'PERFORMANCE_MAX' AND metrics.all_conversions > 0 LIMIT 10000`,
   });

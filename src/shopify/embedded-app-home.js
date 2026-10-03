@@ -262,6 +262,11 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           <s-paragraph>This one-time check reads the selected Meta accounts and daily Insights through the completed E4 contract. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d3-meta-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d3-meta-run" variant="primary">Run read-only acceptance</s-button>
+          <s-stack id="r6d3-meta-historical-step" gap="base">
+              <s-paragraph>This read-only inventory finds the most recent Meta ad-performance date in the last 31 closed business days. It shows aggregate Campaign, Ad Set, Ad, impression, link-click, spend and conversion-support evidence without writing Dataset V2.</s-paragraph>
+              <s-paragraph id="r6d3-meta-historical-message" aria-live="polite"></s-paragraph>
+              <s-button id="r6d3-meta-historical-run" variant="secondary">Run historical read-only inventory</s-button>
+          </s-stack>
           <s-stack id="r6d3-meta-dataset-step" gap="base">
               <s-paragraph>This controlled acceptance may write real provider-verified Meta rows to Dataset V2. A verified empty result writes no synthetic rows and does not enable schedules or backfill.</s-paragraph>
               <s-paragraph id="r6d3-meta-dataset-message" aria-live="polite"></s-paragraph>
@@ -369,6 +374,8 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
       const metaAcceptancePanel = document.getElementById("r6d3-meta-acceptance");
       const metaAcceptanceButton = document.getElementById("r6d3-meta-run");
       const metaAcceptanceMessage = document.getElementById("r6d3-meta-message");
+      const metaHistoricalInventoryButton = document.getElementById("r6d3-meta-historical-run");
+      const metaHistoricalInventoryMessage = document.getElementById("r6d3-meta-historical-message");
       const metaDatasetAcceptanceButton = document.getElementById("r6d3-meta-dataset-run");
       const metaDatasetAcceptanceMessage = document.getElementById("r6d3-meta-dataset-message");
       const acceptancePanel = document.getElementById("r6d2-klaviyo-acceptance");
@@ -631,6 +638,32 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
             metaAcceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "META_PREFLIGHT_FAILED";
             metaAcceptanceButton.disabled = false;
           } finally { metaAcceptanceButton.loading = false; }
+        });
+        metaHistoricalInventoryButton.addEventListener("click", async () => {
+          metaHistoricalInventoryButton.loading = true;
+          metaHistoricalInventoryMessage.textContent = "Finding the most recent Meta performance date without writing Dataset V2…";
+          try {
+            const result = await sessionRequest("/api/shopify/providers/meta/runtime/historical-inventory", {method: "POST"});
+            if (result.status !== "PASS_R6_D5_M1_META_HISTORICAL_READ_ONLY") {
+              metaHistoricalInventoryMessage.textContent = "The historical inventory result could not be verified.";
+            } else if (result.provider_result_status === "empty") {
+              metaHistoricalInventoryMessage.textContent = "PASS — no provider rows were found from " + result.scan_start + " to " + result.scan_end + ". Dataset V2 writes: 0.";
+            } else {
+              const dateLabel = result.provider_date_start === result.provider_date_end
+                ? result.provider_date_start
+                : result.provider_date_start + " to " + result.provider_date_end;
+              metaHistoricalInventoryMessage.textContent = "PASS — " + dateLabel + ": " +
+                result.campaign_count + " Campaign, " + result.adset_count + " Ad Set, " + result.ad_count + " Ad; impressions " +
+                result.impression_total + ", link clicks " + result.ad_click_total + ", spend " + result.spend_total + " " +
+                result.reporting_currency + "; conversion support rows — add to cart " + result.conversion_support.add_to_cart.supported_rows +
+                ", checkout " + result.conversion_support.checkout.supported_rows + ", purchase " +
+                result.conversion_support.purchase.supported_rows + ". Dataset V2 writes: 0.";
+            }
+          } catch (error) {
+            metaHistoricalInventoryMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "")
+              ? error.message
+              : "META_HISTORICAL_INVENTORY_FAILED";
+          } finally { metaHistoricalInventoryButton.loading = false; }
         });
         metaDatasetAcceptanceButton.addEventListener("click", async () => {
           metaDatasetAcceptanceButton.disabled = true;

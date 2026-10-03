@@ -1,0 +1,115 @@
+{
+  "contract_version": "r6d5m1-meta-historical-read-only-v1",
+  "status": "LIVE_READ_ONLY_PASS_PRODUCT_OWNER_ACCEPTED_MERGE_PENDING",
+  "provider": "meta",
+  "business_outcome": "Find the most recent real Meta ad-level performance date in a bounded historical window and prove Campaign to Ad Set to Ad hierarchy plus impressions, link clicks and spend without writing Dataset V2.",
+  "official_provider_check": {
+    "checked_at": "2026-10-03",
+    "sources": [
+      "https://developers.facebook.com/docs/marketing-api/insights",
+      "https://www.postman.com/meta/facebook-marketing-api/folder/zzd6d5p/insights-api",
+      "https://www.postman.com/meta/facebook-marketing-api/documentation/0zr4mes/facebook-marketing-api-mapi"
+    ],
+    "level": "ad",
+    "time_increment_days": 1,
+    "fields": [
+      "campaign_id",
+      "campaign_name",
+      "adset_id",
+      "adset_name",
+      "ad_id",
+      "ad_name",
+      "date_start",
+      "date_stop",
+      "account_currency",
+      "impressions",
+      "actions",
+      "action_values",
+      "spend"
+    ]
+  },
+  "authority": {
+    "workspace": "verified_shopify_session",
+    "connection": "public.workspace_provider_connections",
+    "reporting_currency": "public.workspace_settings.merchant_selected",
+    "account_and_date_from_browser": false
+  },
+  "read_only_inventory": {
+    "bounded_lookback_days": 31,
+    "upper_bound": "previous_closed_business_date_per_account_timezone",
+    "candidate_selection": "most_recent_provider_returned_ad_insight_date_per_selected_account",
+    "selected_account_minimum": 1,
+    "selected_account_maximum": 3,
+    "hierarchy": "campaign_to_adset_to_ad",
+    "ad_click_source": "actions.link_click",
+    "clicks_field": "evidence_only",
+    "conversion_missing_semantics": "unknown_not_zero",
+    "aggregate_response_only": true
+  },
+  "ui": {
+    "surface": "/shopify/app/platforms?acceptance=r6d3-meta",
+    "components": [
+      "s-section",
+      "s-stack",
+      "s-paragraph",
+      "s-button"
+    ],
+    "custom_css": false,
+    "loading_copy": "Finding the most recent Meta performance date without writing Dataset V2…",
+    "empty_copy": "PASS — no provider rows were found in the bounded historical window. Dataset V2 writes: 0.",
+    "success_copy": "PASS — show provider date range, Campaign/Ad Set/Ad counts, impressions, link clicks, spend and conversion support. Dataset V2 writes: 0.",
+    "error_copy": "META_HISTORICAL_INVENTORY_FAILED"
+  },
+  "forbidden": [
+    "dataset_v2_write",
+    "schedule_or_backfill",
+    "production_activation",
+    "synthetic_rows",
+    "browser_supplied_account_or_date",
+    "raw_provider_ids_in_response",
+    "missing_conversion_coerced_to_zero",
+    "oauth_or_token_lifecycle_change",
+    "mapper_contract_change"
+  ],
+  "next_gate": "SEPARATE_EXPLICIT_APPROVAL_FOR_ONE_CONTROLLED_META_HISTORICAL_DATASET_WRITE_ONLY_AFTER_NON_EMPTY_READ_ONLY_PASS",
+  "repository_result": {
+    "pull_request": 323,
+    "security_regression": "PASS",
+    "full_regression": "PASS",
+    "vercel_preview": "PASS",
+    "production_deployment": true,
+    "live_read_only_acceptance": true,
+    "desktop_shopify_admin": true,
+    "mobile_shopify_admin_390x844": true,
+    "product_owner_visual_acceptance": true,
+    "merged": false
+  },
+  "live_acceptance": {
+    "accepted_at": "2026-10-03",
+    "deployed_commit": "1a9d492c94eb4f2b19ca1a474eae831eb8badf5c",
+    "production_deployment_id": "dpl_779vYvFQXQrApvuaNxsxfxkMMgHq",
+    "production_domain": "dev.adstable.app",
+    "provider_date": "2026-10-01",
+    "campaign_count": 1,
+    "adset_count": 1,
+    "ad_count": 1,
+    "impression_total": 181,
+    "ad_click_total": 8,
+    "spend_total": 117.22,
+    "reporting_currency": "TRY",
+    "conversion_support_rows": {
+      "add_to_cart": 0,
+      "checkout": 0,
+      "purchase": 0
+    },
+    "conversion_missing_semantics": "unknown_not_zero",
+    "dataset_v2_writes": 0,
+    "desktop_shopify_admin": "PASS",
+    "mobile_shopify_admin": {
+      "status": "PASS",
+      "viewport_px": "390x844"
+    },
+    "product_owner_visual_acceptance": "ACCEPTED",
+    "production_runtime_errors": "NONE_FOUND"
+  }
+}

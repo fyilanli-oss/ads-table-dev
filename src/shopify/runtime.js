@@ -32,6 +32,7 @@ const {createKlaviyoMetricBinding} = require("../providers/klaviyo/metric-bindin
 const {createKlaviyoControlledDatasetAcceptance} = require("../providers/klaviyo/controlled-dataset-acceptance");
 const {createKlaviyoTokenLifecycle} = require("../providers/klaviyo/token-lifecycle");
 const {createMetaReadOnlyPreflight} = require("../providers/meta/read-only-preflight");
+const {createMetaHistoricalReadOnlyInventory} = require("../providers/meta/historical-read-only-inventory");
 const {createMetaControlledDatasetAcceptance} = require("../providers/meta/controlled-dataset-acceptance");
 const {createGoogleAdsTokenLifecycle} = require("../providers/google/token-lifecycle");
 const {createGoogleAdsSearchClient} = require("../providers/google/search-client");
@@ -229,6 +230,15 @@ function registerShopifyRuntime({app, env = process.env, supabaseAdmin, oauthTra
         : adapters.meta
           ? {execute: async () => {throw Object.assign(new Error("META_PREFLIGHT_NOT_CONFIGURED"), {code: "META_PREFLIGHT_NOT_CONFIGURED", status: 503});}}
           : null,
+      metaHistoricalInventory: adapters.meta && typeof resolveFxRate === "function"
+        ? createMetaHistoricalReadOnlyInventory({
+          connectionStore,
+          settingsStore,
+          transport: fetchImpl,
+          graphVersion: env.META_GRAPH_VERSION || "v20.0",
+          resolveFxRate,
+        })
+        : null,
       metaDatasetAcceptance: adapters.meta && typeof resolveFxRate === "function"
         ? createMetaControlledDatasetAcceptance({
           connectionStore,

@@ -150,7 +150,20 @@ test('Google read-only preflight returns only aggregate evidence and accepts pro
   assert.equal(result.currency_version, 4);
   assert.equal(result.provider_response_evidence.length, 33);
   assert.deepEqual(new Set(result.provider_response_evidence.map(item => item.account_ordinal)), new Set([1, 2, 3]));
-  assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.structure'));
+  const standardStructure = result.provider_response_evidence.find(item => item.label === 'standard.structure');
+  assert.ok(standardStructure);
+  assert.deepEqual(standardStructure.selected_fields, [
+    'campaign.id',
+    'campaign.name',
+    'campaign.advertising_channel_type',
+    'campaign.status',
+    'ad_group.id',
+    'ad_group.name',
+    'ad_group.status',
+    'ad_group_ad.ad.id',
+    'ad_group_ad.ad.name',
+    'ad_group_ad.status',
+  ]);
   assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.history_performance'));
   assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.history_conversions'));
   assert.ok(result.provider_response_evidence.some(item => item.label === 'performance_max.structure'));

@@ -47,3 +47,21 @@ Başarılı sonuç şu anlama gelir:
 
 Production salt-okunur kabulü PASS olmuştur. Üç canonical Google Ads hesabında Standard ve Performance Max dalları çalışmış, provider sonucu doğrulanmış boş (`0` satır) dönmüş, Time/FX kontrolleri geçmiş ve Dataset V2 yazımı `0` kalmıştır. Supabase son kontrolü tek connected canonical bağlantıyı, üç seçilmiş hesabı, encrypted access/refresh token zarflarını, reporting currency kaydını, workspace ve Google Dataset V2 satırlarının `0` olduğunu, sentetik Google satırının `0` ve tarayıcı rol grant'inin `0` olduğunu doğrulamıştır. Redacted kanıt `docs/security/evidence/R6D4D_GOOGLE_READ_ONLY_LIVE_ACCEPTANCE_2026-09-26.json` içindedir. Sıradaki çalışma ayrı analist brief'i ve onayla R6-D4-E kontrollü Dataset V2 kabulüdür.
 
+
+
+## 3 Ekim 2026 corrective — provider response evidence
+
+Önceki canlı sonuç yalnız üç hesapta canonical satır sayısının sıfır olduğunu gösterdi. Hesaplarda Standard Campaign → Ad Group → Ad veya Performance Max Campaign → Asset Group yapısının bulunup bulunmadığı, sorguların hangi alanları istediği ve Google SearchStream'in her sorguya kaç sonuç/chunk döndürdüğü görünmedi. Bu nedenle önceki reporting-completeness boş sonucu yeniden açıldı.
+
+Google Ads'in güncel resmî test-account belgesi test hesaplarının reklam yayınlamadığını ve impressions, conversions ve cost gibi serving metriklerinin boş olduğunu açıkça belirtir. Bu provider kuralı beklenen boşluğu açıklar; fakat canlı hesap yapısı ve gerçek response kanıtının yerine geçmez.
+
+Corrective salt-okunur kabul her seçilmiş hesap için provider kimliği göstermeden şunları raporlar:
+
+- customer metadata;
+- Standard yapı envanteri;
+- Performance Max yapı envanteri;
+- önceki kapanmış gün Standard/PMax performance ve conversion sorguları;
+- son 31 kapanmış gün Standard/PMax performance ve conversion sorguları;
+- her sorgunun exact selected field listesi, provider result count'u, SearchStream chunk count'u ve güvenli field-mask yolları.
+
+Conversion evidence hem `metrics.conversions / conversions_value` hem de `metrics.all_conversions / all_conversions_value` alanlarını ister. Dataset V2 write, schedule ve backfill kapalıdır. Gerçek Shopify oturumundaki corrective sonuç görülmeden empty/unsupported PASS tekrar verilemez.

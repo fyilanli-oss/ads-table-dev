@@ -245,7 +245,7 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
     <s-stack id="r6d4-google-acceptance" display="none">
       <s-section heading="Google Ads acceptance check">
         <s-stack gap="base">
-          <s-paragraph>This one-time check reads the selected Google Ads accounts, Standard Ads and Performance Max Asset Groups through the completed E5 contract. It does not write Dataset V2.</s-paragraph>
+          <s-paragraph>This read-only check inventories Standard Ads and Performance Max structure, then shows provider result counts for previous-day and 31-day performance and conversion queries, including the exact selected fields. It does not write Dataset V2.</s-paragraph>
           <s-paragraph id="r6d4-google-message" aria-live="polite"></s-paragraph>
           <s-button id="r6d4-google-run" variant="primary">Run read-only acceptance</s-button>
           <s-stack id="r6d4-google-dataset-step" gap="base">
@@ -695,9 +695,18 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
           googleAcceptanceMessage.textContent = "Running the read-only checks…";
           try {
             const result = await sessionRequest("/api/shopify/providers/google_ads/runtime/preflight", {method: "POST"});
-            googleAcceptanceMessage.textContent = result.status === "PASS_R6_D4_D_GOOGLE_READ_ONLY_PREFLIGHT"
-              ? "PASS — " + result.selected_account_count + " account(s), " + result.row_count + " verified row(s) across Standard and Performance Max. Time and FX checks succeeded. Dataset V2 writes: 0."
-              : "The acceptance result could not be verified.";
+            if (result.status !== "PASS_R6_D4_D_GOOGLE_READ_ONLY_PREFLIGHT") {
+              googleAcceptanceMessage.textContent = "The acceptance result could not be verified.";
+            } else {
+              const evidence = result.provider_response_evidence.map(item =>
+                "account " + item.account_ordinal + " " + item.label + " [" + item.selected_fields.join(", ") +
+                "] => " + item.result_count + " result(s), " +
+                (item.stream_chunk_count === null ? "stream chunks unavailable" : item.stream_chunk_count + " stream chunk(s)")
+              ).join(" | ");
+              googleAcceptanceMessage.textContent = "PASS — " + result.selected_account_count + " account(s), " +
+                result.row_count + " verified canonical row(s). Provider query evidence: " + evidence +
+                ". Time and FX checks succeeded. Dataset V2 writes: 0.";
+            }
           } catch (error) {
             googleAcceptanceMessage.textContent = /^[A-Z0-9_]{1,64}$/.test(error.message || "") ? error.message : "GOOGLE_PREFLIGHT_FAILED";
             googleAcceptanceButton.disabled = false;

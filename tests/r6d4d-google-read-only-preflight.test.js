@@ -39,21 +39,24 @@ function providerSearch(calls, {withRows = true} = {}) {
     if (input.query.includes('FROM asset_group') && input.query.includes('metrics.impressions')) {
       return {results: withRows ? [pmaxFixture.row] : []};
     }
-    if (input.query.includes('metrics.conversions')) return {results: []};
+    if (input.query.includes('metrics.conversions') || input.query.includes('metrics.all_conversions')) return {results: []};
+    if (input.query.includes('FROM ad_group_ad') || input.query.includes('FROM asset_group')) return {results: []};
     throw new Error('unexpected Google query');
   };
 }
 
 test('R6-D4-D contract reuses E5 and keeps Dataset V2 closed', () => {
-  assert.equal(contract.status, 'PASS_PRODUCTION_READ_ONLY_ACCEPTANCE');
+  assert.equal(contract.status, 'GOOGLE_PROVIDER_RESPONSE_EVIDENCE_PREPARED');
   assert.equal(contract.reuse.e5_standard_query_and_mapper, true);
   assert.equal(contract.reuse.e5_performance_max_query_and_mapper, true);
   assert.equal(contract.reuse.e5_time_fx, true);
   assert.equal(contract.reuse.new_metric_contract, false);
   assert.equal(contract.acceptance.normal_data_sources_ui_changed, false);
+  assert.equal(contract.acceptance.empty_result_requires_structure_and_query_evidence, true);
+  assert.equal(contract.corrective.prior_empty_status, 'REOPENED');
   assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
-  assert.equal(contract.live_acceptance.status, 'PASS');
+  assert.equal(contract.live_acceptance.status, 'PRIOR_PASS_REOPENED');
   assert.equal(contract.live_acceptance.selected_account_count, 3);
   assert.equal(contract.live_acceptance.verified_row_count, 0);
   assert.equal(contract.live_acceptance.provider_result_status, 'empty');
@@ -116,15 +119,29 @@ test('Google read-only preflight returns only aggregate evidence and accepts pro
     now,
   });
   const result = await preflight.execute(authority);
-  assert.deepEqual(result, {
-    status: 'PASS_R6_D4_D_GOOGLE_READ_ONLY_PREFLIGHT', provider_result_status: 'empty', selected_account_count: 3,
-    row_count: 0, standard_row_count: 0, pmax_row_count: 0, empty_provider_result: true,
-    customer_metadata_verified: true, standard_and_pmax_verified: true, time_fx_verified: true,
-    provider_date_strategy: 'previous_closed_business_date_per_customer_timezone', dataset_v2_write: false,
-    production_activation: false, currency_version: 4,
-  });
+  assert.equal(result.status, 'PASS_R6_D4_D_GOOGLE_READ_ONLY_PREFLIGHT');
+  assert.equal(result.provider_result_status, 'empty');
+  assert.equal(result.selected_account_count, 3);
+  assert.equal(result.row_count, 0);
+  assert.equal(result.standard_row_count, 0);
+  assert.equal(result.pmax_row_count, 0);
+  assert.equal(result.empty_provider_result, true);
+  assert.equal(result.customer_metadata_verified, true);
+  assert.equal(result.standard_and_pmax_verified, true);
+  assert.equal(result.time_fx_verified, true);
+  assert.equal(result.provider_date_strategy, 'previous_closed_business_date_per_customer_timezone_with_31_day_evidence_window');
+  assert.equal(result.dataset_v2_write, false);
+  assert.equal(result.production_activation, false);
+  assert.equal(result.currency_version, 4);
+  assert.equal(result.provider_response_evidence.length, 33);
+  assert.deepEqual(new Set(result.provider_response_evidence.map(item => item.account_ordinal)), new Set([1, 2, 3]));
+  assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.structure'));
+  assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.history_performance'));
+  assert.ok(result.provider_response_evidence.some(item => item.label === 'standard.history_conversions'));
+  assert.ok(result.provider_response_evidence.some(item => item.label === 'performance_max.structure'));
+  assert.ok(result.provider_response_evidence.every(item => item.result_count === 0 || item.label === 'customer_metadata'));
   assert.equal(lifecycleCalls, 1);
-  assert.equal(calls.length, 15);
+  assert.equal(calls.length, 33);
   assert.equal(Object.hasOwn(result, 'rows'), false);
   assert.equal(JSON.stringify(result).includes('secret-access'), false);
   assert.ok(accounts.every(account => !JSON.stringify(result).includes(account.id)));
@@ -145,6 +162,31 @@ test('Google preflight route is Shopify-session-bound and ignores caller workspa
   }, res);
   assert.deepEqual(received, authority);
   assert.equal(res.code, 200);
+});
+
+test('Google search preserves sanitized empty SearchStream response evidence', async () => {
+  const client = createGoogleAdsSearchClient({
+    developerToken: 'developer-secret', apiVersion: 'v25',
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: {get: () => null},
+      json: async () => [{results: [], fieldMask: 'campaign.id,metrics.impressions'}],
+    }),
+  });
+  const result = await client({
+    accessToken: 'access-secret',
+    customerId: '1111111111',
+    loginCustomerId: '9999999999',
+    query: 'SELECT campaign.id, metrics.impressions FROM campaign',
+  });
+  assert.deepEqual(result.results, []);
+  assert.deepEqual(result.response_evidence, {
+    stream_chunk_count: 1,
+    chunks_with_results: 1,
+    result_count: 0,
+    field_mask_paths: ['campaign.id', 'metrics.impressions'],
+  });
 });
 
 test('Google search uses the selected manager context and safely classifies unauthorized responses', async () => {
@@ -170,6 +212,8 @@ test('Google acceptance surface is hidden unless the explicit operator parameter
   assert.match(html, /id="r6d4-google-acceptance" display="none"/);
   assert.match(html, /params\.get\("acceptance"\) === "r6d4-google"/);
   assert.match(html, /\/api\/shopify\/providers\/google_ads\/runtime\/preflight/);
+  assert.match(html, /Provider query evidence:/);
+  assert.match(html, /selected_fields\.join/);
   assert.match(html, /Dataset V2 writes: 0/);
 });
 

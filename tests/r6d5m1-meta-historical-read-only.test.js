@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   createMetaHistoricalReadOnlyInventory,
+  providerMetricEvidence,
   subtractDays,
 } = require('../src/providers/meta/historical-read-only-inventory');
 const { registerShopifyAdAccountRoutes } = require('../src/routes/shopify-ad-account-routes');
@@ -67,7 +68,7 @@ function createInventory(selectedTransport) {
 }
 
 test('R6-D5-M1 contract freezes a bounded read-only and no-zero conversion boundary', () => {
-  assert.equal(contract.status, 'LIVE_READ_ONLY_PASS_MERGED');
+  assert.equal(contract.status, 'LIVE_ACCEPTANCE_REOPENED_PROVIDER_ACTION_EVIDENCE_PENDING');
   assert.equal(contract.read_only_inventory.bounded_lookback_days, 31);
   assert.equal(contract.read_only_inventory.hierarchy, 'campaign_to_adset_to_ad');
   assert.equal(contract.read_only_inventory.ad_click_source, 'actions.link_click');
@@ -94,6 +95,14 @@ test('R6-D5-M1 finds the latest provider date and returns only aggregate canonic
   assert.equal(result.spend_total, 5020);
   assert.equal(result.reporting_currency, 'TRY');
   assert.equal(result.conversion_support.purchase.supported_rows, 1);
+  assert.deepEqual(
+    result.provider_action_evidence[0].actions.entries.find(entry => entry.action_type === 'purchase'),
+    { action_type: 'purchase', value: '4', entry_count: 1 },
+  );
+  assert.deepEqual(
+    result.provider_action_evidence[0].action_values.entries.find(entry => entry.action_type === 'purchase'),
+    { action_type: 'purchase', value: '480.00', entry_count: 1 },
+  );
   assert.equal(result.dataset_v2_write, false);
   assert.equal(result.production_activation, false);
   assert.equal(JSON.stringify(result).includes('secret-token'), false);
@@ -109,6 +118,22 @@ test('R6-D5-M1 preserves missing pixel conversion facts as unknown rather than z
   assert.equal(result.conversion_support.add_to_cart.unknown_rows, 1);
   assert.equal(result.conversion_support.checkout.unknown_rows, 1);
   assert.equal(result.conversion_support.purchase.unknown_rows, 1);
+  assert.deepEqual(result.provider_action_evidence[0].actions.entries, [
+    { action_type: 'link_click', value: '60', entry_count: 1 },
+  ]);
+  assert.deepEqual(result.provider_action_evidence[0].action_values.entries, []);
+});
+
+test('provider action evidence exposes only sanitized types, values and counts', () => {
+  const result = providerMetricEvidence([
+    { actions: [{ action_type: 'offsite_conversion.fb_pixel_purchase', value: '1' }] },
+    { actions: [{ action_type: 'offsite_conversion.fb_pixel_purchase', value: '1' }, { action_type: '<unsafe>', value: '2' }] },
+  ], 'actions');
+  assert.deepEqual(result.entries, [
+    { action_type: 'offsite_conversion.fb_pixel_purchase', value: '1', entry_count: 2 },
+  ]);
+  assert.equal(result.malformed_entry_count, 1);
+  assert.equal(JSON.stringify(result).includes('campaign_id'), false);
 });
 
 test('R6-D5-M1 returns verified empty without FX or Dataset writes when the bounded window has no rows', async () => {
@@ -172,6 +197,8 @@ test('Meta historical UI uses only approved Shopify controls and remains operato
   assert.match(html, /<s-button id="r6d3-meta-historical-run" variant="secondary">/);
   assert.match(html, /<s-paragraph id="r6d3-meta-historical-message" aria-live="polite">/);
   assert.match(html, /\/api\/shopify\/providers\/meta\/runtime\/historical-inventory/);
+  assert.match(html, /Provider response evidence:/);
+  assert.match(html, /action_values \[/);
   assert.match(html, /params\.get\("acceptance"\) === "r6d3-meta"/);
   assert.doesNotMatch(html, /<button[^>]*r6d3-meta-historical/);
   assert.doesNotMatch(html, /style=["'][^"']*r6d3-meta-historical/);

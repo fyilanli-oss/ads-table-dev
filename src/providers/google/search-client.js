@@ -47,7 +47,8 @@ function createGoogleAdsSearchClient({fetchImpl = fetch, developerToken, apiVers
     }
     if (response.status === 401) throw failure('GOOGLE_ACCESS_TOKEN_INVALID', 409, response, payload);
     if (!response.ok) throw failure('GOOGLE_PREFLIGHT_PROVIDER_FAILED', 503, response, payload);
-    const chunks = Array.isArray(payload) ? payload : [];
+    if (!Array.isArray(payload)) throw failure('GOOGLE_PREFLIGHT_RESPONSE_INVALID', 503, response, payload);
+    const chunks = payload;
     const results = chunks.flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : []);
     const fieldMaskPaths = new Set();
     for (const chunk of chunks) {

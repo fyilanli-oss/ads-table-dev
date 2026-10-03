@@ -34,7 +34,7 @@ function createGoogleReadOnlyPreflight({connectionStore, settingsStore, tokenLif
         connection: current,
         reportingCurrency: currency.reportingCurrency,
         currencyVersion: currency.currencyVersion,
-        request: Object.freeze({}),
+        request: Object.freeze({providerResponseEvidence: true, lookbackDays: 31}),
       })});
       const verified = verifyProviderResult({provider: 'google_ads', connection: lifecycle.connection, reportingCurrency: currency.reportingCurrency, result: lifecycle.value});
       return Object.freeze({
@@ -48,7 +48,8 @@ function createGoogleReadOnlyPreflight({connectionStore, settingsStore, tokenLif
         customer_metadata_verified: true,
         standard_and_pmax_verified: true,
         time_fx_verified: true,
-        provider_date_strategy: 'previous_closed_business_date_per_customer_timezone',
+        provider_date_strategy: 'previous_closed_business_date_per_customer_timezone_with_31_day_evidence_window',
+        provider_response_evidence: lifecycle.value.provider_response_evidence,
         dataset_v2_write: false,
         production_activation: false,
         currency_version: currency.currencyVersion,

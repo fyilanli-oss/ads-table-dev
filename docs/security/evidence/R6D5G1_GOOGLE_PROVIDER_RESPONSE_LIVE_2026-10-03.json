@@ -1,0 +1,158 @@
+{
+  "evidence_version": "r6d5g1-google-provider-response-live-v1",
+  "observed_at": "2026-10-03",
+  "environment": "production",
+  "operation": "read_only_google_ads_provider_response_evidence",
+  "result": "AGGREGATE_EVIDENCE_ONLY_RAW_RESPONSE_PENDING",
+  "authority": {
+    "workspace": "verified_shopify_session",
+    "selected_accounts": "canonical_workspace_provider_connection",
+    "account_count": 3
+  },
+  "aggregate_provider_response": {
+    "query_count": 33,
+    "search_stream_chunk_count": 33,
+    "customer_metadata": {
+      "queries": 3,
+      "result_count": 3,
+      "stream_chunks": 3
+    },
+    "standard": {
+      "structure": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      },
+      "history_performance": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      },
+      "history_conversions": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      },
+      "previous_day_performance": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      },
+      "previous_day_conversions": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      }
+    },
+    "performance_max": {
+      "structure": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      },
+      "history_performance": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      },
+      "history_conversions": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      },
+      "previous_day_performance": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      },
+      "previous_day_conversions": {
+        "queries": 3,
+        "result_count": 0,
+        "stream_chunks": 3
+      }
+    }
+  },
+  "selected_field_contract": {
+    "customer_metadata": [
+      "customer.id",
+      "customer.currency_code",
+      "customer.time_zone"
+    ],
+    "standard_structure": [
+      "campaign.id",
+      "campaign.name",
+      "campaign.advertising_channel_type",
+      "campaign.status",
+      "ad_group.id",
+      "ad_group.name",
+      "ad_group.status",
+      "ad_group_ad.ad.id",
+      "ad_group_ad.status"
+    ],
+    "standard_performance": [
+      "segments.date",
+      "campaign.id",
+      "ad_group.id",
+      "ad_group_ad.ad.id",
+      "metrics.impressions",
+      "metrics.clicks",
+      "metrics.cost_micros"
+    ],
+    "standard_conversions": [
+      "segments.date",
+      "campaign.id",
+      "ad_group_ad.ad.id",
+      "segments.conversion_action_name",
+      "segments.conversion_action_category",
+      "metrics.conversions",
+      "metrics.conversions_value",
+      "metrics.all_conversions",
+      "metrics.all_conversions_value"
+    ],
+    "performance_max_structure": [
+      "campaign.id",
+      "campaign.name",
+      "campaign.advertising_channel_type",
+      "campaign.status",
+      "asset_group.id",
+      "asset_group.name",
+      "asset_group.status"
+    ],
+    "performance_max_performance": [
+      "segments.date",
+      "campaign.id",
+      "asset_group.id",
+      "metrics.impressions",
+      "metrics.clicks",
+      "metrics.cost_micros"
+    ],
+    "performance_max_conversions": [
+      "segments.date",
+      "campaign.id",
+      "asset_group.id",
+      "segments.conversion_action_name",
+      "segments.conversion_action_category",
+      "metrics.conversions",
+      "metrics.conversions_value",
+      "metrics.all_conversions",
+      "metrics.all_conversions_value"
+    ]
+  },
+  "verification": {
+    "provider_transport_and_auth": "PASS",
+    "selected_account_access": "PASS",
+    "customer_metadata": "PASS",
+    "standard_hierarchy_present": false,
+    "performance_max_hierarchy_present": false,
+    "time_and_fx": "PASS",
+    "dataset_v2_writes": 0,
+    "synthetic_rows": 0,
+    "provider_ids_exposed": false,
+    "raw_provider_rows_retained": false,
+    "raw_provider_response_verified": false
+  },
+  "conclusion": "Aggregate counters show successful queries and zero results, but the exact SearchStream response bodies were not inspected. No final empty-by-structure conclusion is recorded.",
+  "non_empty_acceptance_boundary": "A real production Google Ads account containing serving Standard or Performance Max hierarchy and data is required. Google Ads test accounts do not serve ads, so they cannot prove non-empty serving metrics.",
+  "official_source": "https://developers.google.com/google-ads/api/docs/best-practices/test-accounts",
+  "next_gate": "Run the authenticated read-only acceptance with exact empty raw response capture, then inspect the returned JSON bodies before deciding."
+}

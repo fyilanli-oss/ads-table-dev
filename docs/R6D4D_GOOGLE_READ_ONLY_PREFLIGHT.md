@@ -65,3 +65,11 @@ Corrective salt-okunur kabul her seçilmiş hesap için provider kimliği göste
 - her sorgunun exact selected field listesi, provider result count'u, SearchStream chunk count'u ve güvenli field-mask yolları.
 
 Conversion evidence hem `metrics.conversions / conversions_value` hem de `metrics.all_conversions / all_conversions_value` alanlarını ister. Dataset V2 write, schedule ve backfill kapalıdır. Gerçek Shopify oturumundaki corrective sonuç görülmeden empty/unsupported PASS tekrar verilemez.
+
+## 3 Ekim 2026 canlı corrective — ham yanıt kapısı açık
+
+Gerçek Shopify oturumundaki ilk corrective çalışma `PASS — 3 account(s), 0 verified canonical row(s)` ve `33` sorgu / `33` SearchStream chunk aggregate kanıtı verdi. Ancak bu çalışma Google'ın exact HTTP/SearchStream response gövdesini göstermedi; yalnız uygulamanın ham yanıttan çıkardığı result/chunk/field-mask özetini gösterdi. Bu nedenle empty-by-account-structure kararı henüz final değildir.
+
+Yeni kontrollü salt-okunur çalışma, customer metadata dışındaki Standard ve Performance Max structure/performance/conversion sorgularında yalnız sonuç satırı `0` ise exact response body string'ini authenticated operator çıktısına taşır. Non-empty body provider ID veya satır içeriği sızdırmamak için fail-closed gizlenir. Credential, token ve customer/login-customer ID hiçbir durumda raw evidence alanına girmez.
+
+Dataset V2 write, schedule ve backfill kapalıdır. Gerçek Shopify oturumunda raw response body görülüp kullanıcıyla birlikte değerlendirilmeden Google reporting-completeness PASS veya unsupported kararı verilemez.

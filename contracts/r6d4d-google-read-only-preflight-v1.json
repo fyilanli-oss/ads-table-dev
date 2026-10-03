@@ -1,6 +1,6 @@
 {
   "contract_version": "r6d4d-google-read-only-preflight-v1",
-  "status": "GOOGLE_PROVIDER_RESPONSE_EVIDENCE_PREPARED",
+  "status": "GOOGLE_RAW_PROVIDER_RESPONSE_EVIDENCE_PREPARED",
   "provider": "google_ads",
   "business_outcome": "Verify each selected Google Ads customer with explicit provider response evidence for Standard structure, Performance Max structure, previous-day mapping queries, and a 31-day performance/conversion window before accepting an empty reporting result.",
   "reuse": {
@@ -67,7 +67,8 @@
     "normal_data_sources_ui_changed": false,
     "operator_surface": "/shopify/app/platforms?acceptance=r6d4-google",
     "empty_result_requires_structure_and_query_evidence": true,
-    "provider_ids_exposed": false
+    "provider_ids_exposed": false,
+    "exact_empty_raw_response_body_required": true
   },
   "excluded": [
     "dataset_v2_write",
@@ -83,17 +84,35 @@
   "provider_contact": true,
   "dataset_v2_write": false,
   "live_acceptance": {
-    "status": "PRIOR_PASS_REOPENED",
+    "status": "AGGREGATE_EVIDENCE_ONLY_RAW_RESPONSE_PENDING",
+    "observed_at": "2026-10-03",
     "selected_account_count": 3,
+    "provider_query_count": 33,
+    "provider_stream_chunk_count": 33,
+    "customer_metadata_result_count": 3,
+    "standard_structure_result_count": 0,
+    "performance_max_structure_result_count": 0,
+    "standard_performance_result_count": 0,
+    "standard_conversion_result_count": 0,
+    "performance_max_performance_result_count": 0,
+    "performance_max_conversion_result_count": 0,
     "verified_row_count": 0,
-    "provider_result_status": "empty",
-    "customer_metadata_verified": true,
-    "standard_and_performance_max_verified": true,
+    "provider_result_status": "not_final",
+    "provider_transport_and_auth_verified": true,
+    "exact_selected_fields_verified": true,
+    "conversion_fields_verified": [
+      "metrics.conversions",
+      "metrics.conversions_value",
+      "metrics.all_conversions",
+      "metrics.all_conversions_value"
+    ],
     "time_fx_verified": true,
-    "supabase_postcheck": "PASS",
-    "evidence": "docs/security/evidence/R6D4D_GOOGLE_READ_ONLY_LIVE_ACCEPTANCE_2026-09-26.json"
+    "dataset_v2_writes": 0,
+    "conclusion": "The aggregate result/chunk evidence is not final acceptance. Exact empty SearchStream response bodies must be observed in the real Shopify session.",
+    "evidence": "docs/security/evidence/R6D5G1_GOOGLE_PROVIDER_RESPONSE_LIVE_2026-10-03.json",
+    "raw_response_verified": false
   },
-  "next_gate": "LIVE_GOOGLE_PROVIDER_RESPONSE_EVIDENCE_IN_REAL_SHOPIFY_SESSION",
+  "next_gate": "LIVE_GOOGLE_RAW_PROVIDER_RESPONSE_EVIDENCE_IN_REAL_SHOPIFY_SESSION",
   "official_provider_check": {
     "checked_at": "2026-10-03",
     "sources": [
@@ -108,6 +127,8 @@
     "prepared_at": "2026-10-03",
     "prior_empty_status": "REOPENED",
     "reason": "The prior output proved only zero canonical rows and did not expose account structure, exact selected fields, SearchStream chunk counts, or per-query provider result counts.",
-    "dataset_v2_write": false
+    "dataset_v2_write": false,
+    "live_result": "AGGREGATE_ONLY",
+    "conclusion": "Authentication and query execution produced aggregate evidence, but raw provider response bodies were not yet inspected. The empty decision remains open."
   }
 }

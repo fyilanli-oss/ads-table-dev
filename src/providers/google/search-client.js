@@ -16,7 +16,7 @@ function failure(code, status, response, payload) {
 function createGoogleAdsSearchClient({fetchImpl = fetch, developerToken, apiVersion = 'v25'} = {}) {
   const token = required(developerToken, 'Google Ads developer token');
   if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl is required');
-  return async function search({accessToken, customerId, loginCustomerId, query} = {}) {
+  return async function search({accessToken, customerId, loginCustomerId, query, captureRawResponse = false} = {}) {
     const customer = required(customerId, 'customerId');
     const login = required(loginCustomerId, 'loginCustomerId');
     if (!/^\d+$/.test(customer) || !/^\d+$/.test(login)) throw new Error('GOOGLE_CUSTOMER_CONTEXT_INVALID');
@@ -32,10 +32,23 @@ function createGoogleAdsSearchClient({fetchImpl = fetch, developerToken, apiVers
       signal: AbortSignal.timeout(20000),
       redirect: 'error',
     });
-    const payload = await response.json().catch(() => { throw failure('GOOGLE_PREFLIGHT_RESPONSE_INVALID', 503, response, null); });
+    let rawResponseBody = null;
+    let payload;
+    try {
+      if (typeof response.text === 'function') {
+        rawResponseBody = await response.text();
+        payload = JSON.parse(rawResponseBody);
+      } else {
+        payload = await response.json();
+        rawResponseBody = JSON.stringify(payload);
+      }
+    } catch {
+      throw failure('GOOGLE_PREFLIGHT_RESPONSE_INVALID', 503, response, null);
+    }
     if (response.status === 401) throw failure('GOOGLE_ACCESS_TOKEN_INVALID', 409, response, payload);
     if (!response.ok) throw failure('GOOGLE_PREFLIGHT_PROVIDER_FAILED', 503, response, payload);
-    const chunks = Array.isArray(payload) ? payload : [];
+    if (!Array.isArray(payload)) throw failure('GOOGLE_PREFLIGHT_RESPONSE_INVALID', 503, response, payload);
+    const chunks = payload;
     const results = chunks.flatMap(chunk => Array.isArray(chunk?.results) ? chunk.results : []);
     const fieldMaskPaths = new Set();
     for (const chunk of chunks) {
@@ -53,6 +66,16 @@ function createGoogleAdsSearchClient({fetchImpl = fetch, developerToken, apiVers
         chunks_with_results: chunks.filter(chunk => Array.isArray(chunk?.results)).length,
         result_count: results.length,
         field_mask_paths: Object.freeze([...fieldMaskPaths].sort()),
+        raw_response_body: captureRawResponse === true && results.length === 0 && rawResponseBody.length <= 32768
+          ? rawResponseBody
+          : null,
+        raw_response_status: captureRawResponse !== true
+          ? 'not_requested'
+          : results.length > 0
+            ? 'withheld_non_empty'
+            : rawResponseBody.length > 32768
+              ? 'withheld_too_large'
+              : 'captured_empty',
       }),
     });
   };

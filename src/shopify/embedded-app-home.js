@@ -701,7 +701,9 @@ function renderEmbeddedPlatforms({clientId, providerOAuthEnabled, providerAvaila
               const evidence = result.provider_response_evidence.map(item =>
                 "account " + item.account_ordinal + " " + item.label + " [" + item.selected_fields.join(", ") +
                 "] => " + item.result_count + " result(s), " +
-                (item.stream_chunk_count === null ? "stream chunks unavailable" : item.stream_chunk_count + " stream chunk(s)")
+                (item.stream_chunk_count === null ? "stream chunks unavailable" : item.stream_chunk_count + " stream chunk(s)") +
+                ", raw response status: " + item.raw_response_status +
+                (item.raw_response_body === null ? "" : ", raw response body: " + item.raw_response_body)
               ).join(" | ");
               googleAcceptanceMessage.textContent = "PASS — " + result.selected_account_count + " account(s), " +
                 result.row_count + " verified canonical row(s). Provider query evidence: " + evidence +

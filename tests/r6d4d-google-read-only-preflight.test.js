@@ -17,7 +17,8 @@ const authority = {authority: 'server_resolved_workspace', workspace_id: WORKSPA
 const standardFixture = JSON.parse(fs.readFileSync(path.join(__dirname, '../artifacts/e5-google/e5-t3-standard-ad-fixture.json'), 'utf8'));
 const pmaxFixture = JSON.parse(fs.readFileSync(path.join(__dirname, '../artifacts/e5-google/e5-t4-pmax-asset-group-fixture.json'), 'utf8'));
 const contract = JSON.parse(fs.readFileSync(path.join(__dirname, '../contracts/r6d4d-google-read-only-preflight-v1.json'), 'utf8'));
-const liveEvidence = JSON.parse(fs.readFileSync(path.join(__dirname, '../docs/security/evidence/R6D4D_GOOGLE_READ_ONLY_LIVE_ACCEPTANCE_2026-09-26.json'), 'utf8'));
+const priorLiveEvidence = JSON.parse(fs.readFileSync(path.join(__dirname, '../docs/security/evidence/R6D4D_GOOGLE_READ_ONLY_LIVE_ACCEPTANCE_2026-09-26.json'), 'utf8'));
+const providerResponseEvidence = JSON.parse(fs.readFileSync(path.join(__dirname, '../docs/security/evidence/R6D5G1_GOOGLE_PROVIDER_RESPONSE_LIVE_2026-10-03.json'), 'utf8'));
 const accounts = [
   {id: '1111111111', name: 'One', currency: 'USD', login_customer_id: '9999999999'},
   {id: '2222222222', name: 'Two', currency: 'USD', login_customer_id: '9999999999'},
@@ -45,32 +46,46 @@ function providerSearch(calls, {withRows = true} = {}) {
   };
 }
 
-test('R6-D4-D contract reuses E5 and keeps Dataset V2 closed', () => {
-  assert.equal(contract.status, 'GOOGLE_PROVIDER_RESPONSE_EVIDENCE_PREPARED');
+test('R6-D4-D contract reuses E5, records live query evidence, and keeps Dataset V2 closed', () => {
+  assert.equal(contract.status, 'GOOGLE_RAW_PROVIDER_RESPONSE_EVIDENCE_PREPARED');
   assert.equal(contract.reuse.e5_standard_query_and_mapper, true);
   assert.equal(contract.reuse.e5_performance_max_query_and_mapper, true);
   assert.equal(contract.reuse.e5_time_fx, true);
   assert.equal(contract.reuse.new_metric_contract, false);
   assert.equal(contract.acceptance.normal_data_sources_ui_changed, false);
   assert.equal(contract.acceptance.empty_result_requires_structure_and_query_evidence, true);
+  assert.equal(contract.acceptance.empty_result_must_be_provider_verified, false);
+  assert.equal(contract.acceptance.exact_empty_raw_response_body_required, true);
   assert.equal(contract.corrective.prior_empty_status, 'REOPENED');
+  assert.equal(contract.corrective.live_result, 'AGGREGATE_ONLY');
   assert.equal(contract.provider_contact, true);
   assert.equal(contract.dataset_v2_write, false);
-  assert.equal(contract.live_acceptance.status, 'PRIOR_PASS_REOPENED');
+  assert.equal(contract.live_acceptance.status, 'AGGREGATE_EVIDENCE_ONLY_RAW_RESPONSE_PENDING');
   assert.equal(contract.live_acceptance.selected_account_count, 3);
+  assert.equal(contract.live_acceptance.provider_query_count, 33);
+  assert.equal(contract.live_acceptance.provider_stream_chunk_count, 33);
+  assert.equal(contract.live_acceptance.customer_metadata_result_count, 3);
+  assert.equal(contract.live_acceptance.standard_structure_result_count, 0);
+  assert.equal(contract.live_acceptance.performance_max_structure_result_count, 0);
   assert.equal(contract.live_acceptance.verified_row_count, 0);
-  assert.equal(contract.live_acceptance.provider_result_status, 'empty');
-  assert.equal(contract.live_acceptance.standard_and_performance_max_verified, true);
+  assert.equal(contract.live_acceptance.provider_result_status, 'not_final');
+  assert.equal(contract.live_acceptance.provider_transport_and_auth_verified, true);
+  assert.equal(contract.live_acceptance.exact_selected_fields_verified, true);
   assert.equal(contract.live_acceptance.time_fx_verified, true);
-  assert.equal(contract.live_acceptance.supabase_postcheck, 'PASS');
-  assert.equal(liveEvidence.result, 'PASS_PRODUCTION_READ_ONLY_ACCEPTANCE');
-  assert.equal(liveEvidence.merchant_acceptance.dataset_v2_writes, 0);
-  assert.equal(liveEvidence.supabase_postcheck.google_dataset_rows, 0);
-  assert.equal(liveEvidence.supabase_postcheck.google_synthetic_rows, 0);
-  assert.equal(liveEvidence.supabase_postcheck.browser_grant_count, 0);
-  assert.equal(liveEvidence.safeguards.production_activation, false);
+  assert.equal(contract.live_acceptance.dataset_v2_writes, 0);
+  assert.equal(priorLiveEvidence.result, 'PASS_PRODUCTION_READ_ONLY_ACCEPTANCE');
+  assert.equal(priorLiveEvidence.merchant_acceptance.dataset_v2_writes, 0);
+  assert.equal(providerResponseEvidence.result, 'AGGREGATE_EVIDENCE_ONLY_RAW_RESPONSE_PENDING');
+  assert.equal(providerResponseEvidence.aggregate_provider_response.query_count, 33);
+  assert.equal(providerResponseEvidence.aggregate_provider_response.search_stream_chunk_count, 33);
+  assert.equal(providerResponseEvidence.aggregate_provider_response.customer_metadata.result_count, 3);
+  assert.equal(providerResponseEvidence.aggregate_provider_response.standard.structure.result_count, 0);
+  assert.equal(providerResponseEvidence.aggregate_provider_response.performance_max.structure.result_count, 0);
+  assert.equal(providerResponseEvidence.verification.dataset_v2_writes, 0);
+  assert.equal(providerResponseEvidence.verification.synthetic_rows, 0);
+  assert.equal(providerResponseEvidence.verification.provider_ids_exposed, false);
+  assert.equal(providerResponseEvidence.verification.raw_provider_response_verified, false);
 });
-
 test('completed E5 Standard and PMax mappers support workspace authority without legacy user ownership', () => {
   const customer = standardFixture.customer;
   const standard = mapGoogleStandardAd(standardFixture.row, {workspaceId: WORKSPACE, customer});
@@ -179,6 +194,7 @@ test('Google search preserves sanitized empty SearchStream response evidence', a
     customerId: '1111111111',
     loginCustomerId: '9999999999',
     query: 'SELECT campaign.id, metrics.impressions FROM campaign',
+    captureRawResponse: true,
   });
   assert.deepEqual(result.results, []);
   assert.deepEqual(result.response_evidence, {
@@ -186,7 +202,33 @@ test('Google search preserves sanitized empty SearchStream response evidence', a
     chunks_with_results: 1,
     result_count: 0,
     field_mask_paths: ['campaign.id', 'metrics.impressions'],
+    raw_response_body: '[{"results":[],"fieldMask":"campaign.id,metrics.impressions"}]',
+    raw_response_status: 'captured_empty',
   });
+});
+
+
+test('Google search never exposes a raw body when provider rows are non-empty', async () => {
+  const client = createGoogleAdsSearchClient({
+    developerToken: 'developer-secret', apiVersion: 'v25',
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      headers: {get: () => null},
+      text: async () => '[{"results":[{"campaign":{"id":"1234567890"}}],"fieldMask":"campaign.id"}]',
+    }),
+  });
+  const result = await client({
+    accessToken: 'access-secret',
+    customerId: '1111111111',
+    loginCustomerId: '9999999999',
+    query: 'SELECT campaign.id FROM campaign',
+    captureRawResponse: true,
+  });
+  assert.equal(result.results.length, 1);
+  assert.equal(result.response_evidence.raw_response_body, null);
+  assert.equal(result.response_evidence.raw_response_status, 'withheld_non_empty');
+  assert.equal(JSON.stringify(result.response_evidence).includes('1234567890'), false);
 });
 
 test('Google search uses the selected manager context and safely classifies unauthorized responses', async () => {
@@ -214,6 +256,8 @@ test('Google acceptance surface is hidden unless the explicit operator parameter
   assert.match(html, /\/api\/shopify\/providers\/google_ads\/runtime\/preflight/);
   assert.match(html, /Provider query evidence:/);
   assert.match(html, /selected_fields\.join/);
+  assert.match(html, /raw_response_status/);
+  assert.match(html, /raw_response_body/);
   assert.match(html, /Dataset V2 writes: 0/);
 });
 

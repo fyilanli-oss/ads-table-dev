@@ -66,7 +66,12 @@
       "enforce_platform_account_limit_guard external EXECUTE removed"
     ],
     "function_search_path": "set empty search_path; referenced application relations remain schema-qualified",
-    "legacy_table_privileges": "remove only TRUNCATE, TRIGGER and REFERENCES from anon/authenticated on the exact 14-table inventory"
+    "legacy_table_privileges": "remove only TRUNCATE, TRIGGER and REFERENCES from anon/authenticated on the exact 14-table inventory",
+    "default_privilege_control": {
+      "migration_owner": "postgres",
+      "platform_internal_owner": "supabase_admin",
+      "rule": "Project SQL changes only postgres-owned defaults. Supabase's internal supabase_admin defaults remain provider-controlled and are reviewed through Data API settings and the announced platform rollout; the migration must not impersonate or alter that internal role."
+    }
   },
   "trial_preservation": {
     "legacy_expiry_function_preserved": true,
@@ -97,7 +102,7 @@
     "service_role can execute expire_trials without changing its business semantics",
     "auth trigger behavior remains functional",
     "14 legacy tables expose no TRUNCATE/TRIGGER/REFERENCES to anon/authenticated",
-    "future public object defaults are explicit least privilege",
+    "future postgres-owned public object defaults are explicit least privilege; supabase_admin remains provider-controlled",
     "Supabase Security Advisor function/default privilege findings close or are explicitly classified",
     "production crypto posture passes without exposing values"
   ],

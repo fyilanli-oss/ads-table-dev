@@ -80,10 +80,9 @@ test("non-production remains startable while reporting an insecure diagnostic po
 });
 
 test("migration removes only audited authority and preserves service-role trial execution",()=>{
-  for(const role of ["postgres","supabase_admin"]){
-    assert.match(migration,new RegExp("alter default privileges for role "+role+" in schema public[\\s\\S]*?revoke all privileges on tables from anon, authenticated","i"));
-    assert.match(migration,new RegExp("alter default privileges for role "+role+" in schema public[\\s\\S]*?revoke execute on functions from public, anon, authenticated","i"));
-  }
+  assert.match(migration,/alter default privileges for role postgres in schema public[\s\S]*?revoke all privileges on tables from anon, authenticated/i);
+  assert.match(migration,/alter default privileges for role postgres in schema public[\s\S]*?revoke execute on functions from public, anon, authenticated/i);
+  assert.doesNotMatch(migration,/alter default privileges for role supabase_admin/i);
   for(const fn of ["expire_trials","handle_new_user","enforce_platform_account_limit_guard"]){
     assert.match(migration,new RegExp("revoke all privileges on function public\\."+fn+"\\(\\) from public, anon, authenticated","i"));
     assert.match(migration,new RegExp("alter function public\\."+fn+"\\(\\) set search_path = ''","i"));
@@ -97,7 +96,7 @@ test("preflight and postcheck are read-only and cover exact acceptance gates",()
   for(const sql of [preflight,postcheck]){
     assert.doesNotMatch(sql,/^\\s*(?:insert|update|delete|truncate|alter|grant|revoke|drop|create)\\b/im);
   }
-  for(const gate of ["function_external_execute","service_role_trial_execute","legacy_non_dml","mutable_search_path"]){
+  for(const gate of ["function_external_execute","service_role_trial_execute","legacy_non_dml","mutable_search_path","postgres_default_privileges"]){
     assert.match(postcheck,new RegExp(gate));
   }
 });

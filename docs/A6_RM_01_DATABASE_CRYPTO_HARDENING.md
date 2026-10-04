@@ -12,7 +12,7 @@ Gereksiz public database yetkilerini kaldırırken bugün kullanılan legacy tri
 
 - `expire_trials()` ve `handle_new_user()` postgres-owned `SECURITY DEFINER` fonksiyonlarıdır ve PUBLIC/anon/authenticated tarafından çalıştırılabilir.
 - `enforce_platform_account_limit_guard()` mutable search path ve dış EXECUTE yüzeyi taşır.
-- postgres ve supabase_admin için public schema default ACL'leri future table/sequence/function nesnelerini anon/authenticated rollerine geniş açar.
+- postgres ve Supabase'in iç `supabase_admin` rolü için public schema default ACL envanteri geniş grant'ler gösterir. Proje migration sınırı resmî dokümana uygun olarak yalnız postgres-owned future nesnelerdir; `supabase_admin` provider-kontrollü kalır.
 - On dört legacy tabloda anon ve authenticated için TRUNCATE, TRIGGER ve REFERENCES yetkileri vardır.
 - Browser doğrudan tablo/RPC tüketimi bulunmadı; oturum için Supabase Auth kullanılır, veri yolları server-side service_role ile çalışır.
 - Production crypto env adları vardır; exact boolean/keyring posture ve fail-closed startup henüz kanıtlanmamıştır.
@@ -36,7 +36,7 @@ Bu yalnız geçici legacy entitlement sürekliliğidir. Shopify merchant'ın ger
 - Yalnız exact 14-table inventory üzerindeki TRUNCATE/TRIGGER/REFERENCES kaldırılır.
 - Üç internal/trigger fonksiyonunun PUBLIC/anon/authenticated EXECUTE yetkisi kaldırılır.
 - `expire_trials()` için service_role EXECUTE korunur.
-- Default privileges gelecekteki nesneler için explicit least-privilege olur.
+- Postgres-owned future nesnelerin default privileges yapısı explicit least-privilege olur. Supabase'in iç `supabase_admin` rolüne SQL migration ile müdahale edilmez; Data API ayarı ve provider rollout'u ayrı gözlenir.
 - Rollback blanket grant vermez; yalnız kanıtlanmış exact tüketici yetkisi ayrı review ile geri eklenebilir.
 
 ## Crypto kapısı

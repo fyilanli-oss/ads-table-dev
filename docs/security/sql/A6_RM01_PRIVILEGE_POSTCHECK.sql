@@ -35,6 +35,18 @@ mutable_search_path as (
   where n.nspname='public'
     and p.proname in ('expire_trials','handle_new_user','enforce_platform_account_limit_guard')
     and not ('search_path=""' = any(coalesce(p.proconfig,array[]::text[])))
+),
+postgres_default_privileges as (
+  select count(*)::integer as violation_count
+  from pg_default_acl d
+  cross join lateral aclexplode(d.defaclacl) x
+  left join pg_roles grantee_role on grantee_role.oid=x.grantee
+  where d.defaclnamespace='public'::regnamespace
+    and d.defaclrole='postgres'::regrole
+    and (
+      grantee_role.rolname in ('anon','authenticated')
+      or (x.grantee=0 and d.defaclobjtype='f')
+    )
 )
 select 'function_external_execute' as gate, violation_count from function_external_execute
 union all
@@ -43,4 +55,6 @@ union all
 select 'legacy_non_dml', violation_count from legacy_non_dml
 union all
 select 'mutable_search_path', violation_count from mutable_search_path
+union all
+select 'postgres_default_privileges', violation_count from postgres_default_privileges
 order by gate;

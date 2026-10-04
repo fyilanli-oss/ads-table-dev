@@ -1,0 +1,151 @@
+{
+  "contract_id": "a6-rm-00-release-status-containment-v1",
+  "version": "1.0.0",
+  "status": "active_decision_frozen",
+  "decision_date": "2026-10-04",
+  "authority": {
+    "execution_plan_is_constitution": true,
+    "purpose": "Prevent P0/P1 audit findings from being bypassed through premature Done, PASS, review-ready, cutover, rollback or retirement claims.",
+    "changes_runtime_behavior": false,
+    "authorizes_remediation_implementation": false,
+    "authorizes_production_mutation": false
+  },
+  "invariants": [
+    "Missing evidence never becomes PASS.",
+    "Repository implementation alone cannot satisfy a live or merchant acceptance gate.",
+    "A downstream package cannot close while any mandatory upstream containment gate is open.",
+    "Unknown, unavailable, unsupported, stale, partial and error states cannot be represented as measured zero.",
+    "Uninstall, data deletion and clean reinstall are separate lifecycle states and cannot substitute for one another.",
+    "Audit finding closure requires exact acceptance evidence and an explicit status transition."
+  ],
+  "gates": [
+    {
+      "gate_id": "G-A6-00-01",
+      "name": "shopify_review_ready",
+      "status": "HOLD",
+      "blocks": [
+        "Shopify review-ready claim",
+        "production lifecycle GO"
+      ],
+      "required_packages": [
+        "A6-RM-01",
+        "A6-RM-02",
+        "A6-RM-03",
+        "A6-RM-04",
+        "A6-RM-05",
+        "A6-RM-06",
+        "A6-RM-07",
+        "A6-RM-08",
+        "A6-RM-09",
+        "A6-RM-10"
+      ],
+      "additional_required_acceptance": [
+        "R6 reporting completeness",
+        "R7 integrated three-provider acceptance",
+        "R8 acceptance or an explicit versioned decision removing it from the review critical path"
+      ],
+      "release_rule": "All applicable package evidence is reviewed; Security Regression passes; required merchant/live acceptance is explicit."
+    },
+    {
+      "gate_id": "G-A6-00-02",
+      "name": "delete_my_data_complete",
+      "status": "HOLD",
+      "blocks": [
+        "Delete My Data PASS",
+        "hard deletion complete claim"
+      ],
+      "required_packages": [
+        "A6-RM-03",
+        "A6-RM-04"
+      ],
+      "release_rule": "Versioned manifest, durable claim, resumable execution, zero-residue checks, redacted evidence and completion UI are verified end to end."
+    },
+    {
+      "gate_id": "G-A6-00-03",
+      "name": "clean_reinstall_safe",
+      "status": "HOLD",
+      "blocks": [
+        "Clean reinstall PASS",
+        "post-deletion authority reuse"
+      ],
+      "required_packages": [
+        "A6-RM-03",
+        "A6-RM-04",
+        "A6-RM-05"
+      ],
+      "release_rule": "Pre-redact reinstall and post-terminal-deletion reinstall are separately tested; terminal path creates an isolated new workspace/install generation."
+    },
+    {
+      "gate_id": "G-A6-00-04",
+      "name": "truthful_funnel_cutover",
+      "status": "HOLD",
+      "blocks": [
+        "E11/E12 production cutover GO",
+        "current/final claim without evidence"
+      ],
+      "required_packages": [
+        "A6-RM-02",
+        "A6-RM-06",
+        "A6-RM-07",
+        "A6-RM-08",
+        "A6-RM-09"
+      ],
+      "release_rule": "Fact provenance/finality and formula support reach API/UI; absence/error/unknown never renders measured zero."
+    },
+    {
+      "gate_id": "G-A6-00-05",
+      "name": "rollback_truth_safe",
+      "status": "HOLD",
+      "blocks": [
+        "Safe rollback claim",
+        "R9 GO"
+      ],
+      "required_packages": [
+        "A6-RM-02",
+        "A6-RM-10"
+      ],
+      "release_rule": "Failure injection proves rollback preserves loading, empty, error, stale, support and finality truth."
+    },
+    {
+      "gate_id": "G-A6-00-06",
+      "name": "legacy_retirement",
+      "status": "HOLD",
+      "blocks": [
+        "E14/R10 destructive retirement"
+      ],
+      "required_packages": [
+        "A6-RM-10",
+        "A6-RM-11"
+      ],
+      "release_rule": "Cutover stabilization, consumer-zero observation, restore point and separate destructive approval are all present."
+    }
+  ],
+  "status_transition": {
+    "allowed_from": "HOLD",
+    "allowed_to": [
+      "READY_FOR_ACCEPTANCE",
+      "PASS"
+    ],
+    "authority": "Explicit evidence-backed Execution Plan/contract update reviewed through PR.",
+    "forbidden": [
+      "Automatic transition from passing unit tests",
+      "Automatic transition from merge",
+      "Automatic transition from deployment",
+      "Automatic transition from elapsed time"
+    ]
+  },
+  "source_findings": [
+    "AF-A6-001",
+    "AF-A6-002",
+    "AF-A6-003",
+    "AF-A6-004",
+    "AF-A6-005",
+    "AF-A6-006",
+    "AF-A6-007",
+    "AF-A6-008",
+    "AF-A6-009",
+    "AF-A6-010",
+    "AF-A6-011"
+  ],
+  "rollback": "Reverting this document does not authorize bypassing an open audit finding; any superseding policy must explicitly map every gate and source finding."
+}

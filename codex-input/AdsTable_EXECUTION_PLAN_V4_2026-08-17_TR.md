@@ -39,6 +39,17 @@ Repository ve CI yürütme günlüğü bu belgenin geçmişe dönük baseline ni
 | `Deferred` | Açık karar ve gerekçeyle ileri tarihe taşındı. |
 | `Parked` | Mevcut artefaktlar korunur; yeni bağlantı, provider teması, runtime activation veya ürün yüzeyi ayrı açık karara kadar ilerlemez. |
 
+### 0.3 A6 repository audit remediation emniyet kapısı — 4 Ekim 2026
+
+Repository-wide A0–A6 audit execution'ı tamamlanmış, kullanıcı review'u ve remediation uygulaması ayrılmıştır. Bağlayıcı emniyet contract'ı `contracts/a6-rm-00-release-status-containment-v1.json`, analist açıklaması `docs/A6_RM_00_RELEASE_STATUS_CONTAINMENT.md`, sentez kaydı `docs/audits/A6_REPOSITORY_WIDE_CRITICAL_RISK_SYNTHESIS_2026-10-03.md` dosyalarındadır.
+
+- **A6-RM-00 — Done / containment active:** Runtime, migration, provider, deployment veya deletion değişikliği yapmadan altı HOLD kapısı aktive edilmiştir.
+- Shopify review-ready kararı RM-01–RM-10 ile R6/R7/R8'in ilgili canlı kabulleri tamamlanmadan verilemez. R8 ancak ayrı versionlı kararla review kritik yolundan çıkarılabilir.
+- Delete My Data, clean reinstall, truthful Funnel cutover, safe rollback ve legacy retirement kapıları contract'taki exact upstream paket/evidence şartları sağlanmadan `PASS`, `Done` veya `GO` olamaz.
+- Kodun yazılması, unit test, PR merge'i, deployment veya zaman geçmesi tek başına kabul kanıtı değildir.
+- RM-11/R10 legacy retirement ve RM-12/R11 adapter-readiness Shopify review öncesi zorunlu değildir; kendi bağımlılık ve kabul kapılarında ilerler.
+- Bu kayıt audit bulgularını kapatmaz ve sonraki remediation paketlerini otomatik yetkilendirmez.
+
 ## 1. Değiştirilemez execution prensipleri
 
 1. Proje baştan yazılmayacaktır.

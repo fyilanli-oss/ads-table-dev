@@ -89,6 +89,13 @@ Kullanıcı kararıyla AdsTable'ın Shopify embedded hedef ürünü için **allo
 - UI yalnız aynı-origin BFF tüketir; browser DB/provider token authority'si yoktur. UI implementation EO-07'de analist brief, exact resmî component mapping, desktop + gerçek 320px mobile Shopify Admin kanıtı ve açık ürün sahibi kabulü ister.
 - EO-F5 production, provider, DB, Shopify configuration veya deployment değiştirmemiştir. Sıradaki kapı **EO-F6 — Repair vs re-establishment effort and risk comparison**'dır. Evidence: `docs/A6_EO_F5_PRODUCT_ROUTE_MAP.md`, contract: `contracts/a6-eo-f5-product-route-map-v1.json`.
 
+- **EO-F6 — Complete / re-establishment recommended:** Monolit onarımı ile embedded-only temiz kuruluş aynı review kapsamı üzerinden karşılaştırıldı. Privacy, deletion, billing, scheduler, provider parity, truthful API/UI, canary ve rollback kapılarının hiçbiri temiz yol lehine çıkarılmadı.
+- Monolit onarımı 59–92; embedded-only review kritik yol 42–63 focused engineering day olarak tahmin edildi. Beklenen tasarruf 17–29 focused day, yaklaşık %29–32'dir. Review sonrası EO-09/10 consumer-zero ve retirement dahil temiz program toplamı 49–74 focused day'dir.
+- Focused engineering day dış bekleme içermeyen planlama birimidir; provider finality pencereleri, 15 Ekim Klaviyo revalidation, merchant desktop/mobile kabulü ve Shopify App Review kuyruğu ayrı takvim kapılarıdır.
+- Ağırlıklı readiness skoru monolit için 44/100, temiz yeniden kuruluş için 86/100'dür. Temiz yolun belirgin riski canlı veri continuity/cutover'dır; EO-F4 carry map ve EO-08 parity/rollback başarısızsa cutover yapılmaz.
+- Review kritik sıra EO-01 → EO-02 → EO-03 → EO-04 → EO-05 → EO-06 → EO-07 → EO-08'dir. EO-09/10 legacy consumer-zero/retirement review sonrasında da zorunlu kalır ve ayrı destructive approval ister.
+- EO-F6 yalnız tavsiye üretir; implementation GO değildir. Yeni repository, Vercel project veya Supabase project ancak **EO-F7 açık insan GO** kararıyla oluşturulabilir. Evidence: `docs/A6_EO_F6_EFFORT_RISK_COMPARISON.md`, contract: `contracts/a6-eo-f6-effort-risk-comparison-v1.json`.
+
 ## 1. Değiştirilemez execution prensipleri
 
 1. Proje baştan yazılmayacaktır.

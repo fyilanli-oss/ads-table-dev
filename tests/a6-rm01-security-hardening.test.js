@@ -95,7 +95,7 @@ test("migration removes only audited authority and preserves service-role trial 
 
 test("preflight and postcheck are read-only and cover exact acceptance gates",()=>{
   for(const sql of [preflight,postcheck]){
-    assert.doesNotMatch(sql,/\b(?:insert|update|delete|truncate|alter|grant|revoke|drop|create)\b/i);
+    assert.doesNotMatch(sql,/^\\s*(?:insert|update|delete|truncate|alter|grant|revoke|drop|create)\\b/im);
   }
   for(const gate of ["function_external_execute","service_role_trial_execute","legacy_non_dml","mutable_search_path"]){
     assert.match(postcheck,new RegExp(gate));

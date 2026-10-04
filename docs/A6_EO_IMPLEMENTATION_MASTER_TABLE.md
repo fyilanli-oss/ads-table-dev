@@ -174,22 +174,6 @@ Eski paketler için üç durum vardır:
 
 “EO başladı, eski paketler otomatik kapandı” ifadesi yasaktır.
 
-## Açık legacy yükümlülük köprüsü
-
-Bu iki Klaviyo maddesi EO başladı diye kapanmaz ve yalnız referans verilerek arafta bırakılamaz:
-
-| Açık yükümlülük | Bugünkü kesin durum | EO sahipliği | Nihai kapanış sahibi |
-|---|---|---|---|
-| R6-D5-K3 — Flow/journey count-value ve persistence canlı kabulü | **Açık.** Beş günlük attribution/data-maturity beklemesi kabul kanıtı değildir. Non-fabricated Flow satırı, truthful `Added to Cart` / `Started Checkout` / `Placed Order` count-value support durumu ve Dataset V2 persistence/read-back kanıtı eksiktir. | EO-04-D provider facts/support; EO-05-D idempotent persistence/read-back | EO-05-D |
-| R7-B5 — Estimated 30-Day Email Spend runtime/migration/live acceptance | **Açık.** Repository C1/C2/C3 hazırlığı vardır; production migration, gerçek runtime dağıtımı, no-double-count/currency provenance, merchant Settings ve canlı Dataset/API/UI parity kabulü tamamlanmamıştır. | EO-02-A schema/migration; EO-04-D input semantics; EO-05-B Dataset/provenance; EO-06-A formula; EO-07-A Settings; EO-08-B live parity | EO-08-B |
-
-Kapanış kuralları:
-
-- K3, yalnız Flow verisinin görülmesiyle kapanmaz; provider gerçekliği ile kontrollü Dataset V2 persistence/read-back birlikte geçmelidir.
-- Beş günlük pencerenin dolması, boş/zero sonuç veya zaman geçmesi acceptance değildir.
-- R7-B5, migration ya da UI tek başına geçince kapanmaz; bütün maliyet zinciri ve canlı parity birlikte kanıtlanmalıdır.
-- Her iki kayıt da exact evidence ve açık closure kaydı oluşana kadar **Open** kalır.
-
 ## Yeni bulgu yönlendirme kuralı
 
 | Yeni bulgu doğası | Gideceği EO parent |

@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0.0",
+  "contract_id": "a6-eo-00-embedded-only-reestablishment-v1",
+  "title": "A6-EO-00 Embedded-only re-establishment decision and feasibility gate",
+  "effective_date": "2026-10-04",
+  "status": "strategic_direction_frozen_implementation_go_pending",
+  "authority": {
+    "execution_plan": "codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md",
+    "analyst_decision": "docs/A6_EO_00_EMBEDDED_ONLY_REESTABLISHMENT.md",
+    "containment_contract": "contracts/a6-rm-00-release-status-containment-v1.json",
+    "ui_constitution": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
+  },
+  "objective": "Re-establish the Shopify embedded product behind a clean deployable runtime boundary while carrying only evidence-backed authorities, data and contracts.",
+  "strategic_decision": {
+    "product_surface": "shopify_embedded_only",
+    "active_providers": [
+      "meta",
+      "google_ads",
+      "klaviyo"
+    ],
+    "runtime_boundary": "separate_deployable_root_required",
+    "physical_repository": "pending_EO_F2; separate_repository_is_default_recommendation",
+    "migration_style": "allowlist_only",
+    "big_bang_cutover": false,
+    "legacy_role_until_cutover": [
+      "containment",
+      "rollback",
+      "read_only_history_when_explicitly_allowed"
+    ],
+    "implementation_go": "pending_EO_F1_through_EO_F7"
+  },
+  "execution_plan_amendment": {
+    "section_1_rule_1": "General big-bang rewrite prohibition remains; this contract is the versioned exception for an allowlist-based Shopify embedded target-runtime re-establishment.",
+    "preserved_rules": [
+      "parity_before_cutover",
+      "rollback_before_cutover",
+      "consumer_zero_before_deletion",
+      "evidence_before_done",
+      "explicit_human_merge_and_production_gates"
+    ]
+  },
+  "carry_allowlist_categories": [
+    "approved_contracts_decisions_and_evidence",
+    "shopify_installation_workspace_entitlement_and_settings_authority",
+    "workspace_reporting_currency",
+    "workspace_scoped_provider_connections_and_encrypted_token_vault",
+    "evidence_backed_meta_google_ads_klaviyo_oauth_clients_mappers_and_writers",
+    "dataset_v2_workspace_schema_and_provenance_invariants",
+    "truthful_formula_query_semantics",
+    "shopify_embedded_ui_constitution"
+  ],
+  "denylist": [
+    "standalone_user_authority_and_login_signup_dashboard_product",
+    "legacy_platform_connection_write_refresh_or_reconnect_authority",
+    "root_server_js_monolith",
+    "legacy_dashboard_and_snapshot_v1_primary_authority",
+    "ga4_google_sheets_tiktok_pinterest_organic_runtime",
+    "production_debug_test_operator_or_acceptance_routes",
+    "raw_html_shopify_control_emulation_or_custom_shopify_look_css",
+    "unverified_synthetic_or_ambiguous_dataset_backfill",
+    "bulk_copy_of_legacy_dependency_or_public_trees"
+  ],
+  "feasibility_gates": [
+    {
+      "id": "EO-F1",
+      "name": "authority_and_live_data_inventory",
+      "required": true
+    },
+    {
+      "id": "EO-F2",
+      "name": "physical_project_boundary_decision",
+      "required": true
+    },
+    {
+      "id": "EO-F3",
+      "name": "code_and_dependency_carry_allowlist",
+      "required": true
+    },
+    {
+      "id": "EO-F4",
+      "name": "schema_and_data_carry_map",
+      "required": true
+    },
+    {
+      "id": "EO-F5",
+      "name": "product_and_route_map",
+      "required": true
+    },
+    {
+      "id": "EO-F6",
+      "name": "repair_vs_reestablishment_effort_and_risk_comparison",
+      "required": true
+    },
+    {
+      "id": "EO-F7",
+      "name": "versioned_go_no_go_decision",
+      "required": true
+    }
+  ],
+  "mandatory_controls": [
+    "startup_fail_closed_crypto_and_server_credentials",
+    "shopify_privacy_webhooks_and_durable_deletion",
+    "clean_reinstall_generation_safety",
+    "single_hourly_scheduler_authority",
+    "provider_maturity_reconciliation_and_finality",
+    "truthful_formula_api_and_ui_semantics",
+    "side_by_side_parity_canary_and_rollback",
+    "consumer_zero_before_legacy_retirement"
+  ],
+  "package_sequence": [
+    "A6-EO-00",
+    "A6-EO-01",
+    "A6-EO-02",
+    "A6-EO-03",
+    "A6-EO-04",
+    "A6-EO-05",
+    "A6-EO-06",
+    "A6-EO-07",
+    "A6-EO-08",
+    "A6-EO-09",
+    "A6-EO-10"
+  ],
+  "current_package_effect": {
+    "changes_production": false,
+    "changes_provider": false,
+    "changes_database": false,
+    "creates_new_project": false,
+    "closes_audit_findings": false,
+    "authorizes_cutover": false,
+    "authorizes_legacy_deletion": false
+  },
+  "acceptance": [
+    "The Execution Plan records the versioned exception without weakening parity, rollback or consumer-zero gates.",
+    "Carry allowlist and denylist are explicit and machine readable.",
+    "Every RM, R and E dependency is retained, transferred, reduced to containment or deferred with rationale.",
+    "No implementation starts before EO-F1 through EO-F6 evidence and EO-F7 human GO.",
+    "No legacy authority or data is deleted by this package."
+  ]
+}

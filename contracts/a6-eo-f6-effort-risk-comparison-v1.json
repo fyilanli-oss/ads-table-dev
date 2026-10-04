@@ -209,8 +209,8 @@
   "readiness_score": {
     "scale": "1_weak_to_5_strong",
     "weighted_total_out_of_100": {
-      "monolith_repair": 44,
-      "embedded_only_reestablishment": 86
+      "monolith_repair": 45,
+      "embedded_only_reestablishment": 88
     },
     "criteria": [
       {

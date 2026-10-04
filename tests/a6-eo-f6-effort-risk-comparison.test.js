@@ -41,9 +41,20 @@ test('EO-F6 selects clean re-establishment with transparent scoring', () => {
   assert.equal(contract.comparison.selected, 'embedded_only_reestablishment');
   assert.deepEqual(contract.comparison.percent_saved, { minimum: 29, maximum: 32 });
   assert.deepEqual(contract.readiness_score.weighted_total_out_of_100, {
-    monolith_repair: 44,
-    embedded_only_reestablishment: 86
+    monolith_repair: 45,
+    embedded_only_reestablishment: 88
   });
+  const weighted = Object.fromEntries(
+    ['monolith', 'reestablishment'].map((option) => [
+      option,
+      contract.readiness_score.criteria.reduce(
+        (total, item) => total + (item.weight * item[option]) / 5,
+        0
+      )
+    ])
+  );
+  assert.equal(weighted.monolith, 45);
+  assert.equal(weighted.reestablishment, 88);
   assert.equal(contract.decision.result, 'PASS_reestablishment_recommended');
   assert.equal(contract.decision.next_gate, 'EO-F7_human_GO_NO_GO');
 });

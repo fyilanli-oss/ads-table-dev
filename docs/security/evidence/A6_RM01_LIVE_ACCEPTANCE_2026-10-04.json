@@ -1,0 +1,69 @@
+{
+  "evidence_id": "a6-rm01-live-acceptance-2026-10-04",
+  "recorded_at": "2026-10-04T11:32:47Z",
+  "classification": "redacted_non_secret",
+  "database_phase": {
+    "migration_applied": true,
+    "migration_history_version": "20261004113227",
+    "migration_name": "a6_rm01_least_privilege_hardening",
+    "initial_attempt": {
+      "applied": false,
+      "transaction_rolled_back": true,
+      "reason_code": "PROVIDER_INTERNAL_ROLE_OWNER_BOUNDARY"
+    },
+    "corrected_repository_pr": 347
+  },
+  "postcheck": {
+    "result": "PASS",
+    "gates": [
+      {
+        "gate": "function_external_execute",
+        "violation_count": 0
+      },
+      {
+        "gate": "legacy_non_dml",
+        "violation_count": 0
+      },
+      {
+        "gate": "mutable_search_path",
+        "violation_count": 0
+      },
+      {
+        "gate": "postgres_default_privileges",
+        "violation_count": 0
+      },
+      {
+        "gate": "service_role_trial_execute",
+        "violation_count": 0
+      }
+    ]
+  },
+  "trial_continuity": {
+    "service_role_expire_trials_execute_preserved": true,
+    "shopify_billing_authority": "E10-T7"
+  },
+  "security_advisor": {
+    "closed": [
+      "anon_security_definer_function_executable",
+      "authenticated_security_definer_function_executable",
+      "function_search_path_mutable"
+    ],
+    "remaining_out_of_scope": [
+      {
+        "code": "rls_enabled_no_policy",
+        "level": "INFO",
+        "count": 10
+      },
+      {
+        "code": "auth_leaked_password_protection",
+        "level": "WARN",
+        "count": 1
+      }
+    ]
+  },
+  "runtime_phase": {
+    "provider_token_crypto_posture_verified": false,
+    "startup_guard_activated": false
+  },
+  "secret_or_identity_values_included": false
+}

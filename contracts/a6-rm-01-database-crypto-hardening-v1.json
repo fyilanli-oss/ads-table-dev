@@ -1,7 +1,7 @@
 {
   "contract_id": "a6-rm-01-database-crypto-hardening-v1",
-  "version": "1.0.0",
-  "status": "repository_prepared_live_acceptance_pending",
+  "version": "1.1.0",
+  "status": "database_live_accepted_crypto_activation_pending",
   "decision_date": "2026-10-04",
   "business_outcome": "Remove unnecessary public database authority and guarantee that production provider-token runtime cannot silently fall back to plaintext or legacy reads.",
   "scope": {
@@ -21,8 +21,8 @@
       "Shopify Billing implementation",
       "changing 14-day trial duration",
       "removing legacy trial behavior",
-      "production migration in this repository-only stage",
-      "secret value disclosure"
+      "secret value disclosure",
+      "production provider-token startup guard activation before separate live posture acceptance"
     ]
   },
   "invariants": [
@@ -36,13 +36,13 @@
   "phases": [
     {
       "id": "RM-01A",
-      "status": "repository_prepared",
+      "status": "done",
       "output": "Read-only ACL inventory, redacted live evidence and non-secret crypto posture evaluator."
     },
     {
       "id": "RM-01B",
-      "status": "migration_prepared_not_applied",
-      "output": "Least-privilege migration and postcheck; live application requires separate approval."
+      "status": "live_applied_verified",
+      "output": "Least-privilege migration applied once; five postcheck gates returned zero violations."
     },
     {
       "id": "RM-01C",
@@ -51,8 +51,8 @@
     },
     {
       "id": "RM-01D",
-      "status": "pending",
-      "output": "Live migration, negative role tests, Security Advisor recheck and production runtime acceptance."
+      "status": "database_accepted_runtime_pending",
+      "output": "Database negative privilege gates and Security Advisor recheck passed; production crypto runtime acceptance remains pending."
     }
   ],
   "required_database_changes": {
@@ -116,5 +116,19 @@
     "https://supabase.com/docs/guides/observability/advisors?queryGroups=lint&lint=0029_authenticated_security_definer_function_executable",
     "https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically",
     "https://shopify.dev/docs/api/admin-graphql/latest/mutations/appSubscriptionCreate"
-  ]
+  ],
+  "live_evidence": {
+    "recorded_at": "2026-10-04T11:32:47Z",
+    "migration_history_version": "20261004113227",
+    "migration_name": "a6_rm01_least_privilege_hardening",
+    "postcheck_result": "5_of_5_zero_violations",
+    "trial_service_role_execute_preserved": true,
+    "security_advisor_function_findings_closed": true,
+    "security_advisor_mutable_search_path_findings_closed": true,
+    "remaining_out_of_scope_advisors": [
+      "rls_enabled_no_policy_info",
+      "auth_leaked_password_protection_warn"
+    ],
+    "evidence_file": "docs/security/evidence/A6_RM01_LIVE_ACCEPTANCE_2026-10-04.json"
+  }
 }

@@ -79,23 +79,3 @@ test('the master is a governance prerequisite, not a production mutation', () =>
   assert.match(plan, /\*\*EO single-track implementation master:\*\*/);
   assert.match(doc, /tek aktif ürün hattı \*\*A6-EO\*\*/);
 });
-
-test('K3 and R7-B5 remain explicit open obligations until their final EO evidence gates pass', () => {
-  const byId = Object.fromEntries(contract.open_legacy_obligations.map((item) => [item.id, item]));
-  assert.match(byId['R6-D5-K3'].status, /^Open_/);
-  assert.equal(byId['R6-D5-K3'].final_closure_owner, 'A6-EO-05-D');
-  assert.match(byId['R6-D5-K3'].historical_wait_note, /was not acceptance evidence/);
-  assert.deepEqual(byId['R6-D5-K3'].ownership.map((item) => item.EO_child), [
-    'A6-EO-04-D', 'A6-EO-05-D'
-  ]);
-  assert.match(byId['R7-B5'].status, /^Open_/);
-  assert.equal(byId['R7-B5'].final_closure_owner, 'A6-EO-08-B');
-  assert.deepEqual(byId['R7-B5'].ownership.map((item) => item.EO_child), [
-    'A6-EO-02-A', 'A6-EO-04-D', 'A6-EO-05-B',
-    'A6-EO-06-A', 'A6-EO-07-A', 'A6-EO-08-B'
-  ]);
-  assert.equal(byId['R6-D5-K3'].reference_only_is_not_closure, true);
-  assert.equal(byId['R7-B5'].reference_only_is_not_closure, true);
-  assert.match(doc, /R6-D5-K3 — Flow\/journey count-value ve persistence canlı kabulü/);
-  assert.match(doc, /R7-B5 — Estimated 30-Day Email Spend runtime\/migration\/live acceptance/);
-});

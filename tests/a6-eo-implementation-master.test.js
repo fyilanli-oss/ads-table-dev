@@ -80,13 +80,14 @@ test('the master is a governance prerequisite, not a production mutation', () =>
   assert.match(doc, /tek aktif ürün hattı \*\*A6-EO\*\*/);
 });
 
-test('every stable child has a one-sentence scope summary and appears by full ID in the analyst table', () => {
+test('every stable child has a one-sentence scope summary and appears by display ID in the analyst table', () => {
   const children = contract.packages.flatMap((pkg) => pkg.children);
   assert.equal(children.length, 43);
   for (const child of children) {
     assert.ok(child.objective.length > 20, `${child.id} objective is too short`);
     assert.match(child.objective, /\.$/);
-    assert.match(doc, new RegExp(`\\*\\*${child.id} —`));
+    const displayId = child.id.replace(/^A6-/, '');
+    assert.match(doc, new RegExp(`\\*\\*${displayId} —`));
   }
   assert.equal(contract.single_track_rules.every_child_requires_one_sentence_scope_summary, true);
 });

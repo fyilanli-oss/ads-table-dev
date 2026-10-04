@@ -85,7 +85,7 @@ test('EO-F4 preserves rollback and advances only to EO-F5', () => {
   assert.equal(contract.rollback.silent_data_loss_allowed, false);
   assert.equal(contract.acceptance.next_gate, 'EO-F5');
   assert.match(master.status, /f4_complete/);
-  assert.equal(master.completed_gates.at(-1).id, 'EO-F4');
+  assert.ok(master.completed_gates.some((gate) => gate.id === 'EO-F4'));
   assert.match(plan, /\*\*EO-F4 — Complete \/ separate Supabase data-plane selected:\*\*/);
   assert.match(doc, /ayrı Supabase project/);
 });

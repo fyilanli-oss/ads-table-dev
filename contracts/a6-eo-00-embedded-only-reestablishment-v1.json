@@ -1,9 +1,9 @@
 {
-  "schema_version": "1.5.0",
+  "schema_version": "1.6.0",
   "contract_id": "a6-eo-00-embedded-only-reestablishment-v1",
   "title": "A6-EO-00 Embedded-only re-establishment decision and feasibility gate",
   "effective_date": "2026-10-04",
-  "status": "strategic_direction_frozen_f1_f2_f3_complete_f4_complete_f5_complete_f6_complete_f7_human_decision_pending",
+  "status": "strategic_direction_frozen_f1_f2_f3_complete_f4_complete_f5_complete_f6_complete_f7_GO_eo01_authorized",
   "authority": {
     "execution_plan": "codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md",
     "analyst_decision": "docs/A6_EO_00_EMBEDDED_ONLY_REESTABLISHMENT.md",
@@ -27,7 +27,7 @@
       "rollback",
       "read_only_history_when_explicitly_allowed"
     ],
-    "implementation_go": "pending_EO_F3_through_EO_F7"
+    "implementation_go": "GO_EO-01_authorized"
   },
   "execution_plan_amendment": {
     "section_1_rule_1": "General big-bang rewrite prohibition remains; this contract is the versioned exception for an allowlist-based Shopify embedded target-runtime re-establishment.",
@@ -166,6 +166,11 @@
       "id": "EO-F6",
       "result": "complete_reestablishment_recommended_by_equal_scope_effort_risk_comparison",
       "evidence": "contracts/a6-eo-f6-effort-risk-comparison-v1.json"
+    },
+    {
+      "id": "EO-F7",
+      "result": "GO_embedded_only_clean_reestablishment_EO-01_authorized",
+      "evidence": "contracts/a6-eo-f7-go-decision-v1.json"
     }
   ]
 }

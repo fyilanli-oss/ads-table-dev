@@ -65,6 +65,9 @@ Kullanıcı kararıyla AdsTable'ın Shopify embedded hedef ürünü için **allo
 - Mevcut production runtime yeni geliştirme zemini değil, EO cutover'a kadar containment/rollback hattıdır. Erken kapatma veya silme yasaktır.
 - EO-F1 authority/data inventory, EO-F2 proje sınırı, EO-F3 code/dependency allowlist, EO-F4 schema/data carry map, EO-F5 product/route map, EO-F6 karşılaştırmalı süre-risk hesabı tamamlanmadan EO-F7 uygulama GO kararı verilemez.
 - Bu paket yeni repository/project oluşturmaz; production, provider, DB, deployment veya Shopify configuration değiştirmez.
+- **EO-F1 — Complete / blocking gaps transferred:** Canlı authority envanteri salt-okunur çıkarıldı. Canonical authority `workspaces`, `workspace_settings`, `shopify_installations`, `workspace_provider_connections`, `performance_dataset_rows_v2` ve Klaviyo cost history'dir. Legacy tenant/provider/snapshot/job/billing tabloları yeni runtime authority'si olamaz. Workspace billing/entitlement, canonical scheduler/lease/checkpoint, durable privacy deletion ve clean-reinstall generation authority'leri eksiktir; EO-02/EO-05'e bloklayıcı foundation olarak taşındı.
+- **EO-F2 — Decision frozen:** Hedef fiziksel sınır ayrı GitHub repository + ayrı Vercel project'tir. Yeni repo fork/toplu kopya olmayacak; yeni Vercel project preview-only başlayacak; `dev.adstable.app` mevcut production/rollback hattında kalacaktır. Repository/project oluşturma EO-F7 GO'dan önce yasaktır.
+- **Supabase data-plane HOLD:** Yeni runtime mevcut karışık project'in `service_role` anahtarını alamaz; service role RLS'yi bypass eder. Özel least-privilege boundary ile ayrı Supabase project seçenekleri EO-F4'te karara bağlanır. Evidence: `docs/A6_EO_F1_F2_AUTHORITY_AND_PROJECT_BOUNDARY.md`, contract: `contracts/a6-eo-f1-f2-authority-project-boundary-v1.json`.
 
 ## 1. Değiştirilemez execution prensipleri
 

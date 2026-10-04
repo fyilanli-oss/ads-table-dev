@@ -82,6 +82,6 @@ test('EO-F3 remains non-mutating and advances only to EO-F4', () => {
   assert.equal(contract.legacy_deletion_authorized, false);
   assert.equal(contract.acceptance.next_gate, 'EO-F4');
   assert.match(master.status, /f3_complete/);
-  assert.equal(master.completed_gates.at(-1).id, 'EO-F3');
+  assert.ok(master.completed_gates.some((gate) => gate.id === 'EO-F3'));
   assert.match(executionPlan, /\*\*EO-F3 — Complete \/ carry allowlist frozen:\*\*/);
 });

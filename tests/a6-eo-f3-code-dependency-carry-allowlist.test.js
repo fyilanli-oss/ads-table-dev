@@ -52,7 +52,7 @@ test('EO-F3 excludes the legacy monolith and inactive providers from the target 
     'GA4_Google_Sheets_TikTok_Pinterest_Organic_runtime',
     'debug_test_operator_diagnostic_acceptance_historical_routes'
   ]) {
-    assert.match(retired, new RegExp(forbidden.replace(/[.*+?^$()|[\]{}]/g, '\\$&')));
+    assert.ok(retired.includes(forbidden), `missing retired target: ${forbidden}`);
   }
   assert.equal(contract.target_build_negative_controls.forbidden_provider_or_legacy_imports, 0);
   assert.equal(contract.target_build_negative_controls.user_id_tenant_authority_uses, 0);

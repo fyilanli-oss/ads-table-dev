@@ -149,7 +149,7 @@ Aşağıdaki skor 1 zayıf, 5 güçlüdür. Ağırlıklı sonuç ne kadar yükse
 | Canlı veri continuity | 15 | 4 | 3 |
 | Regression yüzeyinin küçüklüğü | 10 | 1 | 5 |
 | Uzun vadeli bakım | 10 | 1 | 5 |
-| **Ağırlıklı readiness** | **100** | **44/100** | **86/100** |
+| **Ağırlıklı readiness** | **100** | **45/100** | **88/100** |
 
 Temiz yolun tek belirgin dezavantajı canlı veri continuity/cutover işidir. EO-F4 exact carry, re-fetch, sealed token rotation ve eski runtime rollback hattı bu riski azaltır; yok etmez. EO-08 başarısızsa cutover yapılmaz.
 
@@ -196,8 +196,8 @@ Planlama için minimum dış evidence rezervi:
 
 Tek aktif uygulama hattı ve haftada beş gerçek focused day varsayımıyla:
 
-- Embedded-only review kritik geliştirme: yaklaşık **8.5–12.5 çalışma haftası**
-- Monolit onarımı: yaklaşık **12–18.5 çalışma haftası**
+- Embedded-only review kritik geliştirme: yaklaşık **8.4–12.6 çalışma haftası**
+- Monolit onarımı: yaklaşık **11.8–18.4 çalışma haftası**
 
 Bu aralıklara Shopify App Review kuyruğu dahil değildir. Codex otomasyonu bazı kodlama günlerini kısaltabilir; provider evidence, merchant acceptance ve production kapılarını ortadan kaldıramaz. EO-F7 GO sonrasında EO-01 decomposition yapıldığında tahmin tekrar kalibre edilir.
 
@@ -207,7 +207,7 @@ EO-F6 karşılaştırması **embedded-only yeniden kuruluş lehine PASS**:
 
 - aynı review kapsamı korunur;
 - beklenen review-kritik efor 17–29 focused day azalır;
-- readiness skoru 44'ten 86'ya çıkar;
+- readiness skoru 45'ten 88'e çıkar;
 - hidden legacy consumer ve regression riski fiziksel boundary ile küçülür;
 - uzun vadeli geliştirme artık emekli kodun bakım maliyetini taşımaz.
 

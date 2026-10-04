@@ -68,3 +68,20 @@ Diagnostic yalnız boolean, env adı ve güvenli reason code döndürür. Secret
 ## Runtime diagnostic hazırlığı
 
 Mevcut OIDC-korumalı `/api/e10/activation-preflight` cevabına RM-01 için `provider_token_runtime` ve `rm01_crypto_ready` alanları eklenir. Çıktı yalnız boolean ve güvenli reason code taşır; secret değer veya uzunluk yayımlamaz. Bu adım startup assertion'ı bağlamaz ve production'a otomatik terfi etmez. Önce PR CI ve Vercel Preview build/route kabulü gerekir.
+
+## Production crypto posture kabulü — 4 Ekim 2026
+
+OIDC-korumalı production diagnostic, commit `a8e8e1c392589b658e30eacc9731c9bf6e535ab5` üzerinde RM-01 için `PASS` verdi:
+
+- encryption flag mevcut, geçerli ve açık,
+- legacy-read flag mevcut, geçerli ve kapalı,
+- keyring geçerli,
+- server-side Supabase credentials mevcut,
+- `startup_allowed=true`, reason code boş,
+- secret değer veya uzunluk yayımlanmadı.
+
+GitHub workflow #4 genel E10 `ready` değerini de zorunlu tuttuğu için kırmızı sonuçlandı; RM-01 değil, mevcut production OAuth feature flag'inin artık kapalı olmaması bu genel E10 kapısını düşürdü. Bu ayrım fail-closed olarak korunur; RM-01 crypto sonucu PASS sayılırken E10 readiness sonucu değiştirilmez.
+
+Startup guard bu aşamada bağlanmadı. Bir sonraki adım ayrı açık onayla `assertProductionProviderTokenPosture` çağrısını composition root'a bağlamak, CI/Preview sonrası production deployment ve smoke yapmaktır.
+
+**Evidence:** `docs/security/evidence/A6_RM01_CRYPTO_POSTURE_LIVE_2026-10-04.json`

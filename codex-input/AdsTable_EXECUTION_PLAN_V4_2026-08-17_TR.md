@@ -51,6 +51,21 @@ Repository-wide A0–A6 audit execution'ı tamamlanmış, kullanıcı review'u v
 - RM-11/R10 legacy retirement ve RM-12/R11 adapter-readiness Shopify review öncesi zorunlu değildir; kendi bağımlılık ve kabul kapılarında ilerler.
 - Bu kayıt audit bulgularını kapatmaz ve sonraki remediation paketlerini otomatik yetkilendirmez.
 
+
+### 0.4 A6-EO-00 — Embedded-only yeniden kuruluş karar ve fizibilite kapısı — 4 Ekim 2026
+
+Kullanıcı kararıyla AdsTable'ın Shopify embedded hedef ürünü için **allowlist tabanlı kontrollü yeniden kuruluş** stratejik yönü dondurulmuştur. Bağlayıcı executable contract `contracts/a6-eo-00-embedded-only-reestablishment-v1.json`, analist açıklaması `docs/A6_EO_00_EMBEDDED_ONLY_REESTABLISHMENT.md` dosyasındadır.
+
+- Hedef yüzey yalnız Shopify embedded; aktif provider dilimi yalnız Meta, Google Ads ve Klaviyo'dur.
+- Hedef uygulama mevcut monolitten ayrı deployable runtime sınırına sahip olacaktır. Ayrı repository veya aynı repository içinde bağımsız deploy root kararı EO-F2 ile verilir; varsayılan tavsiye ayrı repository'dir.
+- Kök `server.js`, standalone kullanıcı/OAuth/dashboard, V1 snapshot authority, GA4, Google Sheets, TikTok, Pinterest, Organic, test/debug/operator production yüzeyleri ve legacy dependency/public ağaçları yeni runtime'a toplu taşınamaz.
+- Çalışan installation/workspace/settings/currency, canonical provider connection/token vault, Meta/Google Ads/Klaviyo davranışları, Dataset V2 ve Formula/Query kuralları yalnız kanıtlı carry allowlist ile taşınabilir.
+- Bu karar §1 madde 1'deki genel big-bang rewrite yasağını kaldırmaz; yalnız embedded hedef runtime için versionlı istisnadır.
+- Parity, rollback, reconciliation, lifecycle/deletion, clean reinstall ve consumer-zero kapıları aynen korunur. Audit bulguları kapanmaz; yeni package map'e taşınır.
+- Mevcut production runtime yeni geliştirme zemini değil, EO cutover'a kadar containment/rollback hattıdır. Erken kapatma veya silme yasaktır.
+- EO-F1 authority/data inventory, EO-F2 proje sınırı, EO-F3 code/dependency allowlist, EO-F4 schema/data carry map, EO-F5 product/route map, EO-F6 karşılaştırmalı süre-risk hesabı tamamlanmadan EO-F7 uygulama GO kararı verilemez.
+- Bu paket yeni repository/project oluşturmaz; production, provider, DB, deployment veya Shopify configuration değiştirmez.
+
 ## 1. Değiştirilemez execution prensipleri
 
 1. Proje baştan yazılmayacaktır.

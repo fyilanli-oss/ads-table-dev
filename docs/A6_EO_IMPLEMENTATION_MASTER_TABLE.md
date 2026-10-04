@@ -63,103 +63,103 @@ Toplam: **10 parent, 43 stable child**. Bu sayı hedef plan baseline'ıdır; tek
 
 ## EO-01 — Clean runtime shell, CI and dependency boundary
 
-- **A — Repository and physical boundary:** Ayrı clean repository; fork/toplu kopya yok.
-- **B — Official stack, manifest and CI:** Güncel resmî Shopify stack, temiz dependency manifesti, forbidden import/route/table/env testleri.
-- **C — Three-route truthful preview shell:** `/`, `/ad-analysis`, `/settings`; preview-only ve veri iddiası yok.
+- **EO-01-A — Repository and physical boundary:** Ayrı ve boş clean GitHub repository sınırı kurulacak; eski repository fork edilmeyecek veya topluca kopyalanmayacak.
+- **EO-01-B — Official stack, manifest and CI:** Güncel resmî Shopify stack seçilecek, temiz dependency manifesti kilitlenecek ve forbidden import/route/table/environment CI kapıları kurulacak.
+- **EO-01-C — Three-route truthful preview shell:** Yeni Vercel Preview projesinde `/`, `/ad-analysis` ve `/settings` route kabukları veri iddiası ve production bağlantısı olmadan oluşturulacak.
 
 Çıktı: clean repository + preview shell.  
 Referans: A6-RM-01, E3 mimari dersleri, Shopify Embedded UI Constitution.
 
 ## EO-02 — Workspace, installation, billing/trial and privacy foundations
 
-- **A — Private schemas, roles and migrations**
-- **B — Workspace, installation and generation authority**
-- **C — Fourteen-day trial, subscription and entitlement**
-- **D — Privacy, uninstall, deletion and clean reinstall**
+- **EO-02-A — Private schemas, roles and migrations:** Yeni Standard Supabase projesinde private schema, en az yetkili roller ve temiz migration zinciri kurulacak.
+- **EO-02-B — Workspace, installation and generation authority:** Shopify installation/session/bootstrap akışı workspace ve installation generation otoritesine bağlanacak.
+- **EO-02-C — Fourteen-day trial, subscription and entitlement:** On dört günlük trial, abonelik ve kullanım hakkı Shopify billing otoritesiyle yönetilecek.
+- **EO-02-D — Privacy, uninstall, deletion and clean reinstall:** Compliance webhook, Delete my data, uninstall ve yeni-generation clean reinstall yaşam döngüsü kurulacak.
 
 Çıktı: clean data foundation ve tam merchant lifecycle.  
 Referans: A6-RM-03/04/05, E10-T4/T7, R2.
 
 ## EO-03 — Canonical OAuth, connection and token vault
 
-- **A — OAuth transaction boundary**
-- **B — Token envelope and startup guard**
-- **C — Connection and reporting-account authority**
-- **D — Reconnect, disconnect and renewal lifecycle**
+- **EO-03-A — OAuth transaction boundary:** OAuth state, PKCE, nonce, TTL, callback ve workspace bağları tek kullanımlık güvenli transaction sınırına alınacak.
+- **EO-03-B — Token envelope and startup guard:** Provider tokenları yalnız server tarafında şifreli, versionlı ve eksik yapılandırmada fail-closed saklanacak.
+- **EO-03-C — Connection and reporting-account authority:** Doğrulanmış provider hesapları ile seçili Reporting Account için tek canonical otorite kurulacak.
+- **EO-03-D — Reconnect, disconnect and renewal lifecycle:** Reconnect, disconnect, token yenileme ve yeniden yetkilendirme veri veya yetki uydurmadan idempotent çalışacak.
 
 Çıktı: tek provider authority ve güvenli token lifecycle.  
 Referans: A6-RM-01, R0/R5/R6, E7.
 
 ## EO-04 — Meta, Google Ads and Klaviyo adapters
 
-- **A — Common adapter contract**
-- **B — Meta adapter**
-- **C — Google Ads adapter**
-- **D — Klaviyo adapter ve 15 Ekim resmî revalidation**
-- **E — Integrated three-provider acceptance**
+- **EO-04-A — Common adapter contract:** Üç provider için ortak request, ham kanıt, support-state, kota ve hata envelope sözleşmesi kurulacak.
+- **EO-04-B — Meta adapter:** Meta account/campaign/ad hiyerarşisi, actions/action_values ve missing/unsupported davranışı ham yanıtla doğrulanacak.
+- **EO-04-C — Google Ads adapter:** Standard Ad ve Performance Max Asset Group hiyerarşisi en alt doğrulanabilir grain ve ham structure kanıtıyla kurulacak.
+- **EO-04-D — Klaviyo adapter:** Campaign/Message, Flow/Message, metrik ve maliyet girdileri kurulacak; 15 Ekim sözleşmesi resmî kaynakla yeniden doğrulanacak.
+- **EO-04-E — Integrated three-provider acceptance:** Meta, Google Ads ve Klaviyo hem ayrı hem birlikte sentetik veri üretmeden kabul testinden geçirilecek.
 
 Çıktı: raw evidence + normalize edilmiş truthful provider facts.  
 Referans: R6/R7/R7-B5 ve deepest-grain discovery girdileri.
 
 ## EO-05 — Scheduler, Dataset V2, FX, maturity and reconciliation
 
-- **A — Hourly scheduler, shard, lease and checkpoint**
-- **B — Dataset V2, FX and provenance**
-- **C — Maturity, attribution windows and finality**
-- **D — Yesterday+today bootstrap, idempotent upsert and reconciliation**
-- **E — Operational observability**
+- **EO-05-A — Hourly scheduler, shard, lease and checkpoint:** AdsTable-owned saatlik scheduler deterministik shard, single-flight lease ve checkpoint ile kurulacak.
+- **EO-05-B — Dataset V2, FX and provenance:** Canonical facts, Klaviyo allocated spend, kaynak para birimi, FX ve provenance workspace sınırında saklanacak.
+- **EO-05-C — Maturity, attribution windows and finality:** Providerların geçmiş günleri sonradan değiştirebildiği attribution pencereleri için rolling correction ve truthful freshness/finality kuralları kurulacak.
+- **EO-05-D — Bootstrap, idempotent upsert and reconciliation:** İlk yesterday+today bootstrap, güvenli replay, idempotent upsert ve provider–Dataset uyuşmazlık uzlaştırması uygulanacak.
+- **EO-05-E — Operational observability:** Job durumu, gecikme, hata ve alarm kanıtları secret veya PII sızdırmadan gözlemlenebilir olacak.
 
 Çıktı: AdsTable-owned saatlik ve düzeltilebilir canonical data plane.  
 Referans: A6-RM-06/07, E9-T8, R3/R4/R7.
 
 ## EO-06 — Formula, Query and same-origin BFF/API
 
-- **A — Formula engine**
-- **B — Query, filters and comparison semantics**
-- **C — BFF routes and DTO envelope**
-- **D — Support/null/freshness semantics**
-- **E — Contract and security acceptance**
+- **EO-06-A — Formula engine:** Aggregate-first KPI, Klaviyo maliyet dağıtımı, CPC/ROAS/CPS/revenue/revenue margin ve currency-safe hesaplamalar uygulanacak.
+- **EO-06-B — Query, filters and comparison semantics:** Tarih, entity, grain, filtre ve dönem karşılaştırma kuralları tek query sözleşmesinde kurulacak.
+- **EO-06-C — BFF routes and DTO envelope:** Workspace'i session'dan türeten same-origin BFF route'ları ve üç yüzey için kararlı DTO envelope'ları hazırlanacak.
+- **EO-06-D — Support/null/freshness semantics:** Unknown, unsupported, stale, partial ve gerçek zero durumları API boyunca birbirinden ayrı tutulacak.
+- **EO-06-E — Contract and security acceptance:** Tenant tamper, formül, query ve API contract/security testleriyle bu katmanın kabulü kanıtlanacak.
 
 Çıktı: missing/unknown'u sıfır yapmayan truthful API.  
 Referans: A6-RM-08/09, E11 ve Dataset V2 sözleşmeleri.
 
 ## EO-07 — Shopify-native three-surface UI
 
-- **A — Settings**
-- **B — Funnel App Home**
-- **C — Ad Analysis**
-- **D — Cross-platform deepest-grain discovery**
-- **E — Attribution Differences nested view; yalnız D geçerse**
-- **F — Desktop, gerçek mobile ve accessibility acceptance**
+- **EO-07-A — Settings surface:** Reporting Currency, provider bağlantıları/hesap seçimleri, Klaviyo Estimated 30-Day Email Spend, billing ve privacy işlemleri Shopify-native Settings içinde kurulacak.
+- **EO-07-B — Funnel App Home:** Funnel/Table ve bağlamsal dashboard grafikleri uygulamanın ana Shopify App Home yüzeyi olarak kurulacak.
+- **EO-07-C — Cross-platform deepest-grain discovery:** Meta, Google Ads ve Klaviyo için gerçek ve karşılaştırılabilir en alt analiz seviyeleri Ad Analysis tasarlanmadan önce dondurulacak.
+- **EO-07-D — Ad Analysis surface:** Ad Analysis tablo, filtre ve bağlamsal grafikleri yalnız EO-07-C discovery sonucu üzerinde uygulanacak.
+- **EO-07-E — Attribution Differences nested view:** Attribution Differences, discovery ve Ad Analysis kabulünden sonra ayrı yüzey açmadan Ad Analysis içine yerleştirilecek.
+- **EO-07-F — Desktop, real-mobile and accessibility acceptance:** Üç yüzey resmî component eşlemesi, gerçek desktop/mobil Shopify Admin ve erişilebilirlik kabulünden geçirilecek.
 
 Çıktı: Funnel, Ad Analysis ve Settings. Dashboard grafikleri bağlamsal; Platforms Settings içinde.  
 Referans: A6-RM-09, E10-T5, E12 ve UI Constitution.
 
 ## EO-08 — Carry rehearsal, parity, canary and rollback
 
-- **A — Restricted data/sealed-token carry rehearsal**
-- **B — Provider, Dataset, API ve UI parity**
-- **C — Failure injection and rollback rehearsal**
-- **D — Review evidence and explicit review-ready decision**
+- **EO-08-A — Restricted data and sealed-token carry rehearsal:** Yalnız allowlist içindeki veri ve sealed tokenlar disposable/preview sınırında gerçek production'a dokunmadan taşıma provasından geçirilecek.
+- **EO-08-B — Provider, Dataset, API and UI parity:** Provider ham gerçekliği, Dataset V2, API ve UI sonuçları false-zero üretmeden uçtan uca karşılaştırılacak.
+- **EO-08-C — Failure injection and rollback rehearsal:** Auth, provider, veritabanı, job ve UI arızalarında güvenli durma ve rollback davranışı kanıtlanacak.
+- **EO-08-D — Review evidence and review-ready decision:** Shopify yaşam döngüsü ve ürün kanıtları toplanacak; review-ready kararı ayrıca açık insan onayıyla verilecek.
 
 Çıktı: Shopify review'a sunulabilir olduğumuzu kanıtlayan paket.  
 Referans: A6-RM-10, R8/R9, E13.
 
 ## EO-09 — Authority cutover stabilization and consumer-zero
 
-- **A — Production cutover plan and freeze**
-- **B — Canary authority switch**
-- **C — Stabilization and consumer-zero observation**
+- **EO-09-A — Production cutover plan and freeze:** Domain, Shopify App configuration, veri watermark'ı, freeze ve rollback penceresi exact cutover planında dondurulacak.
+- **EO-09-B — Canary authority switch:** Production otoritesi ayrı GO sonrasında küçük ve kontrollü canary geçişiyle yeni yapıya alınacak.
+- **EO-09-C — Stabilization and consumer-zero observation:** Yeni otoritenin stabil olduğu ve eski runtime'ı kullanan hiçbir consumer kalmadığı gözlemle kanıtlanacak.
 
 Çıktı: ayrı GO ile kontrollü production authority geçişi.  
 Referans: A6-RM-10/11, R9, E13.
 
 ## EO-10 — Legacy archive, retention and controlled retirement
 
-- **A — Archive and retention manifest**
-- **B — Legacy route/deployment/environment retirement**
-- **C — Legacy database retirement**
-- **D — Final restore and closure evidence**
+- **EO-10-A — Archive and retention manifest:** Kod, veri ve kanıtlar için geri alınabilir archive ile hukuki/privacy retention manifesti hazırlanacak.
+- **EO-10-B — Legacy route, deployment and environment retirement:** Yalnız consumer-zero kanıtı bulunan eski route, deployment ve environmentlar kontrollü biçimde devreden çıkarılacak.
+- **EO-10-C — Legacy database retirement:** Eski tablo, function ve credentiallar restore point ve exact manifest sonrasında ayrı destructive onayla emekli edilecek.
+- **EO-10-D — Final restore and closure evidence:** Restore sınırı kanıtlanacak ve bütün taşınmış yükümlülükler açık closure evidence ile nihai olarak kapatılacak.
 
 Çıktı: geri alınabilir archive ve kanıtlı legacy retirement.  
 Referans: A6-RM-11, E14, R10.

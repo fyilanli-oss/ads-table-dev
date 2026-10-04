@@ -1,6 +1,7 @@
 begin;
 
--- A6-RM-01: remove unsafe implicit authority for future public objects.
+-- A6-RM-01: remove unsafe implicit authority for future postgres-owned public objects.
+-- supabase_admin is an internal provider role; project postgres cannot and must not impersonate it.
 alter default privileges for role postgres in schema public
   revoke all privileges on tables from anon, authenticated;
 alter default privileges for role postgres in schema public
@@ -8,12 +9,6 @@ alter default privileges for role postgres in schema public
 alter default privileges for role postgres in schema public
   revoke execute on functions from public, anon, authenticated;
 
-alter default privileges for role supabase_admin in schema public
-  revoke all privileges on tables from anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke all privileges on sequences from anon, authenticated;
-alter default privileges for role supabase_admin in schema public
-  revoke execute on functions from public, anon, authenticated;
 
 -- Remove non-Data-API privileges from the exact audited legacy inventory.
 revoke truncate, references, trigger on table

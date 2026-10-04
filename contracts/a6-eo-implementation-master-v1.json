@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.0.0",
   "contract_id": "a6-eo-implementation-master-v1",
   "title": "A6 EO single-track execution rule and integrated implementation package table",
   "effective_date": "2026-10-04",
@@ -564,73 +564,5 @@
   "provider_mutation_authorized": false,
   "live_data_carry_authorized": false,
   "cutover_authorized": false,
-  "legacy_deletion_authorized": false,
-  "open_legacy_obligations": [
-    {
-      "id": "R6-D5-K3",
-      "title": "Klaviyo Flow/journey count-value and persistence live acceptance",
-      "status": "Open_provider_data_maturity_and_live_persistence_acceptance_pending",
-      "historical_wait_note": "The previously discussed five-day attribution/data-maturity wait was not acceptance evidence and did not close this obligation.",
-      "ownership": [
-        {
-          "EO_child": "A6-EO-04-D",
-          "responsibility": "Obtain non-fabricated live Flow facts and truthful Added to Cart, Started Checkout and Placed Order count/value support evidence."
-        },
-        {
-          "EO_child": "A6-EO-05-D",
-          "responsibility": "Prove controlled idempotent Dataset V2 persistence and read-back for the accepted Flow/journey facts."
-        }
-      ],
-      "final_closure_owner": "A6-EO-05-D",
-      "closure_requires": [
-        "live_non_fabricated_Flow_evidence",
-        "truthful_journey_count_and_value_support_states",
-        "controlled_idempotent_Dataset_V2_persistence",
-        "read_back_cardinality_and_identity_evidence",
-        "explicit_closure_record"
-      ],
-      "reference_only_is_not_closure": true
-    },
-    {
-      "id": "R7-B5",
-      "title": "Klaviyo Estimated 30-Day Email Spend runtime, migration and live acceptance",
-      "status": "Open_repository_prepared_production_migration_runtime_and_live_acceptance_pending",
-      "ownership": [
-        {
-          "EO_child": "A6-EO-02-A",
-          "responsibility": "Re-establish the effective-history schema and least-privilege migration boundary."
-        },
-        {
-          "EO_child": "A6-EO-04-D",
-          "responsibility": "Expose truthful Klaviyo Email cost inputs without treating the estimate as provider-billed spend."
-        },
-        {
-          "EO_child": "A6-EO-05-B",
-          "responsibility": "Persist account-day and allocated-spend facts with currency and provenance and without double counting."
-        },
-        {
-          "EO_child": "A6-EO-06-A",
-          "responsibility": "Apply the accepted daily allocation and dependent KPI formulas."
-        },
-        {
-          "EO_child": "A6-EO-07-A",
-          "responsibility": "Provide the Settings history/update/correction workflow with Shopify-native acceptance."
-        },
-        {
-          "EO_child": "A6-EO-08-B",
-          "responsibility": "Prove migration, runtime, Dataset, API and UI parity through live acceptance."
-        }
-      ],
-      "final_closure_owner": "A6-EO-08-B",
-      "closure_requires": [
-        "production_migration_evidence",
-        "runtime_daily_cost_and_allocation_evidence",
-        "no_double_count_and_currency_provenance_evidence",
-        "merchant_Settings_acceptance",
-        "live_Dataset_API_UI_parity",
-        "explicit_closure_record"
-      ],
-      "reference_only_is_not_closure": true
-    }
-  ]
+  "legacy_deletion_authorized": false
 }

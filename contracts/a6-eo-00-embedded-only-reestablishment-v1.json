@@ -1,9 +1,9 @@
 {
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "contract_id": "a6-eo-00-embedded-only-reestablishment-v1",
   "title": "A6-EO-00 Embedded-only re-establishment decision and feasibility gate",
   "effective_date": "2026-10-04",
-  "status": "strategic_direction_frozen_f1_f2_f3_complete_f4_f7_pending",
+  "status": "strategic_direction_frozen_f1_f2_f3_f4_complete_f5_f7_pending",
   "authority": {
     "execution_plan": "codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md",
     "analyst_decision": "docs/A6_EO_00_EMBEDDED_ONLY_REESTABLISHMENT.md",
@@ -151,6 +151,11 @@
       "id": "EO-F3",
       "result": "complete_zero_application_modules_carry_as_is_allowlist_frozen",
       "evidence": "contracts/a6-eo-f3-code-dependency-carry-allowlist-v1.json"
+    },
+    {
+      "id": "EO-F4",
+      "result": "complete_separate_supabase_project_selected_exact_carry_and_refetch_map_frozen",
+      "evidence": "contracts/a6-eo-f4-schema-data-carry-map-v1.json"
     }
   ]
 }

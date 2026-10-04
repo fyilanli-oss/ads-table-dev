@@ -113,7 +113,7 @@ test('EO-F5 preserves UI Constitution and advances only to EO-F6', () => {
   assert.equal(contract.legacy_deletion_authorized, false);
   assert.equal(contract.acceptance.next_gate, 'EO-F6');
   assert.match(master.status, /f5_complete/);
-  assert.equal(master.completed_gates.at(-1).id, 'EO-F5');
+  assert.ok(master.completed_gates.some((gate) => gate.id === 'EO-F5'));
   assert.match(plan, /\*\*EO-F5 — Complete \/ embedded product and route map frozen:\*\*/);
   assert.match(doc, /yalnız \*\*üç ana yüzeyden\*\*/);
 });

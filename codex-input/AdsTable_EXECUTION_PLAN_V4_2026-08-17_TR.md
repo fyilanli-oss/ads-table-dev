@@ -79,6 +79,16 @@ Kullanıcı kararıyla AdsTable'ın Shopify embedded hedef ürünü için **allo
 - Hedef clean schema `app`, `shopify`, `integrations`, `analytics`, `operations`, `privacy` ve `billing` private sınırlarından oluşur. Legacy user/V1/provider tabloları ve expired OAuth satırları taşınmaz.
 - EO-F4 production, provider, DB, deployment veya proje oluşturma değişikliği yapmamıştır. Sıradaki kapı **EO-F5 — Product and route map**'tir. Evidence: `docs/A6_EO_F4_SCHEMA_DATA_CARRY_MAP.md`, contract: `contracts/a6-eo-f4-schema-data-carry-map-v1.json`.
 
+- **EO-F5 — Complete / embedded product and route map frozen:** Hedef ürün yalnız üç ana yüzeydir: `/` Funnel App Home, `/ad-analysis` ve `/settings`. Shopify'ın resmî home davranışı nedeniyle Funnel uygulama adı/root üzerinden açılır; App Nav'da yinelenmez.
+- Dashboard ayrı route/nav değildir; Funnel ve Ad Analysis içindeki bağlamsal grafik panelleridir. Platforms ayrı route/nav değildir; Settings içindeki provider connections/setup bölümüdür.
+- Attribution Differences ayrı route/nav değildir. E10-T5-C2-C Cross-platform deepest-grain discovery tamamlandıktan sonra Ad Analysis içinde açılır; karşılaştırılabilir capability/grain kanıtlanamazsa `capability_unavailable` kalır.
+- `/dashboard`, `/platforms`, `/attribution-differences`, `/funnel`, eski `/shopify/app/*`, `/analysis`, standalone login/signup/auth/dashboard ve production debug/operator/acceptance route'ları hedef build'e girmez.
+- Onboarding server-authoritative sırayla Shopify session/install, 14 günlük trial veya subscription entitlement, Settings içindeki reporting currency, provider account ve gerekiyorsa Klaviyo email cost kontrolü yapar; tamamlanan kullanıcı Funnel'a gider. OAuth callback return target yalnız Settings'tir.
+- Aktif provider allowlist yalnız Meta, Google Ads ve Klaviyo'dur. E10-T5C4'teki eski TikTok-active gösterimi bu güncel EO kararıyla geçersizdir.
+- Hourly refresh yalnız AdsTable-owned signed internal job'dur; browser/page-open/grafik açılması/manual refresh yoktur. UI yalnız refresh/freshness/finality durumunu okur. Missing veri sıfıra çevrilmez.
+- UI yalnız aynı-origin BFF tüketir; browser DB/provider token authority'si yoktur. UI implementation EO-07'de analist brief, exact resmî component mapping, desktop + gerçek 320px mobile Shopify Admin kanıtı ve açık ürün sahibi kabulü ister.
+- EO-F5 production, provider, DB, Shopify configuration veya deployment değiştirmemiştir. Sıradaki kapı **EO-F6 — Repair vs re-establishment effort and risk comparison**'dır. Evidence: `docs/A6_EO_F5_PRODUCT_ROUTE_MAP.md`, contract: `contracts/a6-eo-f5-product-route-map-v1.json`.
+
 ## 1. Değiştirilemez execution prensipleri
 
 1. Proje baştan yazılmayacaktır.

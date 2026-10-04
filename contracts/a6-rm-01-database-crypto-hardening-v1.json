@@ -1,7 +1,7 @@
 {
   "contract_id": "a6-rm-01-database-crypto-hardening-v1",
-  "version": "1.2.0",
-  "status": "database_live_accepted_crypto_activation_pending",
+  "version": "1.3.0",
+  "status": "database_and_crypto_live_accepted_startup_guard_pending",
   "decision_date": "2026-10-04",
   "business_outcome": "Remove unnecessary public database authority and guarantee that production provider-token runtime cannot silently fall back to plaintext or legacy reads.",
   "scope": {
@@ -46,13 +46,13 @@
     },
     {
       "id": "RM-01C",
-      "status": "runtime_diagnostic_prepared_preview_pending",
-      "output": "Existing OIDC-authenticated activation preflight returns the redacted provider-token runtime posture; startup assertion remains unwired and Preview acceptance is pending."
+      "status": "production_posture_pass_startup_guard_pending",
+      "output": "OIDC-protected production diagnostic proves encryption enabled, legacy reads disabled, valid keyring and server credentials; startup assertion remains unwired."
     },
     {
       "id": "RM-01D",
-      "status": "database_accepted_runtime_pending",
-      "output": "Database negative privilege gates and Security Advisor recheck passed; production crypto runtime acceptance remains pending."
+      "status": "live_acceptance_pass_activation_pending",
+      "output": "Database gates and production crypto posture pass; only explicit startup guard activation and deployment smoke remain."
     }
   ],
   "required_database_changes": {
@@ -135,6 +135,20 @@
       "rls_enabled_no_policy_info",
       "auth_leaked_password_protection_warn"
     ],
-    "evidence_file": "docs/security/evidence/A6_RM01_LIVE_ACCEPTANCE_2026-10-04.json"
+    "evidence_file": "docs/security/evidence/A6_RM01_LIVE_ACCEPTANCE_2026-10-04.json",
+    "crypto_recorded_at": "2026-10-04T11:47:44Z",
+    "crypto_source_commit": "a8e8e1c392589b658e30eacc9731c9bf6e535ab5",
+    "crypto_workflow_run_id": "37199813135",
+    "rm01_crypto_ready": true,
+    "production_runtime": true,
+    "encryption_enabled": true,
+    "legacy_reads_enabled": false,
+    "keyring_valid": true,
+    "supabase_server_credentials_present": true,
+    "startup_allowed": true,
+    "reason_codes": [],
+    "values_or_lengths_exposed": false,
+    "crypto_evidence_file": "docs/security/evidence/A6_RM01_CRYPTO_POSTURE_LIVE_2026-10-04.json",
+    "parent_workflow_conclusion": "failure_due_to_unrelated_e10_feature_flag_gate"
   }
 }

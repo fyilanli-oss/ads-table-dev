@@ -1,0 +1,45 @@
+{
+  "evidence_id": "a6-rm01-crypto-posture-live-2026-10-04",
+  "recorded_at": "2026-10-04T11:47:44Z",
+  "classification": "redacted_non_secret",
+  "source": {
+    "commit_sha": "a8e8e1c392589b658e30eacc9731c9bf6e535ab5",
+    "workflow_run_id": "37199813135",
+    "authorization": "github_actions_oidc"
+  },
+  "rm01_result": {
+    "status": "PASS",
+    "rm01_crypto_ready": true,
+    "production": true,
+    "enforcement_required": true,
+    "secure_posture": true,
+    "startup_allowed": true,
+    "configuration": {
+      "encryption_flag_present": true,
+      "encryption_flag_valid": true,
+      "encryption_enabled": true,
+      "legacy_read_flag_present": true,
+      "legacy_read_flag_valid": true,
+      "legacy_reads_enabled": false,
+      "keyring_valid": true,
+      "supabase_server_credentials_present": true
+    },
+    "reason_codes": []
+  },
+  "parent_e10_result": {
+    "ready": false,
+    "classification": "UNCHANGED_SEPARATE_GATE",
+    "reason": "feature_flag_safely_disabled_false",
+    "workflow_conclusion": "failure"
+  },
+  "exposure": {
+    "values_or_lengths_exposed": false,
+    "provider_contact": false,
+    "production_contact": false,
+    "secret_values_included": false
+  },
+  "activation": {
+    "startup_guard_activated": false,
+    "production_oauth_flag_changed": false
+  }
+}

@@ -72,6 +72,12 @@ Kullanıcı kararıyla AdsTable'ın Shopify embedded hedef ürünü için **allo
 - Kök `server.js`, legacy `public/` ürünü, standalone user authority, legacy provider/token/V1 snapshot/job/schedule yolları, GA4/Google Sheets/TikTok/Pinterest/Organic runtime'ı ile debug/operator/acceptance/historical route'ları hedef build'e giremez. Bu karar bugün legacy silme yetkisi vermez.
 - Yeni repository mevcut `package.json` veya lockfile'ı taşımaz. `express`, `googleapis` ve `@supabase/supabase-js` otomatik carry değildir; official Shopify stack EO-01'de, database client/driver EO-F4'te seçilir. Target CI yasak import/table/route, dependency, secret ve production-bundle negative kontrollerini zorunlu tutar.
 - EO-F3 production, provider, DB, deployment veya proje oluşturma değişikliği yapmamıştır. Sıradaki kapı **EO-F4 — Schema and data carry map**'tir. Evidence: `docs/A6_EO_F3_CODE_DEPENDENCY_CARRY_ALLOWLIST.md`, contract: `contracts/a6-eo-f3-code-dependency-carry-allowlist-v1.json`.
+- **EO-F4 — Complete / separate Supabase data-plane selected:** Hedef embedded-only runtime ayrı Standard Supabase Postgres project kullanacaktır. OrioleDB Public Beta seçilmez. Yeni project EO-F7 insan GO'sundan önce oluşturulmaz.
+- Runtime yalnız private schema'lara dar yetkili `adstable_runtime` rolüyle, Vercel serverless için SSL Supavisor transaction mode üzerinden bağlanır; prepared statements kapalıdır. `service_role`, Data API ve browser database client hedef runtime yolunda yasaktır.
+- Exact carry yalnız 10 business row'dur: 1 workspace, 1 setting, 1 Shopify installation, 3 canonical provider connection ve 4 Klaviyo spend-history kaydı. Token plaintext açılmaz; sealed envelope canary sonrası yeni key ile rotate edilir.
+- Mevcut beş Dataset V2 satırı canonical tabloya doğrudan kopyalanmaz; quarantine manifestinde korunur ve yeni adapterlarla yesterday + today yeniden çekilir. 10,478 FX satırı bulk-copy edilmez; gereken pair/date onaylı providerdan yeniden kurulur.
+- Hedef clean schema `app`, `shopify`, `integrations`, `analytics`, `operations`, `privacy` ve `billing` private sınırlarından oluşur. Legacy user/V1/provider tabloları ve expired OAuth satırları taşınmaz.
+- EO-F4 production, provider, DB, deployment veya proje oluşturma değişikliği yapmamıştır. Sıradaki kapı **EO-F5 — Product and route map**'tir. Evidence: `docs/A6_EO_F4_SCHEMA_DATA_CARRY_MAP.md`, contract: `contracts/a6-eo-f4-schema-data-carry-map-v1.json`.
 
 ## 1. Değiştirilemez execution prensipleri
 

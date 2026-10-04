@@ -3,7 +3,7 @@
   "contract_id": "a6-eo-00-embedded-only-reestablishment-v1",
   "title": "A6-EO-00 Embedded-only re-establishment decision and feasibility gate",
   "effective_date": "2026-10-04",
-  "status": "strategic_direction_frozen_f1_f2_f3_f4_f5_f6_complete_f7_human_decision_pending",
+  "status": "strategic_direction_frozen_f1_f2_f3_complete_f4_complete_f5_complete_f6_complete_f7_human_decision_pending",
   "authority": {
     "execution_plan": "codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md",
     "analyst_decision": "docs/A6_EO_00_EMBEDDED_ONLY_REESTABLISHMENT.md",

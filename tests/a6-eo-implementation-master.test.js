@@ -79,3 +79,28 @@ test('the master is a governance prerequisite, not a production mutation', () =>
   assert.match(plan, /\*\*EO single-track implementation master:\*\*/);
   assert.match(doc, /tek aktif ürün hattı \*\*A6-EO\*\*/);
 });
+
+test('every stable child has a one-sentence scope summary and appears by full ID in the analyst table', () => {
+  const children = contract.packages.flatMap((pkg) => pkg.children);
+  assert.equal(children.length, 43);
+  for (const child of children) {
+    assert.ok(child.objective.length > 20, `${child.id} objective is too short`);
+    assert.match(child.objective, /\.$/);
+    assert.match(doc, new RegExp(`\\*\\*${child.id} —`));
+  }
+  assert.equal(contract.single_track_rules.every_child_requires_one_sentence_scope_summary, true);
+});
+
+test('deepest-grain discovery precedes Ad Analysis implementation', () => {
+  const eo7 = contract.packages.find((pkg) => pkg.id === 'A6-EO-07');
+  assert.deepEqual(eo7.children.map((child) => [child.id, child.title]), [
+    ['A6-EO-07-A', 'Settings surface'],
+    ['A6-EO-07-B', 'Funnel App Home'],
+    ['A6-EO-07-C', 'Cross-platform deepest-grain discovery'],
+    ['A6-EO-07-D', 'Ad Analysis surface'],
+    ['A6-EO-07-E', 'Attribution Differences nested view'],
+    ['A6-EO-07-F', 'Desktop, real-mobile and accessibility acceptance']
+  ]);
+  assert.match(eo7.children[3].objective, /only after A6-EO-07-C passes/);
+  assert.match(eo7.children[4].objective, /only after A6-EO-07-C and A6-EO-07-D pass/);
+});

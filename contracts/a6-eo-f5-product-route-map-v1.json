@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "contract_id": "a6-eo-f5-product-route-map-v1",
   "title": "A6 EO-F5 embedded-only product, route and consumer map",
   "evidence_date": "2026-10-04",
@@ -36,63 +36,74 @@
     },
     "global_logical_order": [
       "funnel",
-      "dashboard",
       "ad_analysis",
-      "attribution_differences",
-      "platforms",
       "settings"
     ],
     "rendered_app_nav": [
-      "dashboard",
       "ad_analysis",
-      "attribution_differences",
-      "platforms",
       "settings"
     ],
     "funnel_table_same_route": true,
     "standalone_login": false,
-    "manual_refresh": false
+    "manual_refresh": false,
+    "nested_surfaces": {
+      "funnel": [
+        "funnel_core",
+        "dashboard_charts"
+      ],
+      "ad_analysis": [
+        "deepest_grain_analysis",
+        "dashboard_charts",
+        "attribution_differences_after_E10-T5-C2-C"
+      ],
+      "settings": [
+        "reporting_currency",
+        "provider_connections",
+        "klaviyo_cost",
+        "trial_and_billing",
+        "privacy_and_delete_my_data"
+      ]
+    }
   },
   "ui_routes": [
     {
       "path": "/",
-      "surface": "funnel",
-      "review_critical": true
-    },
-    {
-      "path": "/dashboard",
-      "surface": "dashboard",
-      "review_critical": true
+      "surface": "funnel_app_home",
+      "review_critical": true,
+      "nested_views": [
+        "funnel",
+        "dashboard_charts"
+      ]
     },
     {
       "path": "/ad-analysis",
       "surface": "ad_analysis",
-      "review_critical": true
-    },
-    {
-      "path": "/attribution-differences",
-      "surface": "attribution_differences",
-      "review_critical": false,
-      "capability_gated": true
-    },
-    {
-      "path": "/platforms",
-      "surface": "platforms",
-      "review_critical": true
+      "review_critical": true,
+      "nested_views": [
+        "deepest_grain_analysis",
+        "dashboard_charts",
+        "attribution_differences_after_discovery"
+      ]
     },
     {
       "path": "/settings",
-      "surface": "settings_billing_privacy",
-      "review_critical": true
+      "surface": "settings",
+      "review_critical": true,
+      "nested_views": [
+        "currency",
+        "platforms",
+        "billing",
+        "privacy"
+      ]
     }
   ],
   "onboarding_resolver": [
     "verified_shopify_session",
     "managed_installation_bootstrap",
     "active_trial_or_subscription_entitlement",
-    "merchant_selected_reporting_currency",
-    "at_least_one_verified_active_provider_account",
-    "klaviyo_email_monthly_plan_cost_when_klaviyo_selected",
+    "merchant_selected_reporting_currency_in_settings",
+    "at_least_one_verified_active_provider_account_in_settings",
+    "klaviyo_email_monthly_plan_cost_in_settings_when_klaviyo_selected",
     "funnel_home"
   ],
   "authenticated_api_routes": [
@@ -126,7 +137,7 @@
       "klaviyo"
     ],
     "callback_return_allowlist": [
-      "/platforms"
+      "/settings"
     ],
     "requirements": [
       "verified_shopify_session_on_start",
@@ -212,6 +223,11 @@
     "/shopify/app/platforms",
     "/shopify/app/funnel",
     "/shopify/app/analysis",
+    "/funnel",
+    "/dashboard",
+    "/ad-analysis/attribution-differences",
+    "/attribution-differences",
+    "/platforms",
     "/analysis",
     "/login",
     "/signup",
@@ -256,10 +272,13 @@
   },
   "contract_precedence": {
     "active_provider_override": "EO active provider list overrides E10-T5C4 TikTok-active presentation",
-    "navigation_amendment": "Funnel is logical first and root home; official Shopify home behavior removes duplicate App Nav item",
+    "navigation_amendment": "Funnel is root App Home; only Ad Analysis and Settings render as peer navigation surfaces",
     "analysis_route": "/ad-analysis replaces /analysis",
     "billing_surface": "settings_not_global_nav",
-    "manual_refresh": "forbidden"
+    "manual_refresh": "forbidden",
+    "dashboard_surface": "nested_chart_panels_under_funnel_and_ad_analysis",
+    "platforms_surface": "settings_provider_connections_section",
+    "attribution_surface": "nested_under_ad_analysis_after_E10-T5-C2-C"
   },
   "ui_implementation_gate": {
     "code_written_in_this_package": false,
@@ -275,18 +294,41 @@
   },
   "acceptance": {
     "result": "PASS",
-    "canonical_ui_route_count": 6,
-    "canonical_report_surface_count": 4,
+    "canonical_ui_route_count": 3,
+    "canonical_report_surface_count": 2,
     "active_provider_count": 3,
     "standalone_ui_or_auth_route_count": 0,
     "production_debug_operator_acceptance_route_count": 0,
     "browser_triggered_refresh_route_count": 0,
     "direct_browser_database_access_count": 0,
-    "next_gate": "EO-F6"
+    "next_gate": "EO-F6",
+    "top_level_product_surface_count": 3
   },
   "implementation_authorized": false,
   "project_creation_authorized": false,
   "shopify_configuration_change_authorized": false,
   "cutover_authorized": false,
-  "legacy_deletion_authorized": false
+  "legacy_deletion_authorized": false,
+  "attribution_differences": {
+    "top_level_route": false,
+    "host_surface": "/ad-analysis",
+    "activation_after": "E10-T5-C2-C_cross_platform_deepest_grain_discovery",
+    "behavior": "nested_analysis_view",
+    "missing_capability_state": "capability_unavailable"
+  },
+  "dashboard": {
+    "top_level_route": false,
+    "standalone_surface": false,
+    "host_surfaces": [
+      "/",
+      "/ad-analysis"
+    ],
+    "behavior": "contextual_chart_panels"
+  },
+  "platforms": {
+    "top_level_route": false,
+    "standalone_surface": false,
+    "host_surface": "/settings",
+    "behavior": "provider_connections_section"
+  }
 }

@@ -1,9 +1,9 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "contract_id": "a6-eo-00-embedded-only-reestablishment-v1",
   "title": "A6-EO-00 Embedded-only re-establishment decision and feasibility gate",
   "effective_date": "2026-10-04",
-  "status": "strategic_direction_frozen_implementation_go_pending",
+  "status": "strategic_direction_frozen_f1_complete_f2_decision_frozen_f3_f7_pending",
   "authority": {
     "execution_plan": "codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md",
     "analyst_decision": "docs/A6_EO_00_EMBEDDED_ONLY_REESTABLISHMENT.md",
@@ -19,7 +19,7 @@
       "klaviyo"
     ],
     "runtime_boundary": "separate_deployable_root_required",
-    "physical_repository": "pending_EO_F2; separate_repository_is_default_recommendation",
+    "physical_repository": "separate_repository_selected; creation_waits_for_EO_F7_GO",
     "migration_style": "allowlist_only",
     "big_bang_cutover": false,
     "legacy_role_until_cutover": [
@@ -27,7 +27,7 @@
       "rollback",
       "read_only_history_when_explicitly_allowed"
     ],
-    "implementation_go": "pending_EO_F1_through_EO_F7"
+    "implementation_go": "pending_EO_F3_through_EO_F7"
   },
   "execution_plan_amendment": {
     "section_1_rule_1": "General big-bang rewrite prohibition remains; this contract is the versioned exception for an allowlist-based Shopify embedded target-runtime re-establishment.",
@@ -135,5 +135,17 @@
     "Every RM, R and E dependency is retained, transferred, reduced to containment or deferred with rationale.",
     "No implementation starts before EO-F1 through EO-F6 evidence and EO-F7 human GO.",
     "No legacy authority or data is deleted by this package."
+  ],
+  "completed_gates": [
+    {
+      "id": "EO-F1",
+      "result": "complete_with_blocking_gaps_transferred",
+      "evidence": "docs/A6_EO_F1_F2_AUTHORITY_AND_PROJECT_BOUNDARY.md"
+    },
+    {
+      "id": "EO-F2",
+      "result": "separate_repository_and_separate_vercel_project_selected",
+      "evidence": "contracts/a6-eo-f1-f2-authority-project-boundary-v1.json"
+    }
   ]
 }

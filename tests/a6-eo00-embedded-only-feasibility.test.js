@@ -9,7 +9,8 @@ const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 test("A6-EO-00 freezes embedded-only direction without authorizing cutover", () => {
   const contract = JSON.parse(read("contracts/a6-eo-00-embedded-only-reestablishment-v1.json"));
 
-  assert.equal(contract.status, "strategic_direction_frozen_implementation_go_pending");
+  assert.match(contract.status, /^strategic_direction_frozen_/);
+  assert.equal(contract.strategic_decision.implementation_go, "pending_EO_F3_through_EO_F7");
   assert.equal(contract.strategic_decision.product_surface, "shopify_embedded_only");
   assert.deepEqual(contract.strategic_decision.active_providers, ["meta", "google_ads", "klaviyo"]);
   assert.equal(contract.strategic_decision.big_bang_cutover, false);

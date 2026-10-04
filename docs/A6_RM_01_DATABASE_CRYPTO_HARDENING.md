@@ -1,8 +1,8 @@
 # A6-RM-01 — Database Least-Privilege ve Crypto Fail-Closed
 
 **Karar tarihi:** 4 Ekim 2026  
-**Durum:** Repository prepared / live acceptance pending  
-**Canlı mutation:** Yapılmadı
+**Durum:** Database live accepted / crypto activation pending  
+**Canlı mutation:** Least-privilege migration uygulandı ve postcheck PASS
 
 ## İş çıktısı
 
@@ -53,3 +53,14 @@ Diagnostic yalnız boolean, env adı ve güvenli reason code döndürür. Secret
 ## Bağlayıcı contract
 
 `contracts/a6-rm-01-database-crypto-hardening-v1.json`
+
+## Canlı kabul sonucu — 4 Ekim 2026
+
+- Migration history: `20261004113227 / a6_rm01_least_privilege_hardening`.
+- Beş postcheck kapısının tamamı sıfır ihlal verdi: external function execute, legacy non-DML grants, mutable search path, postgres default privileges ve service-role trial continuity.
+- İlk uygulama denemesi provider-internal `supabase_admin` rol sınırında transaction olarak reddedildi ve tamamen rollback oldu. PR #347 resmî Supabase modeline göre project-owned sınırı `postgres` olarak düzeltti; CI PASS sonrasında migration başarıyla uygulandı.
+- Security Advisor'daki external SECURITY DEFINER ve mutable search-path bulguları kapandı.
+- Kalan 10 `RLS enabled/no policy` INFO kaydı ile leaked-password protection WARN bu database mutation'ının kabulünü bozmaz; ayrı güvenlik kapsamlarında izlenir.
+- Production provider-token crypto posture ve startup guard henüz aktive edilmedi; RM-01 bu runtime kapısı tamamlanana kadar bütünüyle `Done` değildir.
+
+**Evidence:** `docs/security/evidence/A6_RM01_LIVE_ACCEPTANCE_2026-10-04.json`

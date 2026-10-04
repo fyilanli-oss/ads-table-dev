@@ -104,6 +104,15 @@ Kullanıcı kararıyla AdsTable'ın Shopify embedded hedef ürünü için **allo
 - Mevcut production monolit parity/canary/rollback tamamlanana kadar containment ve rollback hattıdır. Consumer-zero ve ayrı destructive approval olmadan silinmez.
 - Sıradaki paket **A6-EO-01 — Clean runtime shell, CI and dependency boundary**'dir. Evidence: `docs/A6_EO_F7_GO_DECISION.md`, contract: `contracts/a6-eo-f7-go-decision-v1.json`.
 
+- **EO single-track implementation master:** EO-F7 GO sonrasında tek aktif ürün geliştirme hattı A6-EO'dur. E, R ve A6-RM paketleri paralel implementation backlog'u değildir; yalnız tarihsel karar, requirement, risk ve evidence referansıdır.
+- Ana yürütme otoritesi `contracts/a6-eo-implementation-master-v1.json` ve analist tablosu `docs/A6_EO_IMPLEMENTATION_MASTER_TABLE.md` dosyalarıdır. Bu master merge edilmeden EO-01 teknik provisioning başlamaz.
+- Aynı anda yalnız bir EO parent `In progress` olabilir. Parent sırası EO-01 → EO-10'dur. Stable child ID derinliği bir seviyeyi geçmez; daha derin teknik işler checklist/test olarak tutulur, yeni paket ailesi açılmaz.
+- Yeni bulgu doğasına göre mevcut EO-01…EO-10 parentlarından birine yönlendirilir. Eski E/R/RM altında yeni uygulama paketi veya paralel ürün hattı açılamaz.
+- EO-01–EO-08 review-critical; EO-09 cutover/consumer-zero ve EO-10 retirement post-review hattıdır. Review-ready EO-08-D + açık insan kararı; retirement consumer-zero PASS + ayrı destructive approval ister.
+- Eski bir yükümlülük yalnız exact EO acceptance evidence ve açık closure kaydıyla kapanır. Referans verilmesi, kod yazılması, PR merge'i veya deployment Done değildir.
+- Production güvenliği için acil containment yalnız minimum, reversible, açık insan kararlı ve legacy ürünü genişletmeyen istisnadır; ikinci ürün hattı oluşturmaz.
+- Master baseline: 10 parent, 43 stable child. İlk ve tek Ready parent **A6-EO-01 — Clean runtime shell, CI and dependency boundary**'dir.
+
 ## 1. Değiştirilemez execution prensipleri
 
 1. Proje baştan yazılmayacaktır.

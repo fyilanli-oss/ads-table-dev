@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.6.0",
+  "schema_version": "1.7.0",
   "contract_id": "a6-eo-00-embedded-only-reestablishment-v1",
   "title": "A6-EO-00 Embedded-only re-establishment decision and feasibility gate",
   "effective_date": "2026-10-04",
@@ -8,7 +8,8 @@
     "execution_plan": "codex-input/AdsTable_EXECUTION_PLAN_V4_2026-08-17_TR.md",
     "analyst_decision": "docs/A6_EO_00_EMBEDDED_ONLY_REESTABLISHMENT.md",
     "containment_contract": "contracts/a6-rm-00-release-status-containment-v1.json",
-    "ui_constitution": "contracts/shopify/shopify-embedded-ui-constitution-v1.json"
+    "ui_constitution": "contracts/shopify/shopify-embedded-ui-constitution-v1.json",
+    "implementation_master": "contracts/a6-eo-implementation-master-v1.json"
   },
   "objective": "Re-establish the Shopify embedded product behind a clean deployable runtime boundary while carrying only evidence-backed authorities, data and contracts.",
   "strategic_decision": {
@@ -27,7 +28,8 @@
       "rollback",
       "read_only_history_when_explicitly_allowed"
     ],
-    "implementation_go": "GO_EO-01_authorized"
+    "implementation_go": "GO_EO-01_authorized",
+    "execution_model": "single_track_EO_parents_legacy_packages_reference_only"
   },
   "execution_plan_amendment": {
     "section_1_rule_1": "General big-bang rewrite prohibition remains; this contract is the versioned exception for an allowlist-based Shopify embedded target-runtime re-establishment.",

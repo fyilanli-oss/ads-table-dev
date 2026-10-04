@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "contract_id": "a6-eo-f7-go-decision-v1",
   "title": "A6 EO-F7 embedded-only clean re-establishment GO decision",
   "decision_date": "2026-10-04",
@@ -129,5 +129,12 @@
   "provider_mutation_authorized": false,
   "production_mutation_authorized": false,
   "legacy_deletion_authorized": false,
-  "next_gate": "A6-EO-01_clean_runtime_shell_CI_dependency_boundary"
+  "next_gate": "A6-EO-01_clean_runtime_shell_CI_dependency_boundary",
+  "execution_governance": {
+    "contract": "contracts/a6-eo-implementation-master-v1.json",
+    "analyst_table": "docs/A6_EO_IMPLEMENTATION_MASTER_TABLE.md",
+    "required_before_EO_01_execution": true,
+    "single_active_parent": true,
+    "legacy_packages_reference_only": true
+  }
 }

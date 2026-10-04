@@ -1,6 +1,6 @@
 {
   "contract_id": "a6-rm-01-database-crypto-hardening-v1",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "status": "database_live_accepted_crypto_activation_pending",
   "decision_date": "2026-10-04",
   "business_outcome": "Remove unnecessary public database authority and guarantee that production provider-token runtime cannot silently fall back to plaintext or legacy reads.",
@@ -46,8 +46,8 @@
     },
     {
       "id": "RM-01C",
-      "status": "guard_prepared_not_activated",
-      "output": "Production crypto readiness policy; server startup wiring waits for live preflight."
+      "status": "runtime_diagnostic_prepared_preview_pending",
+      "output": "Existing OIDC-authenticated activation preflight returns the redacted provider-token runtime posture; startup assertion remains unwired and Preview acceptance is pending."
     },
     {
       "id": "RM-01D",
@@ -95,7 +95,13 @@
       "environment correction if needed",
       "startup guard activation",
       "deployment smoke"
-    ]
+    ],
+    "diagnostic_transport": {
+      "endpoint": "/api/e10/activation-preflight",
+      "authorization": "existing exact GitHub Actions OIDC allowlist",
+      "additive_contract_field": "provider_token_runtime",
+      "preview_scope": "diagnostic only; no startup enforcement and no production promotion"
+    }
   },
   "live_acceptance": [
     "anon/authenticated/PUBLIC cannot execute the three enumerated functions",

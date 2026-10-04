@@ -64,3 +64,7 @@ Diagnostic yalnız boolean, env adı ve güvenli reason code döndürür. Secret
 - Production provider-token crypto posture ve startup guard henüz aktive edilmedi; RM-01 bu runtime kapısı tamamlanana kadar bütünüyle `Done` değildir.
 
 **Evidence:** `docs/security/evidence/A6_RM01_LIVE_ACCEPTANCE_2026-10-04.json`
+
+## Runtime diagnostic hazırlığı
+
+Mevcut OIDC-korumalı `/api/e10/activation-preflight` cevabına RM-01 için `provider_token_runtime` ve `rm01_crypto_ready` alanları eklenir. Çıktı yalnız boolean ve güvenli reason code taşır; secret değer veya uzunluk yayımlamaz. Bu adım startup assertion'ı bağlamaz ve production'a otomatik terfi etmez. Önce PR CI ve Vercel Preview build/route kabulü gerekir.

@@ -3,6 +3,7 @@
 const {shopifyConfigStatus, loadShopifyConfig} = require("../src/config/shopify-config");
 const {parseKeyring} = require("../security/provider-token-vault");
 const {SPECS} = require("../src/shopify/embedded-provider-strategies");
+const {inspectProviderTokenRuntimePosture} = require("../security/provider-token-runtime-posture");
 
 function present(env, name) { return typeof env[name] === "string" && Boolean(env[name].trim()); }
 
@@ -19,8 +20,22 @@ function activationPreflight(env = process.env) {
   })]));
   const databaseVisible = present(env, "SUPABASE_URL") && present(env, "SUPABASE_SERVICE_ROLE_KEY");
   const featureFlagDisabled = !present(env, "SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED") || env.SHOPIFY_EMBEDDED_PROVIDER_OAUTH_ENABLED === "false";
+  const providerTokenRuntime = inspectProviderTokenRuntimePosture(env);
   const ready = shopifyValid && keyringValid && databaseVisible && featureFlagDisabled && Object.values(providers).every(item => item.configured);
-  return Object.freeze({contract_version: "e10-t6c-activation-preflight-v1", ready, shopify: {...shopify, contract_valid: shopifyValid}, token_keyring_valid: keyringValid, remote_database_credentials_visible: databaseVisible, feature_flag_safely_disabled: featureFlagDisabled, providers, values_or_lengths_exposed: false, provider_contact: false, production_contact: false});
+  return Object.freeze({
+    contract_version: "e10-t6c-activation-preflight-v1",
+    ready,
+    rm01_crypto_ready: providerTokenRuntime.secure_posture,
+    provider_token_runtime: providerTokenRuntime,
+    shopify: {...shopify, contract_valid: shopifyValid},
+    token_keyring_valid: keyringValid,
+    remote_database_credentials_visible: databaseVisible,
+    feature_flag_safely_disabled: featureFlagDisabled,
+    providers,
+    values_or_lengths_exposed: false,
+    provider_contact: false,
+    production_contact: false,
+  });
 }
 
 if (require.main === module) {

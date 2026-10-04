@@ -86,7 +86,7 @@ test('EO-F6 remains non-mutating and advances only to the human GO decision', ()
   assert.equal(contract.cutover_authorized, false);
   assert.equal(contract.legacy_deletion_authorized, false);
   assert.match(master.status, /f6_complete/);
-  assert.equal(master.completed_gates.at(-1).id, 'EO-F6');
+  assert.ok(master.completed_gates.some((gate) => gate.id === 'EO-F6'));
   assert.match(plan, /\*\*EO-F6 — Complete \/ re-establishment recommended:\*\*/);
   assert.match(doc, /embedded-only temiz yeniden kuruluş.*tercih edilmelidir/s);
 });

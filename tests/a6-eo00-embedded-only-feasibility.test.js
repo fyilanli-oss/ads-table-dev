@@ -6,11 +6,11 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 
-test("A6-EO-00 freezes embedded-only direction without authorizing cutover", () => {
+test("A6-EO-00 records EO-01 GO without authorizing cutover", () => {
   const contract = JSON.parse(read("contracts/a6-eo-00-embedded-only-reestablishment-v1.json"));
 
   assert.match(contract.status, /^strategic_direction_frozen_/);
-  assert.equal(contract.strategic_decision.implementation_go, "pending_EO_F3_through_EO_F7");
+  assert.equal(contract.strategic_decision.implementation_go, "GO_EO-01_authorized");
   assert.equal(contract.strategic_decision.product_surface, "shopify_embedded_only");
   assert.deepEqual(contract.strategic_decision.active_providers, ["meta", "google_ads", "klaviyo"]);
   assert.equal(contract.strategic_decision.big_bang_cutover, false);

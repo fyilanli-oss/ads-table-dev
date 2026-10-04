@@ -96,6 +96,14 @@ Kullanıcı kararıyla AdsTable'ın Shopify embedded hedef ürünü için **allo
 - Review kritik sıra EO-01 → EO-02 → EO-03 → EO-04 → EO-05 → EO-06 → EO-07 → EO-08'dir. EO-09/10 legacy consumer-zero/retirement review sonrasında da zorunlu kalır ve ayrı destructive approval ister.
 - EO-F6 yalnız tavsiye üretir; implementation GO değildir. Yeni repository, Vercel project veya Supabase project ancak **EO-F7 açık insan GO** kararıyla oluşturulabilir. Evidence: `docs/A6_EO_F6_EFFORT_RISK_COMPARISON.md`, contract: `contracts/a6-eo-f6-effort-risk-comparison-v1.json`.
 
+- **EO-F7 — GO / embedded-only clean re-establishment:** Ürün sahibi 4 Ekim 2026 tarihinde embedded-only temiz yeniden kuruluş yolunu açıkça seçti. EO-F1–F6 fizibilitesi kabul edildi ve A6-EO-01 uygulama başlangıcı yetkilendirildi.
+- Hedef fiziksel sınır ayrı temiz GitHub repository, preview-only başlayan ayrı Vercel project ve ayrı Standard Supabase project'tir. Aday isimler `fyilanli-oss/ads-table-embedded`, `ads-table-embedded` ve `adstable-embedded` olarak donduruldu; provisioning öncesi uygunluk doğrulanır.
+- Hedef ürün yalnız Funnel App Home, Ad Analysis ve Settings; aktif provider yalnız Meta, Google Ads ve Klaviyo'dur. Eski repository fork/toplu kopya yapılmaz; application/runtime carry-as-is sıfırdır.
+- GO; EO-01 clean shell/CI ve sonraki EO paketlerinin kontrollü uygulanmasını açar. Bu kararın kendisi repository/project oluşturmaz ve production/provider/DB/Shopify/deployment mutation yapmaz.
+- Production domain veya Shopify App URL/redirect değişikliği, live data/token carry, provider mutation, cutover, legacy deletion ve retirement yetkisi kapalıdır. Bunlar kendi paket/evidence ve insan kapılarını bekler.
+- Mevcut production monolit parity/canary/rollback tamamlanana kadar containment ve rollback hattıdır. Consumer-zero ve ayrı destructive approval olmadan silinmez.
+- Sıradaki paket **A6-EO-01 — Clean runtime shell, CI and dependency boundary**'dir. Evidence: `docs/A6_EO_F7_GO_DECISION.md`, contract: `contracts/a6-eo-f7-go-decision-v1.json`.
+
 ## 1. Değiştirilemez execution prensipleri
 
 1. Proje baştan yazılmayacaktır.

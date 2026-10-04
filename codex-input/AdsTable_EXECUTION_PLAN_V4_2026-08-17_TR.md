@@ -44,6 +44,7 @@ Repository ve CI yürütme günlüğü bu belgenin geçmişe dönük baseline ni
 Repository-wide A0–A6 audit execution'ı tamamlanmış, kullanıcı review'u ve remediation uygulaması ayrılmıştır. Bağlayıcı emniyet contract'ı `contracts/a6-rm-00-release-status-containment-v1.json`, analist açıklaması `docs/A6_RM_00_RELEASE_STATUS_CONTAINMENT.md`, sentez kaydı `docs/audits/A6_REPOSITORY_WIDE_CRITICAL_RISK_SYNTHESIS_2026-10-03.md` dosyalarındadır.
 
 - **A6-RM-00 — Done / containment active:** Runtime, migration, provider, deployment veya deletion değişikliği yapmadan altı HOLD kapısı aktive edilmiştir.
+- **A6-RM-01 — Repository prepared / live acceptance pending:** Supabase least-privilege migration, read-only preflight/postcheck, redacted canlı ACL evidence ve production provider-token crypto posture guard'ı hazırlanmıştır. Canlı database migration uygulanmamış, production startup guard aktive edilmemiştir. Legacy `expire_trials()` service_role çağrısı ve 14 günlük geçici entitlement davranışı korunur; Shopify merchant trial/ücretlendirme authority'si E10-T7'dir.
 - Shopify review-ready kararı RM-01–RM-10 ile R6/R7/R8'in ilgili canlı kabulleri tamamlanmadan verilemez. R8 ancak ayrı versionlı kararla review kritik yolundan çıkarılabilir.
 - Delete My Data, clean reinstall, truthful Funnel cutover, safe rollback ve legacy retirement kapıları contract'taki exact upstream paket/evidence şartları sağlanmadan `PASS`, `Done` veya `GO` olamaz.
 - Kodun yazılması, unit test, PR merge'i, deployment veya zaman geçmesi tek başına kabul kanıtı değildir.

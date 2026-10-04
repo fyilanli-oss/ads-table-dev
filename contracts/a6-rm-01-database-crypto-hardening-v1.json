@@ -1,0 +1,115 @@
+{
+  "contract_id": "a6-rm-01-database-crypto-hardening-v1",
+  "version": "1.0.0",
+  "status": "repository_prepared_live_acceptance_pending",
+  "decision_date": "2026-10-04",
+  "business_outcome": "Remove unnecessary public database authority and guarantee that production provider-token runtime cannot silently fall back to plaintext or legacy reads.",
+  "scope": {
+    "database": [
+      "public default privileges",
+      "expire_trials()",
+      "handle_new_user()",
+      "enforce_platform_account_limit_guard()",
+      "14 enumerated legacy tables"
+    ],
+    "runtime": [
+      "provider token encryption configuration posture",
+      "non-secret startup diagnostic",
+      "future fail-closed activation"
+    ],
+    "excluded": [
+      "Shopify Billing implementation",
+      "changing 14-day trial duration",
+      "removing legacy trial behavior",
+      "production migration in this repository-only stage",
+      "secret value disclosure"
+    ]
+  },
+  "invariants": [
+    "Shopify Billing remains E10-T7 authority and is not implemented by this package.",
+    "Legacy expire_trials remains callable by service_role until E10-T7 consumer-zero retirement.",
+    "Database trigger execution for handle_new_user remains intact while external RPC execution is removed.",
+    "No secret, key material, token, URL, project ref or credential value appears in evidence or diagnostics.",
+    "Existing required browser SELECT/CRUD grants are not removed without an object-by-object consumer proof.",
+    "Production crypto fail-closed enforcement is not activated before a non-secret live posture preflight passes."
+  ],
+  "phases": [
+    {
+      "id": "RM-01A",
+      "status": "repository_prepared",
+      "output": "Read-only ACL inventory, redacted live evidence and non-secret crypto posture evaluator."
+    },
+    {
+      "id": "RM-01B",
+      "status": "migration_prepared_not_applied",
+      "output": "Least-privilege migration and postcheck; live application requires separate approval."
+    },
+    {
+      "id": "RM-01C",
+      "status": "guard_prepared_not_activated",
+      "output": "Production crypto readiness policy; server startup wiring waits for live preflight."
+    },
+    {
+      "id": "RM-01D",
+      "status": "pending",
+      "output": "Live migration, negative role tests, Security Advisor recheck and production runtime acceptance."
+    }
+  ],
+  "required_database_changes": {
+    "default_privileges": [
+      "revoke future table/sequence privileges from anon and authenticated",
+      "revoke future function EXECUTE from PUBLIC, anon and authenticated"
+    ],
+    "function_acl": [
+      "expire_trials service_role only",
+      "handle_new_user service_role only for explicit allowlist; trigger remains",
+      "enforce_platform_account_limit_guard external EXECUTE removed"
+    ],
+    "function_search_path": "set empty search_path; referenced application relations remain schema-qualified",
+    "legacy_table_privileges": "remove only TRUNCATE, TRIGGER and REFERENCES from anon/authenticated on the exact 14-table inventory"
+  },
+  "trial_preservation": {
+    "legacy_expiry_function_preserved": true,
+    "service_role_execute_required": true,
+    "external_rpc_execute_forbidden": true,
+    "shopify_trial_days": 14,
+    "shopify_billing_owner": "E10-T7",
+    "rule": "RM-01 must not substitute the legacy subscriptions table for Shopify billing authority."
+  },
+  "crypto_acceptance": {
+    "production_requires": {
+      "encryption_enabled": true,
+      "legacy_reads_enabled": false,
+      "valid_active_key_in_keyring": true,
+      "supabase_server_credentials_present": true
+    },
+    "diagnostic_redaction": "names, booleans and safe reason codes only",
+    "activation_order": [
+      "repository tests",
+      "non-secret production preflight",
+      "environment correction if needed",
+      "startup guard activation",
+      "deployment smoke"
+    ]
+  },
+  "live_acceptance": [
+    "anon/authenticated/PUBLIC cannot execute the three enumerated functions",
+    "service_role can execute expire_trials without changing its business semantics",
+    "auth trigger behavior remains functional",
+    "14 legacy tables expose no TRUNCATE/TRIGGER/REFERENCES to anon/authenticated",
+    "future public object defaults are explicit least privilege",
+    "Supabase Security Advisor function/default privilege findings close or are explicitly classified",
+    "production crypto posture passes without exposing values"
+  ],
+  "rollback": {
+    "rule": "Do not restore blanket grants.",
+    "method": "Restore only a captured exact allowlist for a proven consumer, through a separately reviewed migration.",
+    "runtime": "Startup guard activation can be reverted independently; encryption and legacy-read values are never silently downgraded."
+  },
+  "official_sources": [
+    "https://supabase.com/docs/guides/database/postgres/row-level-security",
+    "https://supabase.com/docs/guides/observability/advisors?queryGroups=lint&lint=0029_authenticated_security_definer_function_executable",
+    "https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically",
+    "https://shopify.dev/docs/api/admin-graphql/latest/mutations/appSubscriptionCreate"
+  ]
+}

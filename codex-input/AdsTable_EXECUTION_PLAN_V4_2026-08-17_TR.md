@@ -113,6 +113,17 @@ Kullanıcı kararıyla AdsTable'ın Shopify embedded hedef ürünü için **allo
 - Production güvenliği için acil containment yalnız minimum, reversible, açık insan kararlı ve legacy ürünü genişletmeyen istisnadır; ikinci ürün hattı oluşturmaz.
 - Master baseline: 10 parent, 43 stable child. İlk ve tek Ready parent **A6-EO-01 — Clean runtime shell, CI and dependency boundary**'dir.
 
+### 0.5 Scenario 1 — tek aktif Reporting Store ve çoklu-store scope güvenliği — 6 Ekim 2026
+
+Bu karar yeni Shopify workspace üretmez. Shopify shop/workspace app installation, session, billing ve privacy otoritesidir; `Reporting Store` ise aynı workspace'in seçili provider Reporting Account'ları içindeki analitik mağaza/domain kapsamıdır. Provider'a özgü account/campaign/catalog/destination bağları canonical Reporting Store kimliğine evidence ile bağlanır; URL adı tek başına ownership veya attribution kanıtı değildir.
+
+- İlk provider bağlantısında tek doğrulanmış store adayı varsa sessizce aktif Reporting Store olur; birden fazla aday varsa Dataset yazımı başlamadan kullanıcı Settings'te birini seçer. Workspace genelinde aynı anda yalnız bir aktif Reporting Store bulunur.
+- Sonradan yeni store adayı eklenirse AdsTable-owned saatlik topology kontrolü değişikliği algılar. Mevcut seçim kendiliğinden değişmez. Seçili mağaza diğer adaylardan kesin ayrıştırılabiliyorsa yalnız onun refresh'i devam eder; ayrıştırma kanıtlanamıyorsa yalnız etkilenen provider'ın yeni snapshot yazımı `store_scope_review_required` ile fail-closed durur. Mevcut tarihsel veri korunur ve Settings kullanıcıdan inceleme ister.
+- Reporting Store seçimi effective-dated ve audit edilebilir tutulur. Store değişiminde eski satırlar yeniden etiketlenmez, birleştirilmez veya silinmez; yeni scope için başlangıç bootstrap'ı yalnız `yesterday + today` olur. Missing veya belirsiz store verisi başka store'a ya da `0` değerine dönüştürülmez.
+- İlk ürün/fiyatlandırma sınırı bir Shopify app installation/workspace ve bir aktif Reporting Store'dur. Yeni aday mağazanın algılanması, güvenlik kontrolü veya Settings'te aktif mağaza değişimi tek başına ek ücret doğurmaz.
+- Aynı anda birden fazla store'un saatlik yenilenmesi, ayrı aktif datasetlerinin tutulması, mağazalar arası karşılaştırma veya birleşik organizasyon raporu ilk review diliminin dışındadır. İleride ayrı Multi-Store entitlement/planı olarak ele alınabilir; yalnız algılanan aday sayısı üzerinden ücret çıkarılamaz.
+- Paket yönlendirmesi: EO-02-C entitlement/fiyat sınırını; EO-03-C canonical Reporting Account + Reporting Store authority ve effective binding'i; EO-04 provider discovery/filter kanıtını; EO-05 topology drift, scope-bound Dataset ve fail-closed job davranışını; EO-07-A ise seçim, yeni-store uyarısı ve review akışını uygular. Yeni child veya paralel paket ailesi açılmaz.
+
 ## 1. Değiştirilemez execution prensipleri
 
 1. Proje baştan yazılmayacaktır.

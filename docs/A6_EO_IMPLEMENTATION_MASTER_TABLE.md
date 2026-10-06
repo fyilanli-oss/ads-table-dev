@@ -74,7 +74,7 @@ Referans: A6-RM-01, E3 mimari dersleri, Shopify Embedded UI Constitution.
 
 - **EO-02-A — Private schemas, roles and migrations:** Yeni Standard Supabase projesinde private schema, en az yetkili roller ve temiz migration zinciri kurulacak.
 - **EO-02-B — Workspace, installation and generation authority:** Shopify installation/session/bootstrap akışı workspace ve installation generation otoritesine bağlanacak.
-- **EO-02-C — Fourteen-day trial, subscription and entitlement:** On dört günlük trial, abonelik ve kullanım hakkı Shopify billing otoritesiyle yönetilecek.
+- **EO-02-C — Fourteen-day trial, subscription and entitlement:** On dört günlük trial ve abonelik Shopify billing otoritesiyle yönetilecek; ilk entitlement bir aktif Reporting Store içerirken yalnız aday mağaza algılanması veya aktif mağaza değişimi ek ücret doğurmayacak.
 - **EO-02-D — Privacy, uninstall, deletion and clean reinstall:** Compliance webhook, Delete my data, uninstall ve yeni-generation clean reinstall yaşam döngüsü kurulacak.
 
 Çıktı: clean data foundation ve tam merchant lifecycle.  
@@ -84,7 +84,7 @@ Referans: A6-RM-03/04/05, E10-T4/T7, R2.
 
 - **EO-03-A — OAuth transaction boundary:** OAuth state, PKCE, nonce, TTL, callback ve workspace bağları tek kullanımlık güvenli transaction sınırına alınacak.
 - **EO-03-B — Token envelope and startup guard:** Provider tokenları yalnız server tarafında şifreli, versionlı ve eksik yapılandırmada fail-closed saklanacak.
-- **EO-03-C — Connection and reporting-account authority:** Doğrulanmış provider hesapları ile seçili Reporting Account için tek canonical otorite kurulacak.
+- **EO-03-C — Connection and reporting-account authority:** Doğrulanmış provider hesapları, seçili Reporting Account ve workspace genelindeki tek aktif effective-dated Reporting Store için canonical otorite kurulacak.
 - **EO-03-D — Reconnect, disconnect and renewal lifecycle:** Reconnect, disconnect, token yenileme ve yeniden yetkilendirme veri veya yetki uydurmadan idempotent çalışacak.
 
 Çıktı: tek provider authority ve güvenli token lifecycle.  
@@ -92,7 +92,7 @@ Referans: A6-RM-01, R0/R5/R6, E7.
 
 ## EO-04 — Meta, Google Ads and Klaviyo adapters
 
-- **EO-04-A — Common adapter contract:** Üç provider için ortak request, ham kanıt, support-state, kota ve hata envelope sözleşmesi kurulacak.
+- **EO-04-A — Common adapter contract:** Üç provider için ortak request, ham kanıt, support-state, store-candidate discovery/filter, kota ve hata envelope sözleşmesi kurulacak.
 - **EO-04-B — Meta adapter:** Meta account/campaign/ad hiyerarşisi, actions/action_values ve missing/unsupported davranışı ham yanıtla doğrulanacak.
 - **EO-04-C — Google Ads adapter:** Standard Ad ve Performance Max Asset Group hiyerarşisi en alt doğrulanabilir grain ve ham structure kanıtıyla kurulacak.
 - **EO-04-D — Klaviyo adapter:** Campaign/Message, Flow/Message, metrik ve maliyet girdileri kurulacak; 15 Ekim sözleşmesi resmî kaynakla yeniden doğrulanacak.
@@ -103,8 +103,8 @@ Referans: R6/R7/R7-B5 ve deepest-grain discovery girdileri.
 
 ## EO-05 — Scheduler, Dataset V2, FX, maturity and reconciliation
 
-- **EO-05-A — Hourly scheduler, shard, lease and checkpoint:** AdsTable-owned saatlik scheduler deterministik shard, single-flight lease ve checkpoint ile kurulacak.
-- **EO-05-B — Dataset V2, FX and provenance:** Canonical facts, Klaviyo allocated spend, kaynak para birimi, FX ve provenance workspace sınırında saklanacak.
+- **EO-05-A — Hourly scheduler, shard, lease and checkpoint:** AdsTable-owned saatlik scheduler deterministik shard, single-flight lease, checkpoint ve Reporting Store topology-drift kontrolüyle kurulacak.
+- **EO-05-B — Dataset V2, FX and provenance:** Canonical facts, Reporting Store scope, Klaviyo allocated spend, kaynak para birimi, FX ve provenance workspace sınırında saklanacak.
 - **EO-05-C — Maturity, attribution windows and finality:** Providerların geçmiş günleri sonradan değiştirebildiği attribution pencereleri için rolling correction ve truthful freshness/finality kuralları kurulacak.
 - **EO-05-D — Bootstrap, idempotent upsert and reconciliation:** İlk yesterday+today bootstrap, güvenli replay, idempotent upsert ve provider–Dataset uyuşmazlık uzlaştırması uygulanacak.
 - **EO-05-E — Operational observability:** Job durumu, gecikme, hata ve alarm kanıtları secret veya PII sızdırmadan gözlemlenebilir olacak.
@@ -125,7 +125,7 @@ Referans: A6-RM-08/09, E11 ve Dataset V2 sözleşmeleri.
 
 ## EO-07 — Shopify-native three-surface UI
 
-- **EO-07-A — Settings surface:** Reporting Currency, provider bağlantıları/hesap seçimleri, Klaviyo Estimated 30-Day Email Spend, billing ve privacy işlemleri Shopify-native Settings içinde kurulacak.
+- **EO-07-A — Settings surface:** Reporting Currency, provider bağlantıları/hesap seçimleri, tek aktif Reporting Store seçimi ve yeni-store review uyarısı, Klaviyo Estimated 30-Day Email Spend, billing ve privacy işlemleri Shopify-native Settings içinde kurulacak.
 - **EO-07-B — Funnel App Home:** Funnel/Table ve bağlamsal dashboard grafikleri uygulamanın ana Shopify App Home yüzeyi olarak kurulacak.
 - **EO-07-C — Cross-platform deepest-grain discovery:** Meta, Google Ads ve Klaviyo için gerçek ve karşılaştırılabilir en alt analiz seviyeleri Ad Analysis tasarlanmadan önce dondurulacak.
 - **EO-07-D — Ad Analysis surface:** Ad Analysis tablo, filtre ve bağlamsal grafikleri yalnız EO-07-C discovery sonucu üzerinde uygulanacak.

@@ -105,3 +105,23 @@ test('deepest-grain discovery precedes Ad Analysis implementation', () => {
   assert.match(eo7.children[3].objective, /only after A6-EO-07-C passes/);
   assert.match(eo7.children[4].objective, /only after A6-EO-07-C and A6-EO-07-D pass/);
 });
+
+test('Reporting Store scope is single-active, effective-dated and fail-closed without candidate-based billing', () => {
+  const decision = contract.cross_cutting_decisions.reporting_store_scope_v1;
+  assert.equal(decision.creates_additional_shopify_workspace, false);
+  assert.equal(decision.maximum_active_reporting_stores_per_workspace, 1);
+  assert.equal(decision.multiple_candidates_require_settings_selection_before_dataset_write, true);
+  assert.equal(decision.new_candidate_never_silently_changes_selection, true);
+  assert.equal(decision.ambiguous_provider_write_state, 'store_scope_review_required_fail_closed');
+  assert.equal(decision.selection_is_effective_dated, true);
+  assert.equal(decision.switch_relabels_history, false);
+  assert.equal(decision.new_scope_bootstrap, 'yesterday_and_today_only');
+  assert.equal(decision.candidate_detection_or_single_active_switch_changes_price, false);
+  assert.equal(decision.charge_by_detected_candidate_count, false);
+  assert.deepEqual(decision.package_owners, [
+    'A6-EO-02-C', 'A6-EO-03-C', 'A6-EO-04-A',
+    'A6-EO-05-A', 'A6-EO-05-B', 'A6-EO-07-A'
+  ]);
+  assert.match(plan, /store_scope_review_required/);
+  assert.match(doc, /tek aktif Reporting Store seçimi/);
+});

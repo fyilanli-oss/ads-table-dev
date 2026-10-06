@@ -125,3 +125,30 @@ test('Reporting Store scope is single-active, effective-dated and fail-closed wi
   assert.match(plan, /store_scope_review_required/);
   assert.match(doc, /tek aktif Reporting Store seçimi/);
 });
+
+test('EO-07-C freezes both exact clicked-product and cross-sell acceptance fixtures', () => {
+  const decision = contract.cross_cutting_decisions.product_cross_sell_acceptance_v1;
+  assert.equal(decision.owner_package, 'A6-EO-07-C');
+  assert.equal(decision.status, 'decision_frozen_live_acceptance_pending');
+  assert.equal(decision.common_setup.clicked_product, 'earring_1');
+  assert.equal(decision.common_setup.non_advertised_store_product, 'necklace_1');
+  assert.deepEqual(decision.fixtures.map((fixture) => fixture.id), ['S2-A', 'S2-B']);
+  assert.deepEqual(decision.fixtures[0].expected_business_truth, {
+    total_units: 4,
+    clicked_direct_units: 0,
+    other_cross_sell_units: 4
+  });
+  assert.deepEqual(decision.fixtures[1].expected_business_truth, {
+    total_units: 5,
+    clicked_direct_units: 1,
+    other_cross_sell_units: 4
+  });
+  assert.equal(decision.verified_native_requires_both_fixtures, true);
+  assert.equal(decision.provider_results_are_independent, true);
+  assert.equal(decision.only_verified_provider_dataset_and_ui_leaf_may_activate, true);
+  assert.ok(decision.required_per_provider_evidence.includes('redacted_raw_response'));
+  assert.ok(decision.forbidden_inference_sources.includes('utm'));
+  assert.match(plan, /Fixture S2-A/);
+  assert.match(plan, /Fixture S2-B/);
+  assert.match(doc, /iki exact cross-sell fixture sonucu/);
+});

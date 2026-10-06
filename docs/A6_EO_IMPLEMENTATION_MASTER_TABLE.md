@@ -127,7 +127,7 @@ Referans: A6-RM-08/09, E11 ve Dataset V2 sözleşmeleri.
 
 - **EO-07-A — Settings surface:** Reporting Currency, provider bağlantıları/hesap seçimleri, tek aktif Reporting Store seçimi ve yeni-store review uyarısı, Klaviyo Estimated 30-Day Email Spend, billing ve privacy işlemleri Shopify-native Settings içinde kurulacak.
 - **EO-07-B — Funnel App Home:** Funnel/Table ve bağlamsal dashboard grafikleri uygulamanın ana Shopify App Home yüzeyi olarak kurulacak.
-- **EO-07-C — Cross-platform deepest-grain discovery:** Meta, Google Ads ve Klaviyo için gerçek ve karşılaştırılabilir en alt analiz seviyeleri Ad Analysis tasarlanmadan önce dondurulacak.
+- **EO-07-C — Cross-platform deepest-grain discovery:** Meta, Google Ads ve Klaviyo için gerçek en alt analiz seviyeleri ile clicked-product satın alınmayan/alınan iki exact cross-sell fixture sonucu Ad Analysis tasarlanmadan önce dondurulacak.
 - **EO-07-D — Ad Analysis surface:** Ad Analysis tablo, filtre ve bağlamsal grafikleri yalnız EO-07-C discovery sonucu üzerinde uygulanacak.
 - **EO-07-E — Attribution Differences nested view:** Attribution Differences, discovery ve Ad Analysis kabulünden sonra ayrı yüzey açmadan Ad Analysis içine yerleştirilecek.
 - **EO-07-F — Desktop, real-mobile and accessibility acceptance:** Üç yüzey resmî component eşlemesi, gerçek desktop/mobil Shopify Admin ve erişilebilirlik kabulünden geçirilecek.

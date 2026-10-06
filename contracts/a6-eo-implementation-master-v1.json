@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "contract_id": "a6-eo-implementation-master-v1",
   "title": "A6 EO single-track execution rule and integrated implementation package table",
   "effective_date": "2026-10-04",
@@ -31,6 +31,35 @@
     "merge_requires_explicit_user_approval": true,
     "code_merge_or_deploy_alone_is_done": false,
     "every_child_requires_one_sentence_scope_summary": true
+  },
+  "cross_cutting_decisions": {
+    "reporting_store_scope_v1": {
+      "decided_at": "2026-10-06",
+      "shopify_workspace_role": "installation_session_billing_and_privacy_authority",
+      "reporting_store_role": "analytical_scope_within_selected_provider_reporting_accounts",
+      "creates_additional_shopify_workspace": false,
+      "maximum_active_reporting_stores_per_workspace": 1,
+      "single_verified_candidate_auto_selected": true,
+      "multiple_candidates_require_settings_selection_before_dataset_write": true,
+      "new_candidate_never_silently_changes_selection": true,
+      "continue_selected_store_only_when_provider_isolation_is_proven": true,
+      "ambiguous_provider_write_state": "store_scope_review_required_fail_closed",
+      "existing_history_preserved_on_pause_or_switch": true,
+      "selection_is_effective_dated": true,
+      "switch_relabels_history": false,
+      "new_scope_bootstrap": "yesterday_and_today_only",
+      "candidate_detection_or_single_active_switch_changes_price": false,
+      "simultaneous_multi_store_reporting": "future_separate_entitlement_outside_first_review_slice",
+      "charge_by_detected_candidate_count": false,
+      "package_owners": [
+        "A6-EO-02-C",
+        "A6-EO-03-C",
+        "A6-EO-04-A",
+        "A6-EO-05-A",
+        "A6-EO-05-B",
+        "A6-EO-07-A"
+      ]
+    }
   },
   "exception": {
     "legacy_production_containment_allowed": true,
@@ -112,7 +141,7 @@
         {
           "id": "A6-EO-02-C",
           "title": "Fourteen-day trial, subscription and entitlement",
-          "objective": "Make Shopify billing the merchant entitlement authority."
+          "objective": "Make Shopify billing the merchant entitlement authority with one active Reporting Store included and no fee for candidate detection or switching."
         },
         {
           "id": "A6-EO-02-D",
@@ -158,7 +187,7 @@
         {
           "id": "A6-EO-03-C",
           "title": "Connection and reporting-account authority",
-          "objective": "Verified ownership, one selected account and canonical bindings."
+          "objective": "Establish verified ownership, selected Reporting Accounts and one effective-dated active Reporting Store binding per workspace."
         },
         {
           "id": "A6-EO-03-D",
@@ -192,7 +221,7 @@
         {
           "id": "A6-EO-04-A",
           "title": "Common adapter contract",
-          "objective": "Shared request, raw evidence, support-state, quota and error envelope."
+          "objective": "Build the shared request, raw evidence, support-state, store discovery/filter, quota and error envelope."
         },
         {
           "id": "A6-EO-04-B",
@@ -240,12 +269,12 @@
         {
           "id": "A6-EO-05-A",
           "title": "Hourly scheduler, shard, lease and checkpoint",
-          "objective": "AdsTable-owned single-flight recurring control plane."
+          "objective": "Build the AdsTable-owned single-flight recurring control plane with Reporting Store topology-drift detection."
         },
         {
           "id": "A6-EO-05-B",
           "title": "Dataset V2, FX and provenance",
-          "objective": "Workspace-only canonical facts, source currency and exact FX lineage."
+          "objective": "Persist Reporting Store scope-bound canonical facts, source currency and exact FX lineage within the workspace."
         },
         {
           "id": "A6-EO-05-C",
@@ -339,7 +368,7 @@
         {
           "id": "A6-EO-07-A",
           "title": "Settings surface",
-          "objective": "Currency, provider connections, Klaviyo cost, billing and privacy."
+          "objective": "Build currency, provider connections, one active Reporting Store selection/review, Klaviyo cost, billing and privacy."
         },
         {
           "id": "A6-EO-07-B",

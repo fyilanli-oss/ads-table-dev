@@ -152,3 +152,15 @@ test('EO-07-C freezes both exact clicked-product and cross-sell acceptance fixtu
   assert.match(plan, /Fixture S2-B/);
   assert.match(doc, /iki exact cross-sell fixture sonucu/);
 });
+
+test('EO-07 three-surface product decisions are frozen without advancing implementation status', () => {
+  const decision = contract.cross_cutting_decisions.three_surface_ui_product_freeze_v1;
+  assert.equal(decision.status, 'product_decision_frozen_implementation_pending');
+  assert.deepEqual(decision.surfaces, ['funnel_app_home', 'ad_analysis', 'settings']);
+  assert.equal(decision.advances_package_status, false);
+  assert.equal(decision.authorizes_ui_implementation, false);
+  assert.deepEqual(decision.package_owners, [
+    'A6-EO-07-A', 'A6-EO-07-B', 'A6-EO-07-C',
+    'A6-EO-07-D', 'A6-EO-07-E', 'A6-EO-07-F'
+  ]);
+});

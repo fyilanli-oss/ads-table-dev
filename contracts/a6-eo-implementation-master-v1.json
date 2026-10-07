@@ -123,6 +123,23 @@
       "only_verified_provider_dataset_and_ui_leaf_may_activate": true,
       "standard_search_without_native_clicked_or_promoted_product_identity": "not_applicable",
       "forbidden_inference_sources": ["shopify_order_join", "url", "utm", "fbclid", "fbc"]
+    },
+    "three_surface_ui_product_freeze_v1": {
+      "decided_at": "2026-10-07",
+      "status": "product_decision_frozen_implementation_pending",
+      "document": "docs/A6_EO_07_THREE_SURFACE_UI_PRODUCT_FREEZE.md",
+      "contract": "contracts/shopify/a6-eo-07-three-surface-ui-product-freeze-v1.json",
+      "surfaces": ["funnel_app_home", "ad_analysis", "settings"],
+      "package_owners": [
+        "A6-EO-07-A",
+        "A6-EO-07-B",
+        "A6-EO-07-C",
+        "A6-EO-07-D",
+        "A6-EO-07-E",
+        "A6-EO-07-F"
+      ],
+      "advances_package_status": false,
+      "authorizes_ui_implementation": false
     }
   },
   "exception": {

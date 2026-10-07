@@ -124,6 +124,17 @@ Bu karar yeni Shopify workspace üretmez. Shopify shop/workspace app installatio
 - Aynı anda birden fazla store'un saatlik yenilenmesi, ayrı aktif datasetlerinin tutulması, mağazalar arası karşılaştırma veya birleşik organizasyon raporu ilk review diliminin dışındadır. İleride ayrı Multi-Store entitlement/planı olarak ele alınabilir; yalnız algılanan aday sayısı üzerinden ücret çıkarılamaz.
 - Paket yönlendirmesi: EO-02-C entitlement/fiyat sınırını; EO-03-C canonical Reporting Account + Reporting Store authority ve effective binding'i; EO-04 provider discovery/filter kanıtını; EO-05 topology drift, scope-bound Dataset ve fail-closed job davranışını; EO-07-A ise seçim, yeni-store uyarısı ve review akışını uygular. Yeni child veya paralel paket ailesi açılmaz.
 
+### 0.6 A6-EO-07 three-surface UI product freeze — 7 Ekim 2026
+
+Ürün sahibi Funnel, Ad Analysis ve Settings davranışlarını implementation öncesinde dondurdu. Evidence: `docs/A6_EO_07_THREE_SURFACE_UI_PRODUCT_FREEZE.md`; executable contract: `contracts/shopify/a6-eo-07-three-surface-ui-product-freeze-v1.json`.
+
+- Funnel App Home'da Funnel/Table görünümü ile Summary/Daily zaman sunumu bağımsızdır. Tarih, compare ve filtreler provider-native hiyerarşiyi korur; Table compare yalnız açıkça seçilen metrikleri genişletir ve mobilde aynı anda en fazla bir metrik açılır.
+- Ad Analysis seçili dönem için tek sıralama tablosudur. Evrensel `Ad name` yerine EO-07-C ile doğrulanan provider leaf'i `Analysis item` olarak gösterilir. Purchase, Sales Value, Revenue ve Revenue Margin sıralanabilir; Intent, Performance ve kanıtlı Products aynı tek details modalında yaşar. Provider-returned product identity olmadan URL/UTM/click ID/Shopify order join ile ürün attribution üretilmez.
+- Settings'te eski `ads-table-dev` çalışan Connect/OAuth return/Resume/account/Connected-Reconnect-Disconnect/Reporting Account/Klaviyo cost akışı kullanıcı davranışı referansıdır; legacy kaynak kod ve görsel borç aynen taşınmaz. Sıra Reporting Currency → Provider Connections ve Reporting Accounts → Reporting Store → Subscription → Data & Privacy'dir.
+- Reporting Account değişikliği store topology doğrulanmadan aktifleşmez. Mevcut store yeni account altında doğrulanırsa korunur; farklı aday varsa account+store birlikte açık onayla atomik aktive edilir; aday yoksa eski aktif pair korunur. Pending account Dataset V2 yazamaz ve SnapshotJob alamaz.
+- Subscription Shopify App Pricing otoritesindedir: public plan `$24.99/month`, trial 14 gün, bir aktif Reporting Store dahildir; aday algılama veya store switch ek ücret oluşturmaz. Delete my data uninstall/disconnect'ten ayrıdır, ardışık iki açık server-verified onay ve görünür asenkron completion ister.
+- Bu karar UI kodu, backend, migration, billing activation, deletion, deployment veya EO-07 status advancement yapmaz. A6-EO-01→EO-06 sırası ile EO-07-C→EO-07-D kapısı değişmez; desktop + gerçek 320px mobile ve açık ürün sahibi kabulü zorunludur.
+
 ## 1. Değiştirilemez execution prensipleri
 
 1. Proje baştan yazılmayacaktır.

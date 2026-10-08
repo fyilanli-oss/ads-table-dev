@@ -36,15 +36,18 @@ Kullanıcı 25.11 tarihinde değeri 360 USD olarak güncellerse:
 
 ## Dataset V2 ve Formula sınırı
 
-Dataset V2 Klaviyo satırları gerçek Campaign Message ve Flow Message leaf'leridir. Sabit günlük account maliyeti her mesaj satırına yazılırsa çoğalır; rastgele tek mesaja yazılırsa yanlış sahiplik oluşur; sentetik account/cost satırı üretilirse provider hierarchy bozulur.
+Dataset V2 Klaviyo satırları gerçek Campaign Message ve Flow Message leaf'leridir. Günlük account Email maliyeti her mesaja tam olarak kopyalanamaz ve rastgele tek mesaja atanamaz. 2 Ekim 2026 tarihli v2 sözleşmesi önceki “message satırlarına dağıtılmaz” kararını yalnız Email maliyet dağıtımı bakımından supersede eder.
 
 Bu nedenle:
 
-- Günlük tahmini maliyet Campaign/Flow message satırlarına dağıtılmaz.
-- Maliyet account + business date düzeyinde bir kez tutulur veya effective history'den bir kez türetilir.
-- Backend aggregation/Funnel API ilgili günlük maliyeti toplam sonuca yalnız bir kez ekler.
-- Dataset message satırlarında düzeltici aktivasyona kadar Email spend `null/unsupported` kalır.
-- Cost per sent/open/click/conversion günlük sabit maliyet ile provider performans toplamları üzerinden Formula Engine tarafından türetilir.
+- Günlük Email toplamı `Estimated 30-Day Klaviyo Email Spend / 30` olarak sabittir.
+- Aynı provider business date içindeki gerçek Email Campaign Message ve Flow Message satırları, Klaviyo Reporting API `recipients` payıyla bu toplamı paylaşır.
+- Recipient hacmi yalnız ağırlığı değiştirir; günlük maliyet toplamını değiştirmez.
+- Yuvarlama sonrası leaf spend toplamı günlük account maliyetine tam eşit olur; residual canonical leaf identity sırasındaki son uygun satıra verilir.
+- Uygun recipient yoksa sahte leaf oluşturulmaz; leaf spend `null` kalır ve günlük maliyet account-day katmanında bir kez `unallocated` tutulur.
+- SMS, MMS ve WhatsApp Email maliyetinden pay almaz.
+- Dataset V2 ham provider facts ile leaf'e tahsis edilmiş spend'i saklar; CTR, CPC, ROAS, CPS, Revenue ve Revenue Margin gibi türetilmiş KPI'ları saklamaz.
+- Formula Engine önce ham facts ve allocated spend'i istenen kapsamda toplar, sonra formülleri çalıştırır.
 
 ## Veri ve migration sınırı
 
@@ -59,3 +62,15 @@ Mevcut `email_monthly_plan_cost` ve `monthly_plan_cost` fiziksel adları tarihse
 - Kullanıcı tarih aralığı girmez.
 - Aynı günlük maliyet birden fazla message satırında çoğalmaz.
 - SMS kapsam dışıdır.
+
+## 3 Ekim 2026 resmî API yeniden doğrulaması
+
+Güncel Klaviyo Reporting API belgesi Campaign ve Flow performansını Klaviyo arayüzüyle 1:1 eşleşen Values/Series raporları üzerinden verir. `recipients` resmî istatistiktir; Campaign sonuçları `campaign_id + campaign_message_id`, Flow sonuçları `flow_id + flow_message_id` zorunlu kimlikleriyle gruplanabilir. Mevcut provider client `recipients` istatistiğini zaten ister; implementation eksikliği bu değerin canonical row input'una taşınmaması ve account-day allocation katmanının bulunmamasıdır.
+
+Resmî kaynaklar:
+
+- https://developers.klaviyo.com/en/reference/reporting_api_overview
+- https://developers.klaviyo.com/en/reference/query_campaign_values
+- https://developers.klaviyo.com/en/reference/query_flow_values
+
+Bağlayıcı allocation ve formül kuralları `contracts/r7b5-klaviyo-email-cost-allocation-v2.json` dosyasındadır.
